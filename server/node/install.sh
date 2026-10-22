@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # «Живая Казань» — установка на чистый сервер Ubuntu 22.04 / 24.04.
 #   sudo bash install.sh game.iks-ai-systems.ru
-# Ставит Node.js 20, Caddy (сам получает HTTPS-сертификат), скачивает игру с GitHub,
+# Ставит Node.js 22 (встроенный SQLite для аккаунтов), Caddy (сам получает HTTPS-сертификат), скачивает игру с GitHub,
 # запускает её как службу и раз в 5 минут подтягивает обновления из ветки main.
 # Перед запуском у домена должна быть A-запись на IP этого сервера.
 set -euo pipefail
@@ -19,8 +19,8 @@ apt-get update -y
 apt-get install -y git curl python3 ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https
 
 echo "== Node.js"
-if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 18 ]; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 22 ]; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
 node -v
@@ -54,10 +54,26 @@ DATA_DIR=/var/lib/zk/data
 LLM_API_KEY=
 LLM_API_BASE=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
+# Лимиты, чтобы счёт за ИИ не обогнал сервер: ответов на игрока в день, всего в день, длина ответа
+LLM_PER_PLAYER_DAY=60
+LLM_DAILY_LIMIT=20000
+LLM_MAX_TOKENS=160
+# Сколько соседей видно и в каком радиусе (м)
+VIEW_K=80
+VIEW_RADIUS=350
 EOF
 fi
 chown root:zk "$ENVF"; chmod 640 "$ENVF"
 mkdir -p /var/lib/zk/data; chown -R zk:zk /var/lib/zk
+
+echo "== Лимиты системы"
+cat > /etc/sysctl.d/90-zhivaya-kazan.conf <<EOF
+net.core.somaxconn=4096
+net.ipv4.tcp_max_syn_backlog=4096
+net.ipv4.ip_local_port_range=10240 65000
+fs.file-max=200000
+EOF
+sysctl -p /etc/sysctl.d/90-zhivaya-kazan.conf >/dev/null || true
 
 echo "== Служба игры"
 cat > /etc/systemd/system/zhivaya-kazan.service <<EOF
@@ -72,6 +88,7 @@ WorkingDirectory=$APP/server/node
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=3
+LimitNOFILE=65535
 NoNewPrivileges=true
 ProtectSystem=full
 ReadWritePaths=/var/lib/zk

@@ -12,7 +12,9 @@ function sayAloud(text){const txt=drunkify(String(text||'').trim().slice(0,140))
 }
 async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=Math.max(w.ttl,12);w.path=null;const dx=player.x-w.x,dy=player.y-w.y,L=Math.hypot(dx,dy)||1;w.hx=dx/L;w.hy=dy/L;}
   w.p.memory.push({role:'user',content:txt});let reply=null;
-  let act=null;if(sampleFn){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов).');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
+  // ИИ отвечает, только если к жителю обратились (по имени или вопросом) — иначе короткая фраза по сценарию: так дешевле
+  const asked=new RegExp(w.p.name,'i').test(txt)||/\?/.test(txt)||Math.random()<0.25;
+  let act=null;if(sampleFn&&asked){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов).');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
   if(!reply){act=scriptedThink(w,txt);reply=act?act.reply:pick(SCRIPTED[w.role]||SCRIPTED.resident);}
   if(act){const note=applyNpcAction(w,act);if(note){addEvent(note,'say');nearLine('·',note,false);}}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);

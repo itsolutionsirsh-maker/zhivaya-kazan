@@ -100,10 +100,12 @@ function render(){
   if(z>2.6){ctx.font='600 10px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;const [sx,sy]=toS(s.x,s.y);ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.8)';ctx.strokeText(s.n,sx,sy-12);ctx.fillStyle='#24476F';ctx.fillText(s.n,sx,sy-12);}}
   ctx.font='700 11px "JetBrains Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';
   for(const b of buses){if(b.x<vx0||b.x>vx1||b.y<vy0||b.y>vy1)continue;const [sx,sy0]=toS(b.x,b.y);const sy=sy0-2.2*z-10;ctx.fillStyle=b.color;rrect(ctx,sx-14,sy-8,28,16,4);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(b.route.ref,sx,sy+0.5);}
-  for(const pr of peerRender.values()){const [sx,sy]=toS(pr.x,pr.y);labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img);}
+  {// в толпе подписываем только ближайших, иначе имена слипаются в кашу
+    const arr=[...peerRender.values()];if(arr.length>12)arr.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
+    for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img);}}
   if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg);}
   drawRallyLabels(toS,z);
-  drawSpeedCams(toS,z);drawCityBubbles(toS,z);
+  drawCrowd(toS,z);drawSpeedCams(toS,z);drawCityBubbles(toS,z);
   drawCompanionMark(toS,z);drawSituations(toS,z);
   routeOverlay(toS);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-30,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
