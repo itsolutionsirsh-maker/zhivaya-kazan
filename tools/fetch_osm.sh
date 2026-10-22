@@ -3,7 +3,7 @@
 # bbox: юг, запад, север, восток
 OUT=${1:-raw/kazan_osm.json}
 mkdir -p "$(dirname "$OUT")"
-S=55.780; W=49.090; N=55.806; E=49.138
+S=55.774; W=49.079; N=55.812; E=49.149
 BB="($S,$W,$N,$E)"
 QUERY="[out:json][timeout:240][maxsize:536870912];
 (

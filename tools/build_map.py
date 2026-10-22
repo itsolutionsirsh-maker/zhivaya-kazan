@@ -6,8 +6,9 @@ import json, math, sys, collections
 SRC = sys.argv[1] if len(sys.argv) > 1 else 'raw/kazan_osm.json'
 DST = sys.argv[2] if len(sys.argv) > 2 else 'site/kazan.json'
 
-S, W, N, E = 55.780, 49.090, 55.806, 49.138
-lat0, lon0 = (S + N) / 2, (W + E) / 2
+S, W, N, E = 55.774, 49.079, 55.812, 49.149
+# начало координат фиксировано (центр первой версии карты), чтобы сохранения не сдвигались
+lat0, lon0 = 55.793, 49.114
 M_LAT = 111320.0
 M_LON = 111320.0 * math.cos(math.radians(lat0))
 
@@ -413,7 +414,7 @@ for e in els:
 # выбираем разнообразные маршруты: по 2 направления на ref, не больше 16 всего
 routes.sort(key=lambda r: -r['len'])
 chosen, per_ref, per_type = [], collections.Counter(), collections.Counter()
-limits = {'bus': 11, 'tram': 3, 'trolleybus': 2}
+limits = {'bus': 16, 'tram': 4, 'trolleybus': 4}
 for r in routes:
     key = (r['type'], r['ref'])
     if per_ref[key] >= 2 or per_type[r['type']] >= limits[r['type']]:
