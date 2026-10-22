@@ -288,6 +288,13 @@ textarea{resize:vertical;min-height:64px}
       <kbd>колесо</kbd><span>масштаб</span>
       <kbd>Esc</kbd><span>закрыть окно</span>
     </div>
+    <div id="acctBox" hidden>
+      <h3 class="sub">Аккаунт</h3>
+      <div id="acctForm"><p>Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.</p>
+        <div class="row"><input type="text" id="acctName" maxlength="24" placeholder="Имя" autocomplete="username" style="flex:1;min-width:0"><input type="password" id="acctPin" maxlength="8" inputmode="numeric" placeholder="PIN 4–8 цифр" autocomplete="current-password" style="width:120px"><button class="btn primary" id="acctGo">Войти</button></div></div>
+      <div id="acctOut" hidden><p>Вы вошли как <b id="acctWho"></b>. Прогресс сохраняется на сервере каждые 30 секунд.</p><div class="row"><button class="btn" id="acctOutBtn">Выйти</button></div></div>
+      <p class="online" id="acctMsg"></p>
+    </div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
