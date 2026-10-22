@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Загрузка OSM по плиткам (большой bbox не пролезает в таймаут Overpass) и склейка без дублей."""
+import json, subprocess, sys, time, os
+S, W, N, E = 55.774, 49.079, 55.812, 49.149
+NX, NY = 3, 3
+OUT = sys.argv[1] if len(sys.argv) > 1 else 'raw/kazan_osm.json'
+MIRRORS = ["https://overpass.kumi.systems/api/interpreter",
+           "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+           "https://overpass-api.de/api/interpreter"]
+
+def query(bb, routes):
+    B = f"({bb[0]:.5f},{bb[1]:.5f},{bb[2]:.5f},{bb[3]:.5f})"
+    if routes:
+        parts = [f'relation["route"~"^(bus|trolleybus|tram)$"]{B};']
+    else:
+        parts = [
+            f'way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|pedestrian|footway|path|steps)$"]{B};',
+            f'way["building"]{B};', f'way["natural"="water"]{B};', f'relation["natural"="water"]{B};',
+            f'way["leisure"~"^(park|garden|playground|pitch|stadium)$"]{B};',
+            f'way["landuse"~"^(grass|forest|cemetery|meadow)$"]{B};', f'way["natural"="wood"]{B};',
+            f'node["highway"="bus_stop"]{B};', f'node["highway"~"^(crossing|traffic_signals)$"]{B};',
+            f'way["amenity"="parking"]{B};', f'node["railway"="tram_stop"]{B};',
+            f'node["amenity"~"^(police|hospital|clinic|cafe|restaurant|fast_food|bar|pub|bank|atm|pharmacy|school|university|college|theatre|cinema|fuel|library|place_of_worship|marketplace)$"]{B};',
+            f'way["amenity"~"^(police|hospital|clinic|school|university|college|theatre|cinema|fuel|place_of_worship|marketplace)$"]{B};',
+            f'node["shop"]{B};', f'node["tourism"~"^(attraction|museum|hotel)$"]{B};',
+            f'way["tourism"~"^(attraction|museum|hotel)$"]{B};', f'node["office"]{B};']
+    return "[out:json][timeout:180][maxsize:536870912];(" + "".join(parts) + ");out geom;"
+
+def fetch(q, tag):
+    tmp = f'raw/tile_{tag}.json'
+    for attempt in range(5):
+        for url in MIRRORS:
+            host = url.split('/')[2]
+            r = subprocess.run(['curl', '-sS', '-m', '240', '-o', tmp, '-w', '%{http_code}', url,
+                                '--data-urlencode', 'data=' + q], capture_output=True, text=True)
+            code = r.stdout.strip()
+            if code == '200':
+                try:
+                    d = json.load(open(tmp))
+                    if 'elements' in d:
+                        print(f'  {tag}: {len(d["elements"])} эл. ({host})', flush=True)
+                        os.remove(tmp)
+                        return d['elements']
+                except Exception:
+                    pass
+            print(f'  {tag}: {host} → {code or "err"}', flush=True)
+            time.sleep(5)
+    raise SystemExit(f'FAIL {tag}')
+
+os.makedirs('raw', exist_ok=True)
+seen = {}
+dy, dx = (N - S) / NY, (E - W) / NX
+for iy in range(NY):
+    for ix in range(NX):
+        bb = (S + iy * dy, W + ix * dx, S + (iy + 1) * dy, W + (ix + 1) * dx)
+        for e in fetch(query(bb, False), f'{iy}{ix}'):
+            seen[(e['type'], e['id'])] = e
+for e in fetch(query((S, W, N, E), True), 'routes'):
+    seen[(e['type'], e['id'])] = e
+json.dump({'elements': list(seen.values())}, open(OUT, 'w'))
+print(f'OK: {len(seen)} элементов → {OUT}', flush=True)
