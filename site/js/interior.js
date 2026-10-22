@@ -50,7 +50,7 @@ function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(
   else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(2.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
-function findActionInterior(){const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
+function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
   for(const n of it.npcs){if(n.companionOf&&n.tableF&&!n.tableF.ordered)continue;const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best={label:`Поговорить: ${n.p.name}${n.companionOf?'':', '+n.p.job}`,run:()=>openChat(n)};}}
   if(best)return best;
   for(const f of it.furn){if(!f.spot)continue;const d=Math.max(Math.abs(px-f.x)-f.w/2,Math.abs(py-f.y)-f.h/2);if(d<1.0&&d<bd){const a=spotAction(f,it);if(a){bd=d;best=a;}}}

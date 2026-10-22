@@ -37,6 +37,12 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .bar i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
 .bar.low i{background:var(--alert)}
 .bar.drunkbar i{background:#E0A030}
+#sitCard{position:relative;pointer-events:auto;width:min(92vw,440px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line);border-left:4px solid #E0A030;border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;overflow:hidden;animation:scIn .25s ease-out}
+#sitCard.alert{border-left-color:#D64545}#sitCard.good{border-left-color:#2BB062}#sitCard.call{border-left-color:#4A90E2;animation:scIn .25s ease-out,scRing 1s ease-in-out 3}
+#sitCard .sc-head{display:flex;align-items:center;gap:8px}#scIcon{font-size:18px}#scTitle{flex:1;font-size:14px}#scX{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+#scText{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4}#scBtns{display:flex;flex-wrap:wrap;gap:6px}#scBtns .btn{font-size:12px;padding:6px 10px}#scBtns kbd{font-size:10px;opacity:.6;margin-right:5px}
+#scTimer{position:absolute;left:0;bottom:0;height:3px;background:#E0A030;transition:width .2s linear}#sitCard.alert #scTimer{background:#D64545}#sitCard.call #scTimer{background:#4A90E2}
+@keyframes scIn{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}@keyframes scRing{0%,100%{transform:none}25%{transform:rotate(-1deg)}75%{transform:rotate(1deg)}}
 #drunkFx{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(70,35,0,.5) 100%)}
 body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 @media (prefers-reduced-motion:no-preference){body.drunk #map{animation:zkSway 6s ease-in-out infinite}body.wasted #map{animation-duration:3.4s}}
@@ -153,7 +159,7 @@ textarea{resize:vertical;min-height:64px}
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><div id="tripBox" hidden><span id="tripLbl"></span><button class="btn" id="tripCancel">Отменить</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compTalk" title="Поговорить">💬</button><button class="btn" id="compFollow" hidden>Идти самому</button><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="sitCard" hidden><div class="sc-head"><span id="scIcon">❗</span><b id="scTitle"></b><button id="scX" aria-label="Скрыть">×</button></div><p id="scText"></p><div id="scBtns"></div><i id="scTimer"></i></div><div id="tripBox" hidden><span id="tripLbl"></span><button class="btn" id="tripCancel">Отменить</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compTalk" title="Поговорить">💬</button><button class="btn" id="compFollow" hidden>Идти самому</button><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn" id="centerBtn" title="Вернуться к персонажу" hidden>◎</button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -287,5 +293,7 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/companion.js"></script>
 <script src="js/transport.js"></script>
 <script src="js/drunk.js"></script>
+<script src="js/situations.js"></script>
+<script src="js/sit-street.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>
