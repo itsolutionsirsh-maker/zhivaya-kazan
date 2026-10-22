@@ -114,8 +114,8 @@ function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'n
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();}
-  if(e.key==='Enter'&&!player.busy&&$('#sayBar').hidden){e.preventDefault();openSayBar();return;}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(chatOpen())closeChatPanel();}
+  if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;keys[e.code]=false;});
@@ -148,7 +148,7 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
   followPlayer();
   if(player.vehicle){driveTo(wx,wy);return;}
-  for(const pr of peerRender.values()){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){walkTo(pr.x,pr.y,true);openSayBar(pr.name+', ');setHint(`Подходим к ${pr.name}. Напишите — услышат все рядом`);return;}}
+  for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
   player.talkTarget=null;walkTo(wx,wy);});
@@ -205,8 +205,7 @@ function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent=
 function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);}
 
 // ---------- мультиплеер ----------
-function pushPresence(){if(!roomNs)return;const p={x:Math.round(player.x*10)/10,y:Math.round(player.y*10)/10,n:player.name.slice(0,24),r:player.role,hx:Math.round(player.hx*100)/100,hy:Math.round(player.hy*100)/100,b:(player.bus||player.inside)?1:0,c:player.clothes,v:player.vehicle?player.vehicle.kind:null,vc:player.vehicle?player.vehicle.color:null};p.sy=saySent;p.g=player.rally?{s:player.rally.sq.i,k:player.rally.kind,t:player.rally.title}:null;if(player.thumb&&player.thumb.length<3000)p.a=player.thumb;roomNs.presence(p).catch(()=>{});}
-function syncPeers(){peers=roomNs.peers().filter(p=>!p.isMe&&p.kind==='viewer'&&p.presence&&typeof p.presence.x==='number');const seen=new Set();
+function syncPeers(list){peers=list;const seen=new Set();
   for(const p of peers){seen.add(p.peer);let pr=peerRender.get(p.peer);if(!pr){pr={x:p.presence.x,y:p.presence.y,tx:0,ty:0,name:'',img:null,imgSrc:null,hx:0,hy:1,b:0,c:'#4A90E2',veh:null};peerRender.set(p.peer,pr);}
     pr.tx=p.presence.x;pr.ty=p.presence.y;pr.name=String(p.presence.n||'Игрок').slice(0,24);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
     onPeerSay(pr,p.presence.sy);
@@ -215,9 +214,7 @@ function syncPeers(){peers=roomNs.peers().filter(p=>!p.isMe&&p.kind==='viewer'&&
   for(const k of peerRender.keys())if(!seen.has(k))peerRender.delete(k);}
 function tickPeers(){for(const pr of peerRender.values()){pr.x=lerp(pr.x,pr.tx,0.25);pr.y=lerp(pr.y,pr.ty,0.25);}}
 setInterval(tickPeers,33);
-function initCaps(){try{const u=window.claude&&window.claude.use;if(!u)return;
-  window.claude.use('room').then(r=>{if(!r)return;roomNs=r;r.onPeers(()=>{syncPeers();},()=>{roomNs=null;peerRender.clear();});pushPresence();}).catch(()=>{});
-  window.claude.use('sample').then(s=>{if(s)sampleFn=s;}).catch(()=>{});}catch(e){}}
+function initCaps(){netInit();}
 
 // ---------- старт ----------
 async function boot(){

@@ -49,7 +49,19 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 #logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
 #feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
 #compBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(43,176,98,.6);pointer-events:auto}#compBox .btn{padding:3px 8px;font-size:11px}
-#sayBar{display:flex;gap:8px;padding:8px;width:min(92vw,460px);box-sizing:border-box}#sayBar input{flex:1;min-width:0}
+#chatPanel{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(360px,calc(100vw - 32px));height:min(380px,55vh);display:flex;flex-direction:column;z-index:15;overflow:hidden}
+#chatPanel[hidden]{display:none!important}
+body.chat-open #joy{display:none!important}
+.cp-top{display:flex;align-items:center;gap:6px;padding:8px 8px 6px 10px;border-bottom:1px solid var(--line)}
+#cpTabs{display:flex;gap:4px;flex:1;min-width:0}#cpTabs button{font:inherit;font-size:12px;font-weight:600;color:var(--muted);background:none;border:0;border-radius:8px;padding:5px 9px;cursor:pointer;position:relative}#cpTabs button.on{background:rgba(255,255,255,.1);color:var(--fg)}#cpTabs em{font-style:normal;font-size:10px;background:var(--alert);color:#fff;border-radius:8px;padding:0 5px;margin-left:4px}#cpTabs em:empty{display:none}
+#netLbl{font-size:10px;color:var(--muted);white-space:nowrap}
+#cpHead{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px}#cpHead[hidden]{display:none!important}#cpHead span{color:var(--muted);font-size:11px}
+#cpList{flex:1;overflow:auto;padding:8px 10px;display:flex;flex-direction:column;gap:5px;min-height:0}
+.cl{font-size:12.5px;line-height:1.35;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}.cl b{color:var(--sky);font-weight:600}.cl.me b{color:var(--accent)}.cl i{font-style:normal;font-family:var(--font-mono);font-size:10px;color:var(--muted)}.cl span{min-width:0;overflow-wrap:anywhere}
+.cp-empty{color:var(--muted);font-size:12px;margin:4px 0}
+.cp-person{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font:inherit;color:var(--fg);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;padding:7px 10px;cursor:pointer;text-align:left}.cp-person span{font-size:11px;color:var(--muted)}
+.cp-in{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}.cp-in input{flex:1;min-width:0;padding:7px 10px}
+#sayBtn{position:relative}#sayBtn.has::after{content:attr(data-n);position:absolute;top:-6px;right:-6px;background:var(--alert);color:#fff;font-size:10px;border-radius:9px;padding:1px 5px}
 #feed .ev.old{opacity:.55}
 @keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 .bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
@@ -130,7 +142,7 @@ textarea{resize:vertical;min-height:64px}
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><div id="sayBar" class="card" hidden><input type="text" id="sayInput" maxlength="140" placeholder="Сказать вслух — услышат все рядом"><button class="btn primary" id="saySend">Сказать</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn" id="centerBtn" title="Вернуться к персонажу" hidden>◎</button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -161,7 +173,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span><kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
       <div class="tile"><b><span class="ic">🛴</span>Ехать</b><span>Самокаты стоят у остановок, каршеринг — у обочин, своя машина — у дома. Подойдите и нажмите <kbd>E</kbd>. Клик по карте — автопилот, <kbd>WASD</kbd> — руль.</span></div>
       <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
-      <div class="tile"><b><span class="ic">💬</span>Общаться</b><span><kbd>Enter</kbd> или 💬 — сказать вслух: облачко над головой видят все рядом, жители отвечают. Клик по жителю — личный разговор, клик по игроку — подойти и заговорить.</span></div>
+      <div class="tile"><b><span class="ic">💬</span>Общаться</b><span><kbd>Enter</kbd> или 💬 — чат. «Рядом» — сказать вслух (облачко, жители отвечают), «Город» — всем игрокам, «Личные» — одному игроку. Клик по жителю — разговор с ним, клик по игроку — личка.</span></div>
       <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>Зажмите мышь и тяните — карта двигается. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
       <div class="tile"><b><span class="ic">📢</span>Площади</b><span>На площади Свободы, Тысячелетия, Тукая и 1 Мая можно собрать людей: митинг, встреча или концерт. Жители тоже устраивают свои.</span></div>
       <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
@@ -188,6 +200,13 @@ textarea{resize:vertical;min-height:64px}
     <div class="row"><input type="text" id="speechText" placeholder="Скажите толпе…" maxlength="200" style="flex:1"><button class="btn primary" id="speechSay">В микрофон</button></div>
     <div class="row"><button class="btn" id="speechClose">Сойти со сцены</button></div>
   </div>
+</div>
+
+<div id="chatPanel" class="card" hidden>
+  <div class="cp-top"><div id="cpTabs"><button data-t="near" class="on">Рядом<em></em></button><button data-t="city">Город<em></em></button><button data-t="dm">Личные<em></em></button></div><span id="netLbl"></span><button class="btn" id="cpClose" title="Закрыть">✕</button></div>
+  <div id="cpHead" hidden><button class="btn" id="cpBack">←</button><b id="cpHeadName"></b><span id="cpHeadSt"></span></div>
+  <div id="cpList"></div>
+  <div class="cp-in"><input type="text" id="cpInput" maxlength="240" placeholder="Сказать вслух"><button class="btn primary" id="cpSend">➤</button></div>
 </div>
 
 <div class="modal" id="logModal" hidden>
@@ -230,6 +249,8 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/vehicles.js"></script>
 <script src="js/interior.js"></script>
 <script src="js/rally.js"></script>
+<script src="js/net.js"></script>
+<script src="js/chat.js"></script>
 <script src="js/talk.js"></script>
 <script src="js/companion.js"></script>
 <script src="js/render.js"></script>

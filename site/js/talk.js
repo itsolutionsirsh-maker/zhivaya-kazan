@@ -1,30 +1,25 @@
 // ===== Разговор вслух: игроки рядом и жители слышат =====
 const HEAR_R=45;          // на каком расстоянии слышно (м)
 let sayCounter=0,saySent=null;
-function openSayBar(prefix){if(scene!=='city'&&scene!=='interior')return;$('#sayBar').hidden=false;const i=$('#sayInput');i.value=prefix||'';setTimeout(()=>{i.focus();i.setSelectionRange(i.value.length,i.value.length);},20);}
-function closeSayBar(){$('#sayBar').hidden=true;$('#sayInput').blur();}
-$('#sayBtn').addEventListener('click',()=>{if($('#sayBar').hidden)openSayBar();else closeSayBar();});
-$('#saySend').addEventListener('click',sayAloud);
-$('#sayInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sayAloud();}if(e.key==='Escape'){e.preventDefault();closeSayBar();}e.stopPropagation();});
 function pos(){return scene==='interior'&&interior?{x:interior.ret.x,y:interior.ret.y}:{x:player.x,y:player.y};}
-function sayAloud(){const txt=$('#sayInput').value.trim().slice(0,140);if(!txt)return;$('#sayInput').value='';
-  player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter};addEvent(`${player.name}: ${txt}`,'say');
+function sayAloud(text){const txt=String(text||'').trim().slice(0,140);if(!txt)return;
+  player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter};nearLine(player.name,txt,true);pushPresence();
   // жители рядом слышат и один из них отвечает
   const p=pos();let npc=null,bd=7;
   if(scene==='interior'&&interior){for(const n of interior.npcs){const d=dist(n.x,n.y,player.ix,player.iy);if(d<3&&d<bd){bd=d;npc=n;}}}
   else for(const w of walkers){if(w.bus||w.state==='hurt'||w.rally||w.inside)continue;const d=dist(w.x,w.y,p.x,p.y);if(d<bd){bd=d;npc=w;}}
   if(npc)npcReply(npc,txt);
-  closeSayBar();}
+}
 async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=Math.max(w.ttl,12);w.path=null;const dx=player.x-w.x,dy=player.y-w.y,L=Math.hypot(dx,dy)||1;w.hx=dx/L;w.hy=dy/L;}
   w.p.memory.push({role:'user',content:txt});let reply=null;
   let act=null;if(sampleFn){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов).');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
   if(!reply){act=scriptedThink(w,txt);reply=act?act.reply:pick(SCRIPTED[w.role]||SCRIPTED.resident);}
-  if(act){const note=applyNpcAction(w,act);if(note)addEvent(note,'say');}
+  if(act){const note=applyNpcAction(w,act);if(note){addEvent(note,'say');nearLine('·',note,false);}}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);
-  w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};addEvent(`${w.p.name}: ${reply}`,'say');}
+  w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};nearLine(w.p.name,reply,false);}
 // фразы других игроков (приходят через presence)
 function onPeerSay(pr,s){if(!s||typeof s.t!=='string'||s.i===pr.sayI)return;pr.sayI=s.i;const t=s.t.slice(0,140);pr.say={t,ttl:6};
-  const p=pos();if(dist(pr.x,pr.y,p.x,p.y)<HEAR_R)addEvent(`${pr.name}: ${t}`,'say');}
+  const p=pos();if(dist(pr.x,pr.y,p.x,p.y)<HEAR_R)nearLine(pr.name,t,false);}
 function updateSay(dt){if(player.say){player.say.ttl-=dt;if(player.say.ttl<=0)player.say=null;}
   for(const w of walkers){if(w.say&&!w.rally){w.say.ttl-=dt;if(w.say.ttl<=0)w.say=null;}}
   if(interior)for(const n of interior.npcs){if(n.say){n.say.ttl-=dt;if(n.say.ttl<=0)n.say=null;}}
