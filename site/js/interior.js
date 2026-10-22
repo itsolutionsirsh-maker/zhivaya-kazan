@@ -35,7 +35,7 @@ function makeInterior(kind,name,key){
   }
   return it;}
 function enterInterior(src){const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}
-  interior=it;scene='interior';player.inside=true;companionEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
+  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
 function blockedInside(x,y,r){const it=interior;
@@ -80,9 +80,9 @@ function spotAction(f,it){const n=it.name;const price=it.kind==='bar'?500:350;
     case 'books':return {label:'Полистать книги',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
     case 'pew':return {label:'Посидеть в тишине',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
     case 'duty':return {label:'Спросить о происшествиях',run:()=>setHint(accidents.length?`Дежурный: «Сейчас на выезде — ${accidents[0].kind==='ped'?'сбили пешехода':'ДТП'}${accidents[0].road?', '+accidents[0].road:''}»`:'Дежурный: «В городе спокойно»')};
-    case 'bed':return {label:'Лечь спать до утра',run:()=>sleep(8)};
+    case 'bed':return {label:'Лечь спать до утра',run:()=>trySleep(8)};
     case 'wardrobe':return {label:'Переодеться / сменить фото',run:()=>showProfile()};
-    case 'kitchen':return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);clock.minutes+=40;addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
+    case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);clock.minutes+=40;addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
     case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}clock.minutes+=180;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
     default:return null;}}
 
@@ -109,7 +109,7 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';ctx.fillText(KIND_RU[it.kind]||KIND_RU.default,ox+ctx.measureText(it.name).width*1.45+12,oy+it.h*iz+35);
-  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg);drawInteriorBubbles(it);}
+  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg);drawInteriorBubbles(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   switch(f.t){
     case 'table':ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.arc(f.x+0.1,f.y+0.12,f.w/2,0,TAU);ctx.fill();ctx.fillStyle=it.kind==='home'?'#E8DCC8':'#8B5E3C';ctx.beginPath();ctx.arc(f.x,f.y,f.w/2,0,TAU);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=0.05;ctx.stroke();
