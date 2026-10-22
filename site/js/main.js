@@ -54,7 +54,8 @@ function findAction(){
   if(best)return best;
   for(const s of world.stops){const d=dist(s.x,s.y,player.x,player.y);if(d<9&&d<bd){const rts=routesAtStop(s);if(!rts.length)continue;bd=d;best={label:`Остановка «${s.n}»: ждать ${rts.map(r=>r.ref).join(', ')}`,run:()=>{player.waitingStop=s;player.x=s.x;player.y=s.y;setHint('Ждём транспорт… первый подошедший — ваш');}};}}
   if(best)return best;
-  for(const poi of world.pois){if(Math.abs(poi.x-player.x)>120||Math.abs(poi.y-player.y)>120)continue;const d=poiDist(poi,player.x,player.y);if(d<11&&d<bd){const a=poiAction(poi);if(!a)continue;bd=d;best=a;}}
+  const nearHome=player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8);
+  for(const poi of world.pois){if(Math.abs(poi.x-player.x)>120||Math.abs(poi.y-player.y)>120)continue;const d=poiDist(poi,player.x,player.y);if(nearHome&&d>4)continue;if(d<11&&d<bd){const a=poiAction(poi);if(!a)continue;bd=d;best=a;}}
   if(best)return best;
   if(ra)return ra;
   if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return {label:'Зайти домой',run:()=>enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y})};}
@@ -65,7 +66,7 @@ function findAction(){
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}
 function polyEdgeDist(p,x,y){let m=1e9;for(let k=0;k<p.length;k+=2){const ax=p[k],ay=p[k+1],bx=p[(k+2)%p.length],by=p[(k+3)%p.length];const vx=bx-ax,vy=by-ay,L2=vx*vx+vy*vy||1;const t=clamp(((x-ax)*vx+(y-ay)*vy)/L2,0,1);const d=Math.hypot(ax+vx*t-x,ay+vy*t-y);if(d<m)m=d;}return m;}
-function poiDist(poi,x,y){let d=dist(poi.x,poi.y,x,y);if(d>9&&d<45){const b=poiBuilding(poi);if(b&&x>b.bb[0]-5&&x<b.bb[2]+5&&y>b.bb[1]-5&&y<b.bb[3]+5&&polyEdgeDist(b.p,x,y)<4)d=Math.min(d,9+d*0.01);}return d;}
+function poiDist(poi,x,y){let d=dist(poi.x,poi.y,x,y);if(d>9&&d<45){const b=poiBuilding(poi);if(b&&b!==player.home&&!(player.home&&b.i===player.home.i)&&x>b.bb[0]-5&&x<b.bb[2]+5&&y>b.bb[1]-5&&y<b.bb[3]+5&&polyEdgeDist(b.p,x,y)<4)d=Math.min(d,9+d*0.01);}return d;}
 function kindFromBuilding(b){const t=b.t;if(/church|mosque|cathedral|worship/.test(t))return 'worship';if(/retail|shop|commercial|mall|supermarket/.test(t))return 'shop';if(/office/.test(t))return 'office';if(/university|college/.test(t))return 'university';if(/school/.test(t))return 'school';if(/hospital|clinic/.test(t))return 'hospital';if(/hotel/.test(t))return 'hotel';if(/theatre|cinema/.test(t))return 'theatre';if(/museum/.test(t))return 'museum';if(/police/.test(t))return 'police';return 'default';}
 function inBuildingNear(x,y){let hit=null;world.bgrid.query(x-6,y-6,x+6,y+6,b=>{if(hit||!b.n)return;if(dist(b.cx,b.cy,x,y)<Math.max(14,(b.bb[2]-b.bb[0])/2+6))hit=b;});return hit;}
 function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p=routePoint(r,st.s);return dist(p[0],p[1],s.x,s.y)<32;}));}
