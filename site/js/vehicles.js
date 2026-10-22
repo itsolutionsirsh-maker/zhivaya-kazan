@@ -22,7 +22,8 @@ function updateRentals(dt){rentalTimer-=dt;if(rentalTimer>0)return;rentalTimer=2
   const sc=rentals.filter(r=>r.kind==='scooter'&&dist(r.x,r.y,px,py)<700).length;if(sc<16){const near=world.stops.filter(s=>dist(s.x,s.y,px,py)<650);if(near.length){const s=pick(near);addScooterAt(s.x,s.y);}}
   const cs=rentals.filter(r=>r.kind==='car'&&dist(r.x,r.y,px,py)<700).length;if(cs<9)addCarshareNear(px,py,600);}
 
-function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];
+function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=player.drunk||0;
+  if((kind!=='scooter'&&kind!=='taxi'&&dr>=20)||(kind==='scooter'&&dr>=45)){setHint(kind==='scooter'?'Вы пьяны — на самокат нельзя, улетите в первый же столб. Пешком или такси 🧭':'Вы выпили — за руль нельзя (ст. 12.8 КоАП, лишение прав). Вызовите такси 🧭');return;}
   if(player.money<spec.start){setHint(`Нужно ${spec.start} ₽ на старт`);return;}
   if(kind!=='own'){const i=rentals.indexOf(obj);if(i>=0)rentals.splice(i,1);player.money-=spec.start;}else ownCar.parked=false;
   player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};

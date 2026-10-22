@@ -36,6 +36,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .bar{height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
 .bar.low i{background:var(--alert)}
+.bar.drunkbar i{background:#E0A030}
+#drunkFx{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(70,35,0,.5) 100%)}
+body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
+@media (prefers-reduced-motion:no-preference){body.drunk #map{animation:zkSway 6s ease-in-out infinite}body.wasted #map{animation-duration:3.4s}}
+@keyframes zkSway{0%,100%{transform:rotate(-.5deg) scale(1.03)}50%{transform:rotate(.7deg) scale(1.035) translateX(8px)}}
 .needs .money{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;margin-top:2px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .needs .money b{color:var(--gold);font-size:15px;font-weight:500}
 .online{font-size:11px;color:var(--muted)}
@@ -127,6 +132,7 @@ textarea{resize:vertical;min-height:64px}
 </style>
 
 <canvas id="map"></canvas>
+<div id="drunkFx" aria-hidden="true"></div>
 <div id="hud">
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1><small>центр города · OpenStreetMap</small></div>
@@ -140,6 +146,7 @@ textarea{resize:vertical;min-height:64px}
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
       <span class="lbl">Сытость</span><div class="bar" id="bFood"><i style="width:100%"></i></div>
       <span class="lbl">Настроение</span><div class="bar" id="bMood"><i style="width:70%"></i></div>
+      <span class="lbl" id="lDrunk" hidden>🍺 Хмель</span><div class="bar drunkbar" id="bDrunk" hidden><i style="width:0%"></i></div>
       <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">3 000 ₽</b></div>
     </div>
   </div>
@@ -279,5 +286,6 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/talk.js"></script>
 <script src="js/companion.js"></script>
 <script src="js/transport.js"></script>
+<script src="js/drunk.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

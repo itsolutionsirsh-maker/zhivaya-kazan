@@ -2,7 +2,7 @@
 const HEAR_R=45;          // на каком расстоянии слышно (м)
 let sayCounter=0,saySent=null;
 function pos(){return scene==='interior'&&interior?{x:interior.ret.x,y:interior.ret.y}:{x:player.x,y:player.y};}
-function sayAloud(text){const txt=String(text||'').trim().slice(0,140);if(!txt)return;
+function sayAloud(text){const txt=drunkify(String(text||'').trim().slice(0,140));if(!txt)return;
   player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter};nearLine(player.name,txt,true);pushPresence();
   // жители рядом слышат и один из них отвечает
   const p=pos();let npc=null,bd=7;

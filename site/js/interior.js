@@ -46,7 +46,7 @@ function moveInside(dx,dy){const r=0.3;let ok=false;if(!blockedInside(player.ix+
   if(player.iy>interior.h+0.4){exitInterior();return false;}return ok;}
 function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
   const m=Math.hypot(mx,my);
-  if(m>0.05){player.iwp=null;mx/=m;my/=m;const sp=2.6*dt*Math.min(1,m);moveInside(mx*sp,my*sp);player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
+  if(m>0.05){player.iwp=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=2.6*dt*Math.min(1,m)*dk;moveInside(mx*sp,my*sp);player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
   else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(2.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
@@ -144,7 +144,7 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
 // ===== Меню кафе и бара: поесть и выпить — одному или вместе со спутником (можно угостить) =====
 const MENU={
   cafe:[{e:'🫖',n:'Чай с чак-чаком',p:220,food:15,mood:6,en:4,min:20},{e:'☕',n:'Капучино и десерт',p:350,food:20,mood:8,en:12,min:25},{e:'🥟',n:'Эчпочмак и айран',p:280,food:35,mood:5,en:5,min:20},{e:'🍲',n:'Обед: суп и горячее',p:550,food:60,mood:8,en:6,min:40}],
-  bar:[{e:'🍋',n:'Домашний лимонад',p:250,food:5,mood:6,en:3,min:15},{e:'🍺',n:'Пиво',p:400,food:5,mood:12,en:-4,min:30},{e:'🍗',n:'Крылышки и гренки',p:450,food:35,mood:8,en:2,min:30},{e:'🍔',n:'Бургер с картошкой',p:600,food:55,mood:10,en:4,min:35}]};
+  bar:[{e:'🍋',n:'Домашний лимонад',p:250,food:5,mood:6,en:3,min:15},{e:'🍺',n:'Пиво',p:400,food:5,mood:12,en:-4,min:30,alc:24},{e:'🥃',n:'Облепиховая настойка',p:350,food:2,mood:14,en:-3,min:20,alc:30},{e:'🍗',n:'Крылышки и гренки',p:450,food:35,mood:8,en:2,min:30},{e:'🍔',n:'Бургер с картошкой',p:600,food:55,mood:10,en:4,min:35}]};
 let orderCtx=null;
 function compNpcInside(){return companion&&interior?interior.npcs.find(n=>n.companionOf===companion.w)||null:null;}
 function openOrder(f,it){const cn=f.comp||(compNpcInside()&&!it.furn.some(t=>t.comp)?compNpcInside():null);orderCtx={f,it,cn};player.busy=true;
@@ -161,7 +161,7 @@ function closeOrder(){$('#orderModal').hidden=true;player.busy=false;orderCtx=nu
 const TREAT_THX=['Ой, спасибо! В следующий раз я угощаю.','Рәхмәт! Вот это по-нашему.','Спасибо, очень приятно!','Ну ты даёшь, спасибо! За встречу!'];
 const SELF_LINES=['Мне то же самое, я сам(а) заплачу.','Отлично, давно тут не была... то есть не был. Возьму себе тоже.','Хороший выбор. Я себе тоже возьму.'];
 function placeOrder(m,treat){if(!orderCtx)return;const {f,it,cn}=orderCtx;const cost=m.p*(treat?2:1);if(player.money<cost){setHint(`Не хватает денег: нужно ${fmtMoney(cost)}`);return;}
-  player.money-=cost;player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);clock.minutes+=m.min;
+  player.money-=cost;if(m.alc)addDrink(m.alc,m.n);player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);clock.minutes+=m.min;
   player.ix=f.x-1.05;player.iy=f.y;player.ihx=1;player.ihy=0;player.iwp=null;
   if(cn){f.comp=cn;f.ordered=(f.ordered?f.ordered+', ':'')+m.n;cn.tableF=f;cn.x=f.x+1.05;cn.y=f.y;cn.seated=true;cn.hx=-1;cn.hy=0;
     const w=companion?companion.w:null;const pp=cn.p;pp.mood=treat?'отличное':(pp.mood==='тревожное'||pp.mood==='уставшее'?'хорошее':pp.mood);pp.rel=(pp.rel||0)+(treat?10:4);

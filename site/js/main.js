@@ -78,7 +78,7 @@ function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
     case 'fuel':return player.vehicle&&player.vehicle.kind==='own'?{label:`Заправиться ${n} · 2 500 ₽`,run:()=>spend(2500,()=>addEvent('Полный бак'))}:null;
     default:return null;}}
 function spend(amount,fn){if(player.money<amount){setHint(`Не хватает денег: нужно ${amount} ₽`);return;}player.money-=amount;fn();}
-function sleep(h){const before=Math.floor(clock.minutes/1440);clock.minutes+=h*60;player.energy=100;player.food=clamp(player.food-25,0,100);player.mood=clamp(player.mood+5,0,100);const after=Math.floor(clock.minutes/1440);if(after>before)addEvent(`Доброе утро! Наступил день ${after+1}`);else addEvent('Вы выспались');}
+function sleep(h){player.drunk=0;const before=Math.floor(clock.minutes/1440);clock.minutes+=h*60;player.energy=100;player.food=clamp(player.food-25,0,100);player.mood=clamp(player.mood+5,0,100);const after=Math.floor(clock.minutes/1440);if(after>before)addEvent(`Доброе утро! Наступил день ${after+1}`);else addEvent('Вы выспались');}
 
 // ---------- диалог ----------
 let chatNpc=null,chatBusy=false;
@@ -98,7 +98,7 @@ async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);chatBusy=false;}
 function contextForNpc(w){let place;if(w.isInterior&&interior)place=`внутри «${interior.name}» (${KIND_RU[interior.kind]||'помещение'})`;else{const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,w.x,w.y)<80).slice(0,4).map(p=>p.n).join(', ');const road=nearestRoadName(w.x,w.y);place=`${road?'на улице '+road:'в центре'}${near?', рядом: '+near:''}`;}
   const rl=contextRallies(w.x||player.x,w.y||player.y);const ev=feed.slice(0,3).map(e=>e.text).join('; ')+(rl?'; '+rl:'');const pv=player.vehicle?(player.vehicle.kind==='scooter'?', подъехал на самокате':', подъехал на машине'):'';
-  return `Ты — житель Казани в городской игре-симуляции. Тебя зовут ${w.p.name}, ${w.p.age} лет, ${w.p.job}. Характер: ${w.p.trait}. Настроение: ${w.p.mood}. Сейчас ${fmtTime()}, день ${clock.day}, погода: ${weatherText()}. Ты находишься ${place}. Последние события в городе: ${ev||'ничего особенного'}. С тобой заговорил ${player.name} (${player.role==='tourist'?'турист':player.role==='courier'?'курьер':player.role==='student'?'студент':'местный житель'}${pv})${player.desc?': «'+player.desc+'»':''}. Отвечай как живой человек, 1–2 коротких предложения, по-русски, можно татарское словечко. Не выходи из роли и не говори, что ты ИИ. Отвечай на реплику ниже.`;}
+  return `Ты — житель Казани в городской игре-симуляции. Тебя зовут ${w.p.name}, ${w.p.age} лет, ${w.p.job}. Характер: ${w.p.trait}. Настроение: ${w.p.mood}. Сейчас ${fmtTime()}, день ${clock.day}, погода: ${weatherText()}. Ты находишься ${place}. Последние события в городе: ${ev||'ничего особенного'}. С тобой заговорил ${player.name} (${player.role==='tourist'?'турист':player.role==='courier'?'курьер':player.role==='student'?'студент':'местный житель'}${pv}${(player.drunk||0)>=45?', собеседник заметно пьян: шатается, от него пахнет пивом, говорит громко и развязно':(player.drunk||0)>=20?', собеседник слегка навеселе':''})${player.desc?': «'+player.desc+'»':''}. Отвечай как живой человек, 1–2 коротких предложения, по-русски, можно татарское словечко. Не выходи из роли и не говори, что ты ИИ. Отвечай на реплику ниже.`;}
 function weatherText(){return weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно';}
 
 // ---------- профиль ----------
@@ -118,8 +118,8 @@ function showHowto(){$('#howtoModal').hidden=false;player.busy=true;}
 $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;player.busy=false;flags.howtoSeen=true;try{localStorage.setItem('zk.howto','1');}catch(e){}});
 
 // ---------- сохранение ----------
-function saveState(){try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,minutes:clock.minutes,z:cam.zt,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function saveState(){try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),minutes:clock.minutes,z:cam.zt,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
@@ -180,8 +180,8 @@ function updatePlayer(dt){
   const m=Math.hypot(mx,my);const run=keys.shift||keys.ShiftLeft;
   if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
   if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
-  if(m>0.05){if(cam.free)followPlayer();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1);tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
-  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{const sp=3.0*dt;const dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
+  if(m>0.05){if(cam.free)followPlayer();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1)*dk;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
+  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{let [sx,sy,dk]=drunkSway((w[0]-player.x)/d,(w[1]-player.y)/d);const sp=3.0*dt*dk;let dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);if(!inBuilding(player.x+sx*step,player.y+sy*step)){dx=sx;dy=sy;}const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
     if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;player.x=nx;player.y=ny;player.phase+=dt*8;}}}
 function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!inBuilding(x,y)&&!wallBlocks(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}
 function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.bus)return;if(player.vehicle&&player.vehicle.kind!=='scooter')return;
@@ -203,7 +203,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
     for(const b of buses)b.update(dt,vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
-    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
+    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
     if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
     cam.z=lerp(cam.z,cam.zt,Math.min(1,rdt*5));if(scene==='city'&&(cam.free&&(player.vehicle||player.bus||cine||player.state==='hurt')))followPlayer();if(scene==='city'&&!cam.free){cam.x=lerp(cam.x,player.x,Math.min(1,rdt*6));cam.y=lerp(cam.y,player.y,Math.min(1,rdt*6));}
     hudTimer-=rdt;if(hudTimer<=0){hudTimer=0.25;updateHud();}
@@ -213,7 +213,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     if(scene==='interior')renderInterior();else render();}
   requestAnimationFrame(frame);}
 function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;$('#weatherLbl').textContent=(weather.kind==='rain'?'🌧 дождь':weather.kind==='cloudy'?'☁️ пасмурно':isNight()?'🌙 ясно':'☀️ ясно');
-  setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);$('#moneyLbl').textContent=fmtMoney(player.money);
+  setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){$('#bDrunk').querySelector('i').style.width=dr+'%';$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);
   const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${v.kind==='scooter'?'🛴':'🚗'} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&v.kind!=='scooter'?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
   currentAction=player.busy?null:findAction();const ab=$('#actBtn');if(currentAction){ab.hidden=false;ab.innerHTML='';const k=document.createElement('kbd');k.textContent='E';ab.append(k,document.createTextNode(currentAction.label));}else ab.hidden=true;}
 function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);}
