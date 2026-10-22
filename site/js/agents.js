@@ -63,9 +63,9 @@ class Walker{
 }
 
 // Общая проверка препятствий впереди: машины, аварии, пешеходы на дороге, занятые переходы
-function obstacleAhead(self,vehicles,see){let ahead=1e9;const hx=self.hx,hy=self.hy;const siren=(self.kind==='amb'||self.kind==='police')&&self.target!=null;const pushy=(self.waitT||0)>(siren?1.5:6);
+function obstacleAhead(self,vehicles,see){let ahead=1e9;self.acBlock=null;const hx=self.hx,hy=self.hy;const siren=(self.kind==='amb'||self.kind==='police')&&self.target!=null;const pushy=(self.waitT||0)>(siren?1.5:6);
   if(!siren)for(const v of vehicles){if(v===self)continue;const ox=v.x-self.x,oy=v.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>26)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<(v.wid||2)*0.5+self.wid*0.5+0.4){const g=f-(v.len||4)*0.5-self.len*0.5;if(g<ahead)ahead=g;}}
-  if(!siren)for(const ac of accidents){if(ac.blocking===false)continue;const ox=ac.x-self.x,oy=ac.y-self.y;const f=ox*hx+oy*hy;if(f>0&&f<26&&Math.abs(-ox*hy+oy*hx)<4.5&&f-6<ahead)ahead=f-6;}
+  if(!siren)for(const ac of accidents){if(ac.blocking===false)continue;const ox=ac.x-self.x,oy=ac.y-self.y;const f=ox*hx+oy*hy;if(f>0&&f<26&&Math.abs(-ox*hy+oy*hx)<4.5&&f-6<ahead){ahead=f-6;self.acBlock=ac;}}
   for(const p of roadPeds){const ox=p.x-self.x,oy=p.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>see)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<self.wid*0.5+0.9){const g=f-self.len*0.5-(pushy?0.2:0.7);if(g<ahead)ahead=g;}}
   if(!pushy)for(const c of activeCrossings){const ox=c.x-self.x,oy=c.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>30)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<c.hw+1){const g=f-self.len*0.5-2.2;if(g<ahead)ahead=g;}}
   return ahead;}
@@ -91,6 +91,8 @@ class Car{
     if(this.siren()&&this.sceneXY&&dist(this.x,this.y,this.sceneXY[0],this.sceneXY[1])<16){this.speed=0;this.path=null;this.onArrive();return;}
     const ahead=obstacleAhead(this,vehicles,carSee);vlim=limitBySpace(vlim,ahead);
     this.waitT=(vlim===0&&this.speed<0.1)?(this.waitT||0)+dt:0;
+    // улицу перекрыло ДТП — разворачиваемся и едем в объезд (маршрут обходит перекрытую улицу)
+    if(this.acBlock&&this.waitT>5&&this.target==null&&!this.siren()&&this.kind!=='tow'&&this.path){const a0=this.path[this.seg],b0=this.path[this.seg+1];const q1=world.nodes[a0],q2=world.nodes[b0];const L0=dist(q1[0],q1[1],q2[0],q2[1]);this.path=[b0,a0];this.seg=0;this.t=Math.max(0,L0-this.t);this.waitT=0;this.hx=-this.hx;this.hy=-this.hy;const ac=this.acBlock;if(!ac.detourMsg&&dist(ac.x,ac.y,player.x,player.y)<350){ac.detourMsg=true;addEvent(`ДТП перекрыло ${ac.road||'улицу'} — машины разворачиваются и едут в объезд`);}return;}
     if(vlim===0&&this.speed<0.1){this.stuck+=dt;if(this.stuck>25&&(this.kind==='car'||this.kind==='taxi')){this.stuck=0;this.state='idle';this.ttl=0.1;this.node=this.pickNode();return;}}else this.stuck=0;
     this.speed+=clamp(vlim-this.speed,-9*dt,4*dt);if(this.speed<0)this.speed=0;
     let step=this.speed*dt;

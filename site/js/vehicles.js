@@ -33,6 +33,7 @@ function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=pla
 function exitVehicle(){const v=player.vehicle;if(!v)return;if(v.kind==='taxi'){taxiExit();return;}const spec=v.spec;const mins=Math.max(1,clock.minutes-v.startMin);const cost=Math.round(mins*spec.perMin);
   if(spec.perMin){player.money=Math.max(0,player.money-cost);addEvent(`Поездка на ${spec.word}: ${Math.round(mins)} мин, ${cost} ₽`);}
   if(v.kind==='own'){ownCar.x=v.x;ownCar.y=v.y;ownCar.hx=v.hx;ownCar.hy=v.hy;ownCar.parked=true;}else rentals.push({kind:v.kind,x:v.x,y:v.y,hx:v.hx,hy:v.hy,color:v.color});
+  if(v.kind!=='scooter')parkingCheck(v.kind==='own'?ownCar:rentals[rentals.length-1],v.kind);
   let ex=v.x-v.hy*(v.kind==='scooter'?1:1.8),ey=v.y+v.hx*(v.kind==='scooter'?1:1.8);if(inBuilding(ex,ey)){ex=v.x+v.hy*1.8;ey=v.y-v.hx*1.8;}player.x=ex;player.y=ey;
   player.vehicle=null;}
 function vehProxy(v){return {x:v.x,y:v.y,hx:v.hx,hy:v.hy,len:v.spec.len,wid:v.spec.wid,speed:Math.abs(v.speed),isPlayer:true,waitT:v.waitT||0};}
@@ -44,7 +45,8 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   let thr=0,steer=0;if(!player.busy&&v.kind!=='taxi'){if(keys.w||keys['ц']||keys.ArrowUp)thr+=1;if(keys.s||keys['ы']||keys.ArrowDown)thr-=1;if(keys.d||keys['в']||keys.ArrowRight)steer+=1;if(keys.a||keys['ф']||keys.ArrowLeft)steer-=1;thr+=-joyVec[1];steer+=joyVec[0];}
   const manual=Math.abs(thr)>0.05||Math.abs(steer)>0.05;if(manual)v.auto=null;
   const ns=nearestRoadSeg(v.x,v.y,16);const onRoad=!!(ns&&ns.d<ns.seg.r.hw+1.8);let vmax=s.vmax;
-  if(v.kind!=='scooter'){vmax=onRoad?Math.min(vmax,(ns.seg.r.speed||8)*1.3+2):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
+  const boost=(keys.shift||keys.ShiftLeft)&&!v.auto;   // Shift — «газ в пол»: можно превысить, а камеры это заметят
+  if(v.kind!=='scooter'){vmax=onRoad?(boost?Math.min(vmax*1.45,(ns.seg.r.speed||8)*1.75+3):Math.min(vmax,(ns.seg.r.speed||8)*1.3+2)):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
   if(weather.kind==='rain')vmax*=0.85;v.onRoad=onRoad;
   if(v.auto){const a=v.auto;const look=s.len>3?5:3;while(a.i<a.wps.length-1&&dist(a.wps[a.i][0],a.wps[a.i][1],v.x,v.y)<look)a.i++;
     const tp=a.wps[a.i];const dT=dist(tp[0],tp[1],v.x,v.y);

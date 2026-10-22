@@ -27,8 +27,8 @@ function spawnAll(){
   spawnRentals(player.x,player.y);}
 
 // ---------- автобус ----------
-function boardBus(bus,stop){if(player.money<BUS_FARE){setHint(`На проезд нужно ${BUS_FARE} ₽`);return;}player.money-=BUS_FARE;player.bus=bus;player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
-function leaveBus(stop){const b=player.bus;player.bus=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;addEvent(`Вы вышли на «${stop.n}»`);}
+function boardBus(bus,stop){player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
+function leaveBus(stop){const b=player.bus;player.bus=null;player.fare=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;addEvent(`Вы вышли на «${stop.n}»`);}
 
 // ---------- действия ----------
 let currentAction=null;

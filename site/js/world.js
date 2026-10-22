@@ -11,7 +11,7 @@ function buildWorld(d){
   const nodes=d.nodes.map(p=>[p[0]/10,p[1]/10]);const N=nodes.length;
   const roads=d.roads.map((r,i)=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of r.p){const p=nodes[n];if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}
     const w=r.l?Math.min(ROAD_W[r.c]*1.4,r.l*3.1+1):ROAD_W[r.c];
-    return {c:r.c,n:r.n||'',o:r.o||0,p:r.p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i,speed:(r.s?Math.min(r.s/3.6*0.9,20):ROAD_SPEED[r.c])||0,lanes:r.l||0};});
+    return {c:r.c,n:r.n||'',o:r.o||0,p:r.p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i,speed:(r.s?Math.min(r.s/3.6*0.9,20):ROAD_SPEED[r.c])||0,lim:r.s||60,lanes:r.l||0};});
   const pedAdj=Array.from({length:N},()=>[]),carAdj=Array.from({length:N},()=>[]);
   const rgrid=new Grid(60);
   for(const r of roads){for(let i=0;i<r.p.length-1;i++){const a=r.p[i],b=r.p[i+1];const pa=nodes[a],pb=nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);if(L<0.05)continue;
@@ -100,7 +100,7 @@ function astar(adj,start,goal,costFn){
     for(const [v,L,ri] of adj[u]){const ng=gu+L*costFn(world.roads[ri]);if(stampArr[v]!==gen||ng<gArr[v]){stampArr[v]=gen;gArr[v]=ng;cameArr[v]=u;const p=nodes[v];h.push(ng+Math.hypot(p[0]-gx,p[1]-gy)*0.95,v);}}}
   return null;}
 const pedCost=r=>r.c<=4?1.6:(r.c>=9?0.85:1);
-const carCost=r=>r.c<=4?0.8:(r.c>=7?1.5:1);
+const carCost=r=>(world.blockedRoads&&world.blockedRoads.has(r.i)?40:1)*(r.c<=4?0.8:(r.c>=7?1.5:1));
 const pathQueue=[];
 function requestPath(agent,adj,start,goal,costFn,cb){pathQueue.push({agent,adj,start,goal,costFn,cb});}
 function processPaths(n){while(n-->0&&pathQueue.length){const q=pathQueue.shift();q.cb(astar(q.adj,q.start,q.goal,q.costFn));}}

@@ -103,7 +103,7 @@ function render(){
   for(const pr of peerRender.values()){const [sx,sy]=toS(pr.x,pr.y);labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img);}
   if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg);}
   drawRallyLabels(toS,z);
-  drawCityBubbles(toS,z);
+  drawSpeedCams(toS,z);drawCityBubbles(toS,z);
   drawCompanionMark(toS,z);drawSituations(toS,z);
   routeOverlay(toS);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-30,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
