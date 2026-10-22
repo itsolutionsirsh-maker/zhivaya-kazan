@@ -17,18 +17,26 @@ function resolvePlace(name,x,y){const n=norm(name);if(!n)return null;let best=nu
 function startCompanion(w,mode,place){if(w.isInterior){const cw=w.companionOf;if(cw)w=cw;else return;}
   if(companion&&companion.w!==w)stopCompanion(true);
   let dest=null;if(mode==='go'&&place){dest=resolvePlace(place,w.x,w.y);if(!dest)mode='follow';}
-  companion={w,mode,dest,arrived:false,t:0};w.companion=true;w.state='companion';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.cwps=null;w.repath=0;
+  companion={w,mode,dest,arrived:false,t:0};player.escort=mode==='go'&&!!dest;w.companion=true;w.state='companion';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.cwps=null;w.repath=0;
   addEvent(dest?`${w.p.name} идёт с вами в «${dest.n}»`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
-function stopCompanion(silent){if(!companion)return;const w=companion.w;w.companion=false;w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
+function stopCompanion(silent){if(!companion)return;player.escort=false;player.waypoints=null;const w=companion.w;w.companion=false;w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
   if(interior){interior.npcs=interior.npcs.filter(n=>n.companionOf!==w);}
   if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;updateCompBox();}
-function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;
+function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':'Идти за ним';$('#compBye').textContent=going?'Передумать':'Отпустить';
   $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас в «${c.dest.n}» · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:`🤝 ${c.w.p.name} с вами`;}
-$('#compBye').addEventListener('click',()=>stopCompanion());
+$('#compBye').addEventListener('click',()=>{if(!companion)return;const c=companion,w=c.w;if(c.mode==='go'&&c.dest&&!c.arrived){const t=pick(['Ну ладно, в другой раз!','Эх, жаль. Ну, бывай!','Хорошо, передумали так передумали.']);w.say={t,ttl:5};nearLine(w.p.name,t,false);w.p.memory.push({role:'user',content:'Слушай, я передумал, давай в другой раз.'},{role:'assistant',content:t});}stopCompanion();});
+$('#compFollow').addEventListener('click',()=>{player.escort=!player.escort;player.waypoints=null;updateCompBox();});
+// автопилот: игрок идёт за жителем, на дорогу выходит, только когда безопасно
+function escortStep(dt){const c=companion;if(!c||c.mode!=='go'||c.arrived||c.w.inside){player.escort=false;updateCompBox();return false;}const w=c.w;
+  const T=[w.x-w.hx*1.6,w.y-w.hy*1.6];const d=dist(player.x,player.y,T[0],T[1]);
+  if(d<1.2){const dx=w.x-player.x,dy=w.y-player.y,L=Math.hypot(dx,dy)||1;player.hx=dx/L;player.hy=dy/L;player.waypoints=null;return true;}
+  if(d<22&&clearLine(player.x,player.y,T[0],T[1])){player.waypoints=null;const sp=(d>4?3.4:2.7)*dt;const ux=(T[0]-player.x)/d,uy=(T[1]-player.y)/d;const st=Math.min(sp,d);const nx=player.x+ux*st,ny=player.y+uy*st;player.hx=ux;player.hy=uy;
+    if(unsafeStep(player.x,player.y,nx+ux*1.2,ny+uy*1.2))return true;if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;player.phase+=dt*8;}return true;}
+  player.escortT=(player.escortT||0)-dt;if(!player.waypoints||player.escortT<=0){player.escortT=2;walkTo(w.x,w.y,true);}return false;}
 
 function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=dt;
   if(w.state==='hurt'||w.bus){stopCompanion(true);return;}
-  if(player.inside){w.inside=true;return;}
+  if(player.inside||player.bus||(player.vehicle&&player.vehicle.kind!=='scooter')){w.inside=true;c.route=null;return;}
   if(w.inside){w.inside=false;const sp=[player.x-player.hx*1.5,player.y-player.hy*1.5];w.x=sp[0];w.y=sp[1];w.cwps=null;}
   // игрок уехал далеко (машина, автобус, самокат) — житель «догоняет»
   if(dist(w.x,w.y,player.x,player.y)>70){const n=nearestNode(player.x,player.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.node=n;w.cwps=null;c.route=null;}}
@@ -50,7 +58,7 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
   else{w.repath-=dt;if(!w.cwps||w.repath<=0||w.wi>=w.cwps.length){w.repath=6;const s=nearestNode(w.x,w.y,world.pedAdj,120),g=nearestNode(T[0],T[1],world.pedAdj,120);const path=astar(world.pedAdj,s,g,pedCost);w.cwps=path?pathToWaypoints(path,world.pedAdj,'ped'):null;if(w.cwps){w.cwps.push(T);let bi=0,bd=1e9;for(let i=0;i<Math.min(6,w.cwps.length);i++){const d=dist(w.x,w.y,w.cwps[i][0],w.cwps[i][1]);if(d<bd){bd=d;bi=i;}}w.wi=bd<8?bi+1:bi;}else w.wi=0;}
     if(w.cwps&&w.wi<w.cwps.length){const q=w.cwps[w.wi];if(dist(w.x,w.y,q[0],q[1])<0.8)w.wi++;else stepTo(w,q,spd,dt,true);}else stepTo(w,T,spd,dt);}
   updateCompBox();}
-function stepTo(w,T,spd,dt,force){const d=dist(w.x,w.y,T[0],T[1]);if(d<0.01)return;const st=Math.min(d,spd*dt);w.hx=(T[0]-w.x)/d;w.hy=(T[1]-w.y)/d;const nx=w.x+w.hx*st,ny=w.y+w.hy*st;if(force||!inBuilding(nx,ny)){w.x=nx;w.y=ny;}else w.cwps=null;w.phase+=dt*8;}
+function stepTo(w,T,spd,dt,force){const d=dist(w.x,w.y,T[0],T[1]);if(d<0.01)return;const st=Math.min(d,spd*dt);w.hx=(T[0]-w.x)/d;w.hy=(T[1]-w.y)/d;const nx=w.x+w.hx*st,ny=w.y+w.hy*st;if(unsafeStep(w.x,w.y,nx+w.hx*1.2,ny+w.hy*1.2))return;if(force||!inBuilding(nx,ny)){w.x=nx;w.y=ny;}else w.cwps=null;w.phase+=dt*8;}
 // при входе в помещение спутник заходит следом и садится рядом
 function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.some(n=>n.companionOf===w))return;
   let x=it.w/2+1,y=it.h-1.6;const free=it.furn.find(f=>f.spot==='table'&&!f.taken);if(free){x=free.x+1.05;y=free.y;free.taken=false;}

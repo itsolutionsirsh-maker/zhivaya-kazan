@@ -27,19 +27,21 @@ function spawnAll(){
   spawnRentals(player.x,player.y);}
 
 // ---------- автобус ----------
-function boardBus(bus,stop){player.bus=bus;player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
+function boardBus(bus,stop){if(player.money<BUS_FARE){setHint(`На проезд нужно ${BUS_FARE} ₽`);return;}player.money-=BUS_FARE;player.bus=bus;player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
 function leaveBus(stop){const b=player.bus;player.bus=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;addEvent(`Вы вышли на «${stop.n}»`);}
 
 // ---------- действия ----------
 let currentAction=null;
 function findAction(){
   if(scene==='interior')return findActionInterior();
-  if(player.state==='hurt')return null;
+  if(player.state==='hurt')return {label:accidents.some(a=>a.victim==='player'&&a.amb&&a.amb.state==='scene')?'Врачи скорой осматривают вас…':'Ждём скорую…',run:()=>{}};
   if(player.bus)return {label:'Выйти на следующей остановке',run:()=>{player.exitNext=true;setHint('Выйдем на следующей остановке');}};
+  if(player.vehicle&&player.vehicle.kind==='taxi')return {label:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
+  if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return {label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi};
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
     return {label:v.kind==='scooter'?'Оставить самокат здесь':'Припарковать и выйти',run:exitVehicle};}
-  if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;setHint('Вы передумали ехать');}};
+  if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;if(player.busPlan)cancelTrip(true);setHint('Вы передумали ехать');}};
   const ra=rallyAction();if(ra&&!/^Собрать/.test(ra.label))return ra;
   let best=null,bd=1e9;
   for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside)continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
@@ -109,12 +111,12 @@ $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;play
 
 // ---------- сохранение ----------
 function saveState(){try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,minutes:clock.minutes,z:cam.zt,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.8,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(chatOpen())closeChatPanel();}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
@@ -130,8 +132,8 @@ $('#resetBtn').addEventListener('click',()=>{try{localStorage.removeItem('zk.sta
 $('#speedBtn').addEventListener('click',()=>{const i=(TIME_SCALES.indexOf(clock.scale)+1)%TIME_SCALES.length;clock.scale=TIME_SCALES[i];$('#speedBtn').textContent='×'+clock.scale;});
 $('#centerBtn').addEventListener('click',followPlayer);
 mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;$('#centerBtn').hidden=false;clampCam();});
-$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.8,16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.8,16);});
-canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.8,16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
+$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.22,16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.22,16);});
+canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.22,16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
 let pdown=null,dragging=false,pinch=null;const ptrs=new Map();
 function followPlayer(){cam.free=false;$('#centerBtn').hidden=true;}
 function clampCam(){const bb=world.bbox;cam.x=clamp(cam.x,bb[0],bb[2]);cam.y=clamp(cam.y,bb[1],bb[3]);}
@@ -139,15 +141,16 @@ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:cam.zt};pdown=null;dragging=false;return;}
   pdown={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now()};dragging=false;});
 canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,0.8,16);return;}
+  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,0.22,16);return;}
   if(!pdown||scene!=='city')return;if(!dragging&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>6){dragging=true;cam.free=true;$('#centerBtn').hidden=false;canvas.style.cursor='grabbing';}
   if(dragging){cam.x-=(e.clientX-pdown.lx)/cam.z;cam.y-=(e.clientY-pdown.ly)/cam.z;pdown.lx=e.clientX;pdown.ly=e.clientY;clampCam();}});
 canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;pdown=null;dragging=false;canvas.style.cursor='';});
 canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;pdown=null;return;}if(!pdown)return;if(dragging){dragging=false;pdown=null;canvas.style.cursor='';return;}const moved=Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y);pdown=null;if(moved>8||player.busy||player.bus||player.state==='hurt')return;
   if(scene==='interior'){const it=interior;player.iwp=[(e.clientX-it.ox)/it.iz,(e.clientY-it.oy)/it.iz];return;}
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
+  if(pickingDest){pickDestAt(wx,wy);return;}
   followPlayer();
-  if(player.vehicle){driveTo(wx,wy);return;}
+  if(player.vehicle){if(player.vehicle.kind==='taxi')return;driveTo(wx,wy);return;}
   for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
@@ -161,14 +164,17 @@ const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyVec=[0,0];joyKnob.s
 
 // ---------- обновление игрока ----------
 function updatePlayer(dt){
-  if(player.state==='hurt'){player.hurtT+=dt;return;}
+  if(player.state==='hurt'){player.hurtT+=dt;if(player.hurtT>60&&!cine){addEvent('Скорая доставила вас в больницу');playerToHospital(null);}return;}
   if(player.bus){player.x=player.bus.x;player.y=player.bus.y;return;}
   if(player.vehicle){updateVehicle(dt);return;}
   if(player.talkTarget){const t=player.talkTarget;if(t.bus||player.busy||t.state==='hurt'){player.talkTarget=null;}else if(dist(t.x,t.y,player.x,player.y)<5){player.talkTarget=null;player.waypoints=null;openChat(t);return;}}
   let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
   const m=Math.hypot(mx,my);const run=keys.shift||keys.ShiftLeft;
+  if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
+  if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
   if(m>0.05){if(cam.free)followPlayer();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1);tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
-  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{const sp=3.0*dt;const dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);player.x+=dx*step;player.y+=dy*step;player.hx=dx;player.hy=dy;player.phase+=dt*8;}}}
+  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{const sp=3.0*dt;const dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
+    if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;player.x=nx;player.y=ny;player.phase+=dt*8;}}}
 function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!inBuilding(x,y)&&!wallBlocks(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}
 function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.bus)return;if(player.vehicle&&player.vehicle.kind!=='scooter')return;
   for(const v of cars.concat(buses)){if(v.crashed||v.speed<2.2||v.remove)continue;const ox=player.x-v.x,oy=player.y-v.y;if(Math.abs(ox)>9||Math.abs(oy)>9)continue;const f=ox*v.hx+oy*v.hy;const s=Math.abs(-ox*v.hy+oy*v.hx);if(Math.abs(f)<v.len*0.5+0.35&&s<v.wid*0.5+0.5){playerHitByCar(v);return;}}}
@@ -189,7 +195,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
     for(const b of buses)b.update(dt,vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
-    updateAccidents(dt);updateRallies(dt);updateSay(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
+    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
     if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
     cam.z=lerp(cam.z,cam.zt,Math.min(1,rdt*5));if(scene==='city'&&(cam.free&&(player.vehicle||player.bus||cine||player.state==='hurt')))followPlayer();if(scene==='city'&&!cam.free){cam.x=lerp(cam.x,player.x,Math.min(1,rdt*6));cam.y=lerp(cam.y,player.y,Math.min(1,rdt*6));}
     hudTimer-=rdt;if(hudTimer<=0){hudTimer=0.25;updateHud();}

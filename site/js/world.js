@@ -64,6 +64,9 @@ function buildWorld(d){
   // фонари вдоль улиц каждые ~28 м
   const lamps=[];const lgrid=new Grid(120);for(const r of roads){if(r.c>7||r.c<1)continue;let acc=14;for(let i=0;i<r.p.length-1;i++){const a=nodes[r.p[i]],b=nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);let s=acc;while(s<L){const t=s/L;const x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t;const l=[x,y];lamps.push(l);lgrid.add(l,x,y,x,y);s+=28;}acc=s-L;}}
   world.lamps=lamps;world.lgrid=lgrid;
+  // для скорой и полиции с мигалкой: те же дороги, но без запрета одностороннего движения
+  const emAdj=Array.from({length:N},()=>[]);for(let i=0;i<N;i++)for(const e of carAdj[i]){emAdj[i].push(e);if(!carAdj[e[0]].some(f=>f[0]===i))emAdj[e[0]].push([i,e[1],e[2]]);}
+  world.emAdj=emAdj;
   const pedNodes=[],carNodes=[];for(let i=0;i<N;i++){if(pedAdj[i].length)pedNodes.push(i);if(carAdj[i].length)carNodes.push(i);}
   world.pedNodes=pedNodes;world.carNodes=carNodes;
   initLandmarks(d);
