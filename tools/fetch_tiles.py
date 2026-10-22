@@ -3,14 +3,21 @@
 import json, subprocess, sys, time, os
 S, W, N, E = 55.774, 49.079, 55.812, 49.149
 NX, NY = 3, 3
-OUT = sys.argv[1] if len(sys.argv) > 1 else 'raw/kazan_osm.json'
+OUT = next((a for a in sys.argv[1:] if not a.startswith('--')), 'raw/kazan_osm.json')
 MIRRORS = ["https://overpass.kumi.systems/api/interpreter",
            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
            "https://overpass-api.de/api/interpreter"]
 
 def query(bb, routes):
     B = f"({bb[0]:.5f},{bb[1]:.5f},{bb[2]:.5f},{bb[3]:.5f})"
-    if routes:
+    if routes == 'extras':
+        parts = [f'way["place"="square"]{B};', f'relation["place"="square"]{B};',
+                 f'way["highway"="pedestrian"]["area"="yes"]{B};', f'relation["highway"="pedestrian"]{B};',
+                 f'way["area:highway"="pedestrian"]{B};',
+                 f'way["historic"="citywalls"]{B};', f'way["barrier"="city_wall"]{B};',
+                 f'way["barrier"="wall"](55.7960,49.1020,55.8020,49.1100);',
+                 f'way["man_made"="tower"]["tower:type"="defensive"]{B};', f'way["building"="tower"](55.7960,49.1020,55.8020,49.1100);']
+    elif routes:
         parts = [f'relation["route"~"^(bus|trolleybus|tram)$"]{B};']
     else:
         parts = [
@@ -49,6 +56,12 @@ def fetch(q, tag):
 
 os.makedirs('raw', exist_ok=True)
 seen = {}
+if '--extras' in sys.argv:
+    base = json.load(open(OUT))['elements']
+    for e in base: seen[(e['type'], e['id'])] = e
+    for e in fetch(query((S, W, N, E), 'extras'), 'extras'): seen[(e['type'], e['id'])] = e
+    json.dump({'elements': list(seen.values())}, open(OUT, 'w'))
+    print(f'OK: {len(seen)} элементов → {OUT}', flush=True); sys.exit(0)
 dy, dx = (N - S) / NY, (E - W) / NX
 for iy in range(NY):
     for ix in range(NX):
@@ -56,6 +69,8 @@ for iy in range(NY):
         for e in fetch(query(bb, False), f'{iy}{ix}'):
             seen[(e['type'], e['id'])] = e
 for e in fetch(query((S, W, N, E), True), 'routes'):
+    seen[(e['type'], e['id'])] = e
+for e in fetch(query((S, W, N, E), 'extras'), 'extras'):
     seen[(e['type'], e['id'])] = e
 json.dump({'elements': list(seen.values())}, open(OUT, 'w'))
 print(f'OK: {len(seen)} элементов → {OUT}', flush=True)

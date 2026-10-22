@@ -12,7 +12,9 @@
 }
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.4;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
-#map{position:fixed;inset:0;width:100%;height:100%;display:block;background:#E4DFD3;cursor:crosshair}
+#map{position:fixed;inset:0;width:100%;height:100%;display:block;background:#E4DFD3;cursor:grab}
+#mini{cursor:pointer}
+#rallyKind{display:flex;gap:8px;flex-wrap:wrap}#rallyKind button.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 #hud{position:fixed;inset:0;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
 #hud > *{min-width:0}
 .top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -38,10 +40,13 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .needs .money b{color:var(--gold);font-size:15px;font-weight:500}
 .online{font-size:11px;color:var(--muted)}
 .mid{position:relative;display:flex;justify-content:flex-end;align-items:flex-start;gap:10px}
-#feed{display:flex;flex-direction:column;gap:6px;width:min(300px,60vw);pointer-events:none}
-#feed .ev{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;animation:pop .25s ease-out;box-shadow:var(--shadow)}
+#feed{display:flex;flex-direction:column;gap:5px;width:min(250px,52vw);pointer-events:none}
+#feed .ev{background:rgba(14,24,20,.72);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:11.5px;line-height:1.3;display:flex;gap:8px;align-items:flex-start;animation:pop .25s ease-out;box-shadow:var(--shadow)}
 #feed .ev.alert{border-color:rgba(220,58,68,.6)}
-#feed .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:11px;padding-top:2px;flex:none}
+#feed .ev.rally{border-color:rgba(142,68,173,.7)}
+#feed .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:10px;padding-top:1px;flex:none}
+#logList{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}#logList .ev{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;display:flex;gap:8px}#logList .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:11px;flex:none;padding-top:1px}#logList .ev.alert{border-color:rgba(220,58,68,.6)}#logList .ev.rally{border-color:rgba(142,68,173,.7)}
+#logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
 #feed .ev.old{opacity:.55}
 @keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 .bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
@@ -110,7 +115,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
       <button class="btn" id="speedBtn" title="Скорость времени">×8</button>
-      <button class="btn" id="menuBtn" title="Меню">☰</button>
+      <button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
     <div class="card needs">
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
@@ -125,7 +130,7 @@ textarea{resize:vertical;min-height:64px}
     <div id="action"><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
-      <div class="zoom"><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
+      <div class="zoom"><button class="btn" id="centerBtn" title="Вернуться к персонажу" hidden>◎</button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
     </div>
   </div>
 </div>
@@ -153,10 +158,39 @@ textarea{resize:vertical;min-height:64px}
       <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span><kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
       <div class="tile"><b><span class="ic">🛴</span>Ехать</b><span>Самокаты стоят у остановок, каршеринг — у обочин, своя машина — у дома. Подойдите и нажмите <kbd>E</kbd>. Клик по карте — автопилот, <kbd>WASD</kbd> — руль.</span></div>
       <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
+      <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>Зажмите мышь и тяните — карта двигается. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
+      <div class="tile"><b><span class="ic">📢</span>Площади</b><span>На площади Свободы, Тысячелетия, Тукая и 1 Мая можно собрать людей: митинг, встреча или концерт. Жители тоже устраивают свои.</span></div>
       <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
     </div>
     <p>Энергию восстанавливает сон, сытость — еда, настроение — всё приятное. Деньги зарабатываются в офисе или дома за компьютером.</p>
     <div class="row"><button class="btn primary" id="howtoClose">Понятно, пошли</button></div>
+  </div>
+</div>
+
+<div class="modal" id="rallyModal" hidden>
+  <div class="box">
+    <h2>Собрать людей · <span id="rallyWhere"></span></h2>
+    <p>Жители поблизости подтянутся на площадь, полиция встанет по периметру. Вы организатор: встаньте в центр и выступите.</p>
+    <div class="field"><label>Что устраиваем</label><div id="rallyKind"><button class="btn on" data-k="rally">📢 Митинг</button><button class="btn" data-k="meet">🙋 Сбор / встреча</button><button class="btn" data-k="concert">🎵 Концерт</button></div></div>
+    <div class="field"><label for="rallyTitle">Тема</label><input type="text" id="rallyTitle" maxlength="60" placeholder="Например: За чистый Булак"></div>
+    <div class="row"><button class="btn primary" id="rallyGo">Объявить сбор</button><button class="btn" id="rallyCancel">Отмена</button></div>
+  </div>
+</div>
+
+<div class="modal" id="speechModal" hidden>
+  <div class="box">
+    <h2 id="speechTitle">Выступление</h2>
+    <div class="chat" id="speechLog"></div>
+    <div class="row"><input type="text" id="speechText" placeholder="Скажите толпе…" maxlength="200" style="flex:1"><button class="btn primary" id="speechSay">В микрофон</button></div>
+    <div class="row"><button class="btn" id="speechClose">Сойти со сцены</button></div>
+  </div>
+</div>
+
+<div class="modal" id="logModal" hidden>
+  <div class="box">
+    <h2>Что происходит в городе</h2>
+    <div id="logList"></div>
+    <div class="row"><button class="btn" id="logClose">Закрыть</button></div>
   </div>
 </div>
 
@@ -190,5 +224,6 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/agents.js"></script>
 <script src="js/vehicles.js"></script>
 <script src="js/interior.js"></script>
+<script src="js/rally.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

@@ -7,10 +7,10 @@
 | Папка | Что внутри |
 |---|---|
 | `site/zhivaya-kazan.html` | Разметка, стили, HUD, модальные окна |
-| `site/js/` | Движок по модулям: `world` (граф, A*, переходы), `agents` (жители, машины, транспорт, ДТП), `vehicles` (самокат, каршеринг, своя машина, вождение), `interior` (интерьеры), `render` (2.5D-отрисовка), `main` (игрок, ввод, диалоги, цикл) |
+| `site/js/` | Движок по модулям: `rally` (Кремль, площади, митинги, концерты), `world` (граф, A*, переходы), `agents` (жители, машины, транспорт, ДТП), `vehicles` (самокат, каршеринг, своя машина, вождение), `interior` (интерьеры), `render` (2.5D-отрисовка), `main` (игрок, ввод, диалоги, цикл) |
 | `tools/dev_build.py`, `tools/smoke_test.py` | Локальная сборка и прогон в headless Chromium |
 | `site/kazan.json` | Карта центра (≈4,4×4,2 км): дороги с графом, здания, парки, вода, остановки, POI, маршруты. Генерируется из OSM |
-| `tools/fetch_osm.sh` | Запрос к Overpass API: скачивает сырые данные в `raw/kazan_osm.json` |
+| `tools/fetch_tiles.py` | Загрузка OSM плитками 3×3 с перебором зеркал Overpass (`--extras` — докачать стены Кремля и площади) |
 | `tools/build_map.py` | Превращает сырые данные в компактный `site/kazan.json` (локальные метры × 10, стыковка маршрутов, обрезка воды) |
 
 Страница не тянет ничего из сети — все данные лежат рядом в `kazan.json`.
@@ -18,8 +18,8 @@
 ## Пересобрать карту
 
 ```bash
-bash tools/fetch_osm.sh          # bbox задаётся внутри скрипта
-python3 tools/build_map.py       # raw/kazan_osm.json → site/kazan.json
+python3 tools/fetch_tiles.py raw/kazan_big.json   # bbox задаётся внутри скрипта
+python3 tools/build_map.py raw/kazan_big.json site/kazan.json
 ```
 
 ## Управление

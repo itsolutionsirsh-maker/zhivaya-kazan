@@ -30,8 +30,17 @@ function buildWorld(d){
     else if(/public|university|school|college|hospital|theatre|museum|government|civic|library|train_station|transportation/.test(t)){wall='#EADFC7';roof='#A08F78';}
     else{wall=WALLS[hsh%WALLS.length];roof=ROOFS[(hsh>>>8)%ROOFS.length];}
     const area=polyArea(p);const absA=Math.abs(area);let levels=b.h||(absA<60?1:2+(hsh>>>16)%4);if(absA<40)levels=1;
+    const nm=b.n||'';let dome=null,minarets=0,spire=null,pass=false;
+    if(/Кул-Шариф/.test(nm)){wall='#F3F2EE';roof='#CFE3E8';levels=Math.max(levels,8);dome='#2B9CB4';minarets=4;}
+    else if(/Сююмбике/.test(nm)){wall='#B4543A';roof='#9A4430';levels=19;spire='#3F7A5A';}
+    else if(/Благовещенский собор/.test(nm)){wall='#F6F4EE';roof='#B9C6D3';levels=Math.max(levels,5);dome='#2F6DB5';}
+    else if(/Дворец раиса/.test(nm)){wall='#F0D59A';roof='#B79E6B';}
+    else if(/башня/i.test(nm)||/castle_tower/.test(t)){wall='#F7F4EE';roof='#E5E0D6';levels=Math.max(levels,5);spire='#4F8A5B';pass=true;}
+    else if(/church|cathedral|chapel/.test(t)||/собор|церковь|храм|колокольня/i.test(nm)){wall='#F6F2EA';roof='#C9CED3';dome=/Петропавлов/.test(nm)?'#5E9E6E':'#C9A13B';if(/колокольня/i.test(nm)){levels=Math.max(levels,14);spire='#C9A13B';dome=null;}}
+    else if(/mosque/.test(t)||/мечеть/i.test(nm)){wall='#F4F1EA';roof='#D3E2DE';dome='#3FA39B';minarets=1;}
+    else if(t==='place_of_worship'){wall='#F4F1EA';roof='#D8D6CC';dome='#3FA39B';}
     const hm=Math.min(levels,22)*3.1*K_H;
-    const o={p,h:levels,hm,n:b.n||'',t,bb:[x0,y0,x1,y1],cx:cx/n,cy:cy/n,i,wall,roof,sgn:area>0?1:-1,area:absA,lit:(hsh>>>4)%10<7,dash:(hsh>>>12)%7*0.3};bgrid.add(o,x0,y0,x1,y1);return o;});
+    const o={p,h:levels,hm,n:b.n||'',t,bb:[x0,y0,x1,y1],cx:cx/n,cy:cy/n,i,wall,roof,sgn:area>0?1:-1,area:absA,lit:(hsh>>>4)%10<7,dash:(hsh>>>12)%7*0.3,dome,minarets,spire,pass};bgrid.add(o,x0,y0,x1,y1);return o;});
   // площади
   const areas=d.areas.map(a=>{const p=new Float32Array(a.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let k=0;k<a.p.length;k+=2){p[k]=a.p[k]/10;p[k+1]=a.p[k+1]/10;if(p[k]<x0)x0=p[k];if(p[k]>x1)x1=p[k];if(p[k+1]<y0)y0=p[k+1];if(p[k+1]>y1)y1=p[k+1];}return {k:a.k,p,bb:[x0,y0,x1,y1]};});
   // деревья и припаркованные машины
@@ -57,6 +66,7 @@ function buildWorld(d){
   world.lamps=lamps;world.lgrid=lgrid;
   const pedNodes=[],carNodes=[];for(let i=0;i<N;i++){if(pedAdj[i].length)pedNodes.push(i);if(carAdj[i].length)carNodes.push(i);}
   world.pedNodes=pedNodes;world.carNodes=carNodes;
+  initLandmarks(d);
   return world;
 }
 
@@ -64,9 +74,16 @@ function nearestRoadSeg(x,y,maxR){let best=null;world.rgrid.query(x-maxR,y-maxR,
 function nearestNode(x,y,adj,maxR){let best=-1,bd=(maxR||120)**2;
   for(let r=60;r<=(maxR||120);r+=60){world.ngrid.query(x-r,y-r,x+r,y+r,i=>{if(adj&&adj[i].length===0)return;const p=world.nodes[i];const d=(p[0]-x)**2+(p[1]-y)**2;if(d<bd){bd=d;best=i;}});if(best>=0)break;}
   return best;}
-function inBuilding(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(x<b.bb[0]||x>b.bb[2]||y<b.bb[1]||y>b.bb[3])return;if(pointInPoly(b.p,x,y)){hit=b;return false;}});return hit;}
+function inBuilding(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(b.pass)return;if(x<b.bb[0]||x>b.bb[2]||y<b.bb[1]||y>b.bb[3])return;if(pointInPoly(b.p,x,y)){hit=b;return false;}});return hit;}
 function nearestRoadName(x,y){const ns=nearestRoadSeg(x,y,60);if(ns&&ns.seg.r.n)return ns.seg.r.n;let best='',bd=80*80;world.rgrid.query(x-80,y-80,x+80,y+80,s=>{if(!s.r.n)return;const d=(s.ax-x)**2+(s.ay-y)**2;if(d<bd){bd=d;best=s.r.n;}});return best;}
-function nodeNear(list,center,R){for(let k=0;k<40;k++){const n=pick(list);const p=world.nodes[n];if(dist(p[0],p[1],center[0],center[1])<R)return n;}return pick(list);}
+// если пешеходная дорожка попала внутрь проезжей части — сдвинуть на тротуар (переходы поперёк дороги не трогаем)
+function pushOffRoad(x,y,dx,dy){const ns=nearestRoadSeg(x,y,12);if(!ns||ns.seg.r.c>8||ns.d>=ns.seg.r.hw+0.9)return null;const s=ns.seg;const ux=(s.bx-s.ax)/s.L,uy=(s.by-s.ay)/s.L;if(Math.abs(dx*ux+dy*uy)<0.55)return null;
+  let nx=x-ns.px,ny=y-ns.py;const d=Math.hypot(nx,ny);if(d<0.05){nx=-uy;ny=ux;}else{nx/=d;ny/=d;}const off=s.r.hw+1.2;return [ns.px+nx*off,ns.py+ny*off];}
+// точка на тротуаре рядом с узлом (а не на оси дороги)
+function sidewalkPos(node){const p=world.nodes[node];let best=null;for(const e of world.pedAdj[node]||[]){const r=world.roads[e[2]];if(r.c>8)return [p[0],p[1]];if(!best||r.hw>best.r.hw)best={e,r};}
+  if(!best)return [p[0],p[1]];const q=world.nodes[best.e[0]];const L=dist(p[0],p[1],q[0],q[1])||1;const dx=(q[0]-p[0])/L,dy=(q[1]-p[1])/L;const off=best.r.hw+SIDEWALK*0.55;const sgn=Math.random()<0.5?1:-1;
+  let x=p[0]-dy*off*sgn+dx*Math.min(2,L/2),y=p[1]+dx*off*sgn+dy*Math.min(2,L/2);if(inBuilding(x,y)){x=p[0]+dy*off*sgn+dx*Math.min(2,L/2);y=p[1]-dx*off*sgn+dy*Math.min(2,L/2);}return [x,y];}
+function nodeNear(list,center,R){const adj=list===world.carNodes?world.carAdj:world.pedAdj;const cx=center[0],cy=center[1];const c=[];world.ngrid.query(cx-R,cy-R,cx+R,cy+R,i=>{if(!adj[i].length)return;const p=world.nodes[i];if((p[0]-cx)**2+(p[1]-cy)**2<R*R)c.push(i);});return c.length?pick(c):pick(list);}
 
 // ---------- A* ----------
 let gArr,stampArr,cameArr,gen=0;
@@ -88,5 +105,6 @@ function processPaths(n){while(n-->0&&pathQueue.length){const q=pathQueue.shift(
 function pathToWaypoints(path,adj,side){const wps=[];if(!path||path.length<2)return wps;
   for(let i=0;i<path.length-1;i++){const a=world.nodes[path[i]],b=world.nodes[path[i+1]];const L=dist(a[0],a[1],b[0],b[1])||1;const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;const e=adj[path[i]].find(q=>q[0]===path[i+1]);const r=e?world.roads[e[2]]:null;
     const off=side==='car'?(r?Math.max(1.2,r.hw*0.5):1.5):(r&&r.c<=8?r.hw+1.3:0);
-    wps.push([a[0]-dy*off,a[1]+dx*off]);wps.push([b[0]-dy*off,b[1]+dx*off]);}
+    let p1=[a[0]-dy*off,a[1]+dx*off],p2=[b[0]-dy*off,b[1]+dx*off];if(side==='ped'&&r&&r.c>8){p1=pushOffRoad(p1[0],p1[1],dx,dy)||p1;p2=pushOffRoad(p2[0],p2[1],dx,dy)||p2;}
+    wps.push(p1);wps.push(p2);}
   return wps;}

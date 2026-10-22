@@ -20,7 +20,7 @@ let activeCrossings=[];   // переходы, где сейчас есть пе
 let carSee=16;            // дальность, с которой водители замечают пешехода
 
 class Walker{
-  constructor(role,node){this.role=role;this.p=makePersona(role);this.node=node;const n=world.nodes[node];this.x=n[0];this.y=n[1];this.path=null;this.seg=0;this.t=0;this.spd=role==='courier'?3.4:rnd(2.0,2.9);this.state='idle';this.ttl=rnd(0,3);this.off=rnd(-0.6,0.6);this.hx=1;this.hy=0;this.phase=rnd(0,6);this.waitStop=null;this.bus=null;this.anchor=null;this.gatherTtl=0;this.road=null;}
+  constructor(role,node){this.role=role;this.p=makePersona(role);this.node=node;const n=sidewalkPos(node);this.x=n[0];this.y=n[1];this.path=null;this.seg=0;this.t=0;this.spd=role==='courier'?3.4:rnd(2.0,2.9);this.state='idle';this.ttl=rnd(0,3);this.off=rnd(-0.6,0.6);this.hx=1;this.hy=0;this.phase=rnd(0,6);this.waitStop=null;this.bus=null;this.anchor=null;this.gatherTtl=0;this.road=null;}
   newGoal(){let goal=-1;
     if(this.role==='guard'){this.state='idle';this.ttl=rnd(3,8);return;}
     if(this.role==='police'&&this.anchor){const a=this.anchor;goal=nearestNode(a[0]+rnd(-220,220),a[1]+rnd(-220,220),world.pedAdj,200);}
@@ -34,19 +34,22 @@ class Walker{
     if(this.bus)return;
     switch(this.state){
       case 'idle':this.ttl-=dt;if(this.role==='guard'){const k=performance.now()/1000;this.x=this.gx+Math.sin(k*0.7+this.p.id)*0.5;this.y=this.gy+Math.cos(k*0.5+this.p.id)*0.4;}if(this.ttl<=0)this.newGoal();return;
+      case 'rally':rallyFace(this);this.phase+=dt*0.6;return;
       case 'gather':this.gatherTtl-=dt;if(this.gatherTtl<=0){this.state='idle';this.ttl=1;}return;
       case 'wait':this.ttl-=dt;if(this.ttl<=0){this.waitStop=null;this.state='idle';this.ttl=1;}return;
       case 'hurt':this.ttl-=dt;if(this.ttl<=0)this.recover();return;
       case 'cross':{const d=dist(this.x,this.y,this.tx,this.ty);const st=this.crossSpd*dt;if(d<=st){this.x=this.tx;this.y=this.ty;this.node=nearestNode(this.x,this.y,world.pedAdj,80);if(this.node<0)this.node=pick(world.pedNodes);this.state='idle';this.ttl=0.5;return;}this.hx=(this.tx-this.x)/d;this.hy=(this.ty-this.y)/d;this.x+=this.hx*st;this.y+=this.hy*st;this.phase+=dt*6;return;}
-      case 'walk':break;
+      case 'approach':{const sl=this.rallySlot;if(!sl){this.state='idle';this.ttl=1;return;}const d=dist(this.x,this.y,sl[0],sl[1]);const st=this.spd*dt;if(d<=st){this.x=sl[0];this.y=sl[1];this.state='rally';rallyFace(this);return;}this.hx=(sl[0]-this.x)/d;this.hy=(sl[1]-this.y)/d;this.x+=this.hx*st;this.y+=this.hy*st;this.phase+=dt*8;return;}
+      case 'walk':if(this.rallySlot){this.losT=(this.losT||0)-dt;if(this.losT<=0){this.losT=0.6;const sl=this.rallySlot;const d=dist(this.x,this.y,sl[0],sl[1]);if(d<35||(d<110&&clearLine(this.x,this.y,sl[0],sl[1]))){this.path=null;this.state='approach';return;}}}break;
       default:return;}
     let step=this.spd*dt*(weather.kind==='rain'?1.2:1);this.phase+=dt*7*(this.spd/2.4);
     while(step>0){const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);
       if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
     const edge=world.pedAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;this.road=r;const off=(r&&r.c<=8?r.hw+1.3:0)+this.off;
-    this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;}
-  arrive(){this.path=null;if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
+    this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;
+    if(r&&r.c>8&&Math.abs(this.x-player.x)<450&&Math.abs(this.y-player.y)<450){const q=pushOffRoad(this.x,this.y,dx,dy);if(q){this.x=q[0];this.y=q[1];}}}
+  arrive(){this.path=null;if(this.rallySlot){this.x=this.rallySlot[0];this.y=this.rallySlot[1];this.state='rally';rallyFace(this);return;}if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
     if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);}
     this.state='idle';this.ttl=rnd(6,45);}
   // перебежать дорогу не по переходу
@@ -55,7 +58,7 @@ class Walker{
     this.tx=this.x+dy*2*off;this.ty=this.y-dx*2*off;if(inBuilding(this.tx,this.ty))return false;
     this.path=null;this.goalPoi=null;this.goalStop=null;this.state='cross';this.crossSpd=rnd(1.3,2.1);this.road=r;return true;}
   hit(){this.state='hurt';this.ttl=160;this.path=null;this.goalPoi=null;this.goalStop=null;this.waitStop=null;}
-  recover(){const n=nodeNear(world.pedNodes,[player.x,player.y],500);this.node=n;const p=world.nodes[n];this.x=p[0];this.y=p[1];this.p=makePersona(this.role);this.state='idle';this.ttl=rnd(1,4);}
+  recover(){const n=nodeNear(world.pedNodes,[player.x,player.y],500);this.node=n;const p=sidewalkPos(n);this.x=p[0];this.y=p[1];this.p=makePersona(this.role);this.state='idle';this.ttl=rnd(1,4);}
 }
 
 // Общая проверка препятствий впереди: машины, аварии, пешеходы на дороге, занятые переходы
@@ -113,6 +116,7 @@ class Bus{
     if(player.bus===this){if(player.exitNext){leaveBus(stop);}else{const nx=this.upcoming();setHint(`${busWord(this.route.type)} ${this.route.ref} · «${stop.n}»${nx?' · следующая «'+nx.n+'»':''}`);}}
   }
 }
+function clearLine(x0,y0,x1,y1){const d=dist(x0,y0,x1,y1);const n=Math.ceil(d/2.5);for(let i=1;i<n;i++){const t=i/n;if(inBuilding(x0+(x1-x0)*t,y0+(y1-y0)*t))return false;}return true;}
 function busWord(t){return t==='tram'?'Трамвай':t==='trolleybus'?'Троллейбус':'Автобус';}
 
 // ---------- население ----------
@@ -126,9 +130,9 @@ function spawnPopulation(spawn){
 let bubbleTimer=0,jaywalkTimer=rnd(40,80);
 function updatePopulation(dt){
   bubbleTimer-=dt;if(bubbleTimer<=0){bubbleTimer=0.4;const px=player.x,py=player.y;let moved=0;
-    for(const w of walkers){if(moved>=5)break;if(w.role==='guard'||w.role==='police'||w.bus||w===chatNpc||w.state==='hurt')continue;if(dist(w.x,w.y,px,py)<360)continue;const n=nodeNear(world.pedNodes,[px,py],250);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<60)continue;w.node=n;w.x=p[0];w.y=p[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,2);w.p=makePersona(w.role);moved++;}
+    for(const w of walkers){if(moved>=5)break;if(w.role==='guard'||w.role==='police'||w.bus||w===chatNpc||w.state==='hurt'||w.rally||w.temp)continue;if(dist(w.x,w.y,px,py)<360)continue;const n=nodeNear(world.pedNodes,[px,py],250);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<60)continue;w.node=n;const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,2);w.p=makePersona(w.role);moved++;}
     moved=0;for(const c of cars){if(moved>=2)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.state==='scene'||dist(c.x,c.y,px,py)<720)continue;const n=nodeNear(world.carNodes,[px,py],450);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<110)continue;c.node=n;c.x=p[0];c.y=p[1];c.path=null;c.speed=0;c.state='idle';c.ttl=rnd(0,1);moved++;}}
-  jaywalkTimer-=dt;if(jaywalkTimer<=0){jaywalkTimer=rnd(45,100);const cand=walkers.filter(w=>w.state==='walk'&&w.role==='resident'&&dist(w.x,w.y,player.x,player.y)<260);for(let k=0;k<6&&cand.length;k++){const w=pick(cand);if(w.startCross()){if(Math.random()<0.5)addEvent(`${w.p.name} перебегает ${w.road.n||'дорогу'} не по переходу`);break;}}}
+  jaywalkTimer-=dt;if(jaywalkTimer<=0){jaywalkTimer=rnd(45,100);const cand=walkers.filter(w=>w.state==='walk'&&w.role==='resident'&&!w.rally&&dist(w.x,w.y,player.x,player.y)<260);for(let k=0;k<6&&cand.length;k++){const w=pick(cand);if(w.startCross()){if(Math.random()<0.5)addEvent(`${w.p.name} перебегает ${w.road.n||'дорогу'} не по переходу`);break;}}}
 }
 // пешеходы на дороге и занятые переходы — пересчёт каждый кадр
 function updateRoadPeds(){roadPeds=[];activeCrossings=[];
@@ -151,7 +155,7 @@ function dispatchAmbulance(ac){const hosp=world.pois.filter(p=>p.t==='hospital')
   amb.onScene=()=>{addEvent(ac.victim==='player'?'Скорая приехала за вами':'Скорая на месте, помогают пострадавшим');amb.sceneTtl=ac.victim==='player'?6:30;};cars.push(amb);ac.amb=amb;}
 function createAccident(o){const ac=Object.assign({t:0,cars:[],victim:null,kind:'cars',police:null,amb:null,cleared:false,reported:false,road:nearestRoadName(o.x,o.y)},o);accidents.push(ac);dispatchPolice(ac);dispatchAmbulance(ac);
   // зеваки
-  for(const w of walkers){if(w.role==='guard'||w.bus||w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,ac.x,ac.y)<70&&Math.random()<0.5){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,TAU);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
+  for(const w of walkers){if(w.role==='guard'||w.bus||w.rally||w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,ac.x,ac.y)<70&&Math.random()<0.5){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,TAU);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
   return ac;}
 function spawnRandomAccident(){
   let moving=cars.filter(c=>c.state==='drive'&&!c.crashed&&c.kind!=='police'&&c.kind!=='amb'&&c.speed>3&&dist(c.x,c.y,player.x,player.y)<450);

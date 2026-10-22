@@ -241,7 +241,45 @@ for e in els:
             add_area('land', ring)
 for p in plazas:
     areas.append({'k': 'plaza', 'p': p})
-order = {'water': 0, 'land': 1, 'forest': 2, 'cemetery': 2, 'park': 3, 'grass': 4, 'pitch': 5, 'parking': 6, 'plaza': 7}
+
+# ---------- площади (place=square) и пешеходные зоны ----------
+squares = []
+for e in els:
+    t = e.get('tags', {})
+    is_sq = t.get('place') == 'square'
+    is_ped = t.get('area:highway') == 'pedestrian' or (t.get('highway') == 'pedestrian' and (t.get('area') == 'yes' or e['type'] == 'relation'))
+    if not (is_sq or is_ped):
+        continue
+    rings = []
+    if e['type'] == 'way' and e.get('geometry') and e['nodes'][0] == e['nodes'][-1]:
+        rings = [[list(proj(p['lat'], p['lon'])) for p in e['geometry'][:-1]]]
+    elif e['type'] == 'relation':
+        rings = rings_from_members([m for m in e.get('members', []) if m['type'] == 'way' and m.get('role') in ('outer', '')])
+    for r in rings:
+        r = clip_poly(r, XMIN - PAD, YMIN - PAD, XMAX + PAD, YMAX + PAD)
+        if len(r) < 3 or poly_area(r) < 60:
+            continue
+        areas.append({'k': 'plaza', 'p': [q(v) for p in r for v in p]})
+        if is_sq and t.get('name'):
+            cx = sum(p[0] for p in r) / len(r); cy = sum(p[1] for p in r) / len(r)
+            squares.append({'n': t['name'], 'x': q(cx), 'y': q(cy), 'a': round(poly_area(r))})
+print('площади:', [(s['n'], s['a']) for s in squares])
+
+# ---------- стены (Кремль, ограды) ----------
+walls = []
+for e in els:
+    t = e.get('tags', {})
+    if e['type'] != 'way' or not e.get('geometry'):
+        continue
+    if t.get('historic') == 'citywalls' or t.get('barrier') == 'city_wall':
+        k = 'kremlin'
+    elif t.get('barrier') == 'wall':
+        k = 'wall'
+    else:
+        continue
+    walls.append({'k': k, 'p': [q(v) for g in e['geometry'] for v in proj(g['lat'], g['lon'])]})
+print('стен:', len(walls))
+order = {'water': 0, 'land': 1, 'forest': 2, 'cemetery': 2, 'park': 3, 'grass': 4, 'plaza': 5, 'pitch': 6, 'parking': 7}
 areas.sort(key=lambda a: order.get(a['k'], 9))
 print('площадей:', collections.Counter(a['k'] for a in areas))
 
@@ -428,7 +466,7 @@ out = {
     'meta': {'lat0': lat0, 'lon0': lon0, 'mlat': M_LAT, 'mlon': M_LON,
              'bbox': [q(XMIN), q(YMIN), q(XMAX), q(YMAX)], 'classes': ROAD_CLASSES},
     'nodes': nodes, 'roads': roads, 'buildings': buildings, 'areas': areas,
-    'stops': stops, 'pois': pois, 'routes': chosen, 'crossings': crossings,
+    'stops': stops, 'pois': pois, 'routes': chosen, 'crossings': crossings, 'squares': squares, 'walls': walls,
 }
 json.dump(out, open(DST, 'w'), ensure_ascii=False, separators=(',', ':'))
 import os
