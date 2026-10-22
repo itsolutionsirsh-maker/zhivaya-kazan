@@ -43,7 +43,7 @@ function findAction(){
     return {label:v.kind==='scooter'?'Оставить самокат здесь':'Припарковать и выйти',run:exitVehicle};}
   if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;if(player.busPlan)cancelTrip(true);setHint('Вы передумали ехать');}};
   // пришли с жителем к месту, о котором договорились — E заводит внутрь обоих (а не открывает разговор с ним)
-  if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return {label:`${a.label} вместе с ${companion.w.p.name}`,run:a.run};}
+  if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return {label:`${a.label} (${companion.w.p.name} с вами)`,run:a.run};}
   const ra=rallyAction();if(ra&&!/^Собрать/.test(ra.label))return ra;
   let best=null,bd=1e9;
   for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
@@ -84,7 +84,8 @@ function sleep(h){const before=Math.floor(clock.minutes/1440);clock.minutes+=h*6
 let chatNpc=null,chatBusy=false;
 const SCRIPTED={police:['Проходите, не задерживайтесь. Всё под контролем.','Документы при себе? Шучу. Хорошего дня.','Если видели ДТП — сообщите, пригодится.'],guard:['Сюда нельзя, пропуск нужен.','Стою тут с восьми. Погода ничего.','Камеры всё видят, имейте в виду.'],courier:['Извините, заказ стынет, бегу!','Весь день на самокате — ноги уже не чувствую.','На Баумана опять не проехать…'],staff:['Что будете заказывать?','Сегодня свежие эчпочмаки, рекомендую.','Минутку, сейчас подойду.'],resident:['Исәнмесез! Как сами?','Говорят, на Кольце пробка. Опять.','Вы не знаете, где тут нормальный кофе? Хотя я сама знаю, пойдёмте покажу.','Казань — лучший город, не спорьте.','Автобус десятый уже полчаса жду.','Рәхмәт за беседу, но я спешу.','Слышали, на набережной вечером салют?']};
 function openChat(w){chatNpc=w;player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
-  if(w.p.memory.length){for(const m of w.p.memory)appendMsg(m.role==='user'?'me':'npc',m.content);}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
+  $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
+  if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
   $('#brainLbl').textContent=sampleFn?'думает сам: мозги на Claude':'реплики по сценарию (без ИИ)';
   if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
 function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
@@ -123,7 +124,7 @@ function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'n
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});

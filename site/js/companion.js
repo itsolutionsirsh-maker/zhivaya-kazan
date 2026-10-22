@@ -24,7 +24,7 @@ function stopCompanion(silent){if(!companion)return;player.escort=false;player.w
   if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;updateCompBox();}
 function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':'Идти за ним';$('#compBye').textContent=going?'Передумать':'Отпустить';
   $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас в «${c.dest.n}» · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:`🤝 ${c.w.p.name} с вами`;}
-$('#compTalk').addEventListener('click',()=>{if(companion&&!companion.w.inside&&!player.busy)openChat(companion.w);});
+$('#compTalk').addEventListener('click',()=>{if(!companion||player.busy)return;if(scene==='interior'){const n=compNpcInside();if(n)openChat(n);return;}openChat(companion.w);});
 $('#compBye').addEventListener('click',()=>{if(!companion)return;const c=companion,w=c.w;if(c.mode==='go'&&c.dest&&!c.arrived){const t=pick(['Ну ладно, в другой раз!','Эх, жаль. Ну, бывай!','Хорошо, передумали так передумали.']);w.say={t,ttl:5};nearLine(w.p.name,t,false);w.p.memory.push({role:'user',content:'Слушай, я передумал, давай в другой раз.'},{role:'assistant',content:t});}stopCompanion();});
 $('#compFollow').addEventListener('click',()=>{player.escort=!player.escort;player.waypoints=null;updateCompBox();});
 // автопилот: игрок идёт за жителем, на дорогу выходит, только когда безопасно
@@ -62,10 +62,13 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
 function stepTo(w,T,spd,dt,force){const d=dist(w.x,w.y,T[0],T[1]);if(d<0.01)return;const st=Math.min(d,spd*dt);w.hx=(T[0]-w.x)/d;w.hy=(T[1]-w.y)/d;const nx=w.x+w.hx*st,ny=w.y+w.hy*st;if(unsafeStep(w.x,w.y,nx+w.hx*1.2,ny+w.hy*1.2))return;if(force||!inBuilding(nx,ny)){w.x=nx;w.y=ny;}else w.cwps=null;w.phase+=dt*8;}
 // при входе в помещение спутник заходит следом и садится рядом
 function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.some(n=>n.companionOf===w))return;
-  let x=it.w/2+1,y=it.h-1.6;const free=it.furn.find(f=>f.spot==='table'&&!f.taken);if(free){x=free.x+1.05;y=free.y;free.taken=false;}
-  it.npcs.push({p:w.p,x,y,hx:-1,hy:0,seated:!!free,phase:0,role:w.role,isInterior:true,state:'idle',memory:w.p.memory,companionOf:w});
-  addEvent(`${w.p.name} заходит с вами`,'say');}
-function companionContext(w){const ww=w.companionOf||w;if(!companion||companion.w!==ww)return '';const c=companion;return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в «${c.dest.n}».`:' Ты сейчас гуляешь вместе с собеседником.';}
+  let x=it.w/2+1,y=it.h-1.6;const free=it.furn.find(f=>f.spot==='table'&&!f.taken&&!f.comp);if(free){x=free.x+1.05;y=free.y;}
+  const npc={p:w.p,x,y,hx:-1,hy:0,seated:!!free,phase:0,role:w.role,isInterior:true,state:'idle',memory:w.p.memory,companionOf:w,tableF:free||null};it.npcs.push(npc);if(free)free.comp=npc;
+  const eat=free&&MENU[it.kind];addEvent(`${w.p.name} заходит с вами${eat?' и занимает столик — подходите, закажем':''}`,'say');
+  if(eat){const t=pick(['Я тут столик заняла, иди сюда!','Садись, я место заняла.','Вот свободный столик, давай сюда!']);npc.say={t:w.p.female?t:t.replace('заняла','занял'),ttl:6};}}
+function companionContext(w){const ww=w.companionOf||w;if(!companion||companion.w!==ww)return '';const c=companion;
+  if(w.companionOf&&interior){const f=w.tableF;return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.`;}
+  return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в «${c.dest.n}».`:' Ты сейчас гуляешь вместе с собеседником.';}
 function drawCompanionMark(toS,z){if(!companion||companion.w.inside||player.inside)return;const w=companion.w;const [sx,sy]=toS(w.x,w.y);
   ctx.save();ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(sx,sy,Math.max(1.3*z,9),0,TAU);ctx.stroke();ctx.setLineDash([]);
   ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(20,30,26,.85)';const t='🤝 '+w.p.name;const tw=ctx.measureText(t).width+12;rrect(ctx,sx-tw/2,sy+Math.max(1.3*z,9)+4,tw,17,6);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(t,sx,sy+Math.max(1.3*z,9)+13);

@@ -37,7 +37,7 @@ function makeInterior(kind,name,key){
 function enterInterior(src){const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}
   interior=it;scene='interior';player.inside=true;companionEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
-function exitInterior(){const it=interior;scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
+function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
   if(y>it.h-0.35-r){if(Math.abs(x-it.door.x)<0.85)return y>it.h+0.8;return true;}
@@ -51,7 +51,7 @@ function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
 function findActionInterior(){const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
-  for(const n of it.npcs){const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best={label:`Поговорить: ${n.p.name}, ${n.p.job}`,run:()=>openChat(n)};}}
+  for(const n of it.npcs){if(n.companionOf&&n.tableF&&!n.tableF.ordered)continue;const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best={label:`Поговорить: ${n.p.name}${n.companionOf?'':', '+n.p.job}`,run:()=>openChat(n)};}}
   if(best)return best;
   for(const f of it.furn){if(!f.spot)continue;const d=Math.max(Math.abs(px-f.x)-f.w/2,Math.abs(py-f.y)-f.h/2);if(d<1.0&&d<bd){const a=spotAction(f,it);if(a){bd=d;best=a;}}}
   if(best)return best;
@@ -60,7 +60,10 @@ function findActionInterior(){const it=interior;const px=player.ix,py=player.iy;
 function spotAction(f,it){const n=it.name;const price=it.kind==='bar'?500:350;
   switch(f.spot){
     case 'table':if(it.kind==='home')return {label:player.pantry>0?'Поесть (есть продукты)':'Поесть — продуктов нет, нужно купить',run:()=>{if(player.pantry>0){player.pantry--;player.food=clamp(player.food+35,0,100);clock.minutes+=25;addEvent('Перекусили дома. Сытость +35');}else setHint('Холодильник пуст. Продукты — в магазине');}};
+      if(f.comp&&!f.ordered)return {label:`Сесть за столик (там ${f.comp.p.name}) и заказать`,run:()=>openOrder(f,it)};
+      if(f.comp&&f.ordered)return {label:`Поговорить за столиком: ${f.comp.p.name}`,run:()=>openChat(f.comp)};
       if(f.taken){return {label:'Столик занят — подсесть и поболтать',run:()=>{const nb=it.npcs.find(q=>dist(q.x,q.y,f.x,f.y)<1.3);if(nb)openChat(nb);}};}
+      if(MENU[it.kind])return {label:'Сесть и заказать — меню',run:()=>openOrder(f,it)};
       return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);clock.minutes+=35;addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
     case 'counter':if(/cafe|bar/.test(it.kind))return {label:'Взять кофе с собой · 180 ₽',run:()=>spend(180,()=>{player.energy=clamp(player.energy+12,0,100);player.mood=clamp(player.mood+3,0,100);setHint('Кофе с собой. Энергия +12');})};
       if(it.kind==='bank')return {label:'Снять наличные',run:()=>setHint('Выдали наличные. Баланс тот же')};return {label:'Спросить у администратора',run:()=>setHint('«Чем могу помочь?» — пока ничем')};
@@ -137,3 +140,36 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
     case 'pew':ctx.fillStyle='#8B5E3C';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();ctx.fillStyle='#6E4B2F';ctx.fillRect(x,y,f.w,0.12);break;
     case 'altar':ctx.fillStyle='#D1B36B';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();break;
     default:ctx.fillStyle='#999';ctx.fillRect(x,y,f.w,f.h);}}
+
+// ===== Меню кафе и бара: поесть и выпить — одному или вместе со спутником (можно угостить) =====
+const MENU={
+  cafe:[{e:'🫖',n:'Чай с чак-чаком',p:220,food:15,mood:6,en:4,min:20},{e:'☕',n:'Капучино и десерт',p:350,food:20,mood:8,en:12,min:25},{e:'🥟',n:'Эчпочмак и айран',p:280,food:35,mood:5,en:5,min:20},{e:'🍲',n:'Обед: суп и горячее',p:550,food:60,mood:8,en:6,min:40}],
+  bar:[{e:'🍋',n:'Домашний лимонад',p:250,food:5,mood:6,en:3,min:15},{e:'🍺',n:'Пиво',p:400,food:5,mood:12,en:-4,min:30},{e:'🍗',n:'Крылышки и гренки',p:450,food:35,mood:8,en:2,min:30},{e:'🍔',n:'Бургер с картошкой',p:600,food:55,mood:10,en:4,min:35}]};
+let orderCtx=null;
+function compNpcInside(){return companion&&interior?interior.npcs.find(n=>n.companionOf===companion.w)||null:null;}
+function openOrder(f,it){const cn=f.comp||(compNpcInside()&&!it.furn.some(t=>t.comp)?compNpcInside():null);orderCtx={f,it,cn};player.busy=true;
+  $('#orderTitle').textContent=`«${it.name}» — меню`;
+  $('#orderSub').textContent=cn?`За столиком вы и ${cn.p.name}. Можно угостить — заказ на двоих, ${cn.p.female?'ей':'ему'} будет приятно. Или каждый платит за себя.`:'Выберите, что заказать.';
+  $('#orderTreatRow').hidden=!cn;if(cn){$('#orderTreatLbl').textContent='Я угощаю (заказ на двоих)';$('#orderTreat').checked=true;}
+  renderOrder();$('#orderModal').hidden=false;}
+function renderOrder(){if(!orderCtx)return;const {it,cn}=orderCtx;const treat=!!cn&&$('#orderTreat').checked;const list=$('#orderList');list.innerHTML='';
+  for(const m of MENU[it.kind]||MENU.cafe){const cost=m.p*(treat?2:1);const b=document.createElement('button');b.className='order-item';b.disabled=player.money<cost;
+    const l=document.createElement('span');l.textContent=`${m.e} ${m.n}`;const r=document.createElement('b');r.textContent=fmtMoney(cost);const d=document.createElement('i');d.textContent=`сытость +${m.food} · настроение +${m.mood+(cn?5:0)}`;
+    const col=document.createElement('div');col.append(l,d);b.append(col,r);b.addEventListener('click',()=>placeOrder(m,treat));list.append(b);}
+  $('#orderMoney').textContent=`У вас ${fmtMoney(player.money)}`;}
+function closeOrder(){$('#orderModal').hidden=true;player.busy=false;orderCtx=null;}
+const TREAT_THX=['Ой, спасибо! В следующий раз я угощаю.','Рәхмәт! Вот это по-нашему.','Спасибо, очень приятно!','Ну ты даёшь, спасибо! За встречу!'];
+const SELF_LINES=['Мне то же самое, я сам(а) заплачу.','Отлично, давно тут не была... то есть не был. Возьму себе тоже.','Хороший выбор. Я себе тоже возьму.'];
+function placeOrder(m,treat){if(!orderCtx)return;const {f,it,cn}=orderCtx;const cost=m.p*(treat?2:1);if(player.money<cost){setHint(`Не хватает денег: нужно ${fmtMoney(cost)}`);return;}
+  player.money-=cost;player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);clock.minutes+=m.min;
+  player.ix=f.x-1.05;player.iy=f.y;player.ihx=1;player.ihy=0;player.iwp=null;
+  if(cn){f.comp=cn;f.ordered=(f.ordered?f.ordered+', ':'')+m.n;cn.tableF=f;cn.x=f.x+1.05;cn.y=f.y;cn.seated=true;cn.hx=-1;cn.hy=0;
+    const w=companion?companion.w:null;const pp=cn.p;pp.mood=treat?'отличное':(pp.mood==='тревожное'||pp.mood==='уставшее'?'хорошее':pp.mood);pp.rel=(pp.rel||0)+(treat?10:4);
+    const t=treat?pick(TREAT_THX):pick(SELF_LINES).replace('сам(а)',pp.female?'сама':'сам').replace('давно тут не была... то есть не был',pp.female?'давно тут не была':'давно тут не был');
+    cn.say={t,ttl:6};nearLine(pp.name,t,false);pp.memory.push({role:'user',content:`[${player.name} ${treat?'угощает тебя':'сел(а) с тобой за столик, каждый платит за себя'}: ${m.n}, «${it.name}»]`});pp.memory.push({role:'assistant',content:t});
+    addEvent(`«${it.name}», вы и ${pp.name}: ${m.n}${treat?' (вы угостили)':''}. Сытость +${m.food}, настроение +${m.mood+5}`,'say');
+    closeOrder();setHint('Сидите вместе. E — поговорить');return;}
+  addEvent(`«${it.name}»: ${m.n}. Сытость +${m.food}, настроение +${m.mood}`);closeOrder();}
+$('#orderTreat').addEventListener('change',renderOrder);
+$('#orderClose').addEventListener('click',closeOrder);
+$('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||!interior)return;closeChat();openOrder(w.tableF,interior);});

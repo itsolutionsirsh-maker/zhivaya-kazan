@@ -81,6 +81,7 @@ body.chat-open #joy{display:none!important}
 #joy i{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.35);left:35px;top:35px;pointer-events:none}
 @media (pointer:coarse){#joy{display:block}}
 @media (max-width:640px){.brand small{display:none}.brand h1{font-size:13px}#mini{display:none}.needs{min-width:160px;font-size:11px}#feed{width:min(260px,58vw)}#feed .ev{font-size:11.5px;padding:5px 8px}.clock .t{font-size:18px}}
+.order-list{display:flex;flex-direction:column;gap:8px}.order-item{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}.order-item:hover:not(:disabled){border-color:rgba(43,176,98,.7);background:rgba(43,176,98,.1)}.order-item:disabled{opacity:.45;cursor:not-allowed}.order-item span{display:block;font-size:14px}.order-item i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}.order-item b{white-space:nowrap;font-size:14px}.order-treat{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.order-treat input{width:16px;height:16px;accent-color:#2BB062}
 .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,10,8,.62);pointer-events:auto;padding:16px;box-sizing:border-box;z-index:20}
 .modal .box{background:var(--panel-solid);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:min(100%,480px);max-height:min(92vh,780px);overflow:auto;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
 .modal h2{font-family:var(--font-display);font-size:17px;margin:0;font-weight:700;text-wrap:balance}
@@ -223,6 +224,16 @@ textarea{resize:vertical;min-height:64px}
   </div>
 </div>
 
+<div class="modal" id="orderModal" hidden>
+  <div class="box">
+    <h2 id="orderTitle">Меню</h2>
+    <p id="orderSub"></p>
+    <label class="order-treat" id="orderTreatRow" hidden><input type="checkbox" id="orderTreat"><span id="orderTreatLbl">Угостить</span></label>
+    <div id="orderList" class="order-list"></div>
+    <div class="row" style="justify-content:space-between;align-items:center"><span class="online" id="orderMoney"></span><button class="btn" id="orderClose">Не сейчас</button></div>
+  </div>
+</div>
+
 <div class="modal" id="logModal" hidden>
   <div class="box">
     <h2>Что происходит в городе</h2>
@@ -236,7 +247,7 @@ textarea{resize:vertical;min-height:64px}
     <div class="persona"><div class="face" id="npcFace">А</div><div><b id="npcName">Айрат</b><span id="npcJob">студент</span></div></div>
     <div class="chat" id="chatLog"></div>
     <div class="row"><input type="text" id="chatInput" placeholder="Скажите что-нибудь…" maxlength="200" style="flex:1"><button class="btn primary" id="chatSend">Сказать</button></div>
-    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl"></span><button class="btn" id="chatClose">Попрощаться</button></div>
+    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl"></span><span style="display:flex;gap:8px"><button class="btn" id="chatOrder" hidden>🍽 Заказать ещё</button><button class="btn" id="chatClose">Попрощаться</button></span></div>
   </div>
 </div>
 
