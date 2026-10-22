@@ -47,6 +47,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 #feed .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:10px;padding-top:1px;flex:none}
 #logList{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}#logList .ev{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;display:flex;gap:8px}#logList .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:11px;flex:none;padding-top:1px}#logList .ev.alert{border-color:rgba(220,58,68,.6)}#logList .ev.rally{border-color:rgba(142,68,173,.7)}
 #logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
+#feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
+#sayBar{display:flex;gap:8px;padding:8px;width:min(92vw,460px);box-sizing:border-box}#sayBar input{flex:1;min-width:0}
 #feed .ev.old{opacity:.55}
 @keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 .bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
@@ -115,7 +117,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
       <button class="btn" id="speedBtn" title="Скорость времени">×8</button>
-      <button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
+      <button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
     <div class="card needs">
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
@@ -127,7 +129,7 @@ textarea{resize:vertical;min-height:64px}
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="sayBar" class="card" hidden><input type="text" id="sayInput" maxlength="140" placeholder="Сказать вслух — услышат все рядом"><button class="btn primary" id="saySend">Сказать</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn" id="centerBtn" title="Вернуться к персонажу" hidden>◎</button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -158,6 +160,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span><kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
       <div class="tile"><b><span class="ic">🛴</span>Ехать</b><span>Самокаты стоят у остановок, каршеринг — у обочин, своя машина — у дома. Подойдите и нажмите <kbd>E</kbd>. Клик по карте — автопилот, <kbd>WASD</kbd> — руль.</span></div>
       <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
+      <div class="tile"><b><span class="ic">💬</span>Общаться</b><span><kbd>Enter</kbd> или 💬 — сказать вслух: облачко над головой видят все рядом, жители отвечают. Клик по жителю — личный разговор, клик по игроку — подойти и заговорить.</span></div>
       <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>Зажмите мышь и тяните — карта двигается. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
       <div class="tile"><b><span class="ic">📢</span>Площади</b><span>На площади Свободы, Тысячелетия, Тукая и 1 Мая можно собрать людей: митинг, встреча или концерт. Жители тоже устраивают свои.</span></div>
       <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
@@ -210,6 +213,7 @@ textarea{resize:vertical;min-height:64px}
     <div class="legend">
       <kbd>WASD</kbd><span>идти (Shift — бежать), клик по карте — пойти туда</span>
       <kbd>E</kbd><span>действие: поговорить, зайти, взять самокат, сесть в автобус</span>
+      <kbd>Enter</kbd><span>сказать вслух: услышат игроки и жители рядом</span>
       <kbd>колесо</kbd><span>масштаб</span>
       <kbd>Esc</kbd><span>закрыть окно</span>
     </div>
@@ -225,5 +229,6 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/vehicles.js"></script>
 <script src="js/interior.js"></script>
 <script src="js/rally.js"></script>
+<script src="js/talk.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

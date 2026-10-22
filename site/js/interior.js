@@ -106,7 +106,7 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';ctx.fillText(KIND_RU[it.kind]||KIND_RU.default,ox+ctx.measureText(it.name).width*1.45+12,oy+it.h*iz+35);
-  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg);}
+  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg);drawInteriorBubbles(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   switch(f.t){
     case 'table':ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.arc(f.x+0.1,f.y+0.12,f.w/2,0,TAU);ctx.fill();ctx.fillStyle=it.kind==='home'?'#E8DCC8':'#8B5E3C';ctx.beginPath();ctx.arc(f.x,f.y,f.w/2,0,TAU);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=0.05;ctx.stroke();
