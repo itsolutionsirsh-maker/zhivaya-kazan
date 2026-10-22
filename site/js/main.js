@@ -42,7 +42,7 @@ function findAction(){
   if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;setHint('Вы передумали ехать');}};
   const ra=rallyAction();if(ra&&!/^Собрать/.test(ra.label))return ra;
   let best=null,bd=1e9;
-  for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
+  for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside)continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
   if(best)return best;
   for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best=r.kind==='scooter'?{label:'Взять самокат · 50 ₽ + 6 ₽/мин',run:()=>enterVehicle(r)}:{label:'Взять каршеринг · 200 ₽ + 10 ₽/мин',run:()=>enterVehicle(r)};}}
   if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best={label:'Сесть в свою машину',run:()=>enterVehicle(ownCar)};}}
@@ -77,12 +77,14 @@ const SCRIPTED={police:['Проходите, не задерживайтесь. 
 function openChat(w){chatNpc=w;player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
   if(w.p.memory.length){for(const m of w.p.memory)appendMsg(m.role==='user'?'me':'npc',m.content);}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
   $('#brainLbl').textContent=sampleFn?'думает сам: мозги на Claude':'реплики по сценарию (без ИИ)';
-  if(!w.isInterior){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
-function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
+  if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
+function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
 async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text||chatBusy||!chatNpc)return;inp.value='';const w=chatNpc;appendMsg('me',text);w.p.memory.push({role:'user',content:text});chatBusy=true;let reply=null;
-  if(sampleFn){const bubble=appendMsg('npc','…');try{const ctxStr=contextForNpc(w);const mem=w.p.memory.slice(-10);while(mem.length&&mem[0].role!=='user')mem.shift();const turns=mem.map((m,i)=>i===0?{role:'user',content:ctxStr+'\n\nРеплика: '+m.content}:m);const res=await sampleFn(turns,{cache:false,modelTier:'quick',onText:({text})=>{bubble.textContent=text;}});reply=res.text.trim();bubble.textContent=reply;}catch(e){bubble.remove();if(e&&e.code==='not_granted'){sampleFn=null;$('#brainLbl').textContent='реплики по сценарию (ИИ не разрешён)';}}}
-  if(!reply){reply=pick(SCRIPTED[w.role]||SCRIPTED.resident);await new Promise(r=>setTimeout(r,400));appendMsg('npc',reply);}
+  let act=null;
+  if(sampleFn){const bubble=appendMsg('npc','…');try{const r=await npcThink(w);reply=r.reply;bubble.textContent=reply;act=r;}catch(e){bubble.remove();if(e&&e.code==='not_granted'){sampleFn=null;$('#brainLbl').textContent='реплики по сценарию (ИИ не разрешён)';}}}
+  if(!reply){const s=scriptedThink(w,text);reply=s?s.reply:pick(SCRIPTED[w.role]||SCRIPTED.resident);act=s;await new Promise(r=>setTimeout(r,400));appendMsg('npc',reply);}
+  if(act){const note=applyNpcAction(w,act);if(note)appendMsg('sys',note);}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);chatBusy=false;}
 function contextForNpc(w){let place;if(w.isInterior&&interior)place=`внутри «${interior.name}» (${KIND_RU[interior.kind]||'помещение'})`;else{const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,w.x,w.y)<80).slice(0,4).map(p=>p.n).join(', ');const road=nearestRoadName(w.x,w.y);place=`${road?'на улице '+road:'в центре'}${near?', рядом: '+near:''}`;}
   const rl=contextRallies(w.x||player.x,w.y||player.y);const ev=feed.slice(0,3).map(e=>e.text).join('; ')+(rl?'; '+rl:'');const pv=player.vehicle?(player.vehicle.kind==='scooter'?', подъехал на самокате':', подъехал на машине'):'';
@@ -188,7 +190,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     for(const b of buses)b.update(dt,vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
     updateAccidents(dt);updateRallies(dt);updateSay(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
-    if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}
+    if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
     cam.z=lerp(cam.z,cam.zt,Math.min(1,rdt*5));if(scene==='city'&&(cam.free&&(player.vehicle||player.bus||cine||player.state==='hurt')))followPlayer();if(scene==='city'&&!cam.free){cam.x=lerp(cam.x,player.x,Math.min(1,rdt*6));cam.y=lerp(cam.y,player.y,Math.min(1,rdt*6));}
     hudTimer-=rdt;if(hudTimer<=0){hudTimer=0.25;updateHud();}
     saveTimer-=rdt;if(saveTimer<=0){saveTimer=3;saveState();}

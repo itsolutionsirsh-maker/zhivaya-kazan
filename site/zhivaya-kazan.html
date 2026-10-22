@@ -48,6 +48,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 #logList{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}#logList .ev{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;display:flex;gap:8px}#logList .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:11px;flex:none;padding-top:1px}#logList .ev.alert{border-color:rgba(220,58,68,.6)}#logList .ev.rally{border-color:rgba(142,68,173,.7)}
 #logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
 #feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
+#compBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(43,176,98,.6);pointer-events:auto}#compBox .btn{padding:3px 8px;font-size:11px}
 #sayBar{display:flex;gap:8px;padding:8px;width:min(92vw,460px);box-sizing:border-box}#sayBar input{flex:1;min-width:0}
 #feed .ev.old{opacity:.55}
 @keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
@@ -129,7 +130,7 @@ textarea{resize:vertical;min-height:64px}
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><div id="sayBar" class="card" hidden><input type="text" id="sayInput" maxlength="140" placeholder="Сказать вслух — услышат все рядом"><button class="btn primary" id="saySend">Сказать</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="sayBar" class="card" hidden><input type="text" id="sayInput" maxlength="140" placeholder="Сказать вслух — услышат все рядом"><button class="btn primary" id="saySend">Сказать</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn" id="centerBtn" title="Вернуться к персонажу" hidden>◎</button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -230,5 +231,6 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/interior.js"></script>
 <script src="js/rally.js"></script>
 <script src="js/talk.js"></script>
+<script src="js/companion.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

@@ -12,14 +12,14 @@ function sayAloud(){const txt=$('#sayInput').value.trim().slice(0,140);if(!txt)r
   // жители рядом слышат и один из них отвечает
   const p=pos();let npc=null,bd=7;
   if(scene==='interior'&&interior){for(const n of interior.npcs){const d=dist(n.x,n.y,player.ix,player.iy);if(d<3&&d<bd){bd=d;npc=n;}}}
-  else for(const w of walkers){if(w.bus||w.state==='hurt'||w.rally)continue;const d=dist(w.x,w.y,p.x,p.y);if(d<bd){bd=d;npc=w;}}
+  else for(const w of walkers){if(w.bus||w.state==='hurt'||w.rally||w.inside)continue;const d=dist(w.x,w.y,p.x,p.y);if(d<bd){bd=d;npc=w;}}
   if(npc)npcReply(npc,txt);
   closeSayBar();}
-async function npcReply(w,txt){if(!w.isInterior){w.state='idle';w.ttl=Math.max(w.ttl,12);w.path=null;const dx=player.x-w.x,dy=player.y-w.y,L=Math.hypot(dx,dy)||1;w.hx=dx/L;w.hy=dy/L;}
+async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=Math.max(w.ttl,12);w.path=null;const dx=player.x-w.x,dy=player.y-w.y,L=Math.hypot(dx,dy)||1;w.hx=dx/L;w.hy=dy/L;}
   w.p.memory.push({role:'user',content:txt});let reply=null;
-  if(sampleFn){w.say={t:'…',ttl:20};try{const mem=w.p.memory.slice(-8);while(mem.length&&mem[0].role!=='user')mem.shift();const turns=mem.map((m,i)=>i===0?{role:'user',content:contextForNpc(w)+'\n\nЭто реплика вслух на улице, ответь одной короткой фразой (до 12 слов).\nРеплика: '+m.content}:m);
-      const res=await sampleFn(turns,{cache:false,modelTier:'quick'});reply=res.text.trim().replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
-  if(!reply)reply=pick(SCRIPTED[w.role]||SCRIPTED.resident);
+  let act=null;if(sampleFn){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов).');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
+  if(!reply){act=scriptedThink(w,txt);reply=act?act.reply:pick(SCRIPTED[w.role]||SCRIPTED.resident);}
+  if(act){const note=applyNpcAction(w,act);if(note)addEvent(note,'say');}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);
   w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};addEvent(`${w.p.name}: ${reply}`,'say');}
 // фразы других игроков (приходят через presence)

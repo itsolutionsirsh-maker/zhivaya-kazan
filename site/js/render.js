@@ -72,7 +72,7 @@ function render(){
   for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBusSprite(b);}
   drawRallyWorld(z,t);
   // ---- люди
-  if(z>1.5){for(const w of walkers){if(w.bus||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross',scale:1.5});}
+  if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross',scale:1.5});}
     for(const w of walkers){if(w.state==='hurt'&&w.x>vx0&&w.x<vx1&&w.y>vy0&&w.y<vy1)drawPerson(w.x,w.y,w.hx,w.hy,w.p,0,{lying:true,scale:1.5});}}
   // ---- игрок и другие игроки
   for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,{clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},t,false);}
@@ -103,6 +103,7 @@ function render(){
   if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg);}
   drawRallyLabels(toS,z);
   drawCityBubbles(toS,z);
+  drawCompanionMark(toS,z);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-30,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
   for(const w of walkers){if(w.state!=='cross'||z<2.5)continue;const [sx,sy]=toS(w.x,w.y);ctx.fillStyle='rgba(235,187,75,.95)';rrect(ctx,sx-8,sy-22,16,14,4);ctx.fill();ctx.fillStyle='#2B2200';ctx.fillText('!',sx,sy-15);}
   if(weather.rain.length){ctx.strokeStyle='rgba(120,150,190,.45)';ctx.lineWidth=1;ctx.beginPath();for(const r of weather.rain){const x=r[0]*W,y=r[1]*H;ctx.moveTo(x,y);ctx.lineTo(x-2,y+9*r[2]);}ctx.stroke();ctx.fillStyle='rgba(60,80,110,.12)';ctx.fillRect(0,0,W,H);}

@@ -34,6 +34,7 @@ class Walker{
     if(this.bus)return;
     switch(this.state){
       case 'idle':this.ttl-=dt;if(this.role==='guard'){const k=performance.now()/1000;this.x=this.gx+Math.sin(k*0.7+this.p.id)*0.5;this.y=this.gy+Math.cos(k*0.5+this.p.id)*0.4;}if(this.ttl<=0)this.newGoal();return;
+      case 'companion':return;
       case 'rally':rallyFace(this);this.phase+=dt*0.6;return;
       case 'gather':this.gatherTtl-=dt;if(this.gatherTtl<=0){this.state='idle';this.ttl=1;}return;
       case 'wait':this.ttl-=dt;if(this.ttl<=0){this.waitStop=null;this.state='idle';this.ttl=1;}return;
@@ -130,7 +131,7 @@ function spawnPopulation(spawn){
 let bubbleTimer=0,jaywalkTimer=rnd(40,80);
 function updatePopulation(dt){
   bubbleTimer-=dt;if(bubbleTimer<=0){bubbleTimer=0.4;const px=player.x,py=player.y;let moved=0;
-    for(const w of walkers){if(moved>=5)break;if(w.role==='guard'||w.role==='police'||w.bus||w===chatNpc||w.state==='hurt'||w.rally||w.temp)continue;if(dist(w.x,w.y,px,py)<360)continue;const n=nodeNear(world.pedNodes,[px,py],250);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<60)continue;w.node=n;const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,2);w.p=makePersona(w.role);moved++;}
+    for(const w of walkers){if(moved>=5)break;if(w.role==='guard'||w.role==='police'||w.bus||w===chatNpc||w.state==='hurt'||w.rally||w.temp||w.companion)continue;if(dist(w.x,w.y,px,py)<360)continue;const n=nodeNear(world.pedNodes,[px,py],250);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<60)continue;w.node=n;const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,2);w.p=makePersona(w.role);moved++;}
     moved=0;for(const c of cars){if(moved>=2)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.state==='scene'||dist(c.x,c.y,px,py)<720)continue;const n=nodeNear(world.carNodes,[px,py],450);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<110)continue;c.node=n;c.x=p[0];c.y=p[1];c.path=null;c.speed=0;c.state='idle';c.ttl=rnd(0,1);moved++;}}
   jaywalkTimer-=dt;if(jaywalkTimer<=0){jaywalkTimer=rnd(45,100);const cand=walkers.filter(w=>w.state==='walk'&&w.role==='resident'&&!w.rally&&dist(w.x,w.y,player.x,player.y)<260);for(let k=0;k<6&&cand.length;k++){const w=pick(cand);if(w.startCross()){if(Math.random()<0.5)addEvent(`${w.p.name} перебегает ${w.road.n||'дорогу'} не по переходу`);break;}}}
 }
@@ -155,7 +156,7 @@ function dispatchAmbulance(ac){const hosp=world.pois.filter(p=>p.t==='hospital')
   amb.onScene=()=>{addEvent(ac.victim==='player'?'Скорая приехала за вами':'Скорая на месте, помогают пострадавшим');amb.sceneTtl=ac.victim==='player'?6:30;};cars.push(amb);ac.amb=amb;}
 function createAccident(o){const ac=Object.assign({t:0,cars:[],victim:null,kind:'cars',police:null,amb:null,cleared:false,reported:false,road:nearestRoadName(o.x,o.y)},o);accidents.push(ac);dispatchPolice(ac);dispatchAmbulance(ac);
   // зеваки
-  for(const w of walkers){if(w.role==='guard'||w.bus||w.rally||w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,ac.x,ac.y)<70&&Math.random()<0.5){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,TAU);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
+  for(const w of walkers){if(w.role==='guard'||w.bus||w.rally||w.companion||w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,ac.x,ac.y)<70&&Math.random()<0.5){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,TAU);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
   return ac;}
 function spawnRandomAccident(){
   let moving=cars.filter(c=>c.state==='drive'&&!c.crashed&&c.kind!=='police'&&c.kind!=='amb'&&c.speed>3&&dist(c.x,c.y,player.x,player.y)<450);

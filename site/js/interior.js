@@ -35,7 +35,7 @@ function makeInterior(kind,name,key){
   }
   return it;}
 function enterInterior(src){const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}
-  interior=it;scene='interior';player.inside=true;it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
+  interior=it;scene='interior';player.inside=true;companionEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function exitInterior(){const it=interior;scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
 function blockedInside(x,y,r){const it=interior;

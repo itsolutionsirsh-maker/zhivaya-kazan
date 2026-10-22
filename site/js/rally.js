@@ -50,7 +50,7 @@ function sendTo(w,r,slot,isPolice){const n=nearestNode(slot[0],slot[1],world.ped
   if(dist(w.x,w.y,slot[0],slot[1])<6){w.x=slot[0];w.y=slot[1];w.state='rally';return;}
   w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing'||w.rally!==r)return;if(!path||path.length<2){w.x=slot[0];w.y=slot[1];w.state='rally';return;}w.path=path;w.seg=0;w.t=0;w.state='walk';});
   if(!isPolice){r.people.push(w);if(Math.random()<(r.kind==='rally'?0.55:r.kind==='meet'?0.2:0.05))w.sign=pick(SIGN_COLORS);}}
-function recruit(r,n){const sq=r.sq;const cand=[];for(const w of walkers){if(w.rally||w.bus||w.role!=='resident'||w===chatNpc)continue;if(w.state!=='walk'&&w.state!=='idle'&&w.state!=='wait')continue;const d=dist(w.x,w.y,sq.x,sq.y);if(d<160)cand.push([d,w]);}
+function recruit(r,n){const sq=r.sq;const cand=[];for(const w of walkers){if(w.rally||w.bus||w.role!=='resident'||w===chatNpc||w.companion)continue;if(w.state!=='walk'&&w.state!=='idle'&&w.state!=='wait')continue;const d=dist(w.x,w.y,sq.x,sq.y);if(d<160)cand.push([d,w]);}
   cand.sort((a,b)=>a[0]-b[0]);let added=0;
   for(const [,w] of cand){if(added>=Math.ceil(n/2))break;sendTo(w,r,slotFor(r,r.joined++));w.spd=Math.max(w.spd,3.2);added++;}
   while(added<n&&walkers.length<620){const R0=Math.max(30,sq.r*0.9)+10;let node=nodeNear(world.pedNodes,[sq.x,sq.y],R0+30);for(let k=0;k<6&&dist(world.nodes[node][0],world.nodes[node][1],sq.x,sq.y)<R0-5;k++)node=nodeNear(world.pedNodes,[sq.x,sq.y],R0+30);const w=new Walker('resident',node);w.spd=rnd(3,3.6);w.temp=true;walkers.push(w);sendTo(w,r,slotFor(r,r.joined++));added++;}}
@@ -66,7 +66,7 @@ function updateRallies(dt){
     else if(r.t>=r.dur&&r.by!=='player')endRally(r);
     else if(r.by==='player'&&r.t>=r.dur*1.6)endRally(r);}
   // временные жители, которые далеко от игрока и ничем не заняты, уходят
-  if(Math.random()<dt*0.5){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];if(w.temp&&!w.rally&&w!==chatNpc&&dist(w.x,w.y,player.x,player.y)>450){walkers.splice(i,1);}}}
+  if(Math.random()<dt*0.5){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];if(w.temp&&!w.rally&&!w.companion&&w!==chatNpc&&dist(w.x,w.y,player.x,player.y)>450){walkers.splice(i,1);}}}
   rallyTimer-=dt;if(rallyTimer<=0){rallyTimer=rnd(260,480);if(rallies.filter(r=>r.by==='npc').length<1&&world.squares.length){const near=world.squares.filter(s=>dist(s.x,s.y,player.x,player.y)<1100&&!rallyAt(s));const sq=near.length?pick(near):null;if(sq){const [k,t]=pick(NPC_RALLIES);startRally(sq,k,t,'npc');}}}}
 // стоящие на площади смотрят на центр
 function rallyFace(w){const r=w.rally;if(!r)return;const dx=r.sq.x-w.x,dy=r.sq.y-w.y;const L=Math.hypot(dx,dy)||1;
