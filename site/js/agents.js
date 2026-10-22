@@ -11,7 +11,8 @@ let nextId=1;
 function makePersona(role){const f=Math.random()<0.5;const name=pick(f?NAMES_F:NAMES_M);let job=pick(JOBS);
   if(role==='police')job='сотрудник полиции, патрульно-постовая служба';if(role==='guard')job='охранник';if(role==='courier')job='курьер на самокате';
   const clothes=role==='police'?'#2B3F8C':role==='guard'?'#1E1E1E':role==='courier'?'#F4B400':pick(CLOTHES);
-  return {id:nextId++,name,job,trait:pick(TRAITS),mood:pick(MOODS),age:Math.floor(rnd(18,72)),clothes,skin:pick(SKINS),hair:pick(HAIRS),female:f,role,memory:[]};}
+  const age=Math.floor(rnd(18,72));const hairStyle=role==='police'?4:(f?pick([0,1,1,1,2]):(age>55&&Math.random()<0.4?3:pick([0,0,0,2])));
+  return {id:nextId++,name,job,trait:pick(TRAITS),mood:pick(MOODS),age,clothes,skin:pick(SKINS),hair:pick(HAIRS),female:f,role,memory:[],hairStyle,bag:Math.random()<0.35?pick(['#3A3A3A','#7A4A2A','#C24A3A','#2A4A7A']):null,pants:pick(['#2B2F3A','#3C3C3C','#4A5A7A','#6B5A4A','#1F1F1F','#5A6B8C'])};}
 
 const walkers=[],cars=[],buses=[],accidents=[],policeCars=[];
 let roadPeds=[];          // пешеходы на проезжей части (этот кадр)

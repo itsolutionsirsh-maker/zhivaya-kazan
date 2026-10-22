@@ -3,7 +3,7 @@ const TIME_SCALES=[8,30,1];
 const player={x:0,y:0,hx:0,hy:1,phase:0,name:'Гость',desc:'',role:'resident',avatar:null,avatarImg:null,thumb:null,clothes:'#2F9E6B',skin:'#F1D3B5',hair:'#2B1B12',energy:92,food:80,mood:70,money:3000,pantry:0,waypoints:null,home:null,bus:null,waitingStop:null,exitNext:false,busy:false,state:'ok',vehicle:null,talkTarget:null,inside:false,ix:0,iy:0,ihx:0,ihy:-1,iwp:null,hasCar:true,carColor:'#C62828',hurtT:0};
 const clock={minutes:8*60+30,scale:8,day:1};
 const weather={kind:'clear',ttl:400,rain:[]};
-const cam={x:0,y:0,z:5.5,zt:5.5};
+const cam={x:0,y:0,z:5.5,zt:5.5};let LOD=1;
 const keys={};const flags={};
 let roomNs=null,sampleFn=null,peers=[],peerRender=new Map();
 const feedEl=$('#feed');const feed=[];
@@ -101,7 +101,7 @@ $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;play
 
 // ---------- сохранение ----------
 function saveState(){try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,minutes:clock.minutes,z:cam.zt,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.8,11);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.8,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
@@ -119,8 +119,8 @@ $('#howtoBtn').addEventListener('click',()=>{$('#menuModal').hidden=true;showHow
 $('#changeChar').addEventListener('click',()=>{$('#menuModal').hidden=true;showProfile();});
 $('#resetBtn').addEventListener('click',()=>{try{localStorage.removeItem('zk.state');localStorage.removeItem('zk.profile');localStorage.removeItem('zk.howto');}catch(e){}location.reload();});
 $('#speedBtn').addEventListener('click',()=>{const i=(TIME_SCALES.indexOf(clock.scale)+1)%TIME_SCALES.length;clock.scale=TIME_SCALES[i];$('#speedBtn').textContent='×'+clock.scale;});
-$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.8,11);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.8,11);});
-canvas.addEventListener('wheel',e=>{e.preventDefault();cam.zt=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.8,11);},{passive:false});
+$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.8,16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.8,16);});
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.zt=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.8,16);},{passive:false});
 let pdown=null;
 canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<180&&e.clientY>innerHeight-200)return;pdown={x:e.clientX,y:e.clientY,t:performance.now()};});
 canvas.addEventListener('pointerup',e=>{if(!pdown)return;const moved=Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y);pdown=null;if(moved>8||player.busy||player.bus||player.state==='hurt')return;

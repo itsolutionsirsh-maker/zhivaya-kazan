@@ -85,7 +85,7 @@ function spotAction(f,it){const n=it.name;const price=it.kind==='bar'?500:350;
 
 // ---------- отрисовка интерьера ----------
 const FLOORS={wood:['#C9A77A','#BE9A6C'],dark:['#4A3B33','#43352E'],tiles:['#DDD9D0','#D3CFC6'],marble:['#E7E3DC','#DDD8CF'],carpet:['#8C9AA6','#86939F'],rug:['#A8433B','#9A3C35']};
-function renderInterior(){const it=interior;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);
+function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);
   const iz=clamp(Math.min((W-40)/(it.w+1),(H-250)/(it.h+1.5)),16,46);const ox=(W-it.w*iz)/2,oy=Math.max(124,(H-it.h*iz)/2-10);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
   // пол
