@@ -15,6 +15,8 @@ QUERY="[out:json][timeout:240][maxsize:536870912];
   way[\"landuse\"~\"^(grass|forest|cemetery|meadow)$\"]$BB;
   way[\"natural\"=\"wood\"]$BB;
   node[\"highway\"=\"bus_stop\"]$BB;
+  node[\"highway\"~\"^(crossing|traffic_signals)$\"]$BB;
+  way[\"amenity\"=\"parking\"]$BB;
   node[\"railway\"=\"tram_stop\"]$BB;
   node[\"amenity\"~\"^(police|hospital|clinic|cafe|restaurant|fast_food|bar|pub|bank|atm|pharmacy|school|university|college|theatre|cinema|fuel|library|place_of_worship|marketplace)$\"]$BB;
   way[\"amenity\"~\"^(police|hospital|clinic|school|university|college|theatre|cinema|fuel|place_of_worship|marketplace)$\"]$BB;

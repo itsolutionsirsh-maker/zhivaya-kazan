@@ -229,6 +229,8 @@ for e in els:
             add_area('forest', pts)
         elif t.get('landuse') == 'cemetery':
             add_area('cemetery', pts)
+        elif t.get('amenity') == 'parking' and t.get('parking') not in ('underground', 'multi-storey', 'rooftop'):
+            add_area('parking', pts)
     elif e['type'] == 'relation' and t.get('natural') == 'water':
         outers = [m for m in e.get('members', []) if m['type'] == 'way' and m.get('role') in ('outer', '')]
         inners = [m for m in e.get('members', []) if m['type'] == 'way' and m.get('role') == 'inner']
@@ -238,9 +240,26 @@ for e in els:
             add_area('land', ring)
 for p in plazas:
     areas.append({'k': 'plaza', 'p': p})
-order = {'water': 0, 'land': 1, 'forest': 2, 'cemetery': 2, 'park': 3, 'grass': 4, 'pitch': 5, 'plaza': 6}
+order = {'water': 0, 'land': 1, 'forest': 2, 'cemetery': 2, 'park': 3, 'grass': 4, 'pitch': 5, 'parking': 6, 'plaza': 7}
 areas.sort(key=lambda a: order.get(a['k'], 9))
 print('площадей:', collections.Counter(a['k'] for a in areas))
+
+# ---------- пешеходные переходы ----------
+crossings = []
+for e in els:
+    if e['type'] != 'node':
+        continue
+    t = e.get('tags', {})
+    hw = t.get('highway')
+    if hw == 'crossing' or (hw == 'traffic_signals' and t.get('crossing')) or t.get('crossing') in ('marked', 'zebra', 'traffic_signals', 'uncontrolled'):
+        if t.get('crossing') == 'unmarked' or t.get('crossing') == 'no':
+            continue
+        x, y = proj(e['lat'], e['lon'])
+        if not inside(x, y):
+            continue
+        sig = 1 if (hw == 'traffic_signals' or t.get('crossing') == 'traffic_signals') else 0
+        crossings.append({'x': q(x), 'y': q(y), 's': sig})
+print('переходов:', len(crossings))
 
 # ---------- остановки и POI ----------
 stops = []
@@ -408,7 +427,7 @@ out = {
     'meta': {'lat0': lat0, 'lon0': lon0, 'mlat': M_LAT, 'mlon': M_LON,
              'bbox': [q(XMIN), q(YMIN), q(XMAX), q(YMAX)], 'classes': ROAD_CLASSES},
     'nodes': nodes, 'roads': roads, 'buildings': buildings, 'areas': areas,
-    'stops': stops, 'pois': pois, 'routes': chosen,
+    'stops': stops, 'pois': pois, 'routes': chosen, 'crossings': crossings,
 }
 json.dump(out, open(DST, 'w'), ensure_ascii=False, separators=(',', ':'))
 import os

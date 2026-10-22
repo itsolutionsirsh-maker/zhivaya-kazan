@@ -12,7 +12,7 @@
 }
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.4;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
-#map{position:fixed;inset:0;width:100%;height:100%;display:block;background:#E8E3D7;cursor:crosshair}
+#map{position:fixed;inset:0;width:100%;height:100%;display:block;background:#E4DFD3;cursor:crosshair}
 #hud{position:fixed;inset:0;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
 #hud > *{min-width:0}
 .top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -23,7 +23,6 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .clock{padding:8px 12px;display:flex;align-items:center;gap:12px}
 .clock .t{font-family:var(--font-mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
 .clock .meta{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
-.clock .meta b{color:var(--fg);font-weight:500}
 .btn{font:inherit;font-weight:600;font-size:12px;color:var(--fg);background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:9px;padding:6px 10px;cursor:pointer;pointer-events:auto;transition:background .15s}
 .btn:hover{background:rgba(255,255,255,.14)}
 .btn:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -50,6 +49,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 #actBtn{font-size:13px;padding:10px 16px;border-radius:12px;max-width:min(92vw,520px);white-space:normal;line-height:1.25}
 #actBtn kbd{font-family:var(--font-mono);background:rgba(0,0,0,.25);border-radius:5px;padding:1px 6px;margin-right:6px;font-size:11px}
 #hint{font-size:11px;color:var(--muted);background:var(--panel);padding:4px 10px;border-radius:8px;border:1px solid var(--line)}
+#vehBox{font-size:12px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;background:var(--panel);padding:5px 10px;border-radius:8px;border:1px solid var(--line);color:var(--fg)}
 .side{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
 .zoom{display:flex;flex-direction:column;gap:6px}
 .zoom .btn{width:38px;height:38px;padding:0;font-size:18px;display:grid;place-items:center}
@@ -59,17 +59,21 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 @media (pointer:coarse){#joy{display:block}}
 @media (max-width:640px){.brand small{display:none}.brand h1{font-size:13px}#mini{display:none}.needs{min-width:160px;font-size:11px}#feed{width:min(260px,58vw)}#feed .ev{font-size:11.5px;padding:5px 8px}.clock .t{font-size:18px}}
 .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,10,8,.62);pointer-events:auto;padding:16px;box-sizing:border-box;z-index:20}
-.modal .box{background:var(--panel-solid);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:min(100%,460px);max-height:min(92vh,760px);overflow:auto;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.modal .box{background:var(--panel-solid);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:min(100%,480px);max-height:min(92vh,780px);overflow:auto;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
 .modal h2{font-family:var(--font-display);font-size:17px;margin:0;font-weight:700;text-wrap:balance}
 .modal p{margin:0;color:var(--muted);font-size:13px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 input[type=text],textarea,select{font:inherit;color:var(--fg);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;box-sizing:border-box}
+input[type=color]{width:36px;height:28px;border:1px solid var(--line);border-radius:7px;background:none;padding:0;cursor:pointer}
 textarea{resize:vertical;min-height:64px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .avatarPick{display:flex;gap:12px;align-items:center}
 .avatarPick .pv{width:64px;height:64px;border-radius:50%;background:#2a3b33 center/cover;border:2px solid var(--accent);flex:none;display:grid;place-items:center;font-family:var(--font-display);font-size:22px}
 .avatarPick input{display:none}
+#clothes{display:flex;gap:7px;flex-wrap:wrap}
+#clothes .sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+#clothes .sw.on{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 .chat{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto;padding-right:4px}
 .chat .m{padding:8px 11px;border-radius:12px;font-size:13.5px;max-width:88%;line-height:1.35}
 .chat .m.npc{background:rgba(255,255,255,.07);align-self:flex-start;border-bottom-left-radius:4px}
@@ -90,6 +94,11 @@ textarea{resize:vertical;min-height:64px}
 .routes{display:flex;flex-wrap:wrap;gap:6px}
 .routes .chip{font-family:var(--font-mono);font-size:12px;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.08)}
 .routes .chip.bus{background:rgba(220,58,68,.35)}.routes .chip.tram{background:rgba(142,52,120,.4)}.routes .chip.trolleybus{background:rgba(43,176,98,.35)}
+.howto{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.howto .tile{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted)}
+.howto .tile b{color:var(--fg);font-size:13px;display:flex;align-items:center;gap:8px}
+.howto .tile .ic{font-size:20px}
+@media (max-width:480px){.howto{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -98,22 +107,22 @@ textarea{resize:vertical;min-height:64px}
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1><small>центр города · OpenStreetMap</small></div>
     <div class="card clock">
-      <div class="t" id="clock">08:00</div>
+      <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
-      <button class="btn" id="speedBtn" title="Скорость времени">×60</button>
+      <button class="btn" id="speedBtn" title="Скорость времени">×8</button>
       <button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
     <div class="card needs">
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
       <span class="lbl">Сытость</span><div class="bar" id="bFood"><i style="width:100%"></i></div>
       <span class="lbl">Настроение</span><div class="bar" id="bMood"><i style="width:70%"></i></div>
-      <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">2 000 ₽</b></div>
+      <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">3 000 ₽</b></div>
     </div>
   </div>
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -130,8 +139,24 @@ textarea{resize:vertical;min-height:64px}
     <div class="avatarPick"><div class="pv" id="avPreview">?</div><label class="btn" for="avFile">Загрузить фото</label><input type="file" id="avFile" accept="image/*"></div>
     <div class="field"><label for="pName">Имя</label><input type="text" id="pName" maxlength="24" placeholder="Например, Иршат"></div>
     <div class="field"><label for="pDesc">О себе</label><textarea id="pDesc" maxlength="160" placeholder="Кто вы, чем занимаетесь, какой характер — жители будут это знать"></textarea></div>
-    <div class="field"><label for="pRole">Роль</label><select id="pRole"><option value="resident">Житель</option><option value="tourist">Турист</option><option value="courier">Курьер</option><option value="student">Студент КФУ</option></select></div>
+    <div class="field"><label>Одежда</label><div id="clothes"><span class="sw on" data-c="#2F9E6B" style="background:#2F9E6B"></span><span class="sw" data-c="#D64545" style="background:#D64545"></span><span class="sw" data-c="#3E8ED0" style="background:#3E8ED0"></span><span class="sw" data-c="#F4B400" style="background:#F4B400"></span><span class="sw" data-c="#8E44AD" style="background:#8E44AD"></span><span class="sw" data-c="#212121" style="background:#212121"></span><span class="sw" data-c="#ECEFF1" style="background:#ECEFF1"></span><span class="sw" data-c="#E07B39" style="background:#E07B39"></span></div></div>
+    <div class="row"><div class="field" style="flex:1"><label for="pRole">Роль</label><select id="pRole"><option value="resident">Житель</option><option value="tourist">Турист</option><option value="courier">Курьер</option><option value="student">Студент КФУ</option></select></div>
+      <div class="field"><label for="pCar">Своя машина</label><div class="row" style="gap:8px"><input type="checkbox" id="pCar" checked><input type="color" id="pCarColor" value="#C62828" title="Цвет машины"></div></div></div>
     <div class="row"><button class="btn primary" id="startBtn">Выйти в город</button></div>
+  </div>
+</div>
+
+<div class="modal" id="howtoModal" hidden>
+  <div class="box">
+    <h2>Как тут жить</h2>
+    <div class="howto">
+      <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span><kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
+      <div class="tile"><b><span class="ic">🛴</span>Ехать</b><span>Самокаты стоят у остановок, каршеринг — у обочин, своя машина — у дома. Подойдите и нажмите <kbd>E</kbd>. Клик по карте — автопилот, <kbd>WASD</kbd> — руль.</span></div>
+      <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
+      <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
+    </div>
+    <p>Энергию восстанавливает сон, сытость — еда, настроение — всё приятное. Деньги зарабатываются в офисе или дома за компьютером.</p>
+    <div class="row"><button class="btn primary" id="howtoClose">Понятно, пошли</button></div>
   </div>
 </div>
 
@@ -147,560 +172,23 @@ textarea{resize:vertical;min-height:64px}
 <div class="modal" id="menuModal" hidden>
   <div class="box">
     <h2>Живая Казань</h2>
-    <p>Прототип городской симуляции: реальные улицы, дома и маршруты центра Казани из OpenStreetMap, жители-боты, транспорт и происшествия.</p>
+    <p>Прототип городской симуляции: реальные улицы, дома и маршруты центра Казани из OpenStreetMap, жители-боты, транспорт, происшествия и интерьеры.</p>
     <div class="legend">
       <kbd>WASD</kbd><span>идти (Shift — бежать), клик по карте — пойти туда</span>
-      <kbd>E</kbd><span>действие: поговорить, зайти, сесть в автобус</span>
+      <kbd>E</kbd><span>действие: поговорить, зайти, взять самокат, сесть в автобус</span>
       <kbd>колесо</kbd><span>масштаб</span>
       <kbd>Esc</kbd><span>закрыть окно</span>
     </div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
-    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
   </div>
 </div>
 
-<script>
-'use strict';
-(function(){
-const $=s=>document.querySelector(s);
-const canvas=$('#map'),ctx=canvas.getContext('2d');
-const mini=$('#mini'),mctx=mini.getContext('2d');
-const rnd=(a,b)=>a+Math.random()*(b-a);
-const pick=a=>a[Math.floor(Math.random()*a.length)];
-const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
-const lerp=(a,b,t)=>a+(b-a)*t;
-const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// ---------- данные города ----------
-let world=null;
-const ROAD_W=[14,12,11,9,7.5,6,6,5,4,4,2,1.5,1.5];
-const ROAD_SPEED=[22,18,14,12,11,9,8,5,5,0,0,0,0];
-const CLASS_RU=['магистраль','трасса','проспект','улица','улица','улица','улица','жилая улица','проезд','пешеходная зона','тротуар','тропа','лестница'];
-
-class Grid{
-  constructor(cell){this.cell=cell;this.m=new Map();}
-  key(cx,cy){return (cx+4096)*8192+(cy+4096);}
-  add(item,x0,y0,x1,y1){const c=this.cell;for(let cx=Math.floor(x0/c);cx<=Math.floor(x1/c);cx++)for(let cy=Math.floor(y0/c);cy<=Math.floor(y1/c);cy++){const k=this.key(cx,cy);let a=this.m.get(k);if(!a){a=[];this.m.set(k,a);}a.push(item);}}
-  query(x0,y0,x1,y1,cb){const c=this.cell,seen=new Set();for(let cx=Math.floor(x0/c);cx<=Math.floor(x1/c);cx++)for(let cy=Math.floor(y0/c);cy<=Math.floor(y1/c);cy++){const a=this.m.get(this.key(cx,cy));if(!a)continue;for(const it of a){if(seen.has(it))continue;seen.add(it);cb(it);}}}
-}
-
-function buildWorld(d){
-  const nodes=d.nodes.map(p=>[p[0]/10,p[1]/10]);
-  const N=nodes.length;
-  const roads=d.roads.map((r,i)=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of r.p){const p=nodes[n];if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}
-    const w=r.l?Math.min(ROAD_W[r.c]*1.4,r.l*3.1+1):ROAD_W[r.c];
-    return {c:r.c,n:r.n||'',o:r.o||0,p:r.p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i,speed:(r.s?r.s/3.6*0.9:ROAD_SPEED[r.c])||0};});
-  const pedAdj=Array.from({length:N},()=>[]),carAdj=Array.from({length:N},()=>[]);
-  for(const r of roads){for(let i=0;i<r.p.length-1;i++){const a=r.p[i],b=r.p[i+1];const L=dist(nodes[a][0],nodes[a][1],nodes[b][0],nodes[b][1]);if(L<0.05)continue;
-    if(r.c>=2){pedAdj[a].push([b,L,r.i]);pedAdj[b].push([a,L,r.i]);}
-    if(r.c<=8){if(r.o!==-1)carAdj[a].push([b,L,r.i]);if(r.o!==1)carAdj[b].push([a,L,r.i]);}}}
-  const bgrid=new Grid(80),buildings=d.buildings.map((b,i)=>{const p=new Float32Array(b.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,cx=0,cy=0;for(let k=0;k<b.p.length;k+=2){const x=b.p[k]/10,y=b.p[k+1]/10;p[k]=x;p[k+1]=y;cx+=x;cy+=y;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
-    const n=b.p.length/2;const o={p,h:b.h||(2+((i*7)%4)),n:b.n||'',t:b.t||'',bb:[x0,y0,x1,y1],cx:cx/n,cy:cy/n,i};bgrid.add(o,x0,y0,x1,y1);return o;});
-  const areas=d.areas.map(a=>{const p=new Float32Array(a.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let k=0;k<a.p.length;k+=2){p[k]=a.p[k]/10;p[k+1]=a.p[k+1]/10;if(p[k]<x0)x0=p[k];if(p[k]>x1)x1=p[k];if(p[k+1]<y0)y0=p[k+1];if(p[k+1]>y1)y1=p[k+1];}return {k:a.k,p,bb:[x0,y0,x1,y1]};});
-  const stops=d.stops.map((s,i)=>({x:s.x/10,y:s.y/10,n:s.n,k:s.k,i}));
-  const pois=d.pois.map((p,i)=>({x:p.x/10,y:p.y/10,t:p.t,n:p.n||'',st:p.st||'',i}));
-  const routes=d.routes.map((r,i)=>{const pts=[];for(let k=0;k<r.p.length;k+=2)pts.push([r.p[k]/10,r.p[k+1]/10]);const cum=[0];for(let k=0;k<pts.length-1;k++)cum.push(cum[k]+dist(pts[k][0],pts[k][1],pts[k+1][0],pts[k+1][1]));
-    return {ref:r.ref,name:r.name,type:r.type,pts,cum,len:cum[cum.length-1],stops:r.s.map(s=>({s:s[0],n:s[1]})),i};});
-  // сетка узлов для поиска ближайшего
-  const ngrid=new Grid(60);nodes.forEach((p,i)=>ngrid.add(i,p[0],p[1],p[0],p[1]));
-  const bb=d.meta.bbox.map(v=>v/10);
-  return {nodes,N,roads,pedAdj,carAdj,buildings,bgrid,areas,stops,pois,routes,ngrid,bbox:bb,meta:d.meta};
-}
-
-function nearestNode(x,y,adj,maxR){
-  let best=-1,bd=(maxR||120)**2;
-  for(let r=60;r<=(maxR||120);r+=60){world.ngrid.query(x-r,y-r,x+r,y+r,i=>{if(adj&&adj[i].length===0)return;const p=world.nodes[i];const d=(p[0]-x)**2+(p[1]-y)**2;if(d<bd){bd=d;best=i;}});if(best>=0)break;}
-  return best;
-}
-function pointInPoly(p,x,y){let inside=false;const n=p.length;for(let i=0,j=n-2;i<n;j=i,i+=2){const xi=p[i],yi=p[i+1],xj=p[j],yj=p[j+1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
-function inBuilding(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(hit)return;if(x<b.bb[0]||x>b.bb[2]||y<b.bb[1]||y>b.bb[3])return;if(pointInPoly(b.p,x,y))hit=b;});return hit;}
-function nearestRoadName(x,y){let best='',bd=60*60;for(const r of world.roads){if(!r.n||r.c>8)continue;if(x<r.bb[0]-40||x>r.bb[2]+40||y<r.bb[1]-40||y>r.bb[3]+40)continue;for(const n of r.p){const p=world.nodes[n];const d=(p[0]-x)**2+(p[1]-y)**2;if(d<bd){bd=d;best=r.n;}}}return best;}
-
-// ---------- A* ----------
-class Heap{constructor(){this.a=[];}push(f,v){const a=this.a;a.push([f,v]);let i=a.length-1;while(i>0){const p=(i-1)>>1;if(a[p][0]<=a[i][0])break;[a[p],a[i]]=[a[i],a[p]];i=p;}}pop(){const a=this.a;const top=a[0];const last=a.pop();if(a.length){a[0]=last;let i=0;for(;;){let l=2*i+1,r=l+1,m=i;if(l<a.length&&a[l][0]<a[m][0])m=l;if(r<a.length&&a[r][0]<a[m][0])m=r;if(m===i)break;[a[m],a[i]]=[a[i],a[m]];i=m;}}return top;}get size(){return this.a.length;}}
-let gArr,stampArr,cameArr,gen=0;
-function astar(adj,start,goal,costFn){
-  if(start<0||goal<0)return null;if(start===goal)return [start];
-  if(!gArr){gArr=new Float64Array(world.N);stampArr=new Int32Array(world.N);cameArr=new Int32Array(world.N);}
-  gen++;const nodes=world.nodes,gx=nodes[goal][0],gy=nodes[goal][1];
-  const h=new Heap();gArr[start]=0;stampArr[start]=gen;cameArr[start]=-1;h.push(0,start);let iter=0;
-  while(h.size){const [,u]=h.pop();if(u===goal){const path=[];let c=u;while(c!==-1){path.push(c);c=cameArr[c];}return path.reverse();}
-    if(++iter>30000)return null;const gu=gArr[u];
-    for(const [v,L,ri] of adj[u]){const ng=gu+L*costFn(world.roads[ri]);if(stampArr[v]!==gen||ng<gArr[v]){stampArr[v]=gen;gArr[v]=ng;cameArr[v]=u;const p=nodes[v];h.push(ng+Math.hypot(p[0]-gx,p[1]-gy)*0.95,v);}}}
-  return null;
-}
-const pedCost=r=>r.c<=4?1.6:(r.c>=9?0.85:1);
-const carCost=r=>r.c<=4?0.8:(r.c>=7?1.5:1);
-const pathQueue=[];
-function requestPath(agent,adj,start,goal,costFn,cb){pathQueue.push({agent,adj,start,goal,costFn,cb});}
-function processPaths(n){while(n-->0&&pathQueue.length){const q=pathQueue.shift();q.cb(astar(q.adj,q.start,q.goal,q.costFn));}}
-
-// ---------- персонажи ----------
-const NAMES_M=['Айрат','Ильдар','Марат','Рустем','Данил','Тимур','Артур','Руслан','Камиль','Булат','Ильнур','Наиль','Эмиль','Радик','Ринат','Саша','Дима','Антон','Фарид','Ленар'];
-const NAMES_F=['Гузель','Алсу','Ляйсан','Диляра','Аня','Карина','Эльвира','Регина','Зиля','Дина','Алина','Лейсан','Лиля','Милана','Ирина','Кристина','Айгуль','Чулпан','Полина','Наташа'];
-const JOBS=['студент КФУ','бариста в кофейне на Баумана','курьер','бухгалтер','таксист','учитель математики','программист','продавец в «Бахетле»','пенсионер, бывший инженер КАПО','экскурсовод по Кремлю','врач в РКБ','дизайнер','официант','мама в декрете','маркетолог','сантехник','юрист','повар, делает лучшие эчпочмаки','журналист','музыкант'];
-const TRAITS=['весёлый и болтливый','вечно спешит','ворчливый, но добрый','мечтатель','очень вежливый','любит давать советы','немного стеснительный','обожает Казань и рассказывает о ней','скептик','спортивный, бегает по набережной'];
-const MOODS=['хорошее','отличное','так себе','задумчивое','уставшее','праздничное'];
-const COLORS=['#D64545','#E07B39','#3E8ED0','#2F9E6B','#8E44AD','#C2185B','#1E88E5','#F4B400','#5D4037','#00897B','#6D4C41','#455A64'];
-let nextId=1;
-function makePersona(role){const f=Math.random()<0.5;const name=pick(f?NAMES_F:NAMES_M);let job=pick(JOBS);if(role==='police')job='сотрудник полиции, патрульно-постовая служба';if(role==='guard')job='охранник';if(role==='courier')job='курьер на самокате';
-  return {id:nextId++,name,job,trait:pick(TRAITS),mood:pick(MOODS),age:Math.floor(rnd(18,70)),color:role==='police'?'#2D4A9E':role==='guard'?'#3C3F44':role==='courier'?'#F4B400':pick(COLORS),female:f,memory:[]};}
-
-class Walker{
-  constructor(role,node){this.role=role;this.p=makePersona(role);this.node=node;const n=world.nodes[node];this.x=n[0];this.y=n[1];this.path=null;this.seg=0;this.t=0;this.speed=role==='courier'?2.4:rnd(1.1,1.7);this.state='idle';this.ttl=rnd(0,4);this.off=rnd(-0.6,0.6);this.hx=1;this.hy=0;this.waitStop=null;this.bus=null;this.anchor=null;this.gatherTtl=0;this.home=null;}
-  newGoal(){let goal=-1;
-    if(this.role==='guard'){this.state='idle';this.ttl=rnd(3,8);return;}
-    if(this.role==='police'&&this.anchor){const a=this.anchor;goal=nearestNode(a[0]+rnd(-220,220),a[1]+rnd(-220,220),world.pedAdj,200);}
-    else{const r=Math.random();if(r<0.45&&world.pois.length){const poi=pick(world.pois);goal=nearestNode(poi.x,poi.y,world.pedAdj,120);this.goalPoi=poi;}
-      else if(r<0.6&&world.stops.length){const s=pick(world.stops);goal=nearestNode(s.x,s.y,world.pedAdj,100);this.goalStop=s;}
-      else{goal=Math.floor(Math.random()*world.N);if(world.pedAdj[goal].length===0)goal=-1;}}
-    if(goal<0){this.state='idle';this.ttl=2;return;}
-    this.state='routing';requestPath(this,world.pedAdj,this.node,goal,pedCost,path=>{if(this.state!=='routing')return;if(!path||path.length<2){this.state='idle';this.ttl=rnd(1,5);this.goalPoi=null;this.goalStop=null;return;}this.path=path;this.seg=0;this.t=0;this.state='walk';});}
-  update(dt){
-    if(this.bus)return;
-    if(this.state==='idle'){this.ttl-=dt;if(this.role==='guard'){const k=performance.now()/1000;this.x=this.gx+Math.sin(k*0.7+this.p.id)*0.5;this.y=this.gy+Math.cos(k*0.5+this.p.id)*0.4;}if(this.ttl<=0)this.newGoal();return;}
-    if(this.state==='gather'){this.gatherTtl-=dt;if(this.gatherTtl<=0){this.state='idle';this.ttl=1;}return;}
-    if(this.state==='wait'){this.ttl-=dt;if(this.ttl<=0){this.waitStop=null;this.state='idle';this.ttl=1;}return;}
-    if(this.state!=='walk')return;
-    let step=this.speed*dt*(weather.kind==='rain'?1.25:1);
-    while(step>0){const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);
-      if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
-    const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
-    const edge=world.pedAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;const off=(r&&r.c<=8?r.hw+1.3:0)+this.off;
-    this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;}
-  arrive(){this.path=null;if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
-    if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);}
-    this.state='idle';this.ttl=rnd(6,45);}
-}
-
-class Car{
-  constructor(kind,node){this.kind=kind;this.node=node;const n=world.nodes[node];this.x=n[0];this.y=n[1];this.hx=1;this.hy=0;this.path=null;this.seg=0;this.t=0;this.speed=0;this.vmax=rnd(9,15);this.color=kind==='police'?'#F2F4F7':kind==='amb'?'#FFFFFF':kind==='taxi'?'#F4C542':pick(COLORS);this.state='idle';this.ttl=0;this.crashed=false;this.flash=kind==='police'||kind==='amb';this.len=kind==='amb'?5.6:4.5;this.wid=kind==='amb'?2.2:1.85;this.target=null;this.stuck=0;}
-  newGoal(goalNode){let goal=goalNode;if(goal==null||goal<0){do{goal=Math.floor(Math.random()*world.N);}while(world.carAdj[goal].length===0);}
-    this.state='routing';requestPath(this,world.carAdj,this.node,goal,carCost,path=>{if(this.crashed||this.state!=='routing')return;if(!path||path.length<2){this.state='idle';this.ttl=1;if(this.target==null)this.node=this.pickNode();return;}this.path=path;this.seg=0;this.t=0;this.state='drive';});}
-  pickNode(){let n;do{n=Math.floor(Math.random()*world.N);}while(world.carAdj[n].length===0);const p=world.nodes[n];this.x=p[0];this.y=p[1];return n;}
-  update(dt,vehicles){
-    if(this.crashed||this.state==='scene')return;
-    if(this.state==='idle'){this.ttl-=dt;if(this.ttl<=0)this.newGoal(this.target);return;}
-    if(this.state!=='drive')return;
-    const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
-    const edge=world.carAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;
-    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.kind==='police'&&this.state==='drive'&&this.target!=null)vlim*=1.4;
-    // поворот впереди — притормозить
-    const rem=L-this.t;if(rem<14&&this.seg+2<this.path.length){const pc=world.nodes[this.path[this.seg+2]];const L2=dist(pb[0],pb[1],pc[0],pc[1])||1;const d2x=(pc[0]-pb[0])/L2,d2y=(pc[1]-pb[1])/L2;const cos=dx*d2x+dy*d2y;if(cos<0.85)vlim=Math.min(vlim,4+cos*3);}
-    // препятствия впереди
-    let ahead=1e9;for(const v of vehicles){if(v===this)continue;const ox=v.x-this.x,oy=v.y-this.y;const f=ox*this.hx+oy*this.hy;if(f<=0||f>22)continue;const s=Math.abs(-ox*this.hy+oy*this.hx);if(s<(v.wid||2)*0.5+this.wid*0.5+0.4){const g=f-(v.len||4)*0.5-this.len*0.5;if(g<ahead)ahead=g;}}
-    for(const ac of accidents){const ox=ac.x-this.x,oy=ac.y-this.y;const f=ox*this.hx+oy*this.hy;if(f>0&&f<24&&Math.abs(-ox*this.hy+oy*this.hx)<4.5&&f-5<ahead)ahead=f-5;}
-    if(ahead<2.5)vlim=0;else if(ahead<12)vlim=Math.min(vlim,ahead*0.7);
-    if(vlim===0&&this.speed<0.1){this.stuck+=dt;if(this.stuck>25&&(this.kind==='car'||this.kind==='taxi')){this.stuck=0;this.state='idle';this.ttl=0.1;this.node=this.pickNode();return;}}else this.stuck=0;
-    this.speed+= clamp(vlim-this.speed,-9*dt,4*dt);if(this.speed<0)this.speed=0;
-    let step=this.speed*dt;
-    while(step>0){const a2=this.path[this.seg],b2=this.path[this.seg+1];const p1=world.nodes[a2],p2=world.nodes[b2];const L3=dist(p1[0],p1[1],p2[0],p2[1]);
-      if(this.t+step>=L3){step-=L3-this.t;this.seg++;this.t=0;this.node=b2;if(this.seg>=this.path.length-1){this.path=null;this.onArrive();return;}}else{this.t+=step;step=0;}}
-    const a3=this.path[this.seg],b3=this.path[this.seg+1];const q1=world.nodes[a3],q2=world.nodes[b3];const L4=dist(q1[0],q1[1],q2[0],q2[1])||1;const ex=(q2[0]-q1[0])/L4,ey=(q2[1]-q1[1])/L4;const e2=world.carAdj[a3].find(e=>e[0]===b3);const rr=e2?world.roads[e2[2]]:null;const off=rr?Math.max(1.2,rr.hw*0.5):1.5;
-    this.x=q1[0]+ex*this.t-ey*off;this.y=q1[1]+ey*this.t+ex*off;this.hx=lerp(this.hx,ex,0.4);this.hy=lerp(this.hy,ey,0.4);const hl=Math.hypot(this.hx,this.hy)||1;this.hx/=hl;this.hy/=hl;}
-  onArrive(){if(this.target!=null){this.target=null;this.state='scene';this.speed=0;this.onScene&&this.onScene();return;}if(this.kind==='amb'&&this.goHome){this.remove=true;return;}this.state='idle';this.ttl=this.kind==='police'?0.2:rnd(0,3);}
-}
-
-class Bus{
-  constructor(route,s,dir){this.route=route;this.s=s;this.dir=dir;this.speed=0;this.dwell=0;this.nextStop=null;this.x=0;this.y=0;this.hx=1;this.hy=0;this.len=route.type==='tram'?15:11;this.wid=2.5;this.passengers=[];this.lastStop=null;this.color=route.type==='bus'?'#D8323C':route.type==='tram'?'#8E3478':'#2BB062';this.place();}
-  place(){const r=this.route;let i=0;const cum=r.cum;while(i<cum.length-2&&cum[i+1]<this.s)i++;const L=cum[i+1]-cum[i]||1;const t=(this.s-cum[i])/L;const a=r.pts[i],b=r.pts[i+1];const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;const sg=this.dir;const px=a[0]+(b[0]-a[0])*t,py=a[1]+(b[1]-a[1])*t;const off=2.6;this.x=px-dy*sg*off;this.y=py+dx*sg*off;this.hx=lerp(this.hx,dx*sg,0.3);this.hy=lerp(this.hy,dy*sg,0.3);const hl=Math.hypot(this.hx,this.hy)||1;this.hx/=hl;this.hy/=hl;}
-  upcoming(){const st=this.route.stops;if(this.dir>0){for(const s of st)if(s.s>this.s+0.5)return s;}else{for(let i=st.length-1;i>=0;i--)if(st[i].s<this.s-0.5)return st[i];}return null;}
-  update(dt,vehicles){
-    if(this.dwell>0){this.dwell-=dt;if(this.dwell<=0){this.lastStop=this.nextStop;}return;}
-    const ns=this.upcoming();let vlim=this.route.type==='tram'?10:9.5;
-    if(ns){const d=Math.abs(ns.s-this.s);if(d<25)vlim=Math.min(vlim,2+d*0.35);if(d<0.6){this.s=ns.s;this.nextStop=ns;this.dwell=rnd(5,9);this.speed=0;this.atStop(ns);this.place();return;}}
-    else{const d=this.dir>0?this.route.len-this.s:this.s;if(d<30)vlim=Math.min(vlim,1.5+d*0.3);if(d<0.6){this.dir*=-1;this.dwell=rnd(20,40);this.speed=0;this.nextStop=null;return;}}
-    let ahead=1e9;for(const v of vehicles){if(v===this)continue;const ox=v.x-this.x,oy=v.y-this.y;const f=ox*this.hx+oy*this.hy;if(f<=0||f>26)continue;if(Math.abs(-ox*this.hy+oy*this.hx)<2.3){const g=f-(v.len||4)*0.5-this.len*0.5;if(g<ahead)ahead=g;}}
-    for(const ac of accidents){const ox=ac.x-this.x,oy=ac.y-this.y;const f=ox*this.hx+oy*this.hy;if(f>0&&f<30&&Math.abs(-ox*this.hy+oy*this.hx)<4&&f-7<ahead)ahead=f-7;}
-    if(ahead<3)vlim=0;else if(ahead<14)vlim=Math.min(vlim,ahead*0.6);
-    this.speed+=clamp(vlim-this.speed,-6*dt,2.2*dt);if(this.speed<0)this.speed=0;
-    this.s=clamp(this.s+this.speed*dt*this.dir,0,this.route.len);this.place();}
-  atStop(stop){
-    // высадка
-    this.passengers=this.passengers.filter(w=>{w.ride--;if(w.ride<=0){w.bus=null;w.x=this.x+rnd(-3,3);w.y=this.y+rnd(-3,3);w.node=nearestNode(w.x,w.y,world.pedAdj,100);w.state='idle';w.ttl=rnd(1,4);return false;}return true;});
-    // посадка
-    for(const w of walkers){if(w.state==='wait'&&dist(w.x,w.y,this.x,this.y)<16&&this.passengers.length<12){w.bus=this;w.ride=Math.floor(rnd(1,5));w.state='onbus';w.waitStop=null;this.passengers.push(w);}}
-    if(player.waitingStop&&!player.bus&&dist(player.x,player.y,this.x,this.y)<18){boardBus(this,stop);}
-    if(player.bus===this){if(player.exitNext){leaveBus(stop);}else{const nx=this.upcoming();setHint(`Автобус ${this.route.ref} · остановка «${stop.n}»${nx?' · следующая «'+nx.n+'»':''}`);}}
-  }
-}
-
-// ---------- состояние игры ----------
-const walkers=[],cars=[],buses=[],accidents=[],policeCars=[];let ambulances=[];
-const player={x:0,y:0,vx:0,vy:0,hx:0,hy:1,name:'Гость',desc:'',role:'resident',avatar:null,avatarImg:null,thumb:null,energy:92,food:80,mood:70,money:2000,waypoints:null,home:null,bus:null,waitingStop:null,exitNext:false,busy:false};
-const clock={minutes:8*60,speed:1,day:1};
-const weather={kind:'clear',ttl:400,rain:[]};
-const cam={x:0,y:0,z:3.4};
-const keys={};
-let roomNs=null,sampleFn=null,peers=[],peerRender=new Map();
-const feedEl=$('#feed');const feed=[];
-function addEvent(text,kind){const t=fmtTime();feed.unshift({t,text,kind});if(feed.length>6)feed.pop();renderFeed();}
-function renderFeed(){feedEl.innerHTML='';feed.forEach((e,i)=>{const d=document.createElement('div');d.className='ev'+(e.kind==='alert'?' alert':'')+(i>2?' old':'');const tm=document.createElement('span');tm.className='tm';tm.textContent=e.t;const tx=document.createElement('span');tx.textContent=e.text;d.append(tm,tx);feedEl.append(d);});}
-function fmtTime(){const h=Math.floor(clock.minutes/60)%24,m=Math.floor(clock.minutes%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
-let hintTtl=0;function setHint(t){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=4;}
-
-// ---------- запуск мира ----------
-function spawnAll(){
-  const bb=world.bbox;const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
-  const pedNodes=[];for(let i=0;i<world.N;i++)if(world.pedAdj[i].length)pedNodes.push(i);
-  const carNodes=[];for(let i=0;i<world.N;i++)if(world.carAdj[i].length)carNodes.push(i);
-  const bauman=world.roads.filter(r=>/Баумана/i.test(r.n));
-  let spawn=bauman.length?world.nodes[bauman[0].p[Math.floor(bauman[0].p.length/2)]]:[cx,cy];
-  player.x=spawn[0];player.y=spawn[1];cam.x=player.x;cam.y=player.y;
-  world.pedNodes=pedNodes;world.carNodes=carNodes;
-  const total=260;
-  for(let i=0;i<total;i++){const role=i<4?'police':i<12?'courier':'resident';const w=new Walker(role,nodeNear(pedNodes,spawn,i<60?120:600));if(role==='police'){w.anchor=[spawn[0]+rnd(-150,150),spawn[1]+rnd(-150,150)];}walkers.push(w);}
-  // охрана у банков и магазинов
-  const guardSpots=world.pois.filter(p=>p.t==='bank'||p.t==='market'||p.t==='museum');for(const g of guardSpots.slice(0,14)){const n=nearestNode(g.x,g.y,world.pedAdj,80);if(n<0)continue;const w=new Walker('guard',n);w.x=g.x+rnd(-2,2);w.y=g.y+rnd(-2,2);w.gx=w.x;w.gy=w.y;w.state='idle';w.ttl=9e9;walkers.push(w);}
-  const ncars=130;
-  for(let i=0;i<ncars;i++){const c=new Car(i<8?'taxi':'car',nodeNear(carNodes,spawn,i<50?350:900));c.ttl=rnd(0,2);cars.push(c);}
-  for(let i=0;i<3;i++){const c=new Car('police',pick(carNodes));c.vmax=16;c.ttl=rnd(0,2);cars.push(c);policeCars.push(c);}
-  for(const r of world.routes){const n=clamp(Math.round(r.len/1100),1,3);for(let i=0;i<n;i++){buses.push(new Bus(r,r.len*(i+0.3)/n,i%2?-1:1));}}
-  // дом игрока — жилой дом недалеко
-  const homes=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&dist(b.cx,b.cy,player.x,player.y)<350);player.home=homes.length?pick(homes):null;
-}
-
-function nodeNear(list,center,R){for(let k=0;k<40;k++){const n=pick(list);const p=world.nodes[n];if(dist(p[0],p[1],center[0],center[1])<R)return n;}return pick(list);}
-// Пузырь населения: кто ушёл далеко от игрока — незаметно переезжает ближе
-let bubbleTimer=0;
-function updateBubble(dt){bubbleTimer-=dt;if(bubbleTimer>0)return;bubbleTimer=0.5;const px=player.x,py=player.y;let moved=0;
-  for(const w of walkers){if(moved>=3)break;if(w.role==='guard'||w.role==='police'||w.bus||w===chatNpc)continue;if(dist(w.x,w.y,px,py)<750)continue;const n=nodeNear(world.pedNodes,[px,py],380);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<70)continue;w.node=n;w.x=p[0];w.y=p[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,2);w.p=makePersona(w.role);moved++;}
-  moved=0;for(const c of cars){if(moved>=2)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.state==='scene'||dist(c.x,c.y,px,py)<1000)continue;const n=nodeNear(world.carNodes,[px,py],600);const p=world.nodes[n];if(dist(p[0],p[1],px,py)<120)continue;c.node=n;c.x=p[0];c.y=p[1];c.path=null;c.speed=0;c.state='idle';c.ttl=rnd(0,1);moved++;}}
-// ---------- происшествия ----------
-let accidentTimer=rnd(25,50);
-function spawnAccident(){
-  let moving=cars.filter(c=>c.state==='drive'&&!c.crashed&&c.kind!=='police'&&c.kind!=='amb'&&c.speed>3&&dist(c.x,c.y,player.x,player.y)<450);
-  if(!moving.length)moving=cars.filter(c=>c.state==='drive'&&!c.crashed&&c.kind!=='police'&&c.kind!=='amb'&&c.speed>3);if(!moving.length)return;
-  const a=pick(moving);a.crashed=true;a.speed=0;a.path=null;a.state='crashed';
-  let b=cars.find(c=>c!==a&&!c.crashed&&c.kind!=='police'&&c.kind!=='amb'&&dist(c.x,c.y,a.x,a.y)<22);
-  if(!b){b=new Car('car',a.node);cars.push(b);b.x=a.x+a.hx*5.2;b.y=a.y+a.hy*5.2;const an=rnd(0.4,0.9)*(Math.random()<0.5?1:-1);b.hx=a.hx*Math.cos(an)-a.hy*Math.sin(an);b.hy=a.hx*Math.sin(an)+a.hy*Math.cos(an);}
-  b.crashed=true;b.speed=0;b.path=null;b.state='crashed';const an=rnd(0.25,0.5);const hx=a.hx*Math.cos(an)-a.hy*Math.sin(an),hy=a.hx*Math.sin(an)+a.hy*Math.cos(an);a.hx=hx;a.hy=hy;
-  const road=nearestRoadName(a.x,a.y);const ac={x:(a.x+b.x)/2,y:(a.y+b.y)/2,cars:[a,b],t:0,road,police:null,amb:null,cleared:false,reported:false};accidents.push(ac);
-  addEvent(`ДТП${road?' — '+road:''}: столкнулись две машины`,'alert');
-  // полиция
-  let best=null,bd=1e9;for(const p of policeCars){if(p.state==='scene'||p.target!=null)continue;const d=dist(p.x,p.y,ac.x,ac.y);if(d<bd){bd=d;best=p;}}
-  if(best){const n=nearestNode(ac.x,ac.y,world.carAdj,150);best.target=n;ac.police=best;best.onScene=()=>{addEvent(`Полиция прибыла на место ДТП${road?' ('+road+')':''}`);};if(best.state==='drive'){best.path=null;best.state='idle';best.ttl=0.05;}else{best.state='idle';best.ttl=0.05;}}
-  // скорая из ближайшей больницы
-  const hosp=world.pois.filter(p=>p.t==='hospital');if(hosp.length){let hb=hosp[0],hd=1e9;for(const h of hosp){const d=dist(h.x,h.y,ac.x,ac.y);if(d<hd){hd=d;hb=h;}}const hn=nearestNode(hb.x,hb.y,world.carAdj,200);if(hn>=0){const amb=new Car('amb',hn);amb.vmax=17;amb.target=nearestNode(ac.x,ac.y,world.carAdj,150);amb.homeNode=hn;amb.state='idle';amb.ttl=rnd(3,8);amb.onScene=()=>{addEvent('Скорая на месте ДТП, помогают пострадавшим');amb.sceneTtl=35;};cars.push(amb);ac.amb=amb;}}
-  // зеваки
-  for(const w of walkers){if(w.role==='guard'||w.bus||w.state==='wait')continue;if(dist(w.x,w.y,ac.x,ac.y)<75&&Math.random()<0.55){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,6.28);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
-}
-function sendAmbHome(amb){amb.target=null;amb.goHome=true;amb.onScene=null;amb.state='idle';amb.newGoal(amb.homeNode);}
-function updateAccidents(dt){
-  for(let i=accidents.length-1;i>=0;i--){const ac=accidents[i];ac.t+=dt;
-    if(ac.amb&&ac.amb.state==='scene'){ac.amb.sceneTtl-=dt;if(ac.amb.sceneTtl<=0){sendAmbHome(ac.amb);ac.amb=null;}}
-    if(ac.t>110&&!ac.cleared){ac.cleared=true;addEvent(`Эвакуатор убрал машины${ac.road?' ('+ac.road+')':''}, движение восстановлено`);
-      for(const c of ac.cars){c.crashed=false;c.state='idle';c.ttl=rnd(1,3);c.node=c.pickNode();}
-      if(ac.police){ac.police.state='idle';ac.police.ttl=1;ac.police.target=null;ac.police.onScene=null;}
-      if(ac.amb){if(ac.amb.state==='scene')sendAmbHome(ac.amb);else{ac.amb.target=null;ac.amb.goHome=true;}ac.amb=null;}
-      accidents.splice(i,1);}}
-}
-
-// ---------- автобус и игрок ----------
-function boardBus(bus,stop){player.bus=bus;player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${bus.route.type==='tram'?'трамвай':bus.route.type==='trolleybus'?'троллейбус':'автобус'} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая остановка: «${nx?nx.n:'конечная'}» · E — выйти`);}
-function leaveBus(stop){const b=player.bus;player.bus=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;addEvent(`Вы вышли на «${stop.n}»`);}
-
-// ---------- действия игрока ----------
-let currentAction=null;
-function findAction(){
-  if(player.bus){return {label:'Выйти на следующей остановке',key:'E',run:()=>{player.exitNext=true;setHint('Выйдем на следующей остановке');}};}
-  if(player.waitingStop){return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,key:'E',run:()=>{player.waitingStop=null;setHint('Вы передумали ехать');}};}
-  let best=null,bd=1e9;
-  for(const w of walkers){if(w.bus)continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,key:'E',run:()=>openChat(w)};}}
-  if(best)return best;
-  for(const s of world.stops){const d=dist(s.x,s.y,player.x,player.y);if(d<9&&d<bd){const rts=routesAtStop(s);if(!rts.length)continue;bd=d;best={label:`Остановка «${s.n}»: ждать ${rts.map(r=>r.ref).join(', ')}`,key:'E',run:()=>{player.waitingStop=s;player.x=s.x;player.y=s.y;setHint('Ждём транспорт… первый подошедший — ваш');}};}}
-  if(best)return best;
-  for(const poi of world.pois){const d=dist(poi.x,poi.y,player.x,player.y);if(d<11&&d<bd){const a=poiAction(poi);if(!a)continue;bd=d;best=a;}}
-  if(best)return best;
-  if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<22){return {label:'Домой: поспать до утра',key:'E',run:sleepHome};}
-  for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported){return {label:'Помочь на месте ДТП',key:'E',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}};}}
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n)return {label:`Зайти в «${b.n}»`,key:'E',run:()=>{setHint(`Вы заглянули в «${b.n}». Внутри пока тихо`);player.mood=clamp(player.mood+1,0,100);}};
-  return null;
-}
-function inBuildingNear(x,y){let hit=null;world.bgrid.query(x-6,y-6,x+6,y+6,b=>{if(hit||!b.n)return;if(dist(b.cx,b.cy,x,y)<Math.max(14,(b.bb[2]-b.bb[0])/2+6))hit=b;});return hit;}
-function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p=routePoint(r,st.s);return dist(p[0],p[1],s.x,s.y)<32;}));}
-function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
-function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  switch(poi.t){
-    case 'cafe':return {label:`Поесть в кафе ${n} · 350 ₽`,key:'E',run:()=>spend(350,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+6,0,100);addEvent(`Вы пообедали ${n?'в '+n:'в кафе'}. Эчпочмак был отличный`);})};
-    case 'bar':return {label:`Посидеть в баре ${n} · 500 ₽`,key:'E',run:()=>spend(500,()=>{player.mood=clamp(player.mood+14,0,100);player.energy=clamp(player.energy-8,0,100);addEvent(`Вечер в ${n||'баре'} удался`);})};
-    case 'shop':{const st=poi.st;
-      if(/^(convenience|supermarket|bakery|confectionery|kiosk|greengrocer|deli|pastry|butcher|frozen_food|dairy|tea|coffee|seafood)$/.test(st))return {label:`Купить перекус в ${n||'магазине'} · 120 ₽`,key:'E',run:()=>spend(120,()=>{player.food=clamp(player.food+18,0,100);addEvent(`Вы купили перекус${n?' в '+n:''}`);})};
-      if(/^(clothes|shoes|boutique|fashion|bag|jewelry|watches|fabric|leather)$/.test(st))return {label:`Обновить гардероб в ${n||'бутике'} · 2 500 ₽`,key:'E',run:()=>spend(2500,()=>{player.mood=clamp(player.mood+12,0,100);addEvent(`Обновка из ${n||'бутика'}. Настроение +12`);})};
-      if(/^(hairdresser|beauty|cosmetics|massage|tattoo|perfumery)$/.test(st))return {label:`Привести себя в порядок в ${n||'салоне'} · 900 ₽`,key:'E',run:()=>spend(900,()=>{player.mood=clamp(player.mood+9,0,100);clock.minutes+=50;addEvent(`После ${n||'салона'} — как новый. Настроение +9`);})};
-      if(/^(electronics|mobile_phone|computer|hifi|video_games)$/.test(st))return {label:`Посмотреть гаджеты в ${n||'магазине'}`,key:'E',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+3,0,100);setHint('Полчаса у витрин, ничего не купили. Настроение +3');}};
-      if(/^(alcohol|wine|beverages)$/.test(st))return {label:`Зайти в ${n||'винный'} · 700 ₽`,key:'E',run:()=>spend(700,()=>{player.mood=clamp(player.mood+6,0,100);addEvent(`Купили что-то к вечеру${n?' в '+n:''}`);})};
-      if(/^(books|stationery|art|music|gift|toys|florist)$/.test(st))return {label:`Заглянуть в ${n||'лавку'} · 500 ₽`,key:'E',run:()=>spend(500,()=>{player.mood=clamp(player.mood+7,0,100);addEvent(`Милый сувенир${n?' из '+n:''}. Настроение +7`);})};
-      if(/^(mall|department_store)$/.test(st))return {label:`Прогуляться по ${n||'торговому центру'}`,key:'E',run:()=>{clock.minutes+=60;player.mood=clamp(player.mood+5,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Час по этажам ТЦ. Настроение +5');}};
-      return {label:`Зайти в ${n||'магазин'}`,key:'E',run:()=>{player.mood=clamp(player.mood+1,0,100);setHint(`Вы заглянули в ${n||'магазин'}`);}};}
-    case 'office':return {label:`Подработать 2 часа в ${n||'офисе'} · +1 200 ₽`,key:'E',run:()=>{if(player.energy<15){setHint('Слишком устали для работы — поспите');return;}clock.minutes+=120;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа${n?' в '+n:''}: +1 200 ₽`);}};
-    case 'bank':case 'atm':return {label:`Снять наличные в ${n||'банкомате'}`,key:'E',run:()=>{setHint('Баланс тот же, но теперь наличными');}};
-    case 'theatre':return {label:`Сходить в ${n||'театр'} · 1 200 ₽`,key:'E',run:()=>spend(1200,()=>{clock.minutes+=150;player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в ${n||'театре'} — зал аплодировал стоя`);})};
-    case 'museum':case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,key:'E',run:()=>{clock.minutes+=40;player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
-    case 'pharmacy':return {label:`Аптека ${n} · витамины 250 ₽`,key:'E',run:()=>spend(250,()=>{player.energy=clamp(player.energy+10,0,100);addEvent('Купили витамины. Энергия +10');})};
-    case 'university':return {label:`Зайти в ${n||'университет'}`,key:'E',run:()=>{clock.minutes+=90;player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-8,0,100);addEvent(`Полтора часа на лекции${n?' в '+n:''}`);}};
-    case 'police':return {label:`Отделение полиции ${n}: спросить, что случилось`,key:'E',run:()=>{setHint(accidents.length?`Сейчас на выезде: ДТП${accidents[0].road?' на '+accidents[0].road:''}`:'Дежурный: «В городе спокойно»');}};
-    case 'hospital':return {label:`Больница ${n}: подлечиться · 800 ₽`,key:'E',run:()=>spend(800,()=>{player.energy=100;addEvent('Вас осмотрели, энергия восстановлена');})};
-    case 'worship':return {label:`Зайти в ${n||'храм'}`,key:'E',run:()=>{player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
-    case 'hotel':return {label:`Гостиница ${n}: переночевать · 3 500 ₽`,key:'E',run:()=>spend(3500,()=>sleep(8))};
-    case 'market':return {label:`Рынок ${n}: закупиться · 600 ₽`,key:'E',run:()=>spend(600,()=>{player.food=clamp(player.food+35,0,100);addEvent('Накупили чак-чака и сухофруктов');})};
-    case 'library':return {label:`Почитать в ${n||'библиотеке'}`,key:'E',run:()=>{clock.minutes+=60;player.mood=clamp(player.mood+5,0,100);setHint('Час с книгой');}};
-    case 'fuel':return null;
-    default:return null;}}
-function spend(amount,fn){if(player.money<amount){setHint(`Не хватает денег: нужно ${amount} ₽`);return;}player.money-=amount;fn();}
-function sleepHome(){sleep(8);}
-function sleep(h){const before=Math.floor(clock.minutes/1440);clock.minutes+=h*60;player.energy=100;player.food=clamp(player.food-25,0,100);player.mood=clamp(player.mood+5,0,100);const after=Math.floor(clock.minutes/1440);if(after>before)addEvent(`Доброе утро! Наступил день ${after+1}`);else addEvent('Вы выспались');}
-
-// ---------- диалог с жителем ----------
-let chatNpc=null,chatBusy=false;
-const SCRIPTED={police:['Проходите, не задерживайтесь. Всё под контролем.','Документы при себе? Шучу. Хорошего дня.','Если видели ДТП — сообщите, пригодится.'],guard:['Сюда нельзя, пропуск нужен.','Стою тут с восьми. Погода ничего.','Камеры всё видят, имейте в виду.'],courier:['Извините, заказ стынет, бегу!','Весь день на самокате — ноги уже не чувствую.','На Баумана опять не проехать…'],resident:['Исәнмесез! Как сами?','Говорят, на Кольце пробка. Опять.','Вы не знаете, где тут нормальный кофе? Хотя я сама знаю, пойдёмте покажу.','Казань — лучший город, не спорьте.','Автобус десятый уже полчаса жду.','Рәхмәт за беседу, но я спешу.','Слышали, на набережной вечером салют?']};
-function openChat(w){chatNpc=w;player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.color;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
-  if(w.p.memory.length){for(const m of w.p.memory)appendMsg(m.role==='user'?'me':'npc',m.content);}else{appendMsg('sys',`${w.p.name} останавливается и смотрит на вас`);}
-  $('#brainLbl').textContent=sampleFn?'думает сам: мозги на Claude':'реплики по сценарию (без ИИ)';
-  w.state='idle';w.ttl=9e9;w.path=null;setTimeout(()=>$('#chatInput').focus(),50);}
-function closeChat(){if(!chatNpc)return;chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
-function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
-async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text||chatBusy||!chatNpc)return;inp.value='';const w=chatNpc;appendMsg('me',text);w.p.memory.push({role:'user',content:text});chatBusy=true;
-  let reply=null;
-  if(sampleFn){const bubble=appendMsg('npc','…');try{const ctxStr=contextForNpc(w);const mem=w.p.memory.slice(-10);while(mem.length&&mem[0].role!=='user')mem.shift();const turns=mem.map((m,i)=>i===0?{role:'user',content:ctxStr+'\n\nРеплика: '+m.content}:m);const res=await sampleFn(turns,{cache:false,modelTier:'quick',onText:({text})=>{bubble.textContent=text;}});reply=res.text.trim();bubble.textContent=reply;}catch(e){bubble.remove();if(e&&e.code==='not_granted'){sampleFn=null;$('#brainLbl').textContent='реплики по сценарию (ИИ не разрешён)';}}}
-  if(!reply){reply=pick(SCRIPTED[w.role]||SCRIPTED.resident);await new Promise(r=>setTimeout(r,400));appendMsg('npc',reply);}
-  w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);chatBusy=false;}
-function contextForNpc(w){const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,w.x,w.y)<80).slice(0,4).map(p=>p.n).join(', ');const road=nearestRoadName(w.x,w.y);const ev=feed.slice(0,3).map(e=>e.text).join('; ');
-  return `Ты — житель Казани в городской игре-симуляции. Тебя зовут ${w.p.name}, ${w.p.age} лет, ${w.p.job}. Характер: ${w.p.trait}. Настроение: ${w.p.mood}. Сейчас ${fmtTime()}, день ${clock.day}, погода: ${weatherText()}. Ты стоишь ${road?'на '+road:'в центре'}${near?', рядом: '+near:''}. Последние события в городе: ${ev||'ничего особенного'}. С тобой заговорил ${player.name} (${player.role==='tourist'?'турист':player.role==='courier'?'курьер':player.role==='student'?'студент':'местный житель'})${player.desc?': «'+player.desc+'»':''}. Отвечай как живой человек, 1–2 коротких предложения, по-русски, можно татарское словечко. Не выходи из роли и не говори, что ты ИИ. Отвечай на реплику ниже.`;}
-function weatherText(){return weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно';}
-
-// ---------- профиль ----------
-function loadProfile(){try{return JSON.parse(localStorage.getItem('zk.profile')||'null');}catch(e){return null;}}
-function saveProfile(p){try{localStorage.setItem('zk.profile',JSON.stringify(p));}catch(e){}}
-function applyProfile(p){player.name=p.name||'Гость';player.desc=p.desc||'';player.role=p.role||'resident';player.avatar=p.avatar||null;player.thumb=p.thumb||null;player.avatarImg=null;if(player.avatar){const im=new Image();im.onload=()=>{player.avatarImg=im;};im.src=player.avatar;}$('#nameLbl').textContent=player.name;}
-let pendingAvatar=null,pendingThumb=null;
-$('#avFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{pendingAvatar=cropSquare(im,128,0.86);pendingThumb=cropSquare(im,36,0.55);const pv=$('#avPreview');pv.style.backgroundImage=`url(${pendingAvatar})`;pv.textContent='';};im.src=rd.result;};rd.readAsDataURL(f);});
-function cropSquare(im,size,q){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');const s=Math.min(im.width,im.height);x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,size,size);return c.toDataURL('image/jpeg',q);}
-function showProfile(){const p=loadProfile()||{};$('#pName').value=p.name||'';$('#pDesc').value=p.desc||'';$('#pRole').value=p.role||'resident';pendingAvatar=p.avatar||null;pendingThumb=p.thumb||null;const pv=$('#avPreview');if(pendingAvatar){pv.style.backgroundImage=`url(${pendingAvatar})`;pv.textContent='';}else{pv.style.backgroundImage='';pv.textContent='?';}$('#profileModal').hidden=false;player.busy=true;setTimeout(()=>$('#pName').focus(),50);}
-$('#startBtn').addEventListener('click',()=>{const p={name:($('#pName').value.trim()||'Гость').slice(0,24),desc:$('#pDesc').value.trim().slice(0,160),role:$('#pRole').value,avatar:pendingAvatar,thumb:pendingThumb};saveProfile(p);applyProfile(p);$('#profileModal').hidden=true;player.busy=false;addEvent(`${player.name} вышел в город на улицу Баумана`);});
-$('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').click();});
-
-// ---------- сохранение ----------
-function saveState(){try{localStorage.setItem('zk.state',JSON.stringify({x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,minutes:clock.minutes,z:cam.z}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;clock.minutes=s.minutes??clock.minutes;if(s.z)cam.z=clamp(s.z,0.8,7);}catch(e){}}
-
-// ---------- ввод ----------
-window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
-  keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}}
-  if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
-window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;keys[e.code]=false;});
-$('#actBtn').addEventListener('click',()=>{if(currentAction&&!player.busy)currentAction.run();});
-$('#chatSend').addEventListener('click',sendChat);$('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
-$('#chatClose').addEventListener('click',closeChat);
-$('#menuBtn').addEventListener('click',()=>{$('#menuModal').hidden=false;player.busy=true;$('#statsLbl').textContent=`Жителей: ${walkers.length} · машин: ${cars.length} · транспорта на линии: ${buses.length} · зданий: ${world.buildings.length} · улиц: ${world.roads.length}${roomNs?' · игроков онлайн: '+(peers.length+1):''}`;});
-$('#menuClose').addEventListener('click',()=>{$('#menuModal').hidden=true;player.busy=false;});
-$('#changeChar').addEventListener('click',()=>{$('#menuModal').hidden=true;showProfile();});
-$('#resetBtn').addEventListener('click',()=>{try{localStorage.removeItem('zk.state');localStorage.removeItem('zk.profile');}catch(e){}location.reload();});
-$('#speedBtn').addEventListener('click',()=>{clock.speed=clock.speed===1?3:clock.speed===3?0.2:1;$('#speedBtn').textContent='×'+Math.round(clock.speed*60);});
-$('#zin').addEventListener('click',()=>{cam.z=clamp(cam.z*1.3,0.8,7);});$('#zout').addEventListener('click',()=>{cam.z=clamp(cam.z/1.3,0.8,7);});
-canvas.addEventListener('wheel',e=>{e.preventDefault();cam.z=clamp(cam.z*(e.deltaY<0?1.12:0.89),0.8,7);},{passive:false});
-let pdown=null;
-canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<180&&e.clientY>innerHeight-200)return;pdown={x:e.clientX,y:e.clientY,t:performance.now()};});
-canvas.addEventListener('pointerup',e=>{if(!pdown)return;const moved=Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y);pdown=null;if(moved>8||player.busy||player.bus)return;const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
-  // клик по человеку — подойти и заговорить
-  let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus)continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
-  if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/1.6+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
-  player.talkTarget=null;walkTo(wx,wy);});
-function walkTo(wx,wy,keepTarget){if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
-  const path=astar(world.pedAdj,s,g,pedCost);const wps=[];if(path&&path.length>1){for(let i=0;i<path.length-1;i++){const a=world.nodes[path[i]],b=world.nodes[path[i+1]];const L=dist(a[0],a[1],b[0],b[1])||1;const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;const e=world.pedAdj[path[i]].find(q=>q[0]===path[i+1]);const r=e?world.roads[e[2]]:null;const off=r&&r.c<=8?r.hw+1.3:0;wps.push([a[0]-dy*off,a[1]+dx*off]);wps.push([b[0]-dy*off,b[1]+dx*off]);}}
-  wps.push([wx,wy]);player.waypoints=wps;}
-// джойстик
-const joy=$('#joy'),joyKnob=joy.querySelector('i');let joyVec=[0,0],joyId=null,joyOrigin=null;
-joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joyOrigin=[e.clientX,e.clientY];joy.setPointerCapture(e.pointerId);});
-joy.addEventListener('pointermove',e=>{if(e.pointerId!==joyId)return;let dx=e.clientX-joyOrigin[0],dy=e.clientY-joyOrigin[1];const m=Math.hypot(dx,dy);if(m>44){dx*=44/m;dy*=44/m;}joyVec=[dx/44,dy/44];joyKnob.style.transform=`translate(${dx}px,${dy}px)`;});
-const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyVec=[0,0];joyKnob.style.transform='';};joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
-
-// ---------- обновление ----------
-function updatePlayer(dt){
-  if(player.bus){player.x=player.bus.x;player.y=player.bus.y;return;}
-  let mx=0,my=0;if(!player.busy){if(keys['w']||keys['ц']||keys['ArrowUp'])my-=1;if(keys['s']||keys['ы']||keys['ArrowDown'])my+=1;if(keys['a']||keys['ф']||keys['ArrowLeft'])mx-=1;if(keys['d']||keys['в']||keys['ArrowRight'])mx+=1;mx+=joyVec[0];my+=joyVec[1];}
-  const m=Math.hypot(mx,my);const run=keys['shift']||keys['ShiftLeft'];
-  if(player.talkTarget){const t=player.talkTarget;if(t.bus||player.busy){player.talkTarget=null;}else if(dist(t.x,t.y,player.x,player.y)<5){player.talkTarget=null;player.waypoints=null;openChat(t);return;}}
-  if(m>0.05){player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;const sp=(run?4.2:1.9)*Math.min(1,m)*(player.energy<10?0.6:1);tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;if(run)player.energy=clamp(player.energy-dt*0.15,0,100);}
-  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length){player.waypoints=null;}}else{const sp=1.9*dt;const dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);player.x+=dx*step;player.y+=dy*step;player.hx=dx;player.hy=dy;}}
-}
-function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;return;}if(!inBuilding(nx,player.y)){player.x=nx;return;}if(!inBuilding(player.x,ny)){player.y=ny;}}
-function updateNeeds(gameMin){player.energy=clamp(player.energy-gameMin*0.085,0,100);player.food=clamp(player.food-gameMin*0.12,0,100);let target=55;if(player.food<25)target-=20;if(player.energy<20)target-=20;if(weather.kind==='rain')target-=5;player.mood=lerp(player.mood,target,Math.min(1,gameMin*0.004));}
-let dayPhaseAnnounced={};
-function updateClock(dt){const gm=dt*clock.speed;const before=clock.minutes;clock.minutes+=gm;updateNeeds(gm);const d=Math.floor(clock.minutes/1440)+1;if(d!==clock.day){clock.day=d;dayPhaseAnnounced={};}
-  const h=(clock.minutes/60)%24;const key=Math.floor(h);const marks={6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Остались только таксисты и полиция'};
-  if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}}
-function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.random();const k=r<0.5?'clear':r<0.8?'cloudy':'rain';if(k!==weather.kind){weather.kind=k;addEvent(k==='rain'?'Пошёл дождь. Пешеходы ускорились, водители — наоборот':k==='cloudy'?'Небо затянуло':'Распогодилось');}weather.ttl=rnd(180,420);}
-  if(weather.kind==='rain'&&!reduceMotion){while(weather.rain.length<160)weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);for(const r of weather.rain){r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
-
-let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
-function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
-  if(world){
-    updateClock(dt);updateWeather(dt);processPaths(3);
-    const vehicles=cars.concat(buses);
-    for(const w of walkers)w.update(dt);
-    for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove){cars.splice(i,1);}}
-    for(const b of buses)b.update(dt,vehicles);
-    accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(70,160);if(accidents.length<3)spawnAccident();}
-    updateAccidents(dt);updatePlayer(dt);updateBubble(dt);
-    // камера
-    const tx=player.x,ty=player.y;cam.x=lerp(cam.x,tx,Math.min(1,dt*6));cam.y=lerp(cam.y,ty,Math.min(1,dt*6));
-    hudTimer-=dt;if(hudTimer<=0){hudTimer=0.25;updateHud();}
-    saveTimer-=dt;if(saveTimer<=0){saveTimer=3;saveState();}
-    presTimer-=dt;if(presTimer<=0){presTimer=0.12;pushPresence();}
-    if(hintTtl>0){hintTtl-=dt;if(hintTtl<=0)$('#hint').hidden=true;}
-    render();
-  }
-  requestAnimationFrame(frame);}
-function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;$('#weatherLbl').textContent=(weather.kind==='rain'?'🌧 дождь':weather.kind==='cloudy'?'☁️ пасмурно':isNight()?'🌙 ясно':'☀️ ясно');
-  setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);$('#moneyLbl').textContent=Math.round(player.money).toLocaleString('ru-RU')+' ₽';
-  currentAction=player.busy?null:findAction();const ab=$('#actBtn');if(currentAction){ab.hidden=false;ab.innerHTML='';const k=document.createElement('kbd');k.textContent='E';ab.append(k,document.createTextNode(currentAction.label));}else ab.hidden=true;}
-function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);}
-function isNight(){const h=(clock.minutes/60)%24;return h<6||h>=21;}
-function nightAmount(){const h=(clock.minutes/60)%24;if(h>=7&&h<18)return 0;if(h>=22||h<5)return 1;if(h>=18&&h<22)return (h-18)/4;return 1-(h-5)/2;}
-
-// ---------- отрисовка ----------
-let W=0,H=0,DPR=1;
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);canvas.style.width=W+'px';canvas.style.height=H+'px';}
-window.addEventListener('resize',resize);resize();
-const AREA_FILL={water:'#A6CBE6',land:'#E8E3D7',park:'#BBD8A3',grass:'#CFE0B6',forest:'#A5C78C',cemetery:'#C7D2B3',pitch:'#B4D49C',plaza:'#DDD7C8'};
-const POI_PRIO={police:0,hospital:0,theatre:1,museum:1,sight:1,university:1,worship:1,market:1,school:2,library:2,bank:2,hotel:2,pharmacy:3,fuel:3,bar:4,cafe:4,shop:5,atm:6,office:6};
-function visiblePois(x0,y0,x1,y1,z){const out=[];const minPrio=z>4.5?6:z>3.2?5:z>2.4?3:2;for(const p of world.pois){const pr=POI_PRIO[p.t]??6;if(pr>minPrio||p.x<x0||p.x>x1||p.y<y0||p.y>y1)continue;out.push(p);}out.sort((a,b)=>(POI_PRIO[a.t]??6)-(POI_PRIO[b.t]??6));return out;}
-const POI_GLYPH={cafe:'☕',bar:'🍺',shop:'🛍',police:'👮',hospital:'🏥',pharmacy:'💊',bank:'🏦',atm:'🏧',school:'🎒',university:'🎓',theatre:'🎭',museum:'🏛',worship:'🕌',fuel:'⛽',market:'🧺',hotel:'🏨',library:'📚',office:'🏢',sight:'⭐'};
-function render(){
-  const z=cam.z;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#E8E3D7';ctx.fillRect(0,0,W,H);
-  const vx0=cam.x-W/2/z,vy0=cam.y-H/2/z,vx1=cam.x+W/2/z,vy1=cam.y+H/2/z;
-  ctx.setTransform(DPR*z,0,0,DPR*z,DPR*(W/2-cam.x*z),DPR*(H/2-cam.y*z));
-  // площади
-  for(const a of world.areas){if(a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;ctx.fillStyle=AREA_FILL[a.k]||'#ddd';poly(a.p);ctx.fill();}
-  // дороги: подложка
-  ctx.lineCap='round';ctx.lineJoin='round';
-  const vis=[];for(const r of world.roads){if(r.bb[2]<vx0||r.bb[0]>vx1||r.bb[3]<vy0||r.bb[1]>vy1)continue;vis.push(r);}
-  for(const r of vis){if(r.c>=10)continue;ctx.strokeStyle=r.c<=8?'#B9B2A2':'#CFC8B8';ctx.lineWidth=r.w+1.2;roadPath(r);ctx.stroke();}
-  for(const r of vis){if(r.c>=10){if(z<1.3)continue;ctx.strokeStyle='#BDB6A6';ctx.lineWidth=r.c===12?1.6:1.2;ctx.setLineDash(r.c===12?[0.8,0.8]:[]);roadPath(r);ctx.stroke();ctx.setLineDash([]);continue;}
-    ctx.strokeStyle=r.c<=4?'#FFFFFF':r.c===9?'#E9E3D4':'#FAF8F2';ctx.lineWidth=r.w;roadPath(r);ctx.stroke();}
-  if(z>1.6){ctx.strokeStyle='rgba(120,112,98,.35)';ctx.lineWidth=0.25;ctx.setLineDash([2.5,2.5]);for(const r of vis){if(r.c>4||r.w<8)continue;roadPath(r);ctx.stroke();}ctx.setLineDash([]);}
-  // здания
-  const shadow=z>1.1;world.bgrid.query(vx0,vy0,vx1,vy1,b=>{if(b.bb[2]<vx0||b.bb[0]>vx1||b.bb[3]<vy0||b.bb[1]>vy1)return;const h=b.h;
-    if(shadow){ctx.save();const o=0.5+Math.min(h,12)*0.22;ctx.translate(o,o);ctx.fillStyle='rgba(60,50,40,.28)';poly(b.p);ctx.fill();ctx.restore();}
-    ctx.fillStyle=b.t&&b.t!=='apartments'&&b.t!=='residential'&&b.t!=='house'?(b.t==='shop'||b.t==='retail'||b.t==='commercial'?'#E4D4B6':b.t==='church'||b.t==='mosque'||b.t==='cathedral'||b.t==='place_of_worship'?'#F1E6D1':'#DACFBB'):(h>=9?'#C8B99C':h>=5?'#D2C6AB':'#DCD2BF');
-    poly(b.p);ctx.fill();if(z>1.4){ctx.strokeStyle='rgba(70,58,44,.4)';ctx.lineWidth=0.25;ctx.stroke();}});
-  // остановки
-  if(z>1.2)for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;ctx.fillStyle=s.k==='tram'?'#8E3478':'#2F6DB5';ctx.beginPath();ctx.arc(s.x,s.y,1.6,0,6.283);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y,0.7,0,6.283);ctx.fill();}
-  // происшествия: конусы и обломки
-  for(const ac of accidents){ctx.fillStyle='rgba(40,30,20,.5)';for(let i=0;i<5;i++){ctx.beginPath();ctx.arc(ac.x+Math.cos(i*1.3)*rnd(0,3),ac.y+Math.sin(i*1.7)*rnd(0,3),0.3,0,6.283);ctx.fill();}ctx.fillStyle='#F2651F';for(let i=0;i<4;i++){const an=i*1.57+0.7;ctx.beginPath();ctx.arc(ac.x+Math.cos(an)*7,ac.y+Math.sin(an)*7,0.5,0,6.283);ctx.fill();}}
-  // машины
-  const t=performance.now()/1000;
-  for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;drawCar(c,t);}
-  for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBus(b);}
-  // жители
-  for(const w of walkers){if(w.bus||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;drawWalker(w);}
-  if(player.waypoints){const w=player.waypoints[player.waypoints.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(w[0],w[1],1.6+Math.sin(t*6)*0.3,0,6.283);ctx.stroke();}
-  if(player.home&&z>1.1){ctx.fillStyle='rgba(43,176,98,.85)';ctx.beginPath();ctx.moveTo(player.home.cx,player.home.cy-3);ctx.lineTo(player.home.cx+2.4,player.home.cy-0.6);ctx.lineTo(player.home.cx-2.4,player.home.cy-0.6);ctx.closePath();ctx.fill();ctx.fillRect(player.home.cx-1.6,player.home.cy-0.6,3.2,2.6);}
-  // ночь
-  const night=nightAmount();
-  if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-150*night)},${Math.round(255-130*night)},${Math.round(255-70*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='lighter';ctx.setTransform(DPR*z,0,0,DPR*z,DPR*(W/2-cam.x*z),DPR*(H/2-cam.y*z));
-    // фонари на крупных улицах
-    ctx.fillStyle=`rgba(255,200,110,${0.09*night})`;for(const r of vis){if(r.c>6)continue;for(let i=0;i<r.p.length;i+=2){const p=world.nodes[r.p[i]];ctx.beginPath();ctx.arc(p[0],p[1],11,0,6.283);ctx.fill();}}
-    // фары
-    ctx.fillStyle=`rgba(255,240,200,${0.35*night})`;for(const v of cars.concat(buses)){if(v.crashed||v.x<vx0||v.x>vx1||v.y<vy0||v.y>vy1)continue;ctx.beginPath();ctx.moveTo(v.x+v.hx*(v.len/2),v.y+v.hy*(v.len/2));ctx.lineTo(v.x+v.hx*14-v.hy*4,v.y+v.hy*14+v.hx*4);ctx.lineTo(v.x+v.hx*14+v.hy*4,v.y+v.hy*14-v.hx*4);ctx.closePath();ctx.fill();}
-    ctx.globalCompositeOperation='source-over';}
-  // подписи и игроки (в экранных координатах)
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-  const toS=(x,y)=>[(x-cam.x)*z+W/2,(y-cam.y)*z+H/2];
-  for(const pr of peerRender.values()){const [sx,sy]=toS(pr.x,pr.y);drawPlayer(sx,sy,pr.name,pr.img,false,pr.hx,pr.hy,z);}
-  if(!player.bus){const [sx,sy]=toS(player.x,player.y);drawPlayer(sx,sy,player.name,player.avatarImg,true,player.hx,player.hy,z);}
-  if(z>2.1){ctx.font='500 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const done=new Set();
-    for(const r of vis){if(!r.n||r.c>8||done.has(r.n))continue;let bi=0,bl=0;for(let i=0;i<r.p.length-1;i++){const a=world.nodes[r.p[i]],b=world.nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);if(L>bl){bl=L;bi=i;}}
-      const a=world.nodes[r.p[bi]],b=world.nodes[r.p[bi+1]];const tw=ctx.measureText(r.n).width;if(bl*z<tw+14)continue;const [sx,sy]=toS((a[0]+b[0])/2,(a[1]+b[1])/2);if(sx<-50||sx>W+50||sy<-20||sy>H+20)continue;let an=Math.atan2(b[1]-a[1],b[0]-a[0]);if(an>Math.PI/2)an-=Math.PI;if(an<-Math.PI/2)an+=Math.PI;done.add(r.n);
-      ctx.save();ctx.translate(sx,sy);ctx.rotate(an);ctx.fillStyle='rgba(255,255,255,.75)';ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=3;ctx.strokeText(r.n,0,0);ctx.fillStyle='#4A4238';ctx.fillText(r.n,0,0);ctx.restore();}}
-  if(z>1.5){ctx.textAlign='center';ctx.textBaseline='middle';const occ=new Set();const cell=z>4?26:34;const shown=[];
-    for(const p of visiblePois(vx0,vy0,vx1,vy1,z)){const [sx,sy]=toS(p.x,p.y);const k=Math.floor(sx/cell)*4096+Math.floor(sy/cell);if(occ.has(k))continue;occ.add(k);shown.push([p,sx,sy]);}
-    for(const [p,sx,sy] of shown){const g=POI_GLYPH[p.t]||'•';ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(sx,sy,9,0,6.283);ctx.fill();ctx.font='11px system-ui';ctx.fillStyle='#000';ctx.fillText(g,sx,sy+0.5);}
-    if(z>4.2){ctx.font='500 10px "IBM Plex Sans",system-ui';for(const [p,sx,sy] of shown){if(!p.n)continue;ctx.fillStyle='rgba(255,255,255,.8)';ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.8)';ctx.strokeText(p.n,sx,sy+17);ctx.fillStyle='#3A3128';ctx.fillText(p.n,sx,sy+17);}}}
-  if(z>1.2){ctx.font='600 10px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const s of world.stops){if(z<2.6||s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;const [sx,sy]=toS(s.x,s.y);ctx.fillStyle='rgba(255,255,255,.8)';ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=3;ctx.strokeText(s.n,sx,sy-10);ctx.fillStyle='#24476F';ctx.fillText(s.n,sx,sy-10);}}
-  // номера транспорта и имена игроков
-  ctx.font='700 11px "JetBrains Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-  for(const b of buses){if(b.x<vx0||b.x>vx1||b.y<vy0||b.y>vy1)continue;const [sx,sy0]=toS(b.x,b.y);const sy=sy0-2.2*z-10;ctx.fillStyle=b.color;ctx.beginPath();ctx.roundRect?ctx.roundRect(sx-14,sy-8,28,16,4):ctx.rect(sx-14,sy-8,28,16);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(b.route.ref,sx,sy+0.5);}
-  ctx.font='600 12px "IBM Plex Sans",system-ui';
-  const labelPlayer=(x,y,name,me)=>{const [sx,sy]=toS(x,y);const tw=ctx.measureText(name).width+12;ctx.fillStyle=me?'rgba(43,176,98,.95)':'rgba(20,30,26,.85)';ctx.beginPath();const ty=sy-Math.max(1.7*z,12)-24;ctx.roundRect?ctx.roundRect(sx-tw/2,ty,tw,17,6):ctx.rect(sx-tw/2,ty,tw,17);ctx.fill();ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,sx,ty+8.5);};
-  for(const pr of peerRender.values())labelPlayer(pr.x,pr.y,pr.name,false);
-  if(!player.bus)labelPlayer(player.x,player.y,player.name,true);
-  // ДТП — метка
-  ctx.font='700 11px "IBM Plex Sans",system-ui';for(const ac of accidents){const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';ctx.beginPath();ctx.roundRect?ctx.roundRect(sx-22,sy-30,44,18,5):ctx.rect(sx-22,sy-30,44,18);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
-  // дождь
-  if(weather.rain.length){ctx.strokeStyle='rgba(120,150,190,.45)';ctx.lineWidth=1;ctx.beginPath();for(const r of weather.rain){const x=r[0]*W,y=r[1]*H;ctx.moveTo(x,y);ctx.lineTo(x-2,y+9*r[2]);}ctx.stroke();ctx.fillStyle='rgba(60,80,110,.12)';ctx.fillRect(0,0,W,H);}
-  // за кадром: стрелка к ДТП
-  for(const ac of accidents){const [sx,sy]=toS(ac.x,ac.y);if(sx>0&&sx<W&&sy>0&&sy<H)continue;const dx=sx-W/2,dy=sy-H/2;const an=Math.atan2(dy,dx);const rx=W/2+Math.cos(an)*Math.min(W/2-30,Math.abs(dx)),ry=H/2+Math.sin(an)*Math.min(H/2-90,Math.abs(dy));ctx.save();ctx.translate(clamp(rx,30,W-30),clamp(ry,110,H-110));ctx.rotate(an);ctx.fillStyle='rgba(220,58,68,.9)';ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(-6,-8);ctx.lineTo(-6,8);ctx.closePath();ctx.fill();ctx.restore();}
-  renderMini();
-}
-function poly(p){ctx.beginPath();ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath();}
-function roadPath(r){ctx.beginPath();const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}
-function drawCar(c,t){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(Math.atan2(c.hy,c.hx));const L=c.len,Wd=c.wid;
-  ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(-L/2+0.3,-Wd/2+0.3,L,Wd);
-  ctx.fillStyle=c.crashed?'#7A6F66':c.color;ctx.fillRect(-L/2,-Wd/2,L,Wd);
-  if(c.kind==='police'){ctx.fillStyle='#2D4A9E';ctx.fillRect(-L/2,-Wd/2,L,0.45);ctx.fillRect(-L/2,Wd/2-0.45,L,0.45);}
-  if(c.kind==='amb'){ctx.fillStyle='#D8323C';ctx.fillRect(-0.4,-0.9,0.8,1.8);ctx.fillRect(-1.1,-0.35,2.2,0.7);}
-  ctx.fillStyle='rgba(40,60,80,.55)';ctx.fillRect(L/2-1.7,-Wd/2+0.25,0.7,Wd-0.5);ctx.fillRect(-L/2+0.4,-Wd/2+0.25,0.5,Wd-0.5);
-  if(c.flash&&!c.crashed&&(c.target!=null||c.state==='scene')&&!reduceMotion){const on=Math.floor(t*6)%2===0;ctx.fillStyle=on?'#2F6BFF':'#FF3B3B';ctx.beginPath();ctx.arc(0,-0.5,0.45,0,6.283);ctx.fill();ctx.fillStyle=on?'#FF3B3B':'#2F6BFF';ctx.beginPath();ctx.arc(0,0.5,0.45,0,6.283);ctx.fill();}
-  if(c.crashed&&!reduceMotion){const on=Math.floor(t*2)%2===0;if(on){ctx.fillStyle='#FFB400';ctx.fillRect(L/2-0.5,-Wd/2,0.5,0.5);ctx.fillRect(L/2-0.5,Wd/2-0.5,0.5,0.5);ctx.fillRect(-L/2,-Wd/2,0.5,0.5);ctx.fillRect(-L/2,Wd/2-0.5,0.5,0.5);}}
-  ctx.restore();}
-function drawBus(b){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan2(b.hy,b.hx));const L=b.len,Wd=b.wid;ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(-L/2+0.4,-Wd/2+0.4,L,Wd);ctx.fillStyle=b.color;ctx.fillRect(-L/2,-Wd/2,L,Wd);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-L/2+0.8,-Wd/2+0.3,L-1.6,0.35);ctx.fillRect(-L/2+0.8,Wd/2-0.65,L-1.6,0.35);ctx.fillStyle='rgba(40,60,80,.6)';ctx.fillRect(L/2-0.9,-Wd/2+0.3,0.5,Wd-0.6);if(b.route.type==='tram'){ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(-0.3,-Wd/2,0.6,Wd);}ctx.restore();}
-function drawWalker(w){const r=w.role;ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.arc(w.x+0.3,w.y+0.3,0.95,0,6.283);ctx.fill();ctx.fillStyle=w.p.color;ctx.beginPath();ctx.arc(w.x,w.y,0.95,0,6.283);ctx.fill();
-  if(r==='police'){ctx.fillStyle='#1E3480';ctx.beginPath();ctx.arc(w.x,w.y,0.45,0,6.283);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(w.x-0.5,w.y-0.1,1,0.2);}
-  else if(r==='guard'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(w.x,w.y,0.4,0,6.283);ctx.fill();}
-  else if(r==='courier'){ctx.fillStyle='#333';ctx.fillRect(w.x-0.45,w.y-0.45,0.9,0.9);ctx.fillStyle='#F4B400';ctx.beginPath();ctx.arc(w.x,w.y,0.35,0,6.283);ctx.fill();}
-  else{ctx.fillStyle='rgba(255,235,210,.95)';ctx.beginPath();ctx.arc(w.x,w.y,0.38,0,6.283);ctx.fill();}
-  if(w.state==='wait'&&cam.z>2){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(w.x,w.y-1.3,0.3,0,6.283);ctx.fill();}}
-function drawPlayer(x,y,name,img,me,hx,hy,z){const r=Math.max(1.7*z,12);const ring=me?'#2BB062':'#4A90E2';
-  ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.arc(x+2,y+2,r+2,0,6.283);ctx.fill();
-  ctx.fillStyle=ring;ctx.beginPath();ctx.arc(x,y,r+2.5,0,6.283);ctx.fill();
-  if(hx||hy){ctx.fillStyle=ring;ctx.beginPath();ctx.moveTo(x+hx*(r+9),y+hy*(r+9));ctx.lineTo(x-hy*5,y+hx*5);ctx.lineTo(x+hy*5,y-hx*5);ctx.closePath();ctx.fill();}
-  ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.closePath();ctx.clip();if(img){ctx.drawImage(img,x-r,y-r,2*r,2*r);}else{ctx.fillStyle='#F3E8D8';ctx.fillRect(x-r,y-r,2*r,2*r);ctx.fillStyle='#4A4238';ctx.font='700 '+Math.round(r*1.1)+'px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((name||'?')[0].toUpperCase(),x,y+1);}ctx.restore();}
-let miniBg=null;
-function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
-  if(!miniBg){miniBg=document.createElement('canvas');miniBg.width=mw;miniBg.height=mh;const m=miniBg.getContext('2d');m.fillStyle='#DAD5C7';m.fillRect(0,0,mw,mh);m.setTransform(s,0,0,s,ox-bb[0]*s,oy-bb[1]*s);for(const a of world.areas){if(a.k!=='water'&&a.k!=='park'&&a.k!=='forest')continue;m.fillStyle=AREA_FILL[a.k];m.beginPath();m.moveTo(a.p[0],a.p[1]);for(let i=2;i<a.p.length;i+=2)m.lineTo(a.p[i],a.p[i+1]);m.closePath();m.fill();}
-    m.lineCap='round';for(const r of world.roads){if(r.c>7)continue;m.strokeStyle=r.c<=4?'#fff':'#EFEBE2';m.lineWidth=r.c<=4?10:5;m.beginPath();const p0=world.nodes[r.p[0]];m.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];m.lineTo(p[0],p[1]);}m.stroke();}}
-  mctx.setTransform(1,0,0,1,0,0);mctx.drawImage(miniBg,0,0);mctx.setTransform(s,0,0,s,ox-bb[0]*s,oy-bb[1]*s);
-  for(const b of buses){mctx.fillStyle=b.color;mctx.beginPath();mctx.arc(b.x,b.y,9,0,6.283);mctx.fill();}
-  for(const ac of accidents){mctx.fillStyle='#DC3A44';mctx.beginPath();mctx.arc(ac.x,ac.y,16,0,6.283);mctx.fill();}
-  for(const pr of peerRender.values()){mctx.fillStyle='#4A90E2';mctx.beginPath();mctx.arc(pr.x,pr.y,12,0,6.283);mctx.fill();}
-  mctx.fillStyle='#2BB062';mctx.beginPath();mctx.arc(player.x,player.y,14,0,6.283);mctx.fill();mctx.strokeStyle='#fff';mctx.lineWidth=5;mctx.stroke();
-  // рамка обзора
-  const z=cam.z;mctx.strokeStyle='rgba(20,30,26,.5)';mctx.lineWidth=4;mctx.strokeRect(cam.x-W/2/z,cam.y-H/2/z,W/z,H/z);}
-
-// ---------- мультиплеер (комната) ----------
-function pushPresence(){if(!roomNs)return;const p={x:Math.round(player.x*10)/10,y:Math.round(player.y*10)/10,n:player.name.slice(0,24),r:player.role,hx:Math.round(player.hx*100)/100,hy:Math.round(player.hy*100)/100,b:player.bus?1:0};if(player.thumb&&player.thumb.length<3000)p.a=player.thumb;roomNs.presence(p).catch(()=>{});}
-function syncPeers(){peers=roomNs.peers().filter(p=>!p.isMe&&p.kind==='viewer'&&p.presence&&typeof p.presence.x==='number');const seen=new Set();
-  for(const p of peers){seen.add(p.peer);let pr=peerRender.get(p.peer);if(!pr){pr={x:p.presence.x,y:p.presence.y,tx:0,ty:0,name:'',img:null,imgSrc:null,hx:0,hy:1};peerRender.set(p.peer,pr);}
-    pr.tx=p.presence.x;pr.ty=p.presence.y;pr.name=String(p.presence.n||'Игрок').slice(0,24);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;
-    const a=typeof p.presence.a==='string'&&p.presence.a.startsWith('data:image/')?p.presence.a:null;if(a&&a!==pr.imgSrc){pr.imgSrc=a;const im=new Image();im.onload=()=>{pr.img=im;};im.src=a;}if(!a){pr.img=null;pr.imgSrc=null;}}
-  for(const k of peerRender.keys())if(!seen.has(k))peerRender.delete(k);}
-function tickPeers(){for(const pr of peerRender.values()){pr.x=lerp(pr.x,pr.tx,0.25);pr.y=lerp(pr.y,pr.ty,0.25);}}
-setInterval(tickPeers,33);
-async function initCaps(){try{const u=window.claude&&window.claude.use;if(!u)return;
-  window.claude.use('room').then(r=>{if(!r)return;roomNs=r;r.onPeers(()=>{syncPeers();},()=>{roomNs=null;peerRender.clear();});pushPresence();}).catch(()=>{});
-  window.claude.use('sample').then(s=>{if(s)sampleFn=s;}).catch(()=>{});}catch(e){}}
-
-// ---------- старт ----------
-async function boot(){
-  try{
-    const res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
-    $('#loadMsg').textContent='Строим улицы и дома…';const data=await res.json();
-    await new Promise(r=>setTimeout(r,30));world=buildWorld(data);
-    $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
-    spawnAll();loadState();
-    const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
-    $('#loading').hidden=true;
-    const prof=loadProfile();if(prof){applyProfile(prof);addEvent(`${player.name} снова в городе`);}else showProfile();
-    addEvent('Центр Казани загружен: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц');
-    initCaps();requestAnimationFrame(frame);
-  }catch(e){$('#loadMsg').textContent='Не удалось загрузить карту: '+e.message;const pr=document.querySelector('#loading .pr');if(pr)pr.hidden=true;console.error(e);}
-}
-boot();
-})();
-</script>
+<script src="js/util.js"></script>
+<script src="js/world.js"></script>
+<script src="js/agents.js"></script>
+<script src="js/vehicles.js"></script>
+<script src="js/interior.js"></script>
+<script src="js/render.js"></script>
+<script src="js/main.js"></script>
