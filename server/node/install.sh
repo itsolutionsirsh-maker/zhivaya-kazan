@@ -13,6 +13,14 @@ REPO="${REPO:-https://github.com/itsolutionsirsh-maker/zhivaya-kazan.git}"
 APP=/opt/zhivaya-kazan
 ENVF=/etc/zhivaya-kazan.env
 
+echo "== Подкачка (на сервере с 1 ГБ памяти — чтобы установка и сборка не упирались в память)"
+if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ] && [ "$(awk '/MemTotal/{print $2}' /proc/meminfo)" -lt 2000000 ]; then
+  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+  chmod 600 /swapfile; mkswap /swapfile >/dev/null; swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl -q vm.swappiness=10; echo 'vm.swappiness=10' > /etc/sysctl.d/91-zk-swap.conf
+fi
+
 echo "== Пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -65,6 +73,8 @@ VIEW_K=80
 VIEW_RADIUS=350
 EOF
 fi
+# адрес игры: для кнопки «Играть» в боте и вебхука Телеги (обновляется при каждом запуске install.sh с новым доменом)
+if grep -q '^PUBLIC_URL=' "$ENVF"; then sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN/|" "$ENVF"; else echo "PUBLIC_URL=https://$DOMAIN/" >> "$ENVF"; fi
 chown root:zk "$ENVF"; chmod 640 "$ENVF"
 mkdir -p /var/lib/zk/data; chown -R zk:zk /var/lib/zk
 
@@ -128,8 +138,16 @@ $DOMAIN {
 }
 EOF
 
+echo "== Брандмауэр: открыты только SSH, 80 и 443"
+if command -v ufw >/dev/null 2>&1; then
+  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}'); SSHP=${SSHP:-22}
+  ufw allow "$SSHP"/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
+  ufw --force enable >/dev/null
+fi
+
 systemctl daemon-reload
 systemctl enable --now zhivaya-kazan
+systemctl restart zhivaya-kazan
 systemctl enable --now zhivaya-kazan-update.timer
 systemctl reload caddy || systemctl restart caddy
 
@@ -137,7 +155,7 @@ sleep 2
 if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
   echo
   echo "Готово: https://$DOMAIN"
-  echo "Ключ ИИ для жителей: sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
+  echo "Ключ ИИ для жителей и токен бота (LLM_API_KEY, TG_BOT_TOKEN): sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
   echo "Журнал игры: journalctl -u zhivaya-kazan -f"
 else
   echo "Сервер игры не ответил. Посмотрите: journalctl -u zhivaya-kazan -n 50"

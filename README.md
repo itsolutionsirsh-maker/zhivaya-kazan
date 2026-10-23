@@ -87,14 +87,14 @@ defSit('wallet', {
 
 `server/node/` — сервер на Node.js: раздаёт игру, держит онлайн по WebSocket (позиции и чат мгновенно, соседи до 800 м — 5 раз в секунду), аккаунты «имя + PIN» с сохранением прогресса на сервере (вход с телефона продолжает ту же игру), прокси к ИИ. Понимает и старый протокол `api.php`, так что клиент тот же.
 
-Установка на чистый Ubuntu 22.04/24.04 (2–4 ядра, 4 ГБ). Сначала A-запись домена (например `game.iks-ai-systems.ru`) на IP сервера, потом в консоли сервера:
+Установка на чистый Ubuntu 22.04/24.04. Для старта хватает 1 ядра и 1 ГБ памяти (скрипт сам добавит подкачку на 1 ГБ); для большого онлайна — 2–4 ядра, 4 ГБ. Сначала A-запись домена (например `game.iks-ai-systems.ru`) на IP сервера — или, пока домена нет, адрес вида `203-0-113-7.sslip.io` (IP через дефисы, запись не нужна). Потом в консоли сервера:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/itsolutionsirsh-maker/zhivaya-kazan/main/server/node/install.sh -o install.sh
 sudo bash install.sh game.iks-ai-systems.ru
 ```
 
-Скрипт ставит Node.js 20 и Caddy (HTTPS-сертификат сам), запускает службу `zhivaya-kazan` и таймер, который раз в 5 минут подтягивает `main` с GitHub и перезапускает игру, если что-то изменилось. Ключ ИИ — только в `/etc/zhivaya-kazan.env` на сервере (`sudo nano /etc/zhivaya-kazan.env`, затем `sudo systemctl restart zhivaya-kazan`). Журнал: `journalctl -u zhivaya-kazan -f`. Данные аккаунтов: `/var/lib/zk/data/accounts.json`.
+Скрипт ставит Node.js 22 и Caddy (HTTPS-сертификат сам), открывает в брандмауэре только SSH, 80 и 443, запускает службу `zhivaya-kazan` и таймер, который раз в 5 минут подтягивает `main` с GitHub и перезапускает игру, если что-то изменилось. Ключ ИИ и токен бота — только в `/etc/zhivaya-kazan.env` на сервере (`LLM_API_KEY`, `TG_BOT_TOKEN`; `sudo nano /etc/zhivaya-kazan.env`, затем `sudo systemctl restart zhivaya-kazan`). Сменить домен — запустить `install.sh` ещё раз с новым доменом. Журнал: `journalctl -u zhivaya-kazan -f`. Данные аккаунтов: `/var/lib/zk/data/game.db` (SQLite).
 
 Локально: `cd server/node && npm install && GAME_DIR=../../deploy/kazan node server.js` (после `python3 tools/build_deploy.py`).
 
@@ -165,7 +165,7 @@ sudo bash install.sh game.iks-ai-systems.ru
 
 Аккаунты по имени и PIN теперь работают и на Beget: `api.php` хранит их в `data/acc`, `data/tok`, `data/tgm`.
 
-Бот — **@zhivaya_kazan_bot**, мини-приложение — `https://t.me/zhivaya_kazan_bot/game`, кнопка меню «Играть» (подробности — `docs/TELEGRAM.md`). На `/start` бот отвечает приветствием с кнопкой «Играть»: вебхук на `api.php?a=tgwebhook` сервер ставит сам, когда в `config.php` появляется токен (запросы проверяются секретом, производным от токена). При первом запуске в Телеге — три коротких экрана-подсказки. В меню «Позвать друга» отправляет ссылку `…/game?startapp=ref_<id>`: новичок и тот, кто позвал, получают запись и немного настроения (или карточку из `people.js`, если там есть `window.cityOnInvite(kind, name)`).
+Бот — **@zhivaya_kazan_bot**, мини-приложение — `https://t.me/zhivaya_kazan_bot/game`, кнопка меню «Играть» (подробности — `docs/TELEGRAM.md`). На `/start` бот отвечает приветствием с кнопкой «Играть»: вебхук на `api.php?a=tgwebhook` сервер ставит сам: PHP — когда в `config.php` появляется токен, VPS (`server.js`) — при запуске, если в `/etc/zhivaya-kazan.env` есть `TG_BOT_TOKEN` и `PUBLIC_URL` (заодно ставит кнопку меню на этот адрес). Ответ на `/start` уходит прямо в ответе на вебхук, поэтому серверу не нужен исходящий доступ к api.telegram.org — только сам вебхук. Запросы проверяются секретом, производным от токена; если вебхук уже смотрит на другой сервер, PHP его не перебивает. При первом запуске в Телеге — три коротких экрана-подсказки. В меню «Позвать друга» отправляет ссылку `…/game?startapp=ref_<id>`: новичок и тот, кто позвал, получают запись и немного настроения (или карточку из `people.js`, если там есть `window.cityOnInvite(kind, name)`).
 
 Что нужно от владельца: создать бота у @BotFather, сделать мини-приложение (`/newapp`) с адресом игры, а токен бота вписать самому в `config.php` на сервере (`'tg_bot_token' => '...'`). На VPS токен пишется в `TG_BOT_TOKEN` в `/etc/zhivaya-kazan.env`.
 

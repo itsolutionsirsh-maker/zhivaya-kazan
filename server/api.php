@@ -57,6 +57,9 @@ function tg_ensure_webhook() {
     $flag = $GLOBALS['DATA'] . '/tgwh_' . substr(sha1($tok), 0, 12) . '.php'; if (is_file($flag)) return;
     $try = $flag . '.try'; if (is_file($try) && time() - filemtime($try) < 600) return;   // не получилось — повторим не раньше чем через 10 минут
     touch($try);
+    // вебхук уже смотрит на другой сервер (игра переехала на VPS) — не перебиваем его
+    $info = tg_api('getWebhookInfo', []);
+    if (!empty($info['ok']) && !empty($info['result']['url']) && $info['result']['url'] !== game_url() . 'api.php?a=tgwebhook') { file_put_contents($flag, GUARD . time()); @unlink($try); return; }
     $r = tg_api('setWebhook', ['url' => game_url() . 'api.php?a=tgwebhook', 'secret_token' => tg_secret(), 'allowed_updates' => ['message'], 'drop_pending_updates' => true]);
     if (!empty($r['ok'])) { file_put_contents($flag, GUARD . time()); @unlink($try); }
 }
@@ -66,7 +69,8 @@ if ($a === 'tgwebhook') {
     $msg = $in['message'] ?? null; $text = is_array($msg) ? ($msg['text'] ?? '') : '';
     if (is_array($msg) && isset($msg['chat']['id']) && preg_match('~^/(start|play|help)~', $text)) {
         $name = clean($msg['from']['first_name'] ?? '', 40);
-        tg_api('sendMessage', ['chat_id' => $msg['chat']['id'],
+        // отвечаем прямо в ответе на вебхук: самому серверу не нужно ходить в api.telegram.org
+        out(['method' => 'sendMessage', 'chat_id' => $msg['chat']['id'],
             'text' => ($name ? $name . ', добро' : 'Добро') . " пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇",
             'reply_markup' => ['inline_keyboard' => [[['text' => '▶️ Играть', 'web_app' => ['url' => game_url()]]]]]]);
     }

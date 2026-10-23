@@ -35,19 +35,19 @@ setInterval(()=>{const t=now();for(const [k,b] of buckets){if(!b.length||t-b[b.l
 const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqlite=require('node:sqlite');}catch(e){}
   if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;');
     db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);CREATE TABLE IF NOT EXISTS tokens(tok TEXT PRIMARY KEY,k TEXT,t REAL);CREATE TABLE IF NOT EXISTS tgmap(id TEXT PRIMARY KEY,k TEXT);');
-    for(const c of ['tg TEXT','city TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
+    for(const c of ['tg TEXT','city TEXT','refBy TEXT','invites TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
       tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
       tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
-      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)')};
-    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null});
+      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)')};
+    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
     return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
-      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
+      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
       setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
   setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
   return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
-    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},
+    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
@@ -71,8 +71,33 @@ function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096|
   if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
   return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
 function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};
-  let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false;if(!a){store.createTg(k,u.name,u.id);a=store.get(k);created=true;}
-  const token=crypto.randomBytes(24).toString('hex');store.addTok(k,sha(token));return accOut(a,{token,created,tgName:u.name,start:u.start});}
+  let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false,invitedBy=null;
+  if(!a){store.createTg(k,u.name,u.id);created=true;
+    // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
+    const m=/^ref_(\d{3,15})$/.exec(u.start);
+    if(m&&m[1]!==u.id){const ik=store.tgGet(m[1])||('tg:'+m[1]);const inv=store.get(ik);
+      if(inv){store.setRef(k,ik);invitedBy=inv.name;store.setInvites(ik,(inv.invites||[]).concat([{name:u.name,t:Math.floor(now())}]).slice(-20));}}
+    a=store.get(k);}
+  const invites=a.invites||[];if(invites.length&&!created)store.setInvites(k,[]);   // кто пришёл по ссылке этого игрока, пока он не заходил
+  const token=crypto.randomBytes(24).toString('hex');store.addTok(k,sha(token));return accOut(a,{token,created,tgName:u.name,start:u.start,invitedBy,invites});}
+// бот: на /start отвечаем прямо в ответе на вебхук — серверу не нужно самому ходить в api.telegram.org
+const PUBLIC_URL=ENV.PUBLIC_URL?ENV.PUBLIC_URL.replace(/\/*$/,'/'):'';
+const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
+function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
+  if(!TG_TOKEN||got.length!==want.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(want)))return [403,{err:'forbidden'}];
+  const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
+  if(!msg||!msg.chat||msg.chat.id==null||!/^\/(start|play|help)\b/.test(text))return [200,{ok:1}];
+  const url=PUBLIC_URL||('https://'+String(req.headers.host||'').replace(/[^a-z0-9.:-]/gi,'')+'/');const name=clean((msg.from&&msg.from.first_name)||'',40);
+  return [200,{method:'sendMessage',chat_id:msg.chat.id,
+    text:(name?name+', добро':'Добро')+' пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇',
+    reply_markup:{inline_keyboard:[[{text:'▶️ Играть',web_app:{url}}]]}}];}
+// при запуске: вебхук на этот сервер и кнопка меню бота на эту игру; не вышло — повтор через 10 минут
+async function tgSetup(){if(!TG_TOKEN||!PUBLIC_URL)return;
+  const call=(m,p)=>fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(10000)}).then(r=>r.json());
+  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message'],drop_pending_updates:true});
+    if(w&&w.ok){await call('setChatMenuButton',{menu_button:{type:'web_app',text:'Играть',web_app:{url:PUBLIC_URL}}}).catch(()=>null);log('Телега: вебхук и кнопка меню →',PUBLIC_URL);return;}
+    log('Телега: вебхук не поставился:',w&&w.description);}catch(e){log('Телега: нет связи с api.telegram.org:',e.message);}
+  setTimeout(tgSetup,600000).unref();}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
 function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
@@ -155,7 +180,8 @@ const server=http.createServer(async(req,res)=>{
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
-    if(a==='load'){const acc=accByToken(body.token);return send(res,200,acc?accOut(acc):{err:'auth'});}
+    if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
+    if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
     if(a==='reset')return send(res,200,resetFor(body.token));
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
@@ -203,5 +229,5 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
 setInterval(()=>{stats.bytesOut=0;stats.msgsOut=0;stats.since=now();},60000).unref();
 
-server.listen(PORT,()=>log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'}`));
+server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));
