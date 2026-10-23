@@ -25,8 +25,9 @@ class Walker{
     if(this.role==='guard'){this.state='idle';this.ttl=rnd(3,8);return;}
     if(this.role==='police'&&this.anchor){const a=this.anchor;goal=nearestNode(a[0]+rnd(-220,220),a[1]+rnd(-220,220),world.pedAdj,200);}
     else{const r=Math.random();const R=350;
-      if(r<0.45&&world.pois.length){let poi=null;for(let k=0;k<12;k++){const c=pick(world.pois);if(dist(c.x,c.y,this.x,this.y)<R){poi=c;break;}}if(poi){goal=nearestNode(poi.x,poi.y,world.pedAdj,120);this.goalPoi=poi;}}
-      else if(r<0.6&&world.stops.length){let s=null;for(let k=0;k<12;k++){const c=pick(world.stops);if(dist(c.x,c.y,this.x,this.y)<R*1.5){s=c;break;}}if(s){goal=nearestNode(s.x,s.y,world.pedAdj,100);this.goalStop=s;}}
+      const rush=typeof rushHour==='function'&&rushHour();const pPoi=rush?0.35:0.45,pStop=rush?0.68:0.6;
+      if(r<pPoi&&world.pois.length){let poi=null;for(let k=0;k<12;k++){const c=pick(world.pois);if(dist(c.x,c.y,this.x,this.y)<R&&(typeof poiOpen!=='function'||poiOpen(c))){poi=c;break;}}if(poi){goal=nearestNode(poi.x,poi.y,world.pedAdj,120);this.goalPoi=poi;}}
+      else if(r<pStop&&world.stops.length){let s=null;for(let k=0;k<12;k++){const c=pick(world.stops);if(dist(c.x,c.y,this.x,this.y)<R*1.5){s=c;break;}}if(s){goal=nearestNode(s.x,s.y,world.pedAdj,100);this.goalStop=s;}}
       if(goal<0)goal=nodeNear(world.pedNodes,[this.x,this.y],R);}
     if(goal<0){this.state='idle';this.ttl=2;return;}
     this.state='routing';requestPath(this,world.pedAdj,this.node,goal,pedCost,path=>{if(this.state!=='routing')return;if(!path||path.length<2){this.state='idle';this.ttl=rnd(1,5);this.goalPoi=null;this.goalStop=null;return;}this.path=path;this.seg=0;this.t=0;this.state='walk';});}

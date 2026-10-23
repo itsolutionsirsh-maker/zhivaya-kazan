@@ -61,7 +61,7 @@ function findAction(){
   if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return {label:'Зайти домой',run:()=>enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y})};}
   for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return {label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}};}}
   if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return {label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)};
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n)return {label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y})};
+  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return ca;}if(b&&b.n)return {label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y})};
   return null;}
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}
@@ -73,7 +73,7 @@ function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:'poi'+poi.i,x:player.x,y:player.y})};}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,'poi'+poi.i);if(ca)return ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:'poi'+poi.i,x:player.x,y:player.y})};}
   switch(poi.t){
     case 'atm':return {label:`Снять наличные ${n}`,run:()=>setHint('Выдали наличные. Баланс тот же')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{clock.minutes+=30;player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
@@ -192,7 +192,7 @@ function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.
 function updateNeeds(gameMin){player.energy=clamp(player.energy-gameMin*0.085,0,100);player.food=clamp(player.food-gameMin*0.12,0,100);let target=55;if(player.food<25)target-=20;if(player.energy<20)target-=20;if(weather.kind==='rain')target-=5;player.mood=lerp(player.mood,target,Math.min(1,gameMin*0.004));}
 let dayPhaseAnnounced={};
 function updateClock(dt){const gm=dt*clock.scale/60;const before=clock.minutes;clock.minutes+=gm;updateNeeds(gm);const d=Math.floor(clock.minutes/1440)+1;if(d!==clock.day){clock.day=d;dayPhaseAnnounced={};}
-  const h=(clock.minutes/60)%24;const key=Math.floor(h);const marks={6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Остались только таксисты и полиция'};
+  const h=(clock.minutes/60)%24;const key=Math.floor(h);const we=typeof isWeekend==='function'&&isWeekend();const marks=we?{7:'Выходной. Город просыпается не спеша',11:'Выходной: на Баумана и у Кремля всё больше гуляющих',14:'Кафе и набережная полны',20:'Зажглись фонари, бары заполняются',23:'Поздний вечер выходного: на Баумана ещё гуляют',2:'Ночь. Такси развозят из баров'}:{6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно, на остановках очереди',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Кафе закрываются, остались бары, таксисты и полиция'};
   if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}}
 function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.random();const k=r<0.5?'clear':r<0.8?'cloudy':'rain';if(k!==weather.kind){weather.kind=k;addEvent(k==='rain'?'Пошёл дождь. Пешеходы ускорились, водители — наоборот':k==='cloudy'?'Небо затянуло':'Распогодилось');}weather.ttl=rnd(180,420);}
   if(weather.kind==='rain'&&!reduceMotion&&scene==='city'){while(weather.rain.length<160)weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);for(const r of weather.rain){r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
@@ -206,7 +206,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
     for(const b of buses)b.update(dt,vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
-    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updateSituations(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
+    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updateSituations(rdt);updateRhythm(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
     if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
     cam.z=lerp(cam.z,cam.zt,Math.min(1,rdt*5));if(scene==='city'&&(cam.free&&(player.vehicle||player.bus||cine||player.state==='hurt')))followPlayer();if(scene==='city'&&!cam.free){cam.x=lerp(cam.x,player.x,Math.min(1,rdt*6));cam.y=lerp(cam.y,player.y,Math.min(1,rdt*6));}
     hudTimer-=rdt;if(hudTimer<=0){hudTimer=0.25;updateHud();}
