@@ -34,7 +34,7 @@ function makeInterior(kind,name,key){
     default:{it.floor='tiles';F('counter',w/2,1.1,5,1.1,{spot:'counter'});NPC(w/2,0.5,{role:'staff',job:'администратор'});for(let i=0;i<4;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});NPC(3+rng()*(w-6),3+rng()*(h-6),{wander:true});}
   }
   return it;}
-function enterInterior(src){const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}
+function enterInterior(src){insideShot(src);const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}
   interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
@@ -173,3 +173,15 @@ function placeOrder(m,treat){if(!orderCtx)return;const {f,it,cn}=orderCtx;const 
 $('#orderTreat').addEventListener('change',renderOrder);
 $('#orderClose').addEventListener('click',closeOrder);
 $('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||!interior)return;closeChat();openOrder(w.tableF,interior);});
+
+// ===== Кадр на входе: короткое фото заведения (site/img/inside/*.jpg), потом обычная комната =====
+// Нет файла — ничего не показываем. Клик или движение пропускают кадр. В то же место второй раз за минуту не повторяем.
+const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home'];const shotImg={};const shotSeen=new Map();let shotT=null;
+for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}
+function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(src.kind==='market')return 'shop';return SHOT_KINDS.includes(src.kind)?src.kind:null;}
+function insideShot(src){const k=shotKind(src);const im=k&&shotImg[k];if(!im)return;const key=src.key||src.name;const now=performance.now();if(now-(shotSeen.get(key)||-1e9)<60000)return;shotSeen.set(key,now);
+  const el=$('#insideShot');el.style.backgroundImage=`url("${im.src}")`;$('#insideShotName').textContent=src.name||'';el.hidden=false;el.classList.remove('out');void el.offsetWidth;el.classList.add('in');
+  clearTimeout(shotT);shotT=setTimeout(hideShot,800);}
+function hideShot(){const el=$('#insideShot');if(el.hidden)return;clearTimeout(shotT);el.classList.remove('in');el.classList.add('out');setTimeout(()=>{el.hidden=true;el.classList.remove('out');},280);}
+$('#insideShot').addEventListener('pointerdown',hideShot);
+window.addEventListener('keydown',e=>{if(!$('#insideShot').hidden&&/^(w|a|s|d|ц|ф|ы|в|Arrow\w+|Escape| )$/i.test(e.key))hideShot();},true);

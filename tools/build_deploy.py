@@ -14,6 +14,8 @@ head = ('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
 open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(head + body + '</body></html>')
 shutil.copytree(os.path.join(SITE, 'js'), os.path.join(OUT, 'js'))
 shutil.copy(os.path.join(SITE, 'kazan.json'), OUT)
+if os.path.isdir(os.path.join(SITE, 'img')):
+    shutil.copytree(os.path.join(SITE, 'img'), os.path.join(OUT, 'img'))
 shutil.copy(os.path.join(SERVER, 'api.php'), OUT)
 shutil.copy(os.path.join(SERVER, 'config.sample.php'), OUT)
 shutil.copy(os.path.join(SERVER, 'data.htaccess'), os.path.join(OUT, 'data', '.htaccess'))

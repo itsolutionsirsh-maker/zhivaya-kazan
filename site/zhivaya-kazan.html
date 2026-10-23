@@ -37,6 +37,9 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .bar i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
 .bar.low i{background:var(--alert)}
 .bar.drunkbar i{background:#E0A030}
+#insideShot{position:fixed;inset:0;z-index:40;background:#10161A center/cover no-repeat;opacity:0;pointer-events:auto;display:flex;align-items:flex-end}#insideShot.in{opacity:1;transition:opacity .15s ease-out}#insideShot.out{opacity:0;transition:opacity .28s ease-in}
+#insideShot b{width:100%;padding:28px 24px 26px;background:linear-gradient(transparent,rgba(8,12,10,.86));color:#fff;font-family:var(--font-display);font-size:clamp(20px,4vw,34px);font-weight:700;text-wrap:balance}
+@media (prefers-reduced-motion:reduce){#insideShot.in,#insideShot.out{transition:none}}
 .modal h3.sub{margin:4px 0 -4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}.stack{display:flex;flex-direction:column;gap:8px}.rt-card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 #sitCard{position:relative;pointer-events:auto;width:min(92vw,440px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line);border-left:4px solid #E0A030;border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;overflow:hidden;animation:scIn .25s ease-out}
 #sitCard.alert{border-left-color:#D64545}#sitCard.good{border-left-color:#2BB062}#sitCard.call{border-left-color:#4A90E2;animation:scIn .25s ease-out,scRing 1s ease-in-out 3}
@@ -140,6 +143,7 @@ textarea{resize:vertical;min-height:64px}
 
 <canvas id="map"></canvas>
 <div id="drunkFx" aria-hidden="true"></div>
+<div id="insideShot" hidden><b id="insideShotName"></b></div>
 <div id="hud">
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1><small>центр города · OpenStreetMap</small></div>
