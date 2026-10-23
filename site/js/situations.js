@@ -39,7 +39,7 @@ function heShe(w,m,f){return w&&w.p&&w.p.female?f:m;}
 function takeActor(s,w,state){if(!w)return null;if(chatNpc===w)closeChat();w.sitBy=s;w.keep=true;w.state=state||'sit';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.mv=null;if(!s.actors.includes(w))s.actors.push(w);return w;}
 function releaseActor(w){if(!w||w.sitBy==null)return;w.sitBy=null;w.keep=false;w.mv=null;if(w.temp){const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);return;}
   if(w.state==='sit'||w.state==='hurt'){w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);w.state='idle';w.ttl=rnd(1,4);}}
-function findWalker(minR,maxR,filter){const c=[];for(const w of walkers){if(w.bus||w.inside||w.rally||w.companion||w.sitBy||w.temp||w.role!=='resident'||w.state==='hurt'||w===chatNpc)continue;if(w.state!=='walk'&&w.state!=='idle'&&w.state!=='wait')continue;const d=dist(w.x,w.y,player.x,player.y);if(d<minR||d>maxR)continue;if(filter&&!filter(w))continue;c.push([d,w]);}
+function findWalker(minR,maxR,filter){const c=[];for(const w of walkers){if(w.bus||w.inside||w.rally||w.companion||w.sitBy||w.temp||w.folk||w.role!=='resident'||w.state==='hurt'||w===chatNpc)continue;if(w.state!=='walk'&&w.state!=='idle'&&w.state!=='wait')continue;const d=dist(w.x,w.y,player.x,player.y);if(d<minR||d>maxR)continue;if(filter&&!filter(w))continue;c.push([d,w]);}
   if(!c.length)return null;c.sort((a,b)=>a[0]-b[0]);return c[Math.floor(Math.random()*Math.min(4,c.length))][1];}
 function crowdAround(x,y,R){let n=0;for(const w of walkers){if(w.bus||w.inside)continue;if(Math.abs(w.x-x)<R&&Math.abs(w.y-y)<R&&dist(w.x,w.y,x,y)<R)n++;}return n;}
 // путь по тротуарам до точки
