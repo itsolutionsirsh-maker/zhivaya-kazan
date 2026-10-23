@@ -92,7 +92,11 @@
     const sky=typeof weather!=='undefined'?(weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно'):'ясно';
     const head=t.date.getUTCDate()+' '+MONTH[t.date.getUTCMonth()+1]+', '+WD[t.date.getUTCDay()]+' · '+pad(t.h)+':'+pad(t.m);
     const inbox=(L.inbox||[]).slice(-6).reverse().map(function(m){return (m.from?m.from+': ':'')+m.text;});
-    const rows=inbox.concat(agenda(t)).concat(personal(L));
+    let folk=[];
+    if(typeof cityFolkAll==='function'){
+      try{folk=cityFolkAll().filter(function(f){return f&&f.known&&f.text;}).slice(0,4).map(function(f){return f.text;});}catch(e){folk=[];}
+    }
+    const rows=inbox.concat(folk).concat(agenda(t)).concat(personal(L));
     seenInbox=(L.inbox||[]).length;
     btn.textContent='Сегодня';
     panel.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:13px">'+head+'</span></div>'
