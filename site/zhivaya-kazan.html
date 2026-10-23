@@ -189,6 +189,16 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   </div>
 </div>
 
+<div class="modal" id="tgIntro" hidden>
+  <div class="box" style="max-width:380px">
+    <div id="tgIntroIc" style="font-size:44px;line-height:1;text-align:center">🚶</div>
+    <h2 id="tgIntroT" style="text-align:center"></h2>
+    <p id="tgIntroX" style="text-align:center;font-size:15px;line-height:1.45"></p>
+    <div id="tgIntroDots" style="text-align:center;letter-spacing:6px;color:var(--muted)"></div>
+    <div class="row" style="justify-content:center"><button class="btn" id="tgIntroSkip">Пропустить</button><button class="btn primary" id="tgIntroNext">Дальше</button></div>
+  </div>
+</div>
+
 <div class="modal" id="howtoModal" hidden>
   <div class="box">
     <h2>Как тут жить</h2>
@@ -310,7 +320,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
     </div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
-    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
   </div>
 </div>
 

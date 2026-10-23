@@ -43,7 +43,35 @@ $in = $raw ? json_decode($raw, true) : [];
 if (!is_array($in)) $in = [];
 $a = $_GET['a'] ?? ($in['a'] ?? '');
 
-if ($a === 'ping') out(['ok' => 1, 'llm' => !empty($cfg['api_key']), 'acct' => true, 'tg' => !empty($cfg['tg_bot_token'])]);
+// ---------- бот: вебхук для ответа на /start (ставится сам один раз, когда в config.php появился токен) ----------
+function tg_api($method, $params) {
+    $tok = $GLOBALS['cfg']['tg_bot_token'] ?? ''; if (!$tok) return null;
+    $ch = curl_init('https://api.telegram.org/bot' . $tok . '/' . $method);
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_HTTPHEADER => ['Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode($params, JSON_UNESCAPED_UNICODE)]);
+    $r = curl_exec($ch); curl_close($ch); return $r ? json_decode($r, true) : null;
+}
+function tg_secret() { return substr(hash('sha256', 'wh:' . ($GLOBALS['cfg']['tg_bot_token'] ?? '')), 0, 40); }
+function game_url() { $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/kazan/api.php')), '/'); return 'https://' . ($_SERVER['HTTP_HOST'] ?? 'iks-ai-systems.ru') . $dir . '/'; }
+function tg_ensure_webhook() {
+    $tok = $GLOBALS['cfg']['tg_bot_token'] ?? ''; if (!$tok) return;
+    $flag = $GLOBALS['DATA'] . '/tgwh_' . substr(sha1($tok), 0, 12) . '.php'; if (is_file($flag)) return;
+    $try = $flag . '.try'; if (is_file($try) && time() - filemtime($try) < 600) return;   // не получилось — повторим не раньше чем через 10 минут
+    touch($try);
+    $r = tg_api('setWebhook', ['url' => game_url() . 'api.php?a=tgwebhook', 'secret_token' => tg_secret(), 'allowed_updates' => ['message'], 'drop_pending_updates' => true]);
+    if (!empty($r['ok'])) { file_put_contents($flag, GUARD . time()); @unlink($try); }
+}
+if ($a === 'ping') { tg_ensure_webhook(); out(['ok' => 1, 'llm' => !empty($cfg['api_key']), 'acct' => true, 'tg' => !empty($cfg['tg_bot_token'])]); }
+if ($a === 'tgwebhook') {
+    if (empty($cfg['tg_bot_token']) || !hash_equals(tg_secret(), $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '')) { http_response_code(403); out(['err' => 'forbidden']); }
+    $msg = $in['message'] ?? null; $text = is_array($msg) ? ($msg['text'] ?? '') : '';
+    if (is_array($msg) && isset($msg['chat']['id']) && preg_match('~^/(start|play|help)~', $text)) {
+        $name = clean($msg['from']['first_name'] ?? '', 40);
+        tg_api('sendMessage', ['chat_id' => $msg['chat']['id'],
+            'text' => ($name ? $name . ', добро' : 'Добро') . " пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇",
+            'reply_markup' => ['inline_keyboard' => [[['text' => '▶️ Играть', 'web_app' => ['url' => game_url()]]]]]]);
+    }
+    out(['ok' => 1]);
+}
 
 if ($a === 'sync') {
     $id = idstr($in['id'] ?? '');
@@ -185,7 +213,7 @@ if ($a === 'login') {
     if (isset($r['err'])) out($r);
     out(acc_out($r['acc'], ['token' => new_token($r['acc']['k']), 'created' => $r['created']]));
 }
-if ($a === 'load') { $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']); out(acc_out($acc)); }
+if ($a === 'load') { $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']); $inv = $acc['invites'] ?? []; if ($inv) { $acc['invites'] = []; jwrite(acc_file($acc['k']), $acc); } out(acc_out($acc, ['invites' => $inv])); }
 if ($a === 'save') {
     $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']);
     $st = $in['state'] ?? null; $pr = $in['profile'] ?? null; $ci = $in['city'] ?? null;
@@ -207,9 +235,19 @@ if ($a === 'tglogin') {
     if (!allow('tg:' . $IP, 30, 60)) out(['err' => 'rate_limited']);
     $u = tg_verify($in['initData'] ?? '', $cfg['tg_bot_token']); if (!$u) out(['err' => 'tg_bad']);
     $map = jread(tgm_file($u['id'])); $k = $map['k'] ?? ('tg:' . $u['id']);
-    $acc = jread(acc_file($k)); $created = false;
-    if (!$acc) { $acc = ['k' => $k, 'name' => $u['name'], 'tg' => $u['id'], 'created' => time(), 'updated' => 0, 'state' => null, 'profile' => null, 'city' => null]; jwrite(acc_file($k), $acc); $created = true; }
-    out(acc_out($acc, ['token' => new_token($k), 'created' => $created, 'tgName' => $u['name'], 'start' => $u['start']]));
+    $acc = jread(acc_file($k)); $created = false; $invitedBy = null;
+    if (!$acc) {
+        $acc = ['k' => $k, 'name' => $u['name'], 'tg' => $u['id'], 'created' => time(), 'updated' => 0, 'state' => null, 'profile' => null, 'city' => null]; $created = true;
+        // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
+        if (preg_match('/^ref_(\d{3,15})$/', $u['start'], $m) && $m[1] !== $u['id']) {
+            $im = jread(tgm_file($m[1])); $ik = $im['k'] ?? ('tg:' . $m[1]); $inv = jread(acc_file($ik));
+            if ($inv) { $acc['refBy'] = $ik; $invitedBy = $inv['name']; $inv['invites'] = array_slice(array_merge($inv['invites'] ?? [], [['name' => $u['name'], 't' => time()]]), -20); jwrite(acc_file($ik), $inv); }
+        }
+        jwrite(acc_file($k), $acc);
+    }
+    $invites = $acc['invites'] ?? [];   // кто пришёл по ссылке этого игрока, пока он не заходил
+    if ($invites && !$created) { $acc['invites'] = []; jwrite(acc_file($k), $acc); }
+    out(acc_out($acc, ['token' => new_token($k), 'created' => $created, 'tgName' => $u['name'], 'start' => $u['start'], 'invitedBy' => $invitedBy, 'invites' => $invites]));
 }
 // в Телеге: «у меня уже есть игрок на сайте» — имя + PIN, дальше Телега открывает именно его
 if ($a === 'tglink') {
