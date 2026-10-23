@@ -5,7 +5,7 @@ let companion=null;   // {w, mode:'follow'|'go', dest:{x,y,n,poi}, arrived}
 function placesNear(x,y,R,max){const out=[];for(const p of world.pois){if(!p.n)continue;const d=dist(p.x,p.y,x,y);if(d<R)out.push([d,p]);}
   out.sort((a,b)=>a[0]-b[0]);const seen=new Set();const res=[];for(const [d,p] of out){if(seen.has(p.n))continue;seen.add(p.n);res.push(p);if(res.length>=max)break;}return res;}
 const POI_RU={cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'больница',university:'вуз',library:'библиотека',worship:'храм',police:'полиция',market:'рынок',school:'школа',sight:'достопримечательность',atm:'банкомат',fuel:'заправка'};
-function placesText(x,y){return placesNear(x,y,700,24).map(p=>`${p.n} (${POI_RU[p.t]||p.t}, ${Math.round(dist(p.x,p.y,x,y))} м)`).join('; ');}
+function placesText(x,y){return placesNear(x,y,700,12).map(p=>`${p.n} (${POI_RU[p.t]||p.t}, ${Math.round(dist(p.x,p.y,x,y))} м)`).join('; ');}
 function norm(s){return String(s||'').toLowerCase().replace(/ё/g,'е').replace(/[«»"'.,!?]/g,'').trim();}
 function resolvePlace(name,x,y){const n=norm(name);if(!n)return null;let best=null,bs=0;
   for(const p of placesNear(x,y,1500,400)){const pn=norm(p.n);let s=0;if(pn===n)s=3;else if(pn.includes(n)||n.includes(pn))s=2;else{const a=new Set(pn.split(/\s+/)),b=n.split(/\s+/);const hit=b.filter(w=>w.length>2&&a.has(w)).length;if(hit)s=1+hit*0.1;}

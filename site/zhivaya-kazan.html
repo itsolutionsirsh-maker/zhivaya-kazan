@@ -37,6 +37,10 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .bar i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
 .bar.low i{background:var(--alert)}
 .bar.drunkbar i{background:#E0A030}
+#insideShot{position:fixed;inset:0;z-index:40;background:#10161A center/cover no-repeat;opacity:0;pointer-events:auto;display:flex;align-items:flex-end}#insideShot.in{opacity:1;transition:opacity .15s ease-out}#insideShot.out{opacity:0;transition:opacity .28s ease-in}
+#insideShot b{width:100%;padding:28px 24px 26px;background:linear-gradient(transparent,rgba(8,12,10,.86));color:#fff;font-family:var(--font-display);font-size:clamp(20px,4vw,34px);font-weight:700;text-wrap:balance}
+@media (prefers-reduced-motion:reduce){#insideShot.in,#insideShot.out{transition:none}}
+.modal h3.sub{margin:4px 0 -4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}.stack{display:flex;flex-direction:column;gap:8px}.rt-card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 #sitCard{position:relative;pointer-events:auto;width:min(92vw,440px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line);border-left:4px solid #E0A030;border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;overflow:hidden;animation:scIn .25s ease-out}
 #sitCard.alert{border-left-color:#D64545}#sitCard.good{border-left-color:#2BB062}#sitCard.call{border-left-color:#4A90E2;animation:scIn .25s ease-out,scRing 1s ease-in-out 3}
 #sitCard .sc-head{display:flex;align-items:center;gap:8px}#scIcon{font-size:18px}#scTitle{flex:1;font-size:14px}#scX{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
@@ -139,6 +143,7 @@ textarea{resize:vertical;min-height:64px}
 
 <canvas id="map"></canvas>
 <div id="drunkFx" aria-hidden="true"></div>
+<div id="insideShot" hidden><b id="insideShotName"></b></div>
 <div id="hud">
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1><small>центр города · OpenStreetMap</small></div>
@@ -146,7 +151,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
       <button class="btn" id="speedBtn" title="Скорость времени">×8</button>
-      <button class="btn" id="routeBtn" title="Куда поехать">🧭</button><button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
+      <button class="btn" id="routeBtn" title="Куда поехать">🧭</button><button class="btn" id="jobsBtn" title="Работа и жильё">💼</button><button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
     <div class="card needs">
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
@@ -247,6 +252,18 @@ textarea{resize:vertical;min-height:64px}
   </div>
 </div>
 
+<div class="modal" id="jobsModal" hidden>
+  <div class="box">
+    <h2>Работа и жильё</h2>
+    <div id="jobsMine"></div>
+    <h3 class="sub">Вакансии рядом</h3>
+    <div id="jobsList" class="stack"></div>
+    <h3 class="sub">Жильё</h3>
+    <div id="jobsHome" class="stack"></div>
+    <div class="row"><button class="btn" id="jobsClose">Закрыть</button></div>
+  </div>
+</div>
+
 <div class="modal" id="logModal" hidden>
   <div class="box">
     <h2>Что происходит в городе</h2>
@@ -275,6 +292,13 @@ textarea{resize:vertical;min-height:64px}
       <kbd>колесо</kbd><span>масштаб</span>
       <kbd>Esc</kbd><span>закрыть окно</span>
     </div>
+    <div id="acctBox" hidden>
+      <h3 class="sub">Аккаунт</h3>
+      <div id="acctForm"><p>Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.</p>
+        <div class="row"><input type="text" id="acctName" maxlength="24" placeholder="Имя" autocomplete="username" style="flex:1;min-width:0"><input type="password" id="acctPin" maxlength="8" inputmode="numeric" placeholder="PIN 4–8 цифр" autocomplete="current-password" style="width:120px"><button class="btn primary" id="acctGo">Войти</button></div></div>
+      <div id="acctOut" hidden><p>Вы вошли как <b id="acctWho"></b>. Прогресс сохраняется на сервере каждые 30 секунд.</p><div class="row"><button class="btn" id="acctOutBtn">Выйти</button></div></div>
+      <p class="online" id="acctMsg"></p>
+    </div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
@@ -292,10 +316,15 @@ textarea{resize:vertical;min-height:64px}
 <script src="js/talk.js"></script>
 <script src="js/companion.js"></script>
 <script src="js/transport.js"></script>
+<script src="js/rhythm.js"></script>
 <script src="js/drunk.js"></script>
 <script src="js/situations.js"></script>
 <script src="js/sit-street.js"></script>
 <script src="js/sit-scam.js"></script>
 <script src="js/sit-transport.js"></script>
+<script src="js/sit-life.js"></script>
+<script src="js/events.js"></script>
+<script src="js/people.js"></script>
+<script src="js/phone.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

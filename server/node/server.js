@@ -1,0 +1,183 @@
+// «Живая Казань» — сервер для VPS.
+// Раздаёт игру (deploy/kazan), держит онлайн по WebSocket (/ws), общий и личный чат,
+// аккаунты «имя + PIN» с сохранением прогресса (SQLite), прокси к ИИ с лимитами (ключ только в /etc/zhivaya-kazan.env).
+// Совместим с api.php: тот же /api.php?a=ping|sync|llm — старый клиент работает и здесь.
+//
+// Масштаб: каждому игроку уходят только соседи — сетка 50 м, радиус 350 м, не больше VIEW_K ближайших;
+// имя/одежда/аватар — один раз при появлении, дальше только координаты тех, кто сдвинулся;
+// остальная толпа — счётчиками по клеткам 10 м (клиент рисует её точками). Поэтому трафик растёт
+// с числом соседей, а не с числом игроков на сервере.
+'use strict';
+const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
+const {WebSocketServer}=require('ws');
+
+const ENV=process.env;
+const PORT=+ENV.PORT||8080;
+const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
+const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
+const LLM={key:ENV.LLM_API_KEY||'',base:(ENV.LLM_API_BASE||'https://api.openai.com/v1').replace(/\/+$/,''),model:ENV.LLM_MODEL||'gpt-4o-mini',
+  maxTokens:+ENV.LLM_MAX_TOKENS||160,perPlayerDay:+ENV.LLM_PER_PLAYER_DAY||60,perDay:+ENV.LLM_DAILY_LIMIT||20000};
+const VIEW_R=+ENV.VIEW_RADIUS||350, VIEW_K=+ENV.VIEW_K||80, VIEW_K_CROWD=+ENV.VIEW_K_CROWD||50, NEAR_R=120, CELL=50;
+fs.mkdirSync(DATA,{recursive:true});
+
+const clean=(s,n)=>typeof s==='string'?s.replace(/[\x00-\x1F\x7F]/g,' ').trim().slice(0,n):'';
+const idstr=s=>typeof s==='string'?s.toLowerCase().replace(/[^a-f0-9]/g,'').slice(0,32):'';
+const now=()=>Date.now()/1000;
+const log=(...a)=>console.log(new Date().toISOString(),...a);
+const day=()=>new Date().toISOString().slice(0,10);
+
+// ---------- ограничение частоты ----------
+const buckets=new Map();
+function allow(key,limit,windowSec){const t=now();let b=buckets.get(key);if(!b){b=[];buckets.set(key,b);}while(b.length&&t-b[0]>windowSec)b.shift();if(b.length>=limit)return false;b.push(t);return true;}
+setInterval(()=>{const t=now();for(const [k,b] of buckets){if(!b.length||t-b[b.length-1]>600)buckets.delete(k);}},60000).unref();
+
+// ---------- хранилище аккаунтов: SQLite (Node 22+), иначе JSON ----------
+const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqlite=require('node:sqlite');}catch(e){}
+  if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;');
+    db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);');
+    const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
+      tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts')};
+    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null});
+    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>row(q.byTok.get(t)),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
+      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p)=>q.save.run(JSON.stringify(s),JSON.stringify(p),now(),k),count:()=>q.count.get().n};}
+  const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
+  setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
+  return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t)||null,create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
+    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p)=>{acc[k].state=s;acc[k].profile=p;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
+const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
+const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
+function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2)return {err:'name'};if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
+  if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
+  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
+  if(a.lock_until&&a.lock_until>now())return {err:'locked'};
+  if(!crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'))){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
+  store.setTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,updated:a.updated};}
+function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
+function saveFor(token,state,profile){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null);if(s.length>60000||p.length>12000)return {err:'too_big'};
+  store.save(a.k,state||a.state,profile||a.profile);return {ok:1};}
+
+// ---------- игроки онлайн ----------
+// p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
+const players=new Map();let nextSid=1;const bySid=new Map();
+// две сетки: крупная (50 м) — быстро понять, сколько людей вокруг; мелкая (10 м) — найти ближайших в толпе и посчитать её по клеткам
+const CF=10;const coarse=new Map(),fine=new Map();const gkey=(cx,cy)=>(cx+5000)*20000+(cy+5000);
+function gridMove(p){const ck=gkey(Math.floor(p.x/CELL),Math.floor(p.y/CELL)),fk=gkey(Math.floor(p.x/CF),Math.floor(p.y/CF));if(p.cell===ck&&p.fcell===fk)return;gridDel(p);
+  p.cell=ck;p.fcell=fk;let c=coarse.get(ck);if(!c){c={set:new Set(),fine:new Map()};coarse.set(ck,c);}c.set.add(p);c.fine.set(fk,(c.fine.get(fk)||0)+1);
+  let f=fine.get(fk);if(!f){f=new Set();fine.set(fk,f);}f.add(p);}
+function gridDel(p){if(p.cell==null)return;const c=coarse.get(p.cell);if(c){c.set.delete(p);const n=(c.fine.get(p.fcell)||1)-1;if(n>0)c.fine.set(p.fcell,n);else c.fine.delete(p.fcell);if(!c.set.size)coarse.delete(p.cell);}
+  const f=fine.get(p.fcell);if(f){f.delete(p);if(!f.size)fine.delete(p.fcell);}p.cell=null;p.fcell=null;}
+function around(x,y,R,cb){const c0=Math.floor((x-R)/CELL),c1=Math.floor((x+R)/CELL),r0=Math.floor((y-R)/CELL),r1=Math.floor((y+R)/CELL);for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(c)for(const p of c.set)cb(p);}}
+// ближайшие соседи: в редком месте — все в радиусе; в толпе — по кольцам мелкой сетки, пока не наберётся K
+function nearest(p,R,K,out){out.length=0;const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);let total=0;
+  for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(c)total+=c.set.size;}
+  const add=o=>{if(o===p)return;const d=Math.hypot(o.x-p.x,o.y-p.y);if(d<=R)out.push([d,o]);};
+  if(total<=K*2){around(p.x,p.y,R,add);}
+  else{const fx=Math.floor(p.x/CF),fy=Math.floor(p.y/CF),maxR=Math.ceil(R/CF);
+    for(let r=0;r<=maxR;r++){for(let dx=-r;dx<=r;dx++){const st=(Math.abs(dx)===r)?1:2*r;for(let dy=-r;dy<=r;dy+=st){const f=fine.get(gkey(fx+dx,fy+dy));if(f)for(const o of f)add(o);}}if(out.length>=K)break;}}
+  if(out.length>K){out.sort((a,b)=>a[0]-b[0]);out.length=K;}return total;}
+// толпа: сколько людей в каждой клетке 10 м в радиусе R (клиент сам вычтет тех, кого видит)
+function crowdCells(p,R){const res=[];const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);
+  for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(!c)continue;for(const [fk,n] of c.fine){res.push([Math.floor(fk/20000)-5000,fk%20000-5000,n]);if(res.length>=800)return res;}}return res;}
+const META_KEYS=['n','r','c','v','vc','sy','g','a'];
+function setPresence(p,d){if(!d||typeof d!=='object')return;
+  if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
+  const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
+  if(has){if(typeof m.n==='string')m.n=clean(m.n,24)||'Игрок';if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
+  p.t=now();}
+function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
+  p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
+function delPlayer(p){players.delete(p.id);bySid.delete(p.sid);gridDel(p);}
+setInterval(()=>{const t=now();for(const p of players.values())if(!p.ws&&t-p.t>15)delPlayer(p);},5000).unref();
+
+// ---------- чат ----------
+const msgs=[];let seq=0;let cityRate=[];
+function addMsg(from,n,to,t,x,y){seq++;const m={i:seq,from,n,to:to||null,t,ts:Math.floor(now()),x,y};msgs.push(m);if(msgs.length>400)msgs.shift();return m;}
+function cityLimited(){const t=now();cityRate=cityRate.filter(x=>t-x<1);if(cityRate.length>=8)return true;cityRate.push(t);return false;}
+// при большом онлайне «Город» слышат в радиусе 1,5 км (район), иначе — все
+function deliver(m){const big=players.size>1000;const out={t:'msg',m:{i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}};const s=JSON.stringify(out);
+  if(m.to){for(const id of [m.to,m.from]){const p=players.get(id);if(p&&p.ws&&p.ws.readyState===1)p.ws.send(s);}return;}
+  for(const p of players.values()){if(!p.ws||p.ws.readyState!==1)continue;if(big&&p.id!==m.from&&Math.hypot(p.x-m.x,p.y-m.y)>1500)continue;p.ws.send(s);}}
+function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';const text=clean(textRaw,240);if(!text)return null;const to=toRaw?idstr(toRaw):null;
+  if(!to&&players.size>300&&!allow('city:'+p.id,1,3))return 'rate';if(!to&&cityLimited())return 'busy';deliver(addMsg(p.id,(p.meta&&p.meta.n)||'Игрок',to,text,p.x,p.y));return null;}
+
+// ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
+function apiSync(body){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;setPresence(p,body.p);
+  for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
+  const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
+  const list=[];around(p.x,p.y,VIEW_R,o=>{if(o!==p&&list.length<VIEW_K)list.push({id:o.id,p:Object.assign({},o.meta,{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b})});});
+  return {players:list,msgs:mine,seq,online:players.size};}
+
+// ---------- ИИ: лимит на игрока в день и общий лимит в день ----------
+const llmDay={d:day(),total:0,per:new Map()};
+function llmQuota(who){const d=day();if(llmDay.d!==d){llmDay.d=d;llmDay.total=0;llmDay.per.clear();}if(llmDay.total>=LLM.perDay)return 'budget';const n=llmDay.per.get(who)||0;if(n>=LLM.perPlayerDay)return 'quota';llmDay.per.set(who,n+1);llmDay.total++;return null;}
+async function apiLlm(body,ip){if(!LLM.key)return {err:'no_llm'};if(!allow('llm:'+ip,30,60))return {err:'rate_limited'};const who=idstr(body.id)||ip;const q=llmQuota(who);if(q)return {err:q};
+  const ms=[];for(const m of (Array.isArray(body.messages)?body.messages:[]).slice(-12)){const c=clean(m&&m.content,4000);if(c)ms.push({role:m.role==='assistant'?'assistant':'user',content:c});}if(!ms.length)return {err:'empty'};
+  const req={model:LLM.model,messages:ms,max_tokens:LLM.maxTokens,temperature:0.8};if(body.json)req.response_format={type:'json_object'};
+  const call=()=>{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),30000);return fetch(LLM.base+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+LLM.key},body:JSON.stringify(req),signal:ctl.signal}).finally(()=>clearTimeout(to));};
+  try{let r=await call();if(!r.ok&&body.json&&r.status===400){delete req.response_format;r=await call();}
+    const j=await r.json().catch(()=>null);const text=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+    if(!r.ok||typeof text!=='string')return {err:'upstream_error',code:r.status};return {text:text.trim()};}catch(e){return {err:'upstream_error'};}}
+
+// ---------- HTTP ----------
+const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};
+function send(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(b);}
+function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{ok(ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{});}catch(e){ok({});}});req.on('error',bad);});}
+function ipOf(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'x').split(',')[0].trim();}
+const stats={bytesOut:0,msgsOut:0,tickMs:0,since:now()};
+const server=http.createServer(async(req,res)=>{
+  const u=new URL(req.url,'http://x');const ip=ipOf(req);
+  if(u.pathname==='/api.php'||u.pathname==='/api'){
+    let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
+    const a=u.searchParams.get('a')||body.a||'';
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,online:players.size});
+    if(a==='sync')return send(res,200,apiSync(body));
+    if(a==='llm')return send(res,200,await apiLlm(body,ip));
+    if(a==='login')return send(res,200,login(body.name,body.pin,ip));
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile));
+    if(a==='load'){const acc=accByToken(body.token);return send(res,200,acc?{ok:1,name:acc.name,state:acc.state,profile:acc.profile,updated:acc.updated}:{err:'auth'});}
+    return send(res,404,{err:'unknown_action'});}
+  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
+  let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
+  const file=path.join(ROOT,path.normalize(rel).replace(/^([/\\])+/,''));
+  if(!file.startsWith(ROOT+path.sep))return send(res,403,{err:'forbidden'});
+  const ext=path.extname(file).toLowerCase();if(ext==='.php'||file.includes(path.sep+'data'+path.sep))return send(res,404,{err:'not_found'});
+  fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Не найдено');}
+    const cache=ext==='.html'?'no-cache':(ext==='.json'?'public, max-age=3600':'public, max-age=300');
+    res.writeHead(200,{'Content-Type':MIME[ext]||'application/octet-stream','Content-Length':st.size,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});
+    if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});});
+
+// ---------- WebSocket ----------
+const wss=new WebSocketServer({server,path:'/ws',maxPayload:16*1024,perMessageDeflate:false});
+function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmount>256*1024)return;const s=JSON.stringify(obj);stats.bytesOut+=s.length;stats.msgsOut++;ws.send(s);}
+wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
+  if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
+  ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
+    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.view.clear();setPresence(me,d.p);
+      wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid});return;}
+    if(!me)return;
+    if(d.t==='p'){setPresence(me,d);return;}           // координаты: {t:'p',x,y,hx,hy,b} — часто
+    if(d.t==='m'){setPresence(me,d.m);return;}         // имя, одежда, фраза, аватар — только когда изменились
+    if(d.t==='msg'){const e=postMsg(me,d.to,d.text);if(e)wsSend(me,{t:'err',e});return;}});
+  ws.on('close',()=>{if(me&&me.ws===ws){me.ws=null;delPlayer(me);}});});
+
+// рассылка мира: каждые 200 мс; ближние (до 120 м) — каждый раз, дальние — через раз; только сдвинувшиеся
+let tick=0;const cand=[];
+setInterval(()=>{const t0=process.hrtime.bigint();tick++;
+  for(const p of players.values()){if(!p.ws||p.ws.readyState!==1)continue;
+    // в плотной толпе — меньше соседей и вдвое реже (2,5 раза в секунду): иначе площадь на тысячи человек съест процессор
+    if(p.dense&&(tick+p.sid)%2)continue;
+    const total=nearest(p,VIEW_R,p.dense?VIEW_K_CROWD:VIEW_K,cand);p.dense=total>VIEW_K*3;const shown=new Set();const pos=[],meta=[],gone=[];
+    for(const [d,o] of cand){shown.add(o.sid);const v=p.view.get(o.sid);
+      if(!v||v.v!==o.metaV)meta.push([o.sid,o.id,o.meta]);
+      const far=d>NEAR_R;if(!v||Math.abs(v.x-o.x)>0.05||Math.abs(v.y-o.y)>0.05||v.b!==o.b){if(!v||!far||tick%2===0){pos.push([o.sid,Math.round(o.x*10),Math.round(o.y*10),Math.round(o.hx*100),Math.round(o.hy*100),o.b]);p.view.set(o.sid,{v:o.metaV,x:o.x,y:o.y,b:o.b});continue;}}
+      if(!v||v.v!==o.metaV)p.view.set(o.sid,Object.assign(v||{x:NaN,y:NaN,b:-1},{v:o.metaV}));}
+    for(const sid of p.view.keys())if(!shown.has(sid)){gone.push(sid);p.view.delete(sid);}
+    const msg={t:'w'};let any=false;if(pos.length){msg.p=pos;any=true;}if(meta.length){msg.m=meta;any=true;}if(gone.length){msg.g=gone;any=true;}
+    if(tick%10===p.sid%10){msg.n=players.size;any=true;if(total>VIEW_K){msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=total>VIEW_K;}
+    if(any)wsSend(p,msg);}
+  stats.tickMs=stats.tickMs*0.9+Number(process.hrtime.bigint()-t0)/1e6*0.1;},200).unref();
+setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
+setInterval(()=>{stats.bytesOut=0;stats.msgsOut=0;stats.since=now();},60000).unref();
+
+server.listen(PORT,()=>log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'}`));
+for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));

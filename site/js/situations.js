@@ -11,6 +11,9 @@
 const SIT={defs:{},active:[],timer:45,cool:{},card:null,queue:[],marks:new Map(),patrols:[],dossier:[],speedMul:1,watchers:[]};
 // наблюдатели: проверка каждый кадр (толкнул прохожего, превысил скорость у камеры…)
 function defWatch(fn){SIT.watchers.push(fn);}
+// при входе в помещение (it — интерьер): прорвало трубу дома и т.п.
+SIT.enterHooks=[];function defEnter(fn){SIT.enterHooks.push(fn);}
+function sitOnEnter(it){for(const f of SIT.enterHooks){try{f(it);}catch(e){console.warn(e);}}}
 
 function defSit(id,o){o.id=id;SIT.defs[id]=o;}
 function sitNow(){return performance.now()/1000;}
@@ -90,6 +93,7 @@ function finishPatrol(P,failed){const i=SIT.patrols.indexOf(P);if(i>=0)SIT.patro
 // ---------- цикл ----------
 function sitCanAuto(){return scene==='city'&&!player.busy&&!player.bus&&!cine&&player.state!=='hurt'&&!SIT.card&&!(typeof drunkSt!=='undefined'&&(drunkSt.patrol||drunkSt.arrestT>0))&&SIT.active.filter(s=>!s.def.quiet).length<2;}
 function updateSituations(rdt){const dt=rdt;
+  if(!SIT.boot){SIT.boot=true;for(const d of Object.values(SIT.defs))if(d.always)startSit(d.id);if(player.job&&SIT.defs.job)startSit('job');}
   for(const s of SIT.active){if(s.done)continue;s.t+=dt;if(s.def.update)s.def.update(s,dt);if(s.maxT&&s.t>s.maxT)endSit(s);}
   SIT.active=SIT.active.filter(s=>!s.done);
   updatePatrols(dt);
@@ -106,6 +110,7 @@ function sitAction(){for(const s of SIT.active){if(s.done||!s.def.action)continu
 function sitActionInterior(){for(const s of SIT.active){if(s.done||!s.def.actionInside)continue;const a=s.def.actionInside(s);if(a)return a;}return null;}
 
 // ---------- рисование ----------
+function drawSitInterior(it){for(const s of SIT.active)if(!s.done&&s.def.drawInside)s.def.drawInside(s,it);}
 function drawSituations(toS,z){for(const s of SIT.active)if(!s.done&&s.def.draw)s.def.draw(s,toS,z);
   ctx.save();ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
   for(const m of SIT.marks.values()){const [sx,sy]=toS(m.x,m.y);const on=sx>10&&sx<W-10&&sy>10&&sy<H-10;

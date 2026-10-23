@@ -13,4 +13,8 @@ if os.path.isdir(os.path.join(DST, 'js')):
     shutil.rmtree(os.path.join(DST, 'js'))
 shutil.copytree(os.path.join(SRC, 'js'), os.path.join(DST, 'js'))
 shutil.copy(os.path.join(SRC, 'kazan.json'), os.path.join(DST, 'kazan.json'))
+if os.path.isdir(os.path.join(DST, 'img')):
+    shutil.rmtree(os.path.join(DST, 'img'))
+if os.path.isdir(os.path.join(SRC, 'img')):
+    shutil.copytree(os.path.join(SRC, 'img'), os.path.join(DST, 'img'))
 print('dev build →', DST)
