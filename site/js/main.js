@@ -39,6 +39,7 @@ function findAction(){
   if(player.vehicle&&player.vehicle.kind==='taxi')return {label:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
   if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return {label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi};
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
+    if(v.kind==='own'&&v.speed<1&&typeof ECON!=='undefined'&&ECON.carCond<95&&world.pois.some(p=>p.t==='fuel'&&dist(p.x,p.y,v.x,v.y)<18))return repairAction(false);
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
     return {label:v.kind==='scooter'?'Оставить самокат здесь':'Припарковать и выйти',run:exitVehicle};}
   {const sa=sitAction();if(sa)return sa;}
@@ -47,10 +48,10 @@ function findAction(){
   if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return {label:`${a.label} (${companion.w.p.name} с вами)`,run:a.run};}
   const ra=rallyAction();if(ra&&!/^Собрать/.test(ra.label))return ra;
   let best=null,bd=1e9;
-  for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
+  for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(w.role==='guard'&&d>2.2)continue;if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
   if(best)return best;
   for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best=r.kind==='scooter'?{label:'Взять самокат · 50 ₽ + 6 ₽/мин',run:()=>enterVehicle(r)}:{label:'Взять каршеринг · 200 ₽ + 10 ₽/мин',run:()=>enterVehicle(r)};}}
-  if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best={label:'Сесть в свою машину',run:()=>enterVehicle(ownCar)};}}
+  if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best=(typeof ECON!=='undefined'&&ECON.carCond<12)?repairAction(true):{label:`Сесть в свою машину${typeof ECON!=='undefined'&&ECON.carCond<60?' · '+Math.round(ECON.carCond)+'%':''}`,run:()=>enterVehicle(ownCar)};}}
   if(best)return best;
   for(const s of world.stops){const d=dist(s.x,s.y,player.x,player.y);if(d<9&&d<bd){const rts=routesAtStop(s);if(!rts.length)continue;bd=d;best={label:`Остановка «${s.n}»: ждать ${rts.map(r=>r.ref).join(', ')}`,run:()=>{player.waitingStop=s;player.x=s.x;player.y=s.y;setHint('Ждём транспорт… первый подошедший — ваш');}};}}
   if(best)return best;
@@ -73,11 +74,11 @@ function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,'poi'+poi.i);if(ca)return ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:'poi'+poi.i,x:player.x,y:player.y})};}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,'poi'+poi.i);if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:'poi'+poi.i,x:player.x,y:player.y})};}
   switch(poi.t){
-    case 'atm':return {label:`Снять наличные ${n}`,run:()=>setHint('Выдали наличные. Баланс тот же')};
+    case 'atm':return {label:`Банкомат ${n}: карта и вклад`,run:()=>openBank('atm')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{clock.minutes+=30;player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
-    case 'fuel':return player.vehicle&&player.vehicle.kind==='own'?{label:`Заправиться ${n} · 2 500 ₽`,run:()=>spend(2500,()=>addEvent('Полный бак'))}:null;
+    case 'fuel':if(player.vehicle&&player.vehicle.kind==='own'&&typeof ECON!=='undefined'&&ECON.carCond<95)return repairAction(false);return player.vehicle&&player.vehicle.kind==='own'?{label:`Заправиться ${n} · 2 500 ₽`,run:()=>spend(2500,()=>addEvent('Полный бак'))}:null;
     default:return null;}}
 function spend(amount,fn){if(player.money<amount){setHint(`Не хватает денег: нужно ${amount} ₽`);return;}player.money-=amount;fn();}
 function sleep(h){player.drunk=0;const before=Math.floor(clock.minutes/1440);clock.minutes+=h*60;player.energy=100;player.food=clamp(player.food-25,0,100);player.mood=clamp(player.mood+5,0,100);const after=Math.floor(clock.minutes/1440);if(after>before)addEvent(`Доброе утро! Наступил день ${after+1}`);else addEvent('Вы выспались');}
@@ -121,13 +122,13 @@ function showHowto(){$('#howtoModal').hidden=false;player.busy=true;}
 $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;player.busy=false;flags.howtoSeen=true;try{localStorage.setItem('zk.howto','1');}catch(e){}});
 
 // ---------- сохранение ----------
-function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,z:cam.zt,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object')player.job=s.job;if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object')player.job=s.job;if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
@@ -206,7 +207,7 @@ function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
     for(const b of buses)b.update(dt,vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
-    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updateSituations(rdt);updateRhythm(rdt);updateFolk(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
+    updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updateSituations(rdt);updateRhythm(rdt);updateFolk(rdt);updateEcon(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);
     if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
     cam.z=lerp(cam.z,cam.zt,Math.min(1,rdt*5));if(scene==='city'&&(cam.free&&(player.vehicle||player.bus||cine||player.state==='hurt')))followPlayer();if(scene==='city'&&!cam.free){cam.x=lerp(cam.x,player.x,Math.min(1,rdt*6));cam.y=lerp(cam.y,player.y,Math.min(1,rdt*6));}
     hudTimer-=rdt;if(hudTimer<=0){hudTimer=0.25;updateHud();}

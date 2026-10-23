@@ -25,6 +25,7 @@ function updateRentals(dt){rentalTimer-=dt;if(rentalTimer>0)return;rentalTimer=2
 function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=player.drunk||0;
   if((kind!=='scooter'&&kind!=='taxi'&&dr>=20)||(kind==='scooter'&&dr>=45)){setHint(kind==='scooter'?'Вы пьяны — на самокат нельзя, улетите в первый же столб. Пешком или такси 🧭':'Вы выпили — за руль нельзя (ст. 12.8 КоАП, лишение прав). Вызовите такси 🧭');return;}
   if(player.money<spec.start){setHint(`Нужно ${spec.start} ₽ на старт`);return;}
+  if(kind==='own'&&typeof ECON!=='undefined'&&ECON.carCond<12){setHint('Машина не заводится — нужен эвакуатор и ремонт');return;}
   if(kind!=='own'){const i=rentals.indexOf(obj);if(i>=0)rentals.splice(i,1);player.money-=spec.start;}else ownCar.parked=false;
   player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};
   player.waypoints=null;player.waitingStop=null;player.talkTarget=null;
@@ -44,7 +45,7 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   if(v.damaged>0){v.damaged-=dt;v.speed=0;return;}
   let thr=0,steer=0;if(!player.busy&&v.kind!=='taxi'){if(keys.w||keys['ц']||keys.ArrowUp)thr+=1;if(keys.s||keys['ы']||keys.ArrowDown)thr-=1;if(keys.d||keys['в']||keys.ArrowRight)steer+=1;if(keys.a||keys['ф']||keys.ArrowLeft)steer-=1;thr+=-joyVec[1];steer+=joyVec[0];}
   const manual=Math.abs(thr)>0.05||Math.abs(steer)>0.05;if(manual)v.auto=null;
-  const ns=nearestRoadSeg(v.x,v.y,16);const onRoad=!!(ns&&ns.d<ns.seg.r.hw+1.8);let vmax=s.vmax;
+  const ns=nearestRoadSeg(v.x,v.y,16);const onRoad=!!(ns&&ns.d<ns.seg.r.hw+1.8);let vmax=s.vmax;if(v.kind==='own'&&typeof carSpeedMul==='function')vmax*=carSpeedMul();
   const boost=(keys.shift||keys.ShiftLeft)&&!v.auto;   // Shift — «газ в пол»: можно превысить, а камеры это заметят
   if(v.kind!=='scooter'){vmax=onRoad?(boost?Math.min(vmax*1.45,(ns.seg.r.speed||8)*1.75+3):Math.min(vmax,(ns.seg.r.speed||8)*1.3+2)):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
   if(weather.kind==='rain')vmax*=0.85;v.onRoad=onRoad;
@@ -72,10 +73,10 @@ function checkVehicleCollisions(v){const s=v.spec;const sp=Math.abs(v.speed);
 function playerCrash(v,u,sp){v.speed=0;v.auto=null;v.damaged=v.kind==='scooter'?8:50;v.crashedLook=true;shake=1;
   if(v.kind==='scooter'){player.energy=clamp(player.energy-15,0,100);player.mood=clamp(player.mood-10,0,100);startCine('crash','Вы врезались на самокате',1.6);addEvent(`Вы на самокате врезались в ${u.route?'автобус':'машину'}. Энергия −15`,'alert');return;}
   if(u.kind)crashCar(u);else{u.speed=0;u.dwell=60;}
-  const fault=v.kind==='taxi'?false:Math.random()<0.55;const fine=fault?(v.kind==='car'?4000:3000):0;
+  const fault=v.kind==='taxi'?false:Math.random()<0.55;const fine=fault?(v.kind==='car'?4000:3000):0;if(typeof econCrash==='function')econCrash(v,fault,false);
   const ac=createAccident({x:(v.x+u.x)/2,y:(v.y+u.y)/2,cars:[u,vehProxy(v)],playerCar:true,playerFine:fine,playerMood:fault?15:5,playerFineText:fault?`ГИБДД: виноваты вы. Штраф ${fine} ₽${v.kind==='car'?', каршеринг спишет ущерб':''}`:'ГИБДД: виноват другой водитель, страховая всё покроет'});
   startCine('crash','ДТП! Вы врезались',2.2);addEvent(`Вы попали в ДТП${ac.road?' — '+ac.road:''}. Ждём ГИБДД`,'alert');player.mood=clamp(player.mood-10,0,100);}
-function playerHitWalker(v,w){w.hit();v.speed=0;v.auto=null;v.damaged=70;v.crashedLook=true;shake=1;
+function playerHitWalker(v,w){w.hit();v.speed=0;v.auto=null;v.damaged=70;v.crashedLook=true;shake=1;if(typeof econCrash==='function')econCrash(v,true,true);
   const ac=createAccident({x:w.x,y:w.y,kind:'ped',cars:[vehProxy(v)],victim:w,playerCar:true,playerFine:5000,playerMood:30,playerFineText:'ГИБДД: вы сбили пешехода. Штраф 5 000 ₽, дело передано в суд'});
   startCine('hitped',`Вы сбили ${w.p.name}!`,3);addEvent(`Вы сбили пешехода${ac.road?' — '+ac.road:''}: ${w.p.name}, ${w.p.age}. Вызвана скорая`,'alert');player.mood=clamp(player.mood-20,0,100);}
 function playerHitByCar(vehicle){if(player.state==='hurt'||cine)return;player.state='hurt';player.waypoints=null;player.talkTarget=null;player.hurtT=0;shake=1;

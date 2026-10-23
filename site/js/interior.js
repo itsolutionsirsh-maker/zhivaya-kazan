@@ -65,12 +65,12 @@ function spotAction(f,it){const n=it.name;const price=it.kind==='bar'?500:350;
       if(f.taken){return {label:'Столик занят — подсесть и поболтать',run:()=>{const nb=it.npcs.find(q=>dist(q.x,q.y,f.x,f.y)<1.3);if(nb)openChat(nb);}};}
       if(MENU[it.kind])return {label:'Сесть и заказать — меню',run:()=>openOrder(f,it)};
       return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);clock.minutes+=35;addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
-    case 'counter':if(/cafe|bar/.test(it.kind))return {label:'Взять кофе с собой · 180 ₽',run:()=>spend(180,()=>{player.energy=clamp(player.energy+12,0,100);player.mood=clamp(player.mood+3,0,100);setHint('Кофе с собой. Энергия +12');})};
+    case 'counter':if(it.kind==='bank')return {label:'Окно банка: вклад, кредит, страховка',run:()=>openBank('bank')};if(/cafe|bar/.test(it.kind))return {label:'Взять кофе с собой · 180 ₽',run:()=>spend(180,()=>{player.energy=clamp(player.energy+12,0,100);player.mood=clamp(player.mood+3,0,100);setHint('Кофе с собой. Энергия +12');})};
       if(it.kind==='bank')return {label:'Снять наличные',run:()=>setHint('Выдали наличные. Баланс тот же')};return {label:'Спросить у администратора',run:()=>setHint('«Чем могу помочь?» — пока ничем')};
     case 'cash':return {label:'Спросить кассира',run:()=>setHint('«Берите с полок, оплата сразу»')};
     case 'shelf':{const cost=it.kind==='pharmacy'?250:it.kind==='market'?300:220;const lbl=it.kind==='pharmacy'?'Купить витамины':it.kind==='market'?'Купить чак-чак и фрукты':'Взять продукты';
       return {label:`${lbl} · ${cost} ₽`,run:()=>spend(cost,()=>{if(it.kind==='pharmacy'){player.energy=clamp(player.energy+10,0,100);addEvent('Витамины. Энергия +10');}else{player.food=clamp(player.food+20,0,100);player.pantry=(player.pantry||0)+1;addEvent(`Купили продукты в «${n}». Сытость +20, запас дома +1`);}})};}
-    case 'atm':return {label:'Снять наличные в банкомате',run:()=>setHint('Выдали наличные')};
+    case 'atm':return {label:'Банкомат: карта и вклад',run:()=>openBank('atm')};
     case 'desk':return {label:'Поработать 2 часа · +1 200 ₽',run:()=>{if(player.energy<15){setHint('Слишком устали');return;}clock.minutes+=120;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа в «${n}»: +1 200 ₽`);}};
     case 'seat':return {label:'Смотреть спектакль · 1 200 ₽',run:()=>spend(1200,()=>{clock.minutes+=150;player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в «${n}» — зал аплодировал стоя. Настроение +30`);})};
     case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);clock.minutes+=8;setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};

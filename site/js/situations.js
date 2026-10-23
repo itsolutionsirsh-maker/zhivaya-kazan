@@ -26,7 +26,7 @@ function endSit(s){if(!s||s.done)return;s.done=true;if(s.def.end)s.def.end(s);
   for(const w of s.actors)releaseActor(w);s.actors=[];closeSitCard(s);}
 
 // ---------- последствия ----------
-function sitMoney(d,why){d=Math.round(d);if(d<0)player.money=Math.max(0,player.money+d);else player.money+=d;if(why)addEvent(`${why}: ${d>0?'+':'−'}${fmtMoney(Math.abs(d))}`,d<0?'alert':'say');}
+function sitMoney(d,why){d=Math.round(d);if(d<0)player.money=Math.max(0,player.money+d);else player.money+=d;if(typeof econNotify==='function')econNotify(d,why);if(why)addEvent(`${why}: ${d>0?'+':'−'}${fmtMoney(Math.abs(d))}`,d<0?'alert':'say');}
 function sitRep(d,why){player.rep=clamp(Math.round((player.rep||0)+d),-100,100);if(why)addEvent(`${d>0?'⭐':'👎'} Репутация ${d>0?'+':''}${d}: ${why}`,d>0?'say':'alert');}
 function sitMood(d){player.mood=clamp(player.mood+d,0,100);}
 function dossier(t){SIT.dossier.push({day:clock.day,t});if(SIT.dossier.length>30)SIT.dossier.shift();}
