@@ -8,14 +8,10 @@
     if(typeof defSit!=='function'||typeof defWatch!=='function'||typeof startRally!=='function') return;
     window.__cityEvents=true;
 
-    const KEY='zk.citylife';
-    const epoch=Date.UTC(2026,5,20); // день 1 = суббота 20 июня 2026, неделя Сабантуя
-    function load(){try{return Object.assign({seen:{},notes:[],block:''},JSON.parse(localStorage.getItem(KEY)||'{}'));}catch(e){return {seen:{},notes:[],block:''};}}
-    function save(o){try{const cur=JSON.parse(localStorage.getItem(KEY)||'{}')||{};localStorage.setItem(KEY,JSON.stringify(Object.assign(cur,o)));}catch(e){}}
-    let life=load();
-    function note(text){life.notes.push({day:clock.day,text});if(life.notes.length>24)life.notes.shift();save(life);}
+    const life=cityBag();
+    function note(text){life.notes.push({day:clock.day,text:String(text)});if(life.notes.length>24)life.notes.shift();life.save();}
     function hour(){return Math.floor((clock.minutes/60)%24);}
-    function dateOf(day){const dt=new Date(epoch+(day-1)*86400000);return {m:dt.getUTCMonth()+1,d:dt.getUTCDate(),wd:dt.getUTCDay()};}
+    function dateOf(day){const dt=new Date(Date.UTC(2026,5,20)+(day-1)*86400000);return {m:dt.getUTCMonth()+1,d:dt.getUTCDate(),wd:dt.getUTCDay()};}
     function today(){return dateOf(clock.day);}
 
     function squareFor(hints){
@@ -47,10 +43,9 @@
       if(life.seen[ev.id]) return;
       const sq=squareFor(ev.hints);
       if(!sq||typeof rallyAt==='function'&&rallyAt(sq)) return;
-      life.seen[ev.id]=clock.day; life.block=ev.id; save(life);
+      life.seen[ev.id]=clock.day; life.block=ev.id; life.save();
       startRally(sq, kind||ev.kind, ev.title, 'npc');
       addEvent(ev.line,'rally');
-      dossier('город: '+ev.title);
       note(ev.title+' · '+sq.n);
       sitCard({icon:'📣', tone:'good', title:ev.title, text:ev.line+' Площадь: '+sq.n+'.', ttl:14,
         choices:[{t:'Пойти туда', primary:true, run:()=>{if(typeof walkTo==='function')walkTo(sq.x,sq.y,true);}},{t:'Не сегодня', run:()=>{note('Пропустил: '+ev.title);}}]});
@@ -62,32 +57,40 @@
       for(const ev of YEAR){if(dt.m===ev.m&&dt.d===ev.d&&h===ev.hour) begin(ev);}
       const match=matchOf(dt);
       if(match&&h===19) begin(match,'meet');
-      if(life.block&&player.vehicle){
+      if(life.block&&player.vehicle&&Date.now()>(life.roadTill||0)){
         const id=life.block, sq=squareFor((YEAR.find(e=>e.id===id)||{hints:['свобод']}).hints);
-        if(sq&&dist(player.x,player.y,sq.x,sq.y)<70&&!sitActive('roadblock')) startSit('roadblock',{sq,title:id});
+        if(sq&&dist(player.x,player.y,sq.x,sq.y)<70&&!sitActive('roadblock')){
+          life.roadTill=Date.now()+25000; life.save();
+          startSit('roadblock',{sq:sq,title:id});
+        }
       }
     });
 
     defSit('roadblock',{title:'Улица перекрыта', auto:false, quiet:true,
       start(s){const name=s.sq&&s.sq.n||'площадь';
+        life.roadTill=Date.now()+25000; life.save();
         sitCard({s, icon:'🚧', tone:'alert', title:'Улица перекрыта', text:'Из-за события у «'+name+'» дальше на машине не пускают. Пешком или в объезд.', ttl:10,
           choices:[{t:'Оставить машину и пойти', primary:true, run:()=>endSit(s)},{t:'Разворачиваюсь', run:()=>endSit(s)}],
           onTimeout:()=>endSit(s)});
         return true;}});
 
-    defSit('citydayline',{title:'Утро города', auto:false, quiet:true,
-      start(){return true;}});
-
     let told=clock.day;
     defWatch(function(){
       if(clock.day===told) return;
-      told=clock.day; life.block=''; save(life);
+      told=clock.day; life.block=''; life.save();
       const dt=today();
       const bits=[];
-      for(const ev of YEAR){if(ev.m===dt.m&&ev.d===ev.d) bits.push(ev.title);}
+      for(const ev of YEAR){if(ev.m===dt.m&&ev.d===dt.d) bits.push(ev.title);}
       const match=matchOf(dt); if(match) bits.push(match.title+' вечером');
       if(bits.length) addEvent('Сегодня в городе: '+bits.join('. '));
     });
+  }
+  function cityBag(){
+    if(window.cityLife&&window.cityLife.save) return window.cityLife;
+    let raw={}; try{raw=JSON.parse(localStorage.getItem('zk.citylife')||'{}')||{};}catch(e){}
+    const o=Object.assign({seen:{},notes:[],block:'',wards:{},invited:false,recap:false,party:false,lastRep:null,met:{},roadTill:0}, raw);
+    o.save=function(){const dump={}; for(const k in o) if(k!=='save') dump[k]=o[k]; try{localStorage.setItem('zk.citylife',JSON.stringify(dump));}catch(e){}};
+    window.cityLife=o; return o;
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
