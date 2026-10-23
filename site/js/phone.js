@@ -17,12 +17,44 @@
   function pad(n){return (n<10?'0':'')+n;}
   function life(){try{return JSON.parse(localStorage.getItem('zk.citylife')||'{}')||{};}catch(e){return {};}}
 
+  let seenInbox=0;
+  function pushInbox(msg){
+    const from=String(msg&&msg.from||'Город').slice(0,40);
+    const text=String(msg&&msg.text||'').slice(0,240);
+    const kind=String(msg&&msg.kind||'note').slice(0,24);
+    if(!text) return null;
+    const item={from:from, text:text, kind:kind, day:(typeof clock!=='undefined'&&clock.day)||1, at:Date.now()};
+    const live=window.cityLife;
+    if(live&&typeof live.save==='function'){
+      if(!Array.isArray(live.inbox)) live.inbox=[];
+      live.inbox.push(item);
+      if(live.inbox.length>30) live.inbox.splice(0, live.inbox.length-30);
+      live.save();
+    }else{
+      const raw=life();
+      if(!Array.isArray(raw.inbox)) raw.inbox=[];
+      raw.inbox.push(item);
+      if(raw.inbox.length>30) raw.inbox=raw.inbox.slice(-30);
+      try{localStorage.setItem('zk.citylife', JSON.stringify(raw));}catch(e){}
+    }
+    if(panel.hidden) btn.textContent='Сегодня · '+Math.max(1,(life().inbox||[]).length-seenInbox);
+    else draw();
+    return item;
+  }
+  window.cityPhone={push:pushInbox};
+
   function agenda(t){
     const m=t.date.getUTCMonth()+1, d=t.date.getUTCDate(), wd=t.date.getUTCDay();
     const out=[];
     if(m===6&&d===21) out.push('Сабантуй. Днём площадь заполняется, вокруг полиция.');
     if(m===8&&d===30) out.push('День города. Площадь Свободы вечером перекрыта.');
     if(m===1&&d===1) out.push('Новый год. К полуночи все стекаются на площадь Свободы.');
+    if(m===9&&d===5) out.push('Ярмарка на площади. Лучше пешком.');
+    if(m===3&&d===8) out.push('8 марта. На Баумана не протолкнуться.');
+    if(m===3&&d===9) out.push('Ураза-байрам. Утром у мечетей, центр полный.');
+    if(m===3&&d===14) out.push('Масленица, прощёное воскресенье. Блины на площади.');
+    if(m===5&&d===9) out.push('9 мая. Парад и перекрытия у Кремля.');
+    if(m===5&&d===16) out.push('Курбан-байрам. Утром намаз, днём столы во дворах.');
     if(wd===6&&m>=4&&m<=11) out.push('Вечером матч «Рубина». К арене лучше пешком.');
     if(wd===0&&(m>=9||m<=4)) out.push('Вечером «Ак Барс». Оцепление и пробки у арены.');
     if(!out.length){
@@ -59,7 +91,14 @@
     const t=when(), L=life();
     const sky=typeof weather!=='undefined'?(weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно'):'ясно';
     const head=t.date.getUTCDate()+' '+MONTH[t.date.getUTCMonth()+1]+', '+WD[t.date.getUTCDay()]+' · '+pad(t.h)+':'+pad(t.m);
-    const rows=agenda(t).concat(personal(L));
+    const inbox=(L.inbox||[]).slice(-6).reverse().map(function(m){return (m.from?m.from+': ':'')+m.text;});
+    let folk=[];
+    if(typeof cityFolkAll==='function'){
+      try{folk=cityFolkAll().filter(function(f){return f&&f.known&&f.text;}).slice(0,4).map(function(f){return f.text;});}catch(e){folk=[];}
+    }
+    const rows=inbox.concat(folk).concat(agenda(t)).concat(personal(L));
+    seenInbox=(L.inbox||[]).length;
+    btn.textContent='Сегодня';
     panel.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:13px">'+head+'</span></div>'
       +'<div style="margin:6px 0 10px;color:#3d5c4a">'+sky+'</div>'
       +'<div style="font-size:14px;margin-bottom:8px">'+memory(L)+'</div>'
