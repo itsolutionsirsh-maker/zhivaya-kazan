@@ -81,7 +81,7 @@ function drawCrowd(toS,z){const c=Net.crowd;if(!c||!c.length||scene!=='city')ret
 // ---------- аккаунт на сервере: имя + PIN, прогресс хранится на сервере ----------
 let acct=null;try{acct=JSON.parse(localStorage.getItem('zk.acct')||'null');}catch(e){}
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store'});return r.json();}
-function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');profile=JSON.parse(localStorage.getItem('zk.profile')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile};}
+function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
 async function acctSave(){if(!acct||window.zkNoSave)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{const j=await acctCall('save',Object.assign({token:acct.token},snap));if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}}
 async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).catch(()=>({err:'net'}));
   const E={name:'Имя — от 2 букв',pin:'PIN — от 4 до 8 цифр',wrong_pin:'Неверный PIN для этого имени',locked:'Слишком много попыток. Подождите 15 минут',rate_limited:'Слишком часто. Попробуйте через минуту',net:'Нет связи с сервером'};
@@ -90,15 +90,19 @@ async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).ca
   if(!j.created&&j.state){acctApply(j);return;}
   await acctSave();$('#acctMsg').textContent=j.created?'Аккаунт создан. Прогресс сохраняется на сервере':'Вошли. Прогресс сохраняется на сервере';renderAcct();}
 function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
+  const tg=acct&&acct.tg;const p=inForm.querySelector('p');const go=$('#acctGo');const ob=$('#acctOutBtn');
+  if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=true;return;}
+  if(p)p.textContent='Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.';if(go)go.textContent='Войти';if(ob)ob.hidden=false;
   if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}}
-if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acctLogin($('#acctName').value,$('#acctPin').value));
+if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 setInterval(acctSave,30000);
 window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token},snap))],{type:'application/json'}));}catch(e){}});
 // загрузить прогресс с сервера и перезапустить (локальные сохранения на это время выключены)
-function acctApply(j){window.zkNoSave=true;try{localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
+function acctApply(j){window.zkNoSave=true;try{localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
 // при запуске: если на сервере сохранение новее (играли с другого устройства) — взять его
-async function acctSyncOnBoot(){if(!acct)return;try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}
+async function acctSyncOnBoot(){if(!acct)return;if(acct.tg&&typeof TG!=='undefined'&&TG.on)return;   // в Телеге вход и загрузку делает tg.js
+  try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}
   let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}if(j.state&&(j.state.t||0)>((local&&local.t)||0)+5000)acctApply(j);}catch(e){}}
 
 async function netInit(){

@@ -58,6 +58,8 @@ LLM_MODEL=gpt-4o-mini
 LLM_PER_PLAYER_DAY=60
 LLM_DAILY_LIMIT=20000
 LLM_MAX_TOKENS=160
+# Токен бота от @BotFather — для входа из мини-приложения Телеги. Впишите сами, никому не пересылайте
+TG_BOT_TOKEN=
 # Сколько соседей видно и в каком радиусе (м)
 VIEW_K=80
 VIEW_RADIUS=350

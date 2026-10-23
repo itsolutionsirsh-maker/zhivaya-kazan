@@ -34,27 +34,48 @@ setInterval(()=>{const t=now();for(const [k,b] of buckets){if(!b.length||t-b[b.l
 // ---------- хранилище аккаунтов: SQLite (Node 22+), иначе JSON ----------
 const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqlite=require('node:sqlite');}catch(e){}
   if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;');
-    db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);');
+    db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);CREATE TABLE IF NOT EXISTS tokens(tok TEXT PRIMARY KEY,k TEXT,t REAL);CREATE TABLE IF NOT EXISTS tgmap(id TEXT PRIMARY KEY,k TEXT);');
+    for(const c of ['tg TEXT','city TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
-      tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts')};
-    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null});
-    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>row(q.byTok.get(t)),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
-      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p)=>q.save.run(JSON.stringify(s),JSON.stringify(p),now(),k),count:()=>q.count.get().n};}
+      tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
+      tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
+      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)')};
+    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null});
+    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
+      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
+      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
   setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
-  return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t)||null,create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
-    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p)=>{acc[k].state=s;acc[k].profile=p;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
+  return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
+    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},
+    createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
+    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2)return {err:'name'};if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
-  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
+  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
   if(!crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'))){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
-  store.setTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,updated:a.updated};}
+  store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated};}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
-function saveFor(token,state,profile){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null);if(s.length>60000||p.length>12000)return {err:'too_big'};
-  store.save(a.k,state||a.state,profile||a.profile);return {ok:1};}
+function saveFor(token,state,profile,city){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
+  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};store.save(a.k,state||a.state,profile||a.profile,city||a.city);return {ok:1};}
+function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
+// мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
+const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
+function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096||!TG_TOKEN)return null;let sp;try{sp=new URLSearchParams(initData);}catch(e){return null;}
+  const hash=sp.get('hash');if(!hash)return null;const pairs=[];for(const [k,v] of sp)if(k!=='hash')pairs.push([k,v]);
+  const secret=crypto.createHmac('sha256','WebAppData').update(TG_TOKEN).digest();
+  const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return h.length===hash.length&&crypto.timingSafeEqual(Buffer.from(h),Buffer.from(hash.toLowerCase()));});
+  if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
+  return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
+function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};
+  let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false;if(!a){store.createTg(k,u.name,u.id);a=store.get(k);created=true;}
+  const token=crypto.randomBytes(24).toString('hex');store.addTok(k,sha(token));return accOut(a,{token,created,tgName:u.name,start:u.start});}
+function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
+  const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -129,12 +150,15 @@ const server=http.createServer(async(req,res)=>{
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,online:players.size});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
     if(a==='sync')return send(res,200,apiSync(body));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
-    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile));
-    if(a==='load'){const acc=accByToken(body.token);return send(res,200,acc?{ok:1,name:acc.name,state:acc.state,profile:acc.profile,updated:acc.updated}:{err:'auth'});}
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
+    if(a==='load'){const acc=accByToken(body.token);return send(res,200,acc?accOut(acc):{err:'auth'});}
+    if(a==='reset')return send(res,200,resetFor(body.token));
+    if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
+    if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';

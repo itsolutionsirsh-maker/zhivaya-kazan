@@ -1,6 +1,7 @@
 <?php
 // «Живая Казань» — мини-сервер для своего хостинга (Beget и любой PHP 7.4+).
 // a=ping  — проверка; a=sync — позиции игроков + общий/личный чат; a=llm — ответы жителей через OpenAI-совместимый API.
+// a=login/load/save/reset — аккаунт (имя + PIN); a=tglogin/tglink — вход из мини-приложения Телеги и привязка аккаунта сайта.
 // Настройки — в config.php рядом (ключ API в браузер не уходит).
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -42,7 +43,7 @@ $in = $raw ? json_decode($raw, true) : [];
 if (!is_array($in)) $in = [];
 $a = $_GET['a'] ?? ($in['a'] ?? '');
 
-if ($a === 'ping') out(['ok' => 1, 'llm' => !empty($cfg['api_key'])]);
+if ($a === 'ping') out(['ok' => 1, 'llm' => !empty($cfg['api_key']), 'acct' => true, 'tg' => !empty($cfg['tg_bot_token'])]);
 
 if ($a === 'sync') {
     $id = idstr($in['id'] ?? '');
@@ -123,6 +124,100 @@ if ($a === 'llm') {
     $text = $j['choices'][0]['message']['content'] ?? null;
     if ($code !== 200 || !is_string($text)) out(['err' => 'upstream_error', 'code' => $code]);
     out(['text' => trim($text)]);
+}
+
+// ---------- аккаунты: файлы в data/acc, data/tok, data/tgm (каждый с защитной строкой, по ссылке не читаются) ----------
+function jread($f) { if (!is_file($f)) return null; $r = file_get_contents($f); if (strpos($r, GUARD) === 0) $r = substr($r, strlen(GUARD)); $j = json_decode($r, true); return is_array($j) ? $j : null; }
+function jwrite($f, $x) { $d = dirname($f); if (!is_dir($d)) @mkdir($d, 0755, true); $tmp = $f . '.' . getmypid() . '.tmp'; file_put_contents($tmp, GUARD . json_encode($x, JSON_UNESCAPED_UNICODE)); rename($tmp, $f); }
+function acc_file($k) { return $GLOBALS['DATA'] . '/acc/' . sha1($k) . '.php'; }
+function tok_file($t) { return $GLOBALS['DATA'] . '/tok/' . hash('sha256', $t) . '.php'; }
+function tgm_file($id) { return $GLOBALS['DATA'] . '/tgm/' . preg_replace('/\D/', '', (string)$id) . '.php'; }
+function new_token($k) { $t = bin2hex(random_bytes(24)); jwrite(tok_file($t), ['k' => $k, 't' => time()]); return $t; }
+function acc_by_token($t) { if (!is_string($t) || strlen($t) < 20 || !ctype_xdigit($t)) return null; $m = jread(tok_file($t)); if (!$m) return null; return jread(acc_file($m['k'])); }
+function acc_out($a, $extra = []) { return $extra + ['ok' => 1, 'name' => $a['name'], 'tg' => !empty($a['tg']), 'state' => $a['state'] ?? null, 'profile' => $a['profile'] ?? null, 'city' => $a['city'] ?? null, 'updated' => $a['updated'] ?? 0]; }
+// не чаще $limit раз за $win секунд по ключу
+function allow($key, $limit, $win) {
+    $f = $GLOBALS['DATA'] . '/rate_' . md5($key) . '.php'; $now = time();
+    $hits = jread($f) ?: []; $hits = array_values(array_filter($hits, fn($t) => $now - $t < $win));
+    if (count($hits) >= $limit) return false; $hits[] = $now; jwrite($f, $hits); return true;
+}
+$IP = preg_replace('/[^0-9a-f:.]/i', '', $_SERVER['REMOTE_ADDR'] ?? 'x');
+// вход по имени и PIN; первого входа достаточно, чтобы создать игрока
+function check_pin($name, $pin, $create) {
+    global $IP;
+    $name = clean($name, 24); $pin = is_string($pin) || is_int($pin) ? (string)$pin : '';
+    if (mb_strlen($name) < 2 || strpos($name, ':') !== false) return ['err' => 'name'];
+    if (!preg_match('/^\d{4,8}$/', $pin)) return ['err' => 'pin'];
+    if (!allow('login:' . $IP, 10, 60)) return ['err' => 'rate_limited'];
+    $k = 'n:' . mb_strtolower($name); $f = acc_file($k); $a = jread($f);
+    if (!$a) {
+        if (!$create) return ['err' => 'no_account'];
+        if (!allow('create:' . $IP, 5, 3600)) return ['err' => 'rate_limited'];
+        $a = ['k' => $k, 'name' => $name, 'pin' => password_hash($pin, PASSWORD_DEFAULT), 'created' => time(), 'updated' => 0, 'fails' => 0, 'lock' => 0, 'state' => null, 'profile' => null, 'city' => null];
+        jwrite($f, $a); return ['acc' => $a, 'created' => true];
+    }
+    if (($a['lock'] ?? 0) > time()) return ['err' => 'locked'];
+    if (!password_verify($pin, $a['pin'] ?? '')) { $a['fails'] = ($a['fails'] ?? 0) + 1; if ($a['fails'] >= 8) { $a['fails'] = 0; $a['lock'] = time() + 900; } jwrite($f, $a); return ['err' => 'wrong_pin']; }
+    if (($a['fails'] ?? 0) > 0) { $a['fails'] = 0; jwrite($f, $a); }
+    return ['acc' => $a, 'created' => false];
+}
+// подпись initData мини-приложения: HMAC-SHA256 с ключом от токена бота
+function tg_verify($initData, $botToken) {
+    if (!is_string($initData) || strlen($initData) > 4096 || !$botToken) return null;
+    $pairs = []; $hash = '';
+    foreach (explode('&', $initData) as $kv) { $p = explode('=', $kv, 2); if (count($p) < 2) continue; $k = urldecode($p[0]); $v = urldecode($p[1]); if ($k === 'hash') $hash = $v; else $pairs[$k] = $v; }
+    if (!$hash) return null;
+    $secret = hash_hmac('sha256', $botToken, 'WebAppData', true);
+    $ok = false;
+    foreach ([$pairs, array_diff_key($pairs, ['signature' => 1])] as $set) {   // поле signature в разных версиях то входит в строку проверки, то нет
+        ksort($set); $dcs = implode("\n", array_map(fn($k) => $k . '=' . $set[$k], array_keys($set)));
+        if (hash_equals(hash_hmac('sha256', $dcs, $secret), strtolower($hash))) { $ok = true; break; }
+    }
+    if (!$ok) return null;
+    if (time() - intval($pairs['auth_date'] ?? 0) > 86400) return null;    // initData старше суток не принимаем
+    $u = json_decode($pairs['user'] ?? '', true);
+    if (!is_array($u) || empty($u['id'])) return null;
+    return ['id' => (string)intval($u['id']), 'name' => clean(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')), 24) ?: 'Игрок', 'start' => clean($pairs['start_param'] ?? '', 64)];
+}
+
+if ($a === 'login') {
+    $r = check_pin($in['name'] ?? '', $in['pin'] ?? '', true);
+    if (isset($r['err'])) out($r);
+    out(acc_out($r['acc'], ['token' => new_token($r['acc']['k']), 'created' => $r['created']]));
+}
+if ($a === 'load') { $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']); out(acc_out($acc)); }
+if ($a === 'save') {
+    $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']);
+    $st = $in['state'] ?? null; $pr = $in['profile'] ?? null; $ci = $in['city'] ?? null;
+    if (strlen(json_encode($st)) > 150000 || strlen(json_encode($pr)) > 12000 || strlen(json_encode($ci)) > 60000) out(['err' => 'too_big']);
+    if (!allow('save:' . $acc['k'], 30, 60)) out(['err' => 'rate_limited']);
+    $f = acc_file($acc['k']); $fp = fopen($f, 'c+'); flock($fp, LOCK_EX);
+    $cur = jread($f) ?: $acc;
+    if ($st !== null) $cur['state'] = $st; if ($pr !== null) $cur['profile'] = $pr; if ($ci !== null) $cur['city'] = $ci;
+    $cur['updated'] = time(); jwrite($f, $cur); flock($fp, LOCK_UN); fclose($fp);
+    out(['ok' => 1]);
+}
+// «начать заново»: стирает только прогресс этого игрока, имя и вход остаются
+if ($a === 'reset') {
+    $acc = acc_by_token($in['token'] ?? ''); if (!$acc) out(['err' => 'auth']);
+    $acc['state'] = null; $acc['city'] = null; $acc['updated'] = time(); jwrite(acc_file($acc['k']), $acc); out(['ok' => 1]);
+}
+if ($a === 'tglogin') {
+    if (empty($cfg['tg_bot_token'])) out(['err' => 'no_tg']);
+    if (!allow('tg:' . $IP, 30, 60)) out(['err' => 'rate_limited']);
+    $u = tg_verify($in['initData'] ?? '', $cfg['tg_bot_token']); if (!$u) out(['err' => 'tg_bad']);
+    $map = jread(tgm_file($u['id'])); $k = $map['k'] ?? ('tg:' . $u['id']);
+    $acc = jread(acc_file($k)); $created = false;
+    if (!$acc) { $acc = ['k' => $k, 'name' => $u['name'], 'tg' => $u['id'], 'created' => time(), 'updated' => 0, 'state' => null, 'profile' => null, 'city' => null]; jwrite(acc_file($k), $acc); $created = true; }
+    out(acc_out($acc, ['token' => new_token($k), 'created' => $created, 'tgName' => $u['name'], 'start' => $u['start']]));
+}
+// в Телеге: «у меня уже есть игрок на сайте» — имя + PIN, дальше Телега открывает именно его
+if ($a === 'tglink') {
+    $cur = acc_by_token($in['token'] ?? ''); if (!$cur || empty($cur['tg'])) out(['err' => 'auth']);
+    $r = check_pin($in['name'] ?? '', $in['pin'] ?? '', false); if (isset($r['err'])) out($r);
+    $acc = $r['acc']; $acc['tg'] = $cur['tg']; jwrite(acc_file($acc['k']), $acc);
+    jwrite(tgm_file($cur['tg']), ['k' => $acc['k']]);
+    out(acc_out($acc, ['token' => new_token($acc['k']), 'linked' => true]));
 }
 
 out(['err' => 'unknown_action']);
