@@ -42,25 +42,35 @@ function folkAnchors(){const A={};
   const sb=world.pois.find(p=>p.t==='bar'&&/спорт|sport|футбол|паб|pub/i.test(p.n||''));A.stadium=sb?[sb.x,sb.y]:A.freedom;return A;}
 function homeNear(x,y,r,seed){const c=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,x,y)<r);if(!c.length)return null;const b=c[seed%c.length];
   const pts=[[b.cx,b.bb[3]+3],[b.cx,b.bb[1]-3],[b.bb[0]-3,b.cy],[b.bb[2]+3,b.cy]];for(const q of pts){if(!inBuilding(q[0],q[1]))return {x:q[0],y:q[1],inside:true,key:'home:'+seed,name:'дом',kind:'home',b};}return {x:b.cx,y:b.bb[3]+3,inside:true,key:'home:'+seed,name:'дом',kind:'home',b};}
+// описание места: строка из моих запасных ('bar','busk',…) или объект второго программиста {kind, hints, label}
+const SPEC_STR={bar:{kind:'bar'},busk:{kind:'street'},pharmacy:{kind:'pharmacy'},school:{kind:'school'},cafe:{kind:'cafe'},shop:{kind:'shop'},yard:{kind:'yard'},taxi:{kind:'taxi'},chai:{kind:'cafe',hints:['чайхан']},kremlin:{kind:'street',hints:['кремл']}};
+function normSpec(x){if(!x)return null;if(typeof x==='string')return Object.assign({hints:[]},SPEC_STR[x]||{kind:x});return {kind:x.kind,hints:(x.hints||[]).map(h=>String(h).toLowerCase()),label:x.label||''};}
+function hintAnchor(hints,A,def){for(const h of hints){if(/бауман/.test(h))return A.bauman;if(/кремл/.test(h))return A.kremlin;if(/свобод/.test(h))return A.freedom;if(/ак барс|арен|стадион/.test(h))return A.stadium;}return def;}
+const KIND_TEST={bar:p=>p.t==='bar',cafe:p=>p.t==='cafe',restaurant:p=>p.t==='cafe',pharmacy:p=>p.t==='pharmacy',office:p=>p.t==='office'&&!!p.n,school:p=>p.t==='school'||p.t==='university',shop:p=>p.t==='shop'};
+function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
+  if(k==='taxi')return {x:a[0],y:a[1],inside:true,key:'taxi',name:'за рулём такси',kind:'taxi'};
+  if(k==='home')return role==='work'?P.home:P.yard;
+  if(k==='yard')return P.yard;
+  const c=hintAnchor(sp.hints,A,a);
+  if(k==='street'){const s=nearestPoi(c[0],c[1],p=>p.t==='sight',350);const q=s?[s.x,s.y]:c;return spotPlace(q[0]+8,q[1]+6,sp.label||(sp.hints.some(h=>/бауман/.test(h))?'на Баумана':sp.hints.some(h=>/кремл/.test(h))?'у Кремля':'на улице'),'street');}
+  let test=KIND_TEST[k]||(p=>p.t===k);if(k==='office'&&/школ|лицей|гимназ/i.test(sp.label))test=KIND_TEST.school;
+  const taken=new Set(Object.values(P).filter(Boolean).map(q=>q.key));
+  const use=FOLK.use||(FOLK.use={});const named=p=>!!p.n&&!taken.has('poi'+p.i)&&(use['poi'+p.i]||0)<(role==='work'?1:2);   // на работе по одному, «своё место» — не больше двоих
+  // кандидаты рядом с подсказкой: совпадение по названию или улице, иначе просто ближайшие
+  const cand=[];for(const p of world.pois){if(!test(p)||!named(p))continue;const d=dist(p.x,p.y,c[0],c[1]);if(d<900)cand.push([d,p]);}
+  cand.sort((u,v)=>u[0]-v[0]);
+  const want=k==='restaurant'?/ресторан|чайхан|столов|кухн|кафе/i:null;
+  const hit=(p)=>{if(!sp.hints.length)return true;const n=(p.n||'').toLowerCase();if(sp.hints.some(h=>n.includes(h)))return true;const r=(nearestRoadName(p.x,p.y)||'').toLowerCase();return sp.hints.some(h=>r.includes(h))||dist(p.x,p.y,c[0],c[1])<160;};
+  let best=null;for(const [d,p] of cand.slice(0,40)){if(want&&!want.test(p.n))continue;if(hit(p)){best=p;break;}}
+  if(!best)for(const [d,p] of cand.slice(0,40)){if(hit(p)){best=p;break;}}
+  if(!best&&cand.length)best=cand[0][1];
+  if(!best)best=nearestPoi(c[0],c[1],p=>test(p)&&!!p.n);
+  const pl=poiPlace(best,role);if(pl){use[pl.key]=(use[pl.key]||0)+(role==='work'?2:1);if(sp.label)pl.label=sp.label;}return pl;}
 function folkPlaces(f,A){const a=A[f.ward]||A.freedom;const seed=hashStr(f.id);const P={};
   P.home=f.id==='fidania'&&player.home?{x:player.home.cx,y:player.home.bb[3]+3,inside:true,key:'home:player',name:'ваш дом',kind:'home'}:(homeNear(a[0]+((seed%7)-3)*60,a[1]+((seed%5)-2)*60,420,seed)||spotPlace(a[0],a[1],'дом','home'));
-  const isOpenish=p=>!!p.n;
-  switch(f.work){
-    case 'bar':P.work=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='bar'&&isOpenish(p)),'work');break;
-    case 'busk':{const s=nearestPoi(a[0],a[1],p=>p.t==='sight');const q=s&&dist(s.x,s.y,a[0],a[1])<350?[s.x,s.y]:a;P.work=spotPlace(q[0],q[1],'Баумана','busk');break;}
-    case 'pharmacy':P.work=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='pharmacy'),'work');break;
-    case 'school':P.work=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='school'||p.t==='university'),'work');break;
-    case 'cafe':P.work=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='cafe'&&isOpenish(p)&&/ресторан|кафе|чайхан|столов/i.test(p.n))||nearestPoi(a[0],a[1],p=>p.t==='cafe'&&isOpenish(p)),'work');break;
-    case 'shop':P.work=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='shop'&&/спорт|sport/i.test(p.n||''),900)||nearestPoi(a[0],a[1],p=>p.t==='shop'&&isOpenish(p)),'work');break;
-    case 'yard':P.work=spotPlace(A.yard[0]+6,A.yard[1]+8,'двор','yard');break;
-    case 'taxi':P.work={x:a[0],y:a[1],inside:true,key:'taxi',name:'за рулём такси',kind:'taxi'};break;}
-  P.yard=spotPlace(A.yard[0]+6,A.yard[1]+8,'двор','yard');
-  switch(f.haunt){
-    case 'cafe':P.haunt=poiPlace(nearestPoi(a[0]+40,a[1]+40,p=>p.t==='cafe'&&isOpenish(p)&&(!P.work||'poi'+p.i!==P.work.key)),'haunt');break;
-    case 'bar':P.haunt=poiPlace(f.ward==='stadium'?nearestPoi(A.stadium[0],A.stadium[1],p=>p.t==='bar'&&isOpenish(p)):nearestPoi(a[0]+60,a[1]-30,p=>p.t==='bar'&&isOpenish(p)&&(!P.work||'poi'+p.i!==P.work.key)),'haunt');break;
-    case 'chai':P.haunt=poiPlace(nearestPoi(a[0],a[1],p=>p.t==='cafe'&&/чайхан|чай/i.test(p.n||''),1500)||nearestPoi(a[0],a[1],p=>p.t==='cafe'&&isOpenish(p)),'haunt');break;
-    case 'shop':P.haunt=poiPlace(nearestPoi(A.yard[0],A.yard[1],p=>p.t==='shop'&&isOpenish(p)),'haunt');break;
-    case 'kremlin':P.haunt=spotPlace(A.kremlin[0]+20,A.kremlin[1]+30,'у Кремля','walk');break;}
+  P.yard=spotPlace(A.yard[0]+6,A.yard[1]+8,'во дворе','yard');
+  P.work=resolveSpec(normSpec(f.work),f,A,a,'work',P);
+  P.haunt=resolveSpec(normSpec(f.haunt),f,A,a,'haunt',P);
   for(const k of ['work','haunt'])if(!P[k])P[k]=P.home;return P;}
 function folkInit(){if(FOLK.ready||!world||!player.home)return;FOLK.ready=true;folkLoad();const A=folkAnchors();
   for(const src of folkSrc()){const f=Object.assign({},src);f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
@@ -108,7 +118,7 @@ function updateFolk(rdt){if(!world)return;if(!FOLK.ready){folkInit();if(!FOLK.re
     if(f.trip&&f.w&&dist(f.w.x,f.w.y,player.x,player.y)>460){f.at=f.trip.to;f.trip=null;folkDrop(f);}
     const w=f.w;if(!w)continue;const d=dist(w.x,w.y,player.x,player.y);
     if(w.state==='folkStay'){if(d<10)faceTo(w,player.x,player.y);
-      if(pl&&pl.kind==='busk'&&d<40&&Math.random()<0.025)say(w,pick(BUSK),4);}
+      if(pl&&pl.kind==='street'&&f.at==='work'&&/музыкант/.test(f.job)&&d<40&&Math.random()<0.025)say(w,pick(BUSK),4);}
     // здоровается со знакомыми раз в день
     if(f.met>0&&f.greet!==clock.day&&d<7&&scene==='city'&&!player.vehicle){f.greet=clock.day;const L=FOLK_HI_F[f.id]&&Math.random()<0.6?FOLK_HI_F[f.id]:FOLK_HI;say(w,pick(L).replace('{n}',player.name));}}
   FOLK.st=(FOLK.st||0)+1;if(FOLK.st%20===0)folkStore();}
@@ -117,7 +127,7 @@ function folkOnChat(w){const id=w&&(w.folk||(w.p&&w.p.folk));if(!id)return;const
   if(f.last!==clock.day){f.met=(f.met||0)+1;f.last=clock.day;if(f.met===1)addEvent(`Вы познакомились: ${f.name}, ${f.job}. Теперь узнаёт вас при встрече`,'say');}
   f.greet=clock.day;folkStore();}
 function folkContext(w){const id=w&&(w.folk||(w.p&&w.p.folk));if(!id)return '';const f=FOLK.list.find(q=>q.id===id);if(!f)return '';
-  const bio=f.bio?` О тебе: ${f.bio}`:'';const sp=f.speech?` Говоришь ${f.speech}.`:'';
+  const bio=f.bio?` О тебе: ${f.bio}`:'';const sp=f.speech?` Манера речи: ${String(f.speech).replace(/\.?$/,'.')}`:'';
   const rel=f.met>1?` Собеседник — ${player.name}, вы знакомы: виделись ${f.met} ${f.met<5?'раза':'раз'}, последний раз ${clock.day-f.last<=0?'сегодня':clock.day-f.last===1?'вчера':(clock.day-f.last)+' дн. назад'}. Общайся как со знакомым.`:f.met===1?` Собеседник — ${player.name}, вы только что познакомились.`:` Собеседника (${player.name}) ты раньше не встречал${f.female?'а':''}.`;
   return bio+sp+rel;}
 // внутри заведения: свой человек за стойкой или за столиком
