@@ -159,6 +159,24 @@
       if(clock.day<8||life.recap||hour()<8||sitActive('week')) return;
       startSit('week');
     });
+
+    window.cityOnInvite=function(kind, name){
+      const who=String(name||'друг').slice(0,40);
+      const invited=kind==='invited';
+      life.wards.yard=(life.wards.yard||0)+2;
+      note(invited?('Вас позвал '+who):('По вашей ссылке пришёл '+who));
+      if(typeof sitMood==='function') sitMood(invited?8:6);
+      if(typeof sitCard==='function') sitCard({
+        icon:'🍯', tone:'good',
+        title:invited?'Чак-чак от Фидании':'Двор уже знает',
+        text:invited
+          ?('Фидания выносит чак-чак: «Тебя '+who+' привёл — садись». Настроение лучше, двор запомнил.')
+          :('По вашей ссылке пришёл '+who+'. Фидания говорит соседям, что у вас свои люди.'),
+        ttl:12,
+        choices:[{t:'Спасибо', primary:true, run:function(){}}]
+      });
+      life.save();
+    };
   }
   function cityBag(){
     if(window.cityLife&&window.cityLife.save) return window.cityLife;
@@ -170,3 +188,36 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+window.cityTatar=[
+  {tt:'Сәлам!', ru:'Привет!', when:'hello'},
+  {tt:'Исәнмесез!', ru:'Здравствуйте!', when:'hello'},
+  {tt:'Хәерле иртә!', ru:'Доброе утро!', when:'hello'},
+  {tt:'Хәерле кич!', ru:'Добрый вечер!', when:'hello'},
+  {tt:'Ни хәл?', ru:'Как дела?', when:'hello'},
+  {tt:'Хуш!', ru:'Пока!', when:'bye'},
+  {tt:'Сау булыгыз!', ru:'До свидания!', when:'bye'},
+  {tt:'Күрешкәнче!', ru:'До встречи!', when:'bye'},
+  {tt:'Өйгә кайтыйм.', ru:'Я иду домой.', when:'bye'},
+  {tt:'Рәхмәт!', ru:'Спасибо!', when:'thanks'},
+  {tt:'Зур рәхмәт!', ru:'Большое спасибо!', when:'thanks'},
+  {tt:'Яхшы, рәхмәт.', ru:'Хорошо, спасибо.', when:'thanks'},
+  {tt:'Рәхим итегез.', ru:'Пожалуйста, проходите.', when:'thanks'},
+  {tt:'Гафу итегез.', ru:'Извините.', when:'sorry'},
+  {tt:'Кичерегез.', ru:'Простите.', when:'sorry'},
+  {tt:'Бәйрәм белән!', ru:'С праздником!', when:'holiday'},
+  {tt:'Бәйрәмегез котлы булсын!', ru:'Поздравляю с праздником!', when:'holiday'},
+  {tt:'Туган көнең белән!', ru:'С днём рождения!', when:'holiday'},
+  {tt:'Һава яхшы.', ru:'Погода хорошая.', when:'weather'},
+  {tt:'Яңгыр ява.', ru:'Идёт дождь.', when:'weather'},
+  {tt:'Җәй көне эссе.', ru:'Летом жарко.', when:'weather'},
+  {tt:'Салкын бүген.', ru:'Сегодня холодно.', when:'weather'},
+  {tt:'Тәмле!', ru:'Вкусно!', when:'food'},
+  {tt:'Чәй эчәбезме?', ru:'Чай будем?', when:'food'},
+  {tt:'Ашарга вакыт.', ru:'Пора поесть.', when:'food'},
+  {tt:'Чак-чак алыгыз.', ru:'Берите чак-чак.', when:'food'},
+  {tt:'Метрога менәм.', ru:'Сажусь в метро.', when:'metro'},
+  {tt:'Киләсе тукталыш.', ru:'Следующая остановка.', when:'metro'},
+  {tt:'Чыгу кайда?', ru:'Где выход?', when:'metro'},
+  {tt:'Казан матур шәһәр.', ru:'Казань красивый город.', when:'hello'}
+];

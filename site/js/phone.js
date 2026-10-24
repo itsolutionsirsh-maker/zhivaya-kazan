@@ -80,12 +80,21 @@
   }
 
   const btn=document.createElement('button');
-  btn.type='button'; btn.textContent='Сегодня';
-  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:30;border:0;border-radius:999px;padding:8px 14px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 13px "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
+  btn.type='button'; btn.id='zkToday'; btn.textContent='Сегодня';
+  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:30;border:0;border-radius:999px;padding:12px 16px;min-height:44px;min-width:44px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
   const panel=document.createElement('section');
+  panel.id='zkTodayPanel';
   panel.hidden=true;
-  panel.style.cssText='position:fixed;left:16px;top:118px;z-index:30;width:min(320px,calc(100vw - 24px));max-height:min(460px,70vh);overflow:auto;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px 14px 12px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.4 "IBM Plex Sans",system-ui';
-  function mount(){if(!document.body||btn.parentNode) return; document.body.append(btn,panel);}
+  panel.style.cssText='position:fixed;left:16px;top:130px;z-index:30;width:min(320px,calc(100vw - 32px));max-height:60vh;overflow:auto;overflow-wrap:anywhere;word-break:break-word;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px 14px 12px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.45 "IBM Plex Sans",system-ui';
+  const fit=document.createElement('style');
+  fit.textContent='@media (max-width:640px){#zkToday{top:148px}#zkTodayPanel{top:204px}}';
+  let tab='feed';
+  function mount(){if(!document.body||btn.parentNode) return; document.head.append(fit); document.body.append(btn,panel);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&','<':'<','>':'>','"':'"'}[c];});}
+  function tabBtn(id,label){
+    const on=tab===id;
+    return '<button type="button" data-tab="'+id+'" style="min-height:44px;min-width:44px;padding:10px 14px;border-radius:999px;border:1px solid rgba(0,0,0,.12);font:600 14px/1.2 inherit;cursor:pointer;background:'+(on?'#132019':'transparent')+';color:'+(on?'#f6f1e6':'#1c241f')+'">'+label+'</button>';
+  }
 
   function draw(){
     const t=when(), L=life();
@@ -99,10 +108,29 @@
     const rows=inbox.concat(folk).concat(agenda(t)).concat(personal(L));
     seenInbox=(L.inbox||[]).length;
     btn.textContent='Сегодня';
-    panel.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:13px">'+head+'</span></div>'
-      +'<div style="margin:6px 0 10px;color:#3d5c4a">'+sky+'</div>'
-      +'<div style="font-size:14px;margin-bottom:8px">'+memory(L)+'</div>'
-      +rows.map(function(s){return '<div style="padding:7px 0;border-top:1px solid rgba(0,0,0,.08)">'+s+'</div>';}).join('');
+    const badges=badgeHtml();
+    const body=tab==='badges'?badges:rows.map(function(s){return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.08);font-size:15px">'+esc(s)+'</div>';}).join('');
+    panel.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'+tabBtn('feed','Сегодня')+tabBtn('badges','Значки')+'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:14px">'+esc(head)+'</span></div>'
+      +'<div style="margin:6px 0 10px;color:#3d5c4a;font-size:15px">'+esc(sky)+'</div>'
+      +(tab==='badges'?'':('<div style="font-size:15px;margin-bottom:8px">'+esc(memory(L))+'</div>'))
+      +body;
+    panel.querySelectorAll('[data-tab]').forEach(function(b){
+      b.addEventListener('click',function(){tab=b.getAttribute('data-tab'); draw();});
+    });
+  }
+  function badgeHtml(){
+    const list=window.cityAchievements;
+    if(!Array.isArray(list)||!list.length) return '<div style="padding:8px 0;font-size:15px">Значки появятся, когда подключится список.</div>';
+    let st={};
+    if(typeof window.cityAchievementsState==='function'){try{st=window.cityAchievementsState()||{};}catch(e){st={};}}
+    return list.map(function(a){
+      const s=st[a.id]||{};
+      const done=!!s.done;
+      const n=s.n||0;
+      const need=a.n||1;
+      return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.08);font-size:15px;opacity:'+(done?'1':'.55')+'"><b>'+esc((a.icon?a.icon+' ':'')+a.title)+'</b> '+(done?'· есть':'· нет, '+n+'/'+need)+'<div style="opacity:.75">'+esc(a.text||'')+'</div></div>';
+    }).join('');
   }
   btn.addEventListener('click',function(){panel.hidden=!panel.hidden; if(!panel.hidden) draw();});
   document.addEventListener('keydown',function(e){if(e.key==='Escape') panel.hidden=true;});
