@@ -1,15 +1,15 @@
-// ===== Метро: первая линия Казанского метрополитена, в центре — Кремлёвская, Площадь Тукая, Суконная слобода =====
+// ===== Метро: первая линия Казанского метрополитена, на карте — Козья слобода, Кремлёвская, Площадь Тукая, Суконная слобода =====
 // Вход с улицы (знак «М»), турникет 46 ₽, платформа, поезд, объявление по-русски и по-татарски, выход на другой станции.
 // Остальные станции линии за пределами карты — на схеме, но выйти на них нельзя.
 const METRO_LINE=[
   {id:'avia',n:'Авиастроительная'},{id:'sever',n:'Северный вокзал'},{id:'yashlek',n:'Яшьлек',tat:'Яшьлек'},
-  {id:'koza',n:'Козья слобода',tat:'Кәҗә бистәсе'},
+  {id:'koza',n:'Козья слобода',tat:'Кәҗә бистәсе',ll:[[55.81727,49.09721],[55.81579,49.10012]]},   // входы из OSM; станция появится, когда карта дойдёт до неё
   {id:'kreml',n:'Кремлёвская',tat:'Кремль',ll:[[55.7958,49.1078],[55.7952,49.1064]]},
   {id:'tukay',n:'Площадь Габдуллы Тукая',short:'Площадь Тукая',tat:'Габдулла Тукай мәйданы',ll:[[55.78699,49.1223],[55.78727,49.12175]]},
   {id:'sukon',n:'Суконная слобода',tat:'Суконная бистәсе',ll:[[55.77607,49.14303],[55.77608,49.14379]]},
   {id:'amet',n:'Аметьево',tat:'Әмәт'},{id:'gorki',n:'Горки'},{id:'pobedy',n:'Проспект Победы'},{id:'dubrav',n:'Дубравная'}];
 const METRO={fare:46,ready:false,st:[],ride:null,lastSign:0};
-const RIDE_MIN={kreml_tukay:2,tukay_sukon:2.5};     // минуты в пути между соседними станциями центра
+const RIDE_MIN={koza_kreml:2.5,kreml_tukay:2,tukay_sukon:2.5};     // минуты в пути между соседними станциями центра
 function metroInit(){if(METRO.ready||!world)return;METRO.ready=true;const m=world.meta;
   for(const s of METRO_LINE){if(!s.ll)continue;const ents=[];
     for(const [lat,lon] of s.ll){const x=(lon-m.lon0)*m.mlon,y=-(lat-m.lat0)*m.mlat;const n=nearestNode(x,y,world.pedAdj,120);if(n<0)continue;const p=sidewalkPos(n);ents.push({x:p[0],y:p[1],node:n});}
@@ -47,7 +47,7 @@ function metroTrainAction(){const s=metroCur();if(!s)return null;const R=METRO.r
   return null;}
 if(typeof defSit==='function')defSit('metroPick',{title:'Метро',quiet:true,
   start(s){const cur=metroCur();if(!cur)return false;const others=METRO.st.filter(q=>q.id!==cur.id);
-    const choices=others.slice(0,2).map(q=>({t:`«${stName(q)}» · ${Math.round(rideMinutes(cur,q))} мин`,primary:true,run:()=>{metroCall(q.id);endSit(s);}}));
+    const choices=others.slice(0,3).map(q=>({t:`«${stName(q)}» · ${Math.round(rideMinutes(cur,q))} мин`,primary:true,run:()=>{metroCall(q.id);endSit(s);}}));
     choices.push({t:'Схема линии',run:()=>{endSit(s);metroScheme();}});
     sitCard({s,icon:'🚇',title:`Станция «${stName(cur)}»`,text:`Интервал сейчас около ${metroInterval()} мин. Дальше по линии — за пределами центра: на север до «Авиастроительной», на юг до «Дубравной».`,ttl:0,choices});return true;}});
 function metroScheme(){startSit('metroScheme');}

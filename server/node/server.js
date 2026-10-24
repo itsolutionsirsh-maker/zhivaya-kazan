@@ -41,15 +41,19 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
       tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
       tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
-      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)')};
+      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setPin:db.prepare('UPDATE accounts SET salt=?,pin=? WHERE k=?'),
+      imp:db.prepare('INSERT OR REPLACE INTO accounts(k,name,salt,pin,tok,state,profile,city,created,updated,fails,lock_until,tg,refBy,invites) VALUES(?,?,?,?,\'\',?,?,?,?,?,0,0,?,?,?)'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)')};
     const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
     return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
-      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
+      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
+      importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
+      importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
       setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
   setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
   return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
-    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},
+    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},setPin:(k,salt,pin)=>{acc[k].salt=salt;acc[k].pin=pin;dirty=true;},
+    importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
@@ -58,8 +62,11 @@ function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.leng
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
   if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
-  if(!crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'))){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
+  if(!pinOk(a,pin)){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
   store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated};}
+// PIN: свой scrypt; у аккаунтов, перенесённых с PHP-хостинга, — bcrypt (после первого входа переводим на scrypt)
+function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
+  try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
 function saveFor(token,state,profile,city){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
   if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};store.save(a.k,state||a.state,profile||a.profile,city||a.city);return {ok:1};}
@@ -261,5 +268,16 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
 setInterval(()=>{stats.bytesOut=0;stats.msgsOut=0;stats.since=now();},60000).unref();
 
-server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
+// переезд с PHP-хостинга: node server.js --import-php https://сайт/kazan/api.php — забирает аккаунты, ключи входа и привязки Телеги
+async function importPhp(url){if(!TG_TOKEN)throw new Error('нужен TG_BOT_TOKEN в окружении — им подписан ключ выгрузки');
+  const key=sha('export:'+TG_TOKEN).slice(0,40);const r=await fetch(url.replace(/\?.*$/,'')+'?a=export',{headers:{'X-Export-Key':key},signal:AbortSignal.timeout(60000)});const j=await r.json();if(!j.ok)throw new Error('выгрузка: '+(j.err||r.status));
+  const km=k=>typeof k==='string'&&k.startsWith('n:')?k.slice(2):k;let na=0,ns=0,nt=0,ng=0;
+  for(const x of j.accounts||[]){const k=km(x.k);const cur=store.get(k);if(cur&&(cur.updated||0)>=(x.updated||0)){ns++;continue;}
+    store.importAcc({k,name:clean(x.name,24)||'Игрок',salt:x.pin?'bcrypt':'',pin:x.pin||'',state:x.state,profile:x.profile,city:x.city,created:x.created,updated:x.updated,tg:x.tg?String(x.tg):null,refBy:km(x.refBy)||null,invites:Array.isArray(x.invites)?x.invites:[]});na++;}
+  for(const t of j.tokens||[]){if(/^[a-f0-9]{64}$/.test(t.h)&&store.get(km(t.k))){store.importTok(t.h,km(t.k),t.t);nt++;}}
+  for(const m of j.tgm||[]){const k=km(m.k);if(/^\d{3,15}$/.test(m.id)&&store.get(k)){store.tgSet(m.id,k);ng++;}}
+  return {accounts:na,skipped:ns,tokens:nt,tgLinks:ng};}
+const impI=process.argv.indexOf('--import-php');
+if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
+else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));

@@ -212,6 +212,18 @@ function tg_verify($initData, $botToken) {
     return ['id' => (string)intval($u['id']), 'name' => clean(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')), 24) ?: 'Игрок', 'start' => clean($pairs['start_param'] ?? '', 64)];
 }
 
+// переезд на VPS: сервер на VPS забирает отсюда аккаунты, ключи входа и привязки Телеги.
+// Ключ выводится из токена бота (он одинаковый на обоих серверах), отдельно ничего настраивать не нужно.
+if ($a === 'export') {
+    $tok = $cfg['tg_bot_token'] ?? ''; $key = $tok ? substr(hash('sha256', 'export:' . $tok), 0, 40) : '';
+    if (!$key || !hash_equals($key, (string)($_SERVER['HTTP_X_EXPORT_KEY'] ?? ''))) { http_response_code(403); out(['err' => 'forbidden']); }
+    if (!allow('export:' . $IP, 6, 3600)) out(['err' => 'rate_limited']);
+    $res = ['ok' => 1, 'accounts' => [], 'tokens' => [], 'tgm' => []];
+    foreach (glob($DATA . '/acc/*.php') ?: [] as $f) { $x = jread($f); if ($x && !empty($x['k'])) $res['accounts'][] = $x; }
+    foreach (glob($DATA . '/tok/*.php') ?: [] as $f) { $x = jread($f); if ($x && !empty($x['k'])) $res['tokens'][] = ['h' => basename($f, '.php'), 'k' => $x['k'], 't' => $x['t'] ?? 0]; }
+    foreach (glob($DATA . '/tgm/*.php') ?: [] as $f) { $x = jread($f); if ($x && !empty($x['k'])) $res['tgm'][] = ['id' => basename($f, '.php'), 'k' => $x['k']]; }
+    out($res);
+}
 // жалоба на игрока: копится в data/reports.php (модератор смотрит файл); на VPS — ещё и автоотключение чата
 if ($a === 'report') {
     if (!allow('rep:' . $IP, 10, 3600)) out(['err' => 'rate_limited']);
