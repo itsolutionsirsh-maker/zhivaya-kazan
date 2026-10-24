@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/itsolutionsirsh-maker/zhivaya-kazan
 sudo bash install.sh game.iks-ai-systems.ru
 ```
 
-Скрипт ставит Node.js 22 и Caddy (HTTPS-сертификат сам), открывает в брандмауэре только SSH, 80 и 443, запускает службу `zhivaya-kazan` и таймер, который раз в 5 минут подтягивает `main` с GitHub и перезапускает игру, если что-то изменилось. Ключ ИИ и токен бота — только в `/etc/zhivaya-kazan.env` на сервере (`LLM_API_KEY`, `TG_BOT_TOKEN`; `sudo nano /etc/zhivaya-kazan.env`, затем `sudo systemctl restart zhivaya-kazan`). Сменить домен — запустить `install.sh` ещё раз с новым доменом. Журнал: `journalctl -u zhivaya-kazan -f`. Данные аккаунтов: `/var/lib/zk/data/game.db` (SQLite).
+Скрипт ставит Node.js 22 и Caddy (HTTPS-сертификат сам), открывает в брандмауэре только SSH, 80 и 443, запускает службу `zhivaya-kazan` и таймер, который раз в 5 минут подтягивает `main` с GitHub и перезапускает игру, если что-то изменилось. Ключ ИИ и токен бота — только в `/etc/zhivaya-kazan.env` на сервере (`LLM_API_KEY`, `TG_BOT_TOKEN`; `sudo nano /etc/zhivaya-kazan.env`, затем `sudo systemctl restart zhivaya-kazan`). Сменить домен — запустить `install.sh` ещё раз с новым доменом. Можно сразу несколько адресов: `sudo bash install.sh kazan.lifegorod.com 213-218-161-82.sslip.io` — первый основной (кнопка в боте), второй работает, пока основной домен ещё не активен. В веб-консоли noVNC хостинга не набираются символы с Shift (`:`, `&`, `|`), поэтому там адрес пишется без `https://`, а команды — по одной. Журнал: `journalctl -u zhivaya-kazan -f`. Данные аккаунтов: `/var/lib/zk/data/game.db` (SQLite).
 
 Локально: `cd server/node && npm install && GAME_DIR=../../deploy/kazan node server.js` (после `python3 tools/build_deploy.py`).
 
