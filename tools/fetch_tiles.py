@@ -46,7 +46,9 @@ def fetch(q, tag, soft=False):
             if code == '200':
                 try:
                     d = json.load(open(tmp))
-                    if 'elements' in d:
+                    if 'elements' in d and 'error' in str(d.get('remark', '')).lower():
+                        print(f'  {tag}: {host} → неполный ответ ({d["remark"][:60]})', flush=True)   # Overpass обрезал по таймауту
+                    elif 'elements' in d:
                         print(f'  {tag}: {len(d["elements"])} эл. ({host})', flush=True)
                         os.remove(tmp)
                         return d['elements']
