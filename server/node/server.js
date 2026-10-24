@@ -17,7 +17,11 @@ const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'))
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
-try{const sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'));for(const k of ['TG_BOT_TOKEN','ADMIN_TG_ID','LLM_API_KEY'])if(!ENV[k]&&typeof sec[k]==='string'&&sec[k])ENV[k]=sec[k];}catch(e){}
+{let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}
+  for(const k of ['TG_BOT_TOKEN','ADMIN_TG_ID','LLM_API_KEY','MOD_TOKEN'])if(!ENV[k]&&typeof sec[k]==='string'&&sec[k])ENV[k]=sec[k];
+  // ключ модератора не задан в настройках — создаём свой и храним рядом с ключами
+  if(!ENV.MOD_TOKEN||ENV.MOD_TOKEN.length<16){ENV.MOD_TOKEN=crypto.randomBytes(24).toString('hex');sec.MOD_TOKEN=ENV.MOD_TOKEN;
+    try{fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);}catch(e){}}}
 const LLM={key:ENV.LLM_API_KEY||'',base:(ENV.LLM_API_BASE||'https://api.openai.com/v1').replace(/\/+$/,''),model:ENV.LLM_MODEL||'gpt-4o-mini',
   maxTokens:+ENV.LLM_MAX_TOKENS||160,perPlayerDay:+ENV.LLM_PER_PLAYER_DAY||60,perDay:+ENV.LLM_DAILY_LIMIT||20000};
 const VIEW_R=+ENV.VIEW_RADIUS||350, VIEW_K=+ENV.VIEW_K||80, VIEW_K_CROWD=+ENV.VIEW_K_CROWD||50, NEAR_R=120, CELL=50;
@@ -238,7 +242,7 @@ async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rat
   if(admin&&!/^\d{3,15}$/.test(admin))return {err:'admin_format'};if(llm.length>300)return {err:'llm_format'};
   let me=null;try{me=await fetch(`https://api.telegram.org/bot${token}/getMe`,{signal:AbortSignal.timeout(10000)}).then(r=>r.json());}catch(e){return {err:'tg_unreachable'};}
   if(!me||!me.ok)return {err:'token_wrong'};const uname=String(me.result&&me.result.username||'').toLowerCase();if(uname!==SETUP_BOT)return {err:'other_bot',bot:uname};
-  const sec={TG_BOT_TOKEN:token};if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
+  let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}sec.TG_BOT_TOKEN=token;if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
   fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);
   let imported=null;if(body.migrate!==false){try{imported=await importPhp(OLD_API,token);}catch(e){imported={err:e.message};}}
   log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':'')+'; перенос:',JSON.stringify(imported));
