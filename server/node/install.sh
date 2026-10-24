@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # «Живая Казань» — установка на чистый сервер Ubuntu 22.04 / 24.04.
-#   sudo bash install.sh game.iks-ai-systems.ru
+#   sudo bash install.sh game.iks-ai-systems.ru [запасной.адрес ...]
+# Первый адрес — основной (кнопка «Играть» в боте). Остальные тоже открывают игру: например, временный
+# <IP-через-дефисы>.sslip.io, пока основной домен ещё не заработал.
 # Ставит Node.js 22 (встроенный SQLite для аккаунтов), Caddy (сам получает HTTPS-сертификат), скачивает игру с GitHub,
 # запускает её как службу и раз в 5 минут подтягивает обновления из ветки main.
 # Перед запуском у домена должна быть A-запись на IP этого сервера.
@@ -8,6 +10,7 @@ set -euo pipefail
 
 DOMAIN="${1:-}"
 if [ -z "$DOMAIN" ]; then echo "Укажите домен: sudo bash install.sh game.example.ru"; exit 1; fi
+SITES="$*"; SITES="${SITES// /, }"   # для Caddy: «a.ru, b.ru»
 if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo"; exit 1; fi
 REPO="${REPO:-https://github.com/itsolutionsirsh-maker/zhivaya-kazan.git}"
 APP=/opt/zhivaya-kazan
@@ -157,9 +160,9 @@ OnUnitActiveSec=5min
 WantedBy=timers.target
 EOF
 
-echo "== Caddy: $DOMAIN → игра"
+echo "== Caddy: $SITES → игра"
 cat > /etc/caddy/Caddyfile <<EOF
-$DOMAIN {
+$SITES {
 	encode gzip
 	reverse_proxy 127.0.0.1:8080
 }
