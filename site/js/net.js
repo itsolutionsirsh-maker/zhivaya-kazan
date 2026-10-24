@@ -65,7 +65,7 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
     if(d.t==='w')wsApply(d);
     else if(d.t==='msg'){const m=d.m;if(m.from===myCid)return;if(m.to&&m.to!==myCid)return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){for(const m of d.msgs||[]){if(m.from===myCid)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
-    else if(d.t==='err')setHint(d.e==='busy'?'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд':'Не так часто: подождите пару секунд');};
+    else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
   wsSock.onclose=()=>{setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
 function wsFallback(){if(Net.mode==='http')return;Net.mode='http';httpLoop();}

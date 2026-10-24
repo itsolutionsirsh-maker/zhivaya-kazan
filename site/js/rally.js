@@ -83,7 +83,7 @@ function openRallyModal(sq){rallySq=sq;$('#rallyWhere').textContent=sq.n;$('#ral
 function closeRallyModal(){$('#rallyModal').hidden=true;player.busy=false;}
 document.querySelectorAll('#rallyKind button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#rallyKind button').forEach(q=>q.classList.remove('on'));b.classList.add('on');}));
 $('#rallyCancel').addEventListener('click',closeRallyModal);
-$('#rallyGo').addEventListener('click',()=>{const k=(document.querySelector('#rallyKind button.on')||{}).dataset?.k||'rally';const t=$('#rallyTitle').value.trim()||RALLY_KIND[k].word+' на площади';closeRallyModal();const r=startRally(rallySq,k,t,'player');if(r){player.rally=r;setHint('Люди подтягиваются. Встаньте в центр и нажмите E — выступить');}});
+$('#rallyGo').addEventListener('click',()=>{const k=(document.querySelector('#rallyKind button.on')||{}).dataset?.k||'rally';const t=modClean($('#rallyTitle').value.trim()).slice(0,60)||RALLY_KIND[k].word+' на площади';closeRallyModal();const r=startRally(rallySq,k,t,'player');if(r){player.rally=r;setHint('Люди подтягиваются. Встаньте в центр и нажмите E — выступить');}});
 $('#rallyTitle').addEventListener('keydown',e=>{if(e.key==='Enter')$('#rallyGo').click();});
 let speechRally=null;
 function openSpeech(r){speechRally=r;$('#speechTitle').textContent=`${RALLY_KIND[r.kind].icon} «${r.title}» · ${r.people.filter(w=>w.state==='rally').length} человек слушают`;$('#speechText').value='';$('#speechLog').innerHTML='';$('#speechModal').hidden=false;player.busy=true;setTimeout(()=>$('#speechText').focus(),50);}
@@ -91,7 +91,7 @@ function closeSpeech(){$('#speechModal').hidden=true;player.busy=false;speechRal
 $('#speechClose').addEventListener('click',closeSpeech);
 $('#speechSay').addEventListener('click',sayToCrowd);$('#speechText').addEventListener('keydown',e=>{if(e.key==='Enter')sayToCrowd();});
 let speechBusy=false;
-async function sayToCrowd(){const r=speechRally;const txt=$('#speechText').value.trim();if(!r||!txt||speechBusy)return;speechBusy=true;$('#speechText').value='';
+async function sayToCrowd(){const r=speechRally;const txt=modClean($('#speechText').value.trim());if(!r||!txt||speechBusy)return;speechBusy=true;$('#speechText').value='';
   const log=$('#speechLog');const me=document.createElement('div');me.className='m me';me.textContent=txt;log.append(me);
   const crowd=r.people.filter(w=>w.state==='rally');let lines=null;
   if(sampleFn&&crowd.length){const sample=crowd.slice(0,4).map(w=>`${w.p.name}, ${w.p.age}, ${w.p.job}, характер: ${w.p.trait}`).join('\n');

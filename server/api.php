@@ -212,6 +212,14 @@ function tg_verify($initData, $botToken) {
     return ['id' => (string)intval($u['id']), 'name' => clean(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')), 24) ?: 'Игрок', 'start' => clean($pairs['start_param'] ?? '', 64)];
 }
 
+// жалоба на игрока: копится в data/reports.php (модератор смотрит файл); на VPS — ещё и автоотключение чата
+if ($a === 'report') {
+    if (!allow('rep:' . $IP, 10, 3600)) out(['err' => 'rate_limited']);
+    $rec = ['t' => time(), 'from' => clean($in['id'] ?? '', 32), 'ip' => $IP, 'target' => clean($in['target'] ?? '', 32), 'name' => clean($in['name'] ?? '', 24), 'kind' => clean($in['kind'] ?? 'chat', 10), 'text' => clean($in['text'] ?? '', 240)];
+    $f = $DATA . '/reports.php'; if (!is_file($f)) { @mkdir($DATA, 0755, true); file_put_contents($f, GUARD); }
+    file_put_contents($f, json_encode($rec, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
+    out(['ok' => 1]);
+}
 if ($a === 'login') {
     $r = check_pin($in['name'] ?? '', $in['pin'] ?? '', true);
     if (isset($r['err'])) out($r);

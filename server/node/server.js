@@ -21,6 +21,8 @@ const VIEW_R=+ENV.VIEW_RADIUS||350, VIEW_K=+ENV.VIEW_K||80, VIEW_K_CROWD=+ENV.VI
 fs.mkdirSync(DATA,{recursive:true});
 
 const clean=(s,n)=>typeof s==='string'?s.replace(/[\x00-\x1F\x7F]/g,' ').trim().slice(0,n):'';
+// фильтр мата, ссылок и телефонов — тот же файл, что в игре
+const Mod=(()=>{try{return require(path.join(__dirname,'../../site/js/modcore.js'));}catch(e){return {clean:s=>s,name:(n,f)=>n||f,bad:()=>false};}})();
 const idstr=s=>typeof s==='string'?s.toLowerCase().replace(/[^a-f0-9]/g,'').slice(0,32):'';
 const now=()=>Date.now()/1000;
 const log=(...a)=>console.log(new Date().toISOString(),...a);
@@ -128,7 +130,9 @@ const META_KEYS=['n','r','c','v','vc','sy','g','a'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
   if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
-  if(has){if(typeof m.n==='string')m.n=clean(m.n,24)||'Игрок';if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
+  if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
+    if(m.sy&&typeof m.sy==='object'){if(modBlocked(p))m.sy=null;else if(typeof m.sy.t==='string')m.sy={t:Mod.clean(clean(m.sy.t,140)),i:+m.sy.i||0};}
+    if(m.g&&typeof m.g==='object'&&typeof m.g.t==='string')m.g=Object.assign({},m.g,{t:Mod.clean(clean(m.g.t,60))});if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
   p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
@@ -143,11 +147,37 @@ function cityLimited(){const t=now();cityRate=cityRate.filter(x=>t-x<1);if(cityR
 function deliver(m){const big=players.size>1000;const out={t:'msg',m:{i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}};const s=JSON.stringify(out);
   if(m.to){for(const id of [m.to,m.from]){const p=players.get(id);if(p&&p.ws&&p.ws.readyState===1)p.ws.send(s);}return;}
   for(const p of players.values()){if(!p.ws||p.ws.readyState!==1)continue;if(big&&p.id!==m.from&&Math.hypot(p.x-m.x,p.y-m.y)>1500)continue;p.ws.send(s);}}
-function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';const text=clean(textRaw,240);if(!text)return null;const to=toRaw?idstr(toRaw):null;
+function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';if(modBlocked(p))return 'banned';const text=Mod.clean(clean(textRaw,240));if(!text)return null;const to=toRaw?idstr(toRaw):null;
+  if(!to&&modMuted(p))return 'muted';if(text===p.lastMsg&&now()-(p.lastMsgT||0)<20)return 'dup';p.lastMsg=text;p.lastMsgT=now();
   if(!to&&players.size>300&&!allow('city:'+p.id,1,3))return 'rate';if(!to&&cityLimited())return 'busy';deliver(addMsg(p.id,(p.meta&&p.meta.n)||'Игрок',to,text,p.x,p.y));return null;}
 
+// ---------- модерация: жалобы, временное отключение чата, баны ----------
+// Жалобы пишутся в DATA/reports.jsonl. Три жалобы от разных игроков за час — общий чат нарушителю отключается на час.
+// Модератор (Иршат) — через a=mod с ключом MOD_TOKEN из /etc/zhivaya-kazan.env: список жалоб, бан и снятие бана.
+const MODF=path.join(DATA,'mod.json');let modState={bans:{},ipbans:{}};try{modState=Object.assign(modState,JSON.parse(fs.readFileSync(MODF,'utf8')));}catch(e){}
+const mutes=new Map(),repRecent=new Map();
+function modSave(){try{fs.writeFileSync(MODF+'.tmp',JSON.stringify(modState));fs.renameSync(MODF+'.tmp',MODF);}catch(e){}}
+function modBlocked(p){const t=now();const b=modState.bans[p.id];if(b&&(!b.until||b.until>t))return true;const ib=p.ip&&modState.ipbans[p.ip];return !!(ib&&(!ib.until||ib.until>t));}
+function modMuted(p){const u=mutes.get(p.id);if(u&&u>now())return true;if(u)mutes.delete(p.id);return false;}
+function modReport(body,ip){const from=idstr(body.id),target=idstr(body.target);if(target.length<8||from===target)return {err:'bad_target'};if(!allow('rep:'+ip,10,3600))return {err:'rate_limited'};
+  const tp=players.get(target);const rec={t:Math.floor(now()),from,ip,target,targetIp:tp&&tp.ip||null,name:clean(body.name,24),kind:clean(body.kind,10)||'chat',text:clean(body.text,240)};
+  try{fs.appendFileSync(path.join(DATA,'reports.jsonl'),JSON.stringify(rec)+'\n');}catch(e){}
+  const t=now();const list=(repRecent.get(target)||[]).filter(r=>t-r.t<3600);if(!list.some(r=>r.from===from||r.ip===ip))list.push({from,ip,t});repRecent.set(target,list);
+  if(list.length>=3&&!modMuted({id:target})){mutes.set(target,t+3600);log('Модерация: общий чат отключён на час для',target,rec.name);}
+  return {ok:1};}
+function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String(req.headers['x-mod-token']||body.token||'');
+  if(key.length<16||got.length!==key.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(key)))return {err:'forbidden'};
+  const t=now();const target=idstr(body.target||'');const act=String(body.do||'list');
+  if(act==='ban'&&target.length>=8){const h=Math.max(0,+body.hours||0);const until=h?t+h*3600:0;const pl=players.get(target);modState.bans[target]={until,why:clean(body.why,120),t:Math.floor(t)};
+    if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
+  if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
+  if(act==='mute'&&target.length>=8){mutes.set(target,t+Math.max(1,+body.minutes||60)*60);return {ok:1};}
+  let reports=[];try{reports=fs.readFileSync(path.join(DATA,'reports.jsonl'),'utf8').trim().split('\n').slice(-100).map(l=>{try{return JSON.parse(l);}catch(e){return null;}}).filter(Boolean).reverse();}catch(e){}
+  const online=[...players.values()].map(p=>({id:p.id,n:(p.meta&&p.meta.n)||'Игрок'}));
+  return {ok:1,reports,bans:modState.bans,ipbans:Object.keys(modState.ipbans).length,mutes:[...mutes].filter(([,u])=>u>t).map(([id,u])=>({id,until:Math.floor(u)})),online};}
+
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
-function apiSync(body){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;setPresence(p,body.p);
+function apiSync(body,ip){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;p.ip=ip;setPresence(p,body.p);
   for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const list=[];around(p.x,p.y,VIEW_R,o=>{if(o!==p&&list.length<VIEW_K)list.push({id:o.id,p:Object.assign({},o.meta,{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b})});});
@@ -176,7 +206,9 @@ const server=http.createServer(async(req,res)=>{
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
-    if(a==='sync')return send(res,200,apiSync(body));
+    if(a==='sync')return send(res,200,apiSync(body,ip));
+    if(a==='report')return send(res,200,modReport(body,ip));
+    if(a==='mod')return send(res,200,modAdmin(req,body));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
@@ -202,7 +234,7 @@ function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmoun
 wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
-    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.view.clear();setPresence(me,d.p);
+    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.ip=ip;me.view.clear();setPresence(me,d.p);
       wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid});return;}
     if(!me)return;
     if(d.t==='p'){setPresence(me,d);return;}           // координаты: {t:'p',x,y,hx,hy,b} — часто
