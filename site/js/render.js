@@ -210,8 +210,9 @@ function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=
   const z=cam.z;mctx.strokeStyle='rgba(20,30,26,.5)';mctx.lineWidth=4;mctx.strokeRect(cam.x-W/2/z,cam.y-H/2/z,W/z,H/z);}
 
 // ---------- мелкий масштаб: готовая картинка города + движущиеся точки ----------
-let overview=null;const OV_S=0.75;
-function buildOverview(){const bb=world.bbox;const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+let overview=null;let OV_S=0.75;
+// обзорная картинка всей карты: не больше ~9 млн точек (iOS не держит холст больше ~16 млн, а память телефона не резиновая)
+function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   g.fillStyle=GROUND;g.fillRect(0,0,w,h);g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of world.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}

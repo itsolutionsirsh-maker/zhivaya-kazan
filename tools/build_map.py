@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Преобразует сырой ответ Overpass в компактный kazan.json для игры.
 Координаты — локальные метры × 10 (дециметры), ось Y вниз (как на canvas)."""
-import json, math, sys, collections
+import json, math, sys, collections, os
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else 'raw/kazan_osm.json'
 DST = sys.argv[2] if len(sys.argv) > 2 else 'site/kazan.json'
 
-S, W, N, E = 55.774, 49.079, 55.812, 49.149
+# bbox карты: юг, запад, север, восток (можно задать BBOX="S,W,N,E")
+S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.774,49.079,55.812,49.149').split(','))
 # начало координат фиксировано (центр первой версии карты), чтобы сохранения не сдвигались
 lat0, lon0 = 55.793, 49.114
 M_LAT = 111320.0
@@ -449,13 +450,14 @@ for e in els:
     routes.append({'ref': t.get('ref', '?'), 'name': t.get('name', ''), 'type': rt,
                    'p': [q(v) for p in pts for v in p], 's': dedup, 'len': round(best_len), 'rid': e['id']})
 
-# выбираем разнообразные маршруты: по 2 направления на ref, не больше 16 всего
+# выбираем разнообразные маршруты: один вариант на номер (машины всё равно ходят в обе стороны),
+# немного автобусов, троллейбусов и трамваев — чтобы не грузить телефон
 routes.sort(key=lambda r: -r['len'])
 chosen, per_ref, per_type = [], collections.Counter(), collections.Counter()
-limits = {'bus': 16, 'tram': 4, 'trolleybus': 4}
+limits = {'bus': 6, 'tram': 2, 'trolleybus': 3}
 for r in routes:
     key = (r['type'], r['ref'])
-    if per_ref[key] >= 2 or per_type[r['type']] >= limits[r['type']]:
+    if per_ref[key] >= 1 or per_type[r['type']] >= limits[r['type']]:
         continue
     if len(r['s']) < 3:
         continue
