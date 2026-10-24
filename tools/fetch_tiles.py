@@ -2,7 +2,7 @@
 """Загрузка OSM по плиткам (большой bbox не пролезает в таймаут Overpass) и склейка без дублей."""
 import json, subprocess, sys, time, os
 # bbox карты: юг, запад, север, восток (тот же, что в build_map.py; можно задать BBOX="S,W,N,E")
-S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.768,49.071,55.8205,49.160').split(','))
+S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.760,49.064,55.829,49.172').split(','))
 NX, NY = 3, 3
 OUT = next((a for a in sys.argv[1:] if not a.startswith('--')), 'raw/kazan_osm.json')
 MIRRORS = ["https://overpass.kumi.systems/api/interpreter",
