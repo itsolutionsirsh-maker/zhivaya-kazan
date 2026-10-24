@@ -7,7 +7,7 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else 'raw/kazan_osm.json'
 DST = sys.argv[2] if len(sys.argv) > 2 else 'site/kazan.json'
 
 # bbox карты: юг, запад, север, восток (можно задать BBOX="S,W,N,E")
-S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.774,49.079,55.812,49.149').split(','))
+S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.768,49.071,55.8205,49.160').split(','))
 # начало координат фиксировано (центр первой версии карты), чтобы сохранения не сдвигались
 lat0, lon0 = 55.793, 49.114
 M_LAT = 111320.0

@@ -22,9 +22,11 @@
 ## Пересобрать карту
 
 ```bash
-python3 tools/fetch_tiles.py raw/kazan_big.json   # bbox задаётся внутри скрипта
-python3 tools/build_map.py raw/kazan_big.json site/kazan.json
+python3 tools/fetch_tiles.py raw/kazan_v3.json    # вся карта плитками (долго, серверы Overpass часто отвечают 504)
+python3 tools/build_map.py raw/kazan_v3.json site/kazan.json
 ```
+
+Карта: юг 55.768, запад 49.071, север 55.8205, восток 49.160 — примерно 5,8 × 5,6 км, от «Козьей слободы» на севере до Суконной слободы и Кабана на юге, от Волги до парка Горького (около 6 400 зданий). Другой bbox — `BBOX="S,W,N,E"` для обоих скриптов. Расширить уже скачанную карту, докачав только полосы вокруг неё: `BBOX=новый python3 tools/fetch_tiles.py raw/старый.json --ring=старый_S,W,N,E` — плитки по ~1 км, каждая в `raw/ring/`, после обрыва докачиваются только недостающие. Начало координат (lat0/lon0) не меняется, сохранения не сдвигаются.
 
 ## Управление
 
