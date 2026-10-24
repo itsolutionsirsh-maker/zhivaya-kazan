@@ -22,7 +22,8 @@ const FOLK_DEF={
   rinat:{trait:'философ',age:41,bio:'Повар в кафе у площади Свободы, гордится своим эчпочмаком.',speech:'неторопливо, про еду, угощает словами',work:'cafe',haunt:'bar',day:[[0,'home'],[10,'work'],[22,'haunt'],[23.5,'home']]}};
 const FOLK={list:[],ready:false,t:0,save:{}};
 function folkSrc(){const ext=Array.isArray(window.cityFolk)&&window.cityFolk.length?window.cityFolk:null;return (ext||FOLK_FALLBACK).map(f=>Object.assign({},FOLK_DEF[f.id]||{},f));}
-function folkLoad(){try{FOLK.save=JSON.parse(localStorage.getItem('zk.folk')||'{}')||{};}catch(e){FOLK.save={};}}
+function folkLoad(){if(window.__folkSaved&&typeof window.__folkSaved==='object'){FOLK.save=window.__folkSaved;return;}try{FOLK.save=JSON.parse(localStorage.getItem('zk.folk')||'{}')||{};}catch(e){FOLK.save={};}}
+function folkDump(){if(!FOLK.ready)return window.__folkSaved;const o={};for(const f of FOLK.list){o[f.id]={met:f.met||0,last:f.last||0,greet:f.greet||0,mem:(f.p.memory||[]).slice(-12)};}return o;}
 function folkStore(){if(window.zkNoSave)return;const o={};for(const f of FOLK.list){o[f.id]={met:f.met||0,last:f.last||0,greet:f.greet||0,mem:(f.p.memory||[]).slice(-12)};}try{localStorage.setItem('zk.folk',JSON.stringify(o));}catch(e){}}
 // постоянная внешность по имени
 function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Math.floor(r()*a.length)];

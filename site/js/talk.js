@@ -2,7 +2,7 @@
 const HEAR_R=45;          // на каком расстоянии слышно (м)
 let sayCounter=0,saySent=null;
 function pos(){return scene==='interior'&&interior?{x:interior.ret.x,y:interior.ret.y}:{x:player.x,y:player.y};}
-function sayAloud(text){const txt=drunkify(String(text||'').trim().slice(0,140));if(!txt)return;
+function sayAloud(text){const txt=drunkify(modClean(String(text||'').trim()).slice(0,140));if(!txt)return;
   player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter};nearLine(player.name,txt,true);pushPresence();
   // жители рядом слышат и один из них отвечает
   const p=pos();let npc=null,bd=7;
@@ -20,8 +20,8 @@ async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);
   w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};nearLine(w.p.name,reply,false);}
 // фразы других игроков (приходят через presence)
-function onPeerSay(pr,s){if(!s||typeof s.t!=='string'||s.i===pr.sayI)return;pr.sayI=s.i;const t=s.t.slice(0,140);pr.say={t,ttl:6};
-  const p=pos();if(dist(pr.x,pr.y,p.x,p.y)<HEAR_R)nearLine(pr.name,t,false);}
+function onPeerSay(pr,s){if(!s||typeof s.t!=='string'||s.i===pr.sayI)return;pr.sayI=s.i;if(modIgnored(pr.key))return;const t=modClean(s.t.slice(0,140));pr.say={t,ttl:6};
+  const p=pos();if(dist(pr.x,pr.y,p.x,p.y)<HEAR_R)nearLine(pr.name,t,false,pr.key);}
 function updateSay(dt){if(player.say){player.say.ttl-=dt;if(player.say.ttl<=0)player.say=null;}
   for(const w of walkers){if(w.say&&!w.rally){w.say.ttl-=dt;if(w.say.ttl<=0)w.say=null;}}
   if(interior)for(const n of interior.npcs){if(n.say){n.say.ttl-=dt;if(n.say.ttl<=0)n.say=null;}}

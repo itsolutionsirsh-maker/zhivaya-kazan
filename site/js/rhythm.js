@@ -60,6 +60,7 @@ function venueBusy(kind,h){h=h??cityHour();const we=isWeekend();
     case 'bar':return h<2?0.95:h<4?0.6:h<16?0.2:h<19?0.35:h<22?0.7:1;
     case 'office':case 'university':case 'school':return we?0.1:(h>=9&&h<18?1:0.1);
     case 'theatre':return h>=18&&h<22.5?1:0.15;
+    case 'metro':return h<6?0:rushHour()?1:Math.max(0.2,pedFactor(h)*0.75);
     default:return Math.max(0.25,pedFactor(h));}}
 function extraPatron(x,y,hx){const p=makePersona('resident');return {p,x,y,hx,hy:0,seated:true,phase:Math.random()*6,role:'resident',isInterior:true,state:'idle',memory:p.memory,extra:true};}
 function refreshCrowd(it){if(!it||it.kind==='home')return;
@@ -86,6 +87,8 @@ function sendHome(w){w.goHome=true;let best=null,bd=1e9;for(let k=0;k<14;k++){co
   w.goalPoi=best;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,goal,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=0.5;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';});}
 // выходит из подъезда или заведения недалеко от игрока
 function wakeWalker(){const w=RHYTHM.dormW.pop();if(!w)return false;const px=player.x,py=player.y;let spot=null;
+  // часть людей выходит из метро
+  if(typeof metroSpots==='function'&&typeof metroOpen==='function'&&metroOpen()&&Math.random()<0.25){const ms=metroSpots().filter(e=>{const d=dist(e.x,e.y,px,py);return d>30&&d<320;});if(ms.length){const e=pick(ms);spot={x:e.x,y:e.y,t:'metro'};}}
   for(let k=0;k<16&&!spot;k++){const p=pick(world.pois);const d=dist(p.x,p.y,px,py);if(d>40&&d<320&&poiOpen(p))spot=p;}
   let n;if(spot){n=nearestNode(spot.x,spot.y,world.pedAdj,120);}if(n==null||n<0){n=nodeNear(world.pedNodes,[px,py],300);spot=null;}
   w.node=n;if(spot){w.x=spot.x+rnd(-1.5,1.5);w.y=spot.y+rnd(-1.5,1.5);}else{const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];}

@@ -143,12 +143,15 @@ function busWord(t){return t==='tram'?'Трамвай':t==='trolleybus'?'Тро�
 
 // ---------- население ----------
 function spawnPopulation(spawn){
-  for(let i=0;i<420;i++){const role=i<4?'police':i<14?'courier':'resident';const w=new Walker(role,nodeNear(world.pedNodes,spawn,i<250?160:300));if(role==='police')w.anchor=[spawn[0]+rnd(-150,150),spawn[1]+rnd(-150,150)];walkers.push(w);}
+  // сколько народу и машин держит город: меньше — легче телефону и серверу (было 420 / 130 / до 3 машин на маршрут)
+  for(let i=0;i<POP.walkers;i++){const role=i<4?'police':i<14?'courier':'resident';const w=new Walker(role,nodeNear(world.pedNodes,spawn,i<POP.walkers*0.6?160:300));if(role==='police')w.anchor=[spawn[0]+rnd(-150,150),spawn[1]+rnd(-150,150)];walkers.push(w);}
   const guardSpots=world.pois.filter(p=>p.t==='bank'||p.t==='market'||p.t==='museum');for(const g of guardSpots.slice(0,16)){const n=nearestNode(g.x,g.y,world.pedAdj,80);if(n<0)continue;const w=new Walker('guard',n);w.x=g.x+rnd(-2,2);w.y=g.y+rnd(-2,2);w.gx=w.x;w.gy=w.y;w.state='idle';w.ttl=9e9;walkers.push(w);}
-  for(let i=0;i<130;i++){const c=new Car(i<8?'taxi':'car',nodeNear(world.carNodes,spawn,i<70?300:600));c.ttl=rnd(0,2);cars.push(c);}
+  for(let i=0;i<POP.cars;i++){const c=new Car(i<8?'taxi':'car',nodeNear(world.carNodes,spawn,i<POP.cars*0.55?300:600));c.ttl=rnd(0,2);cars.push(c);}
   for(let i=0;i<3;i++){const c=new Car('police',nodeNear(world.carNodes,spawn,700));c.vmax=16;c.ttl=rnd(0,2);cars.push(c);policeCars.push(c);}
-  for(const r of world.routes){const n=clamp(Math.round(r.len/1100),1,3);for(let i=0;i<n;i++){buses.push(new Bus(r,r.len*(i+0.3)/n,i%2?-1:1));}}
+  for(const r of world.routes){const n=clamp(Math.round(r.len/POP.busEvery),1,POP.busMax);for(let i=0;i<n;i++){buses.push(new Bus(r,r.len*(i+0.3)/n,i%2?-1:1));}}
 }
+// на слабом телефоне — ещё меньше (мало ядер или памяти)
+const POP=(()=>{const weak=(navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=3;return weak?{walkers:200,cars:60,busEvery:2600,busMax:2}:{walkers:280,cars:85,busEvery:2600,busMax:2};})();
 let bubbleTimer=0,jaywalkTimer=rnd(40,80);
 function updatePopulation(dt){
   bubbleTimer-=dt;if(bubbleTimer<=0){bubbleTimer=0.4;const px=player.x,py=player.y;let moved=0;
@@ -179,7 +182,7 @@ function dispatchPolice(ac){let best=null,bd=1e9;for(const p of policeCars){if(p
   // далёкий экипаж (вне экрана) «выезжает» с ближайшего поста
   if(bd>260&&dist(best.x,best.y,player.x,player.y)>220&&!best.creep){const sn=emergencyStart(ac,n);if(sn>=0){best.node=sn;best.x=world.nodes[sn][0];best.y=world.nodes[sn][1];}}
   best.creep=null;best.target=n;best.sceneXY=[ac.x,ac.y];ac.police=best;best.path=null;best.state='idle';best.ttl=0.05;
-  best.onScene=()=>{addEvent(`Полиция прибыла на место${ac.road?' ('+ac.road+')':''}`);if(ac.playerFine){player.money=Math.max(0,player.money-ac.playerFine);player.mood=clamp(player.mood-ac.playerMood,0,100);addEvent(ac.playerFineText);ac.playerFine=0;}if(ac.playerCar&&player.vehicle)player.vehicle.damaged=Math.min(player.vehicle.damaged,3);policeAtScene(ac,best);};}
+  best.onScene=()=>{addEvent(`Полиция прибыла на место${ac.road?' ('+ac.road+')':''}`);if(ac.playerFine){player.money=Math.max(0,player.money-ac.playerFine);player.mood=clamp(player.mood-ac.playerMood,0,100);addEvent(ac.playerFineText);if(typeof phoneNote==='function')phoneNote('Госуслуги',ac.playerFineText.replace(/^ГИБДД:\s*/,''),'fine');ac.playerFine=0;}if(ac.playerCar&&player.vehicle)player.vehicle.damaged=Math.min(player.vehicle.damaged,3);policeAtScene(ac,best);};}
 function dispatchAmbulance(ac){const hosp=world.pois.filter(p=>p.t==='hospital');if(!hosp.length)return;let hb=hosp[0],hd=1e9;for(const h of hosp){const d=dist(h.x,h.y,ac.x,ac.y);if(d<hd){hd=d;hb=h;}}const hn=nearestNode(hb.x,hb.y,world.carAdj,200);if(hn<0)return;
   const tgt=nearestNode(ac.x,ac.y,world.carAdj,150);let sn=emergencyStart(ac,tgt);
   if(sn<0)sn=nodeNear(world.carNodes,[ac.x,ac.y],320);const amb=new Car('amb',sn);amb.vmax=17;amb.target=tgt;amb.sceneXY=[ac.x,ac.y];amb.homeNode=hn;amb.hospital=hb;amb.state='idle';amb.ttl=rnd(0.5,1.5);

@@ -13,6 +13,14 @@ REPO="${REPO:-https://github.com/itsolutionsirsh-maker/zhivaya-kazan.git}"
 APP=/opt/zhivaya-kazan
 ENVF=/etc/zhivaya-kazan.env
 
+echo "== Подкачка (на сервере с 1 ГБ памяти — чтобы установка и сборка не упирались в память)"
+if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ] && [ "$(awk '/MemTotal/{print $2}' /proc/meminfo)" -lt 2000000 ]; then
+  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+  chmod 600 /swapfile; mkswap /swapfile >/dev/null; swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  sysctl -q vm.swappiness=10; echo 'vm.swappiness=10' > /etc/sysctl.d/91-zk-swap.conf
+fi
+
 echo "== Пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -58,11 +66,20 @@ LLM_MODEL=gpt-4o-mini
 LLM_PER_PLAYER_DAY=60
 LLM_DAILY_LIMIT=20000
 LLM_MAX_TOKENS=160
+# Токен бота от @BotFather — для входа из мини-приложения Телеги. Впишите сами, никому не пересылайте
+TG_BOT_TOKEN=
 # Сколько соседей видно и в каком радиусе (м)
 VIEW_K=80
 VIEW_RADIUS=350
 EOF
 fi
+# сводка по утрам, тревоги и копии базы в Телегу (добавляется и в старые настройки)
+grep -q '^ADMIN_TG_ID=' "$ENVF" || printf '# Ваш id в Телеге для сводки по утрам и тревог «сервер не отвечает» (узнать у @userinfobot)\nADMIN_TG_ID=\n' >> "$ENVF"
+grep -q '^BACKUP_TO_TG=' "$ENVF" || printf '# 1 — раз в сутки присылать копию базы игроков в Телегу админу (копии на сервере делаются всегда)\nBACKUP_TO_TG=0\n' >> "$ENVF"
+# адрес игры: для кнопки «Играть» в боте и вебхука Телеги (обновляется при каждом запуске install.sh с новым доменом)
+if grep -q '^PUBLIC_URL=' "$ENVF"; then sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN/|" "$ENVF"; else echo "PUBLIC_URL=https://$DOMAIN/" >> "$ENVF"; fi
+# ключ модератора для страницы /mod.html — создаётся один раз
+if ! grep -q '^MOD_TOKEN=.\+' "$ENVF"; then sed -i '/^MOD_TOKEN=/d' "$ENVF"; echo "MOD_TOKEN=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" >> "$ENVF"; fi
 chown root:zk "$ENVF"; chmod 640 "$ENVF"
 mkdir -p /var/lib/zk/data; chown -R zk:zk /var/lib/zk
 
@@ -97,14 +114,36 @@ ReadWritePaths=/var/lib/zk
 WantedBy=multi-user.target
 EOF
 
-echo "== Автообновление из GitHub (каждые 5 минут)"
+echo "== Автообновление из GitHub (каждые 5 минут) и проверка «сервер жив» (каждые 2 минуты)"
+# скрипты, которые работают от root, лежат вне папки игры: её может менять служба
+install -m 755 -o root -g root "$APP/server/node/update.sh" /usr/local/sbin/zk-update
+install -m 755 -o root -g root "$APP/server/node/health.sh" /usr/local/sbin/zk-health
 cat > /etc/systemd/system/zhivaya-kazan-update.service <<EOF
 [Unit]
 Description=Живая Казань — обновление из GitHub
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash $APP/server/node/update.sh
+ExecStart=/usr/local/sbin/zk-update
+EOF
+cat > /etc/systemd/system/zhivaya-kazan-health.service <<EOF
+[Unit]
+Description=Живая Казань — проверка «сервер жив»
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zk-health
+EOF
+cat > /etc/systemd/system/zhivaya-kazan-health.timer <<EOF
+[Unit]
+Description=Живая Казань — проверять сервер каждые 2 минуты
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target
 EOF
 cat > /etc/systemd/system/zhivaya-kazan-update.timer <<EOF
 [Unit]
@@ -126,16 +165,25 @@ $DOMAIN {
 }
 EOF
 
+echo "== Брандмауэр: открыты только SSH, 80 и 443"
+if command -v ufw >/dev/null 2>&1; then
+  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}'); SSHP=${SSHP:-22}
+  ufw allow "$SSHP"/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
+  ufw --force enable >/dev/null
+fi
+
 systemctl daemon-reload
 systemctl enable --now zhivaya-kazan
-systemctl enable --now zhivaya-kazan-update.timer
+systemctl restart zhivaya-kazan
+systemctl enable --now zhivaya-kazan-update.timer zhivaya-kazan-health.timer
 systemctl reload caddy || systemctl restart caddy
 
 sleep 2
 if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
   echo
   echo "Готово: https://$DOMAIN"
-  echo "Ключ ИИ для жителей: sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
+  echo "Ключ ИИ для жителей, токен бота и ваш id в Телеге (LLM_API_KEY, TG_BOT_TOKEN, ADMIN_TG_ID): sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
+  echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ — MOD_TOKEN: sudo grep MOD_TOKEN $ENVF)"
   echo "Журнал игры: journalctl -u zhivaya-kazan -f"
 else
   echo "Сервер игры не ответил. Посмотрите: journalctl -u zhivaya-kazan -n 50"

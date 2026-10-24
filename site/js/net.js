@@ -1,3 +1,7 @@
+// откуда пришёл игрок — для цифр на сервере: Телега, ссылка друга, метка в адресе (?from=vk) или сайт-источник
+function netSrc(){try{if(typeof TG!=='undefined'&&TG.on)return /^ref_/.test(TG.startParam)?'ref':(TG.startParam?('tg:'+TG.startParam).slice(0,24):'tg');
+  const q=new URLSearchParams(location.search),u=q.get('from')||q.get('utm_source');if(u)return ('web:'+u).slice(0,24);
+  const r=document.referrer?new URL(document.referrer).hostname:'';return r&&r!==location.hostname?('web:'+r).slice(0,24):'web';}catch(e){return 'web';}}
 // ===== Сеть: комната claude.ai или свой сервер (api.php) =====
 // Режимы: 'room' — внутри claude.ai; 'http' — на своём сайте; 'off' — одиночная игра.
 const Net={mode:'off',me:null,peers:[],llm:false};
@@ -29,7 +33,7 @@ function readRoomMsgs(list){for(const p of list){const m=p.presence.m;if(!Array.
   lastSeen.set(p.peer,max);}}
 
 async function httpLoop(){for(;;){
-  try{const body={a:'sync',id:myCid,p:buildPresence(),out:httpOut.splice(0),since:httpSince};
+  try{const body={a:'sync',id:myCid,p:buildPresence(),out:httpOut.splice(0),since:httpSince,src:netSrc()};
     const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
     if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myCid){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myCid)continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
@@ -60,12 +64,12 @@ function wsApply(d){
   Net.peers=[...wsPeers.values()];syncPeers(Net.peers);setNetStatus(true);}
 function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';let opened=false;
   try{wsSock=new WebSocket(url);}catch(e){wsFallback();return;}
-  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
+  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p,src:netSrc()}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
   wsSock.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.t==='w')wsApply(d);
     else if(d.t==='msg'){const m=d.m;if(m.from===myCid)return;if(m.to&&m.to!==myCid)return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){for(const m of d.msgs||[]){if(m.from===myCid)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
-    else if(d.t==='err')setHint(d.e==='busy'?'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд':'Не так часто: подождите пару секунд');};
+    else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
   wsSock.onclose=()=>{setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
 function wsFallback(){if(Net.mode==='http')return;Net.mode='http';httpLoop();}
@@ -81,7 +85,7 @@ function drawCrowd(toS,z){const c=Net.crowd;if(!c||!c.length||scene!=='city')ret
 // ---------- аккаунт на сервере: имя + PIN, прогресс хранится на сервере ----------
 let acct=null;try{acct=JSON.parse(localStorage.getItem('zk.acct')||'null');}catch(e){}
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store'});return r.json();}
-function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');profile=JSON.parse(localStorage.getItem('zk.profile')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile};}
+function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
 async function acctSave(){if(!acct||window.zkNoSave)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{const j=await acctCall('save',Object.assign({token:acct.token},snap));if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}}
 async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).catch(()=>({err:'net'}));
   const E={name:'Имя — от 2 букв',pin:'PIN — от 4 до 8 цифр',wrong_pin:'Неверный PIN для этого имени',locked:'Слишком много попыток. Подождите 15 минут',rate_limited:'Слишком часто. Попробуйте через минуту',net:'Нет связи с сервером'};
@@ -90,15 +94,19 @@ async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).ca
   if(!j.created&&j.state){acctApply(j);return;}
   await acctSave();$('#acctMsg').textContent=j.created?'Аккаунт создан. Прогресс сохраняется на сервере':'Вошли. Прогресс сохраняется на сервере';renderAcct();}
 function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
+  const tg=acct&&acct.tg;const p=inForm.querySelector('p');const go=$('#acctGo');const ob=$('#acctOutBtn');
+  if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=true;return;}
+  if(p)p.textContent='Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.';if(go)go.textContent='Войти';if(ob)ob.hidden=false;
   if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}}
-if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acctLogin($('#acctName').value,$('#acctPin').value));
+if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 setInterval(acctSave,30000);
 window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token},snap))],{type:'application/json'}));}catch(e){}});
 // загрузить прогресс с сервера и перезапустить (локальные сохранения на это время выключены)
-function acctApply(j){window.zkNoSave=true;try{localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
+function acctApply(j){window.zkNoSave=true;try{localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
 // при запуске: если на сервере сохранение новее (играли с другого устройства) — взять его
-async function acctSyncOnBoot(){if(!acct)return;try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}
+async function acctSyncOnBoot(){if(!acct)return;if(acct.tg&&typeof TG!=='undefined'&&TG.on)return;   // в Телеге вход и загрузку делает tg.js
+  try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}
   let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}if(j.state&&(j.state.t||0)>((local&&local.t)||0)+5000)acctApply(j);}catch(e){}}
 
 async function netInit(){

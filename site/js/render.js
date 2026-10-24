@@ -110,6 +110,7 @@ function render(){
   routeOverlay(toS);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-30,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
   for(const w of walkers){if(w.state!=='cross'||z<2.5)continue;const [sx,sy]=toS(w.x,w.y);ctx.fillStyle='rgba(235,187,75,.95)';rrect(ctx,sx-8,sy-22,16,14,4);ctx.fill();ctx.fillStyle='#2B2200';ctx.fillText('!',sx,sy-15);}
+  if(typeof drawMetroSigns==='function')drawMetroSigns(vx0,vy0,vx1,vy1,z,toS);
   // свои люди: имя над головой у тех, с кем уже знакомы
   if(z>2.2&&typeof FOLK!=='undefined'){ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';for(const f of FOLK.list){const w=f.w;if(!w||!f.met||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;const [sx,sy]=toS(w.x,w.y);const t='★ '+f.name;const tw=ctx.measureText(t).width+12;ctx.fillStyle='rgba(20,60,40,.85)';rrect(ctx,sx-tw/2,sy-46*Math.min(1.6,z/4)-9,tw,18,9);ctx.fill();ctx.fillStyle='#E9FFF1';ctx.fillText(t,sx,sy-46*Math.min(1.6,z/4));}}
   if(weather.rain.length){ctx.strokeStyle='rgba(120,150,190,.45)';ctx.lineWidth=1;ctx.beginPath();for(const r of weather.rain){const x=r[0]*W,y=r[1]*H;ctx.moveTo(x,y);ctx.lineTo(x-2,y+9*r[2]);}ctx.stroke();ctx.fillStyle='rgba(60,80,110,.12)';ctx.fillRect(0,0,W,H);}
@@ -209,8 +210,9 @@ function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=
   const z=cam.z;mctx.strokeStyle='rgba(20,30,26,.5)';mctx.lineWidth=4;mctx.strokeRect(cam.x-W/2/z,cam.y-H/2/z,W/z,H/z);}
 
 // ---------- мелкий масштаб: готовая картинка города + движущиеся точки ----------
-let overview=null;const OV_S=0.75;
-function buildOverview(){const bb=world.bbox;const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+let overview=null;let OV_S=0.75;
+// обзорная картинка всей карты: не больше ~9 млн точек (iOS не держит холст больше ~16 млн, а память телефона не резиновая)
+function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   g.fillStyle=GROUND;g.fillRect(0,0,w,h);g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of world.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}

@@ -21,10 +21,14 @@ const VIEW_R=+ENV.VIEW_RADIUS||350, VIEW_K=+ENV.VIEW_K||80, VIEW_K_CROWD=+ENV.VI
 fs.mkdirSync(DATA,{recursive:true});
 
 const clean=(s,n)=>typeof s==='string'?s.replace(/[\x00-\x1F\x7F]/g,' ').trim().slice(0,n):'';
+// фильтр мата, ссылок и телефонов — тот же файл, что в игре
+const Mod=(()=>{try{return require(path.join(__dirname,'../../site/js/modcore.js'));}catch(e){return {clean:s=>s,name:(n,f)=>n||f,bad:()=>false};}})();
 const idstr=s=>typeof s==='string'?s.toLowerCase().replace(/[^a-f0-9]/g,'').slice(0,32):'';
 const now=()=>Date.now()/1000;
 const log=(...a)=>console.log(new Date().toISOString(),...a);
 const day=()=>new Date().toISOString().slice(0,10);
+const mskDay=(off=0)=>new Date(Date.now()+3*3600e3+off*86400e3).toISOString().slice(0,10);   // сутки по Москве — для цифр
+const mskHour=()=>new Date(Date.now()+3*3600e3).getUTCHours();
 
 // ---------- ограничение частоты ----------
 const buckets=new Map();
@@ -34,27 +38,90 @@ setInterval(()=>{const t=now();for(const [k,b] of buckets){if(!b.length||t-b[b.l
 // ---------- хранилище аккаунтов: SQLite (Node 22+), иначе JSON ----------
 const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqlite=require('node:sqlite');}catch(e){}
   if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;');
-    db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);');
+    db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);CREATE TABLE IF NOT EXISTS tokens(tok TEXT PRIMARY KEY,k TEXT,t REAL);CREATE TABLE IF NOT EXISTS tgmap(id TEXT PRIMARY KEY,k TEXT);');
+    // журнал заходов для цифр: только случайный номер устройства и день, без имён и адресов
+    db.exec('CREATE TABLE IF NOT EXISTS visits(d TEXT,id TEXT,PRIMARY KEY(d,id)) WITHOUT ROWID;CREATE TABLE IF NOT EXISTS firsts(id TEXT PRIMARY KEY,d TEXT,src TEXT) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS firsts_d ON firsts(d);');
+    for(const c of ['tg TEXT','city TEXT','refBy TEXT','invites TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
-      tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts')};
-    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null});
-    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>row(q.byTok.get(t)),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
-      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p)=>q.save.run(JSON.stringify(s),JSON.stringify(p),now(),k),count:()=>q.count.get().n};}
+      tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
+      tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
+      tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setPin:db.prepare('UPDATE accounts SET salt=?,pin=? WHERE k=?'),
+      imp:db.prepare('INSERT OR REPLACE INTO accounts(k,name,salt,pin,tok,state,profile,city,created,updated,fails,lock_until,tg,refBy,invites) VALUES(?,?,?,?,\'\',?,?,?,?,?,0,0,?,?,?)'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)'),
+      vis:db.prepare('INSERT OR IGNORE INTO visits(d,id) VALUES(?,?)'),first:db.prepare('INSERT OR IGNORE INTO firsts(id,d,src) VALUES(?,?,?)'),
+      dau:db.prepare('SELECT d,COUNT(*) n FROM visits WHERE d>=? GROUP BY d'),nu:db.prepare('SELECT d,COUNT(*) n FROM firsts WHERE d>=? GROUP BY d'),
+      ret:db.prepare("SELECT f.d,COUNT(*) n FROM firsts f JOIN visits v ON v.id=f.id AND v.d=date(f.d,'+'||?||' day') WHERE f.d>=? GROUP BY f.d"),
+      src:db.prepare('SELECT src,COUNT(*) n FROM firsts WHERE d>=? GROUP BY src ORDER BY n DESC LIMIT 12'),everyone:db.prepare('SELECT COUNT(*) n FROM firsts')};
+    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
+    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
+      addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
+      importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
+      importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
+      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n,
+      visit:(id,d,src)=>{q.vis.run(d,id);q.first.run(id,d,src||'');},
+      stats:from=>{const m=rows=>Object.fromEntries(rows.map(r=>[r.d,r.n]));return {dau:m(q.dau.all(from)),nu:m(q.nu.all(from)),r1:m(q.ret.all(1,from)),r7:m(q.ret.all(7,from)),src:q.src.all(from),everyone:q.everyone.get().n};},
+      backup:file=>db.exec("VACUUM INTO '"+file.replace(/'/g,"''")+"'")};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
   setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
-  return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t)||null,create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
-    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p)=>{acc[k].state=s;acc[k].profile=p;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length};})();
+  return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
+    addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},setPin:(k,salt,pin)=>{acc[k].salt=salt;acc[k].pin=pin;dirty=true;},
+    importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
+    createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
+    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
+    visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file)};})();
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2)return {err:'name'};if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
-  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
+  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
-  if(!crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'))){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
-  store.setTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,updated:a.updated};}
+  if(!pinOk(a,pin)){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
+  store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated};}
+// PIN: свой scrypt; у аккаунтов, перенесённых с PHP-хостинга, — bcrypt (после первого входа переводим на scrypt)
+function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
+  try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
-function saveFor(token,state,profile){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null);if(s.length>60000||p.length>12000)return {err:'too_big'};
-  store.save(a.k,state||a.state,profile||a.profile);return {ok:1};}
+function saveFor(token,state,profile,city){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
+  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};store.save(a.k,state||a.state,profile||a.profile,city||a.city);return {ok:1};}
+function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
+// мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
+const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
+function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096||!TG_TOKEN)return null;let sp;try{sp=new URLSearchParams(initData);}catch(e){return null;}
+  const hash=sp.get('hash');if(!hash)return null;const pairs=[];for(const [k,v] of sp)if(k!=='hash')pairs.push([k,v]);
+  const secret=crypto.createHmac('sha256','WebAppData').update(TG_TOKEN).digest();
+  const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return h.length===hash.length&&crypto.timingSafeEqual(Buffer.from(h),Buffer.from(hash.toLowerCase()));});
+  if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
+  return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
+function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};
+  let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false,invitedBy=null;
+  if(!a){store.createTg(k,u.name,u.id);created=true;
+    // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
+    const m=/^ref_(\d{3,15})$/.exec(u.start);
+    if(m&&m[1]!==u.id){const ik=store.tgGet(m[1])||('tg:'+m[1]);const inv=store.get(ik);
+      if(inv){store.setRef(k,ik);invitedBy=inv.name;store.setInvites(ik,(inv.invites||[]).concat([{name:u.name,t:Math.floor(now())}]).slice(-20));}}
+    a=store.get(k);}
+  const invites=a.invites||[];if(invites.length&&!created)store.setInvites(k,[]);   // кто пришёл по ссылке этого игрока, пока он не заходил
+  const token=crypto.randomBytes(24).toString('hex');store.addTok(k,sha(token));return accOut(a,{token,created,tgName:u.name,start:u.start,invitedBy,invites});}
+// бот: на /start отвечаем прямо в ответе на вебхук — серверу не нужно самому ходить в api.telegram.org
+const PUBLIC_URL=ENV.PUBLIC_URL?ENV.PUBLIC_URL.replace(/\/*$/,'/'):'';
+const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
+function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
+  if(!TG_TOKEN||got.length!==want.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(want)))return [403,{err:'forbidden'}];
+  const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
+  if(!msg||!msg.chat||msg.chat.id==null||!/^\/(start|play|help)\b/.test(text))return [200,{ok:1}];
+  const url=PUBLIC_URL||('https://'+String(req.headers.host||'').replace(/[^a-z0-9.:-]/gi,'')+'/');const name=clean((msg.from&&msg.from.first_name)||'',40);
+  return [200,{method:'sendMessage',chat_id:msg.chat.id,
+    text:(name?name+', добро':'Добро')+' пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇',
+    reply_markup:{inline_keyboard:[[{text:'▶️ Играть',web_app:{url}}]]}}];}
+// при запуске: вебхук на этот сервер и кнопка меню бота на эту игру; не вышло — повтор через 10 минут
+async function tgSetup(){if(!TG_TOKEN||!PUBLIC_URL)return;
+  const call=(m,p)=>fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(10000)}).then(r=>r.json());
+  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message'],drop_pending_updates:true});
+    if(w&&w.ok){await call('setChatMenuButton',{menu_button:{type:'web_app',text:'Играть',web_app:{url:PUBLIC_URL}}}).catch(()=>null);log('Телега: вебхук и кнопка меню →',PUBLIC_URL);return;}
+    log('Телега: вебхук не поставился:',w&&w.description);}catch(e){log('Телега: нет связи с api.telegram.org:',e.message);}
+  setTimeout(tgSetup,600000).unref();}
+function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
+  const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -82,7 +149,9 @@ const META_KEYS=['n','r','c','v','vc','sy','g','a'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
   if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
-  if(has){if(typeof m.n==='string')m.n=clean(m.n,24)||'Игрок';if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
+  if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
+    if(m.sy&&typeof m.sy==='object'){if(modBlocked(p))m.sy=null;else if(typeof m.sy.t==='string')m.sy={t:Mod.clean(clean(m.sy.t,140)),i:+m.sy.i||0};}
+    if(m.g&&typeof m.g==='object'&&typeof m.g.t==='string')m.g=Object.assign({},m.g,{t:Mod.clean(clean(m.g.t,60))});if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
   p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
@@ -97,11 +166,47 @@ function cityLimited(){const t=now();cityRate=cityRate.filter(x=>t-x<1);if(cityR
 function deliver(m){const big=players.size>1000;const out={t:'msg',m:{i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}};const s=JSON.stringify(out);
   if(m.to){for(const id of [m.to,m.from]){const p=players.get(id);if(p&&p.ws&&p.ws.readyState===1)p.ws.send(s);}return;}
   for(const p of players.values()){if(!p.ws||p.ws.readyState!==1)continue;if(big&&p.id!==m.from&&Math.hypot(p.x-m.x,p.y-m.y)>1500)continue;p.ws.send(s);}}
-function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';const text=clean(textRaw,240);if(!text)return null;const to=toRaw?idstr(toRaw):null;
+function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';if(modBlocked(p))return 'banned';const text=Mod.clean(clean(textRaw,240));if(!text)return null;const to=toRaw?idstr(toRaw):null;
+  if(!to&&modMuted(p))return 'muted';if(text===p.lastMsg&&now()-(p.lastMsgT||0)<20)return 'dup';p.lastMsg=text;p.lastMsgT=now();
   if(!to&&players.size>300&&!allow('city:'+p.id,1,3))return 'rate';if(!to&&cityLimited())return 'busy';deliver(addMsg(p.id,(p.meta&&p.meta.n)||'Игрок',to,text,p.x,p.y));return null;}
 
+// ---------- модерация: жалобы, временное отключение чата, баны ----------
+// Жалобы пишутся в DATA/reports.jsonl. Три жалобы от разных игроков за час — общий чат нарушителю отключается на час.
+// Модератор (Иршат) — через a=mod с ключом MOD_TOKEN из /etc/zhivaya-kazan.env: список жалоб, бан и снятие бана.
+const MODF=path.join(DATA,'mod.json');let modState={bans:{},ipbans:{}};try{modState=Object.assign(modState,JSON.parse(fs.readFileSync(MODF,'utf8')));}catch(e){}
+const mutes=new Map(),repRecent=new Map();
+function modSave(){try{fs.writeFileSync(MODF+'.tmp',JSON.stringify(modState));fs.renameSync(MODF+'.tmp',MODF);}catch(e){}}
+function modBlocked(p){const t=now();const b=modState.bans[p.id];if(b&&(!b.until||b.until>t))return true;const ib=p.ip&&modState.ipbans[p.ip];return !!(ib&&(!ib.until||ib.until>t));}
+function modMuted(p){const u=mutes.get(p.id);if(u&&u>now())return true;if(u)mutes.delete(p.id);return false;}
+function modReport(body,ip){const from=idstr(body.id),target=idstr(body.target);if(target.length<8||from===target)return {err:'bad_target'};if(!allow('rep:'+ip,10,3600))return {err:'rate_limited'};
+  const tp=players.get(target);const rec={t:Math.floor(now()),from,ip,target,targetIp:tp&&tp.ip||null,name:clean(body.name,24),kind:clean(body.kind,10)||'chat',text:clean(body.text,240)};
+  try{fs.appendFileSync(path.join(DATA,'reports.jsonl'),JSON.stringify(rec)+'\n');}catch(e){}
+  const t=now();const list=(repRecent.get(target)||[]).filter(r=>t-r.t<3600);if(!list.some(r=>r.from===from||r.ip===ip))list.push({from,ip,t});repRecent.set(target,list);
+  if(list.length>=3&&!modMuted({id:target})){mutes.set(target,t+3600);log('Модерация: общий чат отключён на час для',target,rec.name);}
+  return {ok:1};}
+function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String(req.headers['x-mod-token']||body.token||'');
+  if(key.length<16||got.length!==key.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(key)))return {err:'forbidden'};
+  const t=now();const target=idstr(body.target||'');const act=String(body.do||'list');
+  if(act==='stats')return statsOut(Math.min(60,Math.max(7,+body.days||14)));
+  if(act==='ban'&&target.length>=8){const h=Math.max(0,+body.hours||0);const until=h?t+h*3600:0;const pl=players.get(target);modState.bans[target]={until,why:clean(body.why,120),t:Math.floor(t)};
+    if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
+  if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
+  if(act==='mute'&&target.length>=8){mutes.set(target,t+Math.max(1,+body.minutes||60)*60);return {ok:1};}
+  let reports=[];try{reports=fs.readFileSync(path.join(DATA,'reports.jsonl'),'utf8').trim().split('\n').slice(-100).map(l=>{try{return JSON.parse(l);}catch(e){return null;}}).filter(Boolean).reverse();}catch(e){}
+  const online=[...players.values()].map(p=>({id:p.id,n:(p.meta&&p.meta.n)||'Игрок'}));
+  return {ok:1,reports,bans:modState.bans,ipbans:Object.keys(modState.ipbans).length,mutes:[...mutes].filter(([,u])=>u>t).map(([id,u])=>({id,until:Math.floor(u)})),online};}
+
+// ---------- цифры: кто зашёл сегодня (раз в сутки на устройство), пик онлайна ----------
+const seen={d:'',set:new Set()};const peak={d:'',n:0};
+function visit(id,src){const d=mskDay();if(seen.d!==d){seen.d=d;seen.set.clear();}if(seen.set.has(id))return;seen.set.add(id);
+  try{store.visit(id,d,clean(src,24).replace(/[^\w:.\-]/g,'')||'web');}catch(e){log('журнал заходов:',e.message);}}
+function notePeak(){const d=mskDay();if(peak.d!==d){peak.d=d;peak.n=0;}if(players.size>peak.n)peak.n=players.size;}
+function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);if(!st)return {err:'no_sqlite'};const rows=[];
+  for(let i=0;i<days;i++){const d=mskDay(-i);const nu=st.nu[d]||0;rows.push({d,dau:st.dau[d]||0,nu,r1:st.r1[d]||0,r7:st.r7[d]||0,r1ready:i>=1,r7ready:i>=7});}
+  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n};}
+
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
-function apiSync(body){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;setPresence(p,body.p);
+function apiSync(body,ip){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;p.ip=ip;setPresence(p,body.p);visit(id,body.src);notePeak();
   for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const list=[];around(p.x,p.y,VIEW_R,o=>{if(o!==p&&list.length<VIEW_K)list.push({id:o.id,p:Object.assign({},o.meta,{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b})});});
@@ -129,12 +234,18 @@ const server=http.createServer(async(req,res)=>{
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,online:players.size});
-    if(a==='sync')return send(res,200,apiSync(body));
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
+    if(a==='sync')return send(res,200,apiSync(body,ip));
+    if(a==='report')return send(res,200,modReport(body,ip));
+    if(a==='mod')return send(res,200,modAdmin(req,body));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
-    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile));
-    if(a==='load'){const acc=accByToken(body.token);return send(res,200,acc?{ok:1,name:acc.name,state:acc.state,profile:acc.profile,updated:acc.updated}:{err:'auth'});}
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
+    if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
+    if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
+    if(a==='reset')return send(res,200,resetFor(body.token));
+    if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
+    if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
@@ -152,7 +263,7 @@ function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmoun
 wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
-    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.view.clear();setPresence(me,d.p);
+    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.ip=ip;me.view.clear();setPresence(me,d.p);visit(id,d.src);notePeak();
       wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid});return;}
     if(!me)return;
     if(d.t==='p'){setPresence(me,d);return;}           // координаты: {t:'p',x,y,hx,hy,b} — часто
@@ -179,5 +290,36 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
 setInterval(()=>{stats.bytesOut=0;stats.msgsOut=0;stats.since=now();},60000).unref();
 
-server.listen(PORT,()=>log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'}`));
+// ---------- раз в сутки: копия базы (в 4 утра по Москве, хранится 7 дней) и сводка админу в Телегу (в 9 утра) ----------
+const ADMIN_TG=/^\d{3,15}$/.test(ENV.ADMIN_TG_ID||'')?ENV.ADMIN_TG_ID:'';
+const BK=path.join(DATA,'backup'),DAILYF=path.join(DATA,'daily.json');const daily={backup:'',summary:''};try{daily.summary=JSON.parse(fs.readFileSync(DAILYF,'utf8')).summary||'';}catch(e){}
+try{for(const f of fs.readdirSync(BK))if(/^game-(\d{4}-\d\d-\d\d)\.db$/.test(f))daily.backup=f.slice(5,15)>daily.backup?f.slice(5,15):daily.backup;}catch(e){}
+function tgApi(m,p){return fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(15000)}).then(r=>r.json());}
+async function sendAdmin(text){if(!TG_TOKEN||!ADMIN_TG)return;try{await tgApi('sendMessage',{chat_id:ADMIN_TG,text,disable_web_page_preview:true});}catch(e){log('сводка в Телегу:',e.message);}}
+async function sendAdminFile(file,caption){if(!TG_TOKEN||!ADMIN_TG)return;
+  try{const zlib=require('zlib');const gz=zlib.gzipSync(fs.readFileSync(file));if(gz.length>45e6)return log('копия больше 45 МБ — в Телегу не шлю');
+    const fd=new FormData();fd.append('chat_id',ADMIN_TG);fd.append('caption',caption);fd.append('document',new Blob([gz]),path.basename(file)+'.gz');
+    const r=await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendDocument`,{method:'POST',body:fd,signal:AbortSignal.timeout(120000)}).then(r=>r.json());if(!r.ok)log('копия в Телегу:',r.description);}catch(e){log('копия в Телегу:',e.message);}}
+function doBackup(){const d=mskDay();fs.mkdirSync(BK,{recursive:true});const file=path.join(BK,'game-'+d+'.db');
+  try{if(fs.existsSync(file))fs.unlinkSync(file);store.backup(file);for(const x of ['mod.json','reports.jsonl'])if(fs.existsSync(path.join(DATA,x)))fs.copyFileSync(path.join(DATA,x),path.join(BK,x.replace('.',`-${d}.`)));
+    const old=fs.readdirSync(BK).filter(f=>{const m=/(\d{4}-\d\d-\d\d)/.exec(f);return m&&m[1]<mskDay(-7);});for(const f of old)fs.unlinkSync(path.join(BK,f));
+    daily.backup=d;log('копия базы:',file,Math.round(fs.statSync(file).size/1024)+' КБ');if(ENV.BACKUP_TO_TG==='1')sendAdminFile(file,'Копия базы «Живой Казани» за '+d);}
+  catch(e){log('копия базы не вышла:',e.message);sendAdmin('⚠️ Копия базы не сделалась: '+e.message);}}
+function summary(){const st=statsOut(9);if(!st.ok)return;const y=st.rows[1],w=st.rows[8];const pc=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+  sendAdmin(`Живая Казань · ${y.d}\nИгроков за день: ${y.dau} (новых ${y.nu})\nВернулись на 2-й день (пришедшие ${st.rows[2].d}): ${pc(st.rows[2].r1,st.rows[2].nu)}\nВернулись через неделю (пришедшие ${w.d}): ${pc(w.r7,w.nu)}\nПик онлайна сегодня: ${st.peakToday}, сейчас ${st.online}\nВсего игроков: ${st.everyone} · ответов ИИ сегодня: ${llmDay.total}`);}
+function dailyTick(){const d=mskDay(),h=mskHour();if(h>=4&&daily.backup!==d)doBackup();if(h>=9&&daily.summary!==d){daily.summary=d;try{fs.writeFileSync(DAILYF,JSON.stringify({summary:d}));}catch(e){}summary();}}
+setInterval(dailyTick,300000).unref();setTimeout(dailyTick,60000).unref();
+
+// переезд с PHP-хостинга: node server.js --import-php https://сайт/kazan/api.php — забирает аккаунты, ключи входа и привязки Телеги
+async function importPhp(url){if(!TG_TOKEN)throw new Error('нужен TG_BOT_TOKEN в окружении — им подписан ключ выгрузки');
+  const key=sha('export:'+TG_TOKEN).slice(0,40);const r=await fetch(url.replace(/\?.*$/,'')+'?a=export',{headers:{'X-Export-Key':key},signal:AbortSignal.timeout(60000)});const j=await r.json();if(!j.ok)throw new Error('выгрузка: '+(j.err||r.status));
+  const km=k=>typeof k==='string'&&k.startsWith('n:')?k.slice(2):k;let na=0,ns=0,nt=0,ng=0;
+  for(const x of j.accounts||[]){const k=km(x.k);const cur=store.get(k);if(cur&&(cur.updated||0)>=(x.updated||0)){ns++;continue;}
+    store.importAcc({k,name:clean(x.name,24)||'Игрок',salt:x.pin?'bcrypt':'',pin:x.pin||'',state:x.state,profile:x.profile,city:x.city,created:x.created,updated:x.updated,tg:x.tg?String(x.tg):null,refBy:km(x.refBy)||null,invites:Array.isArray(x.invites)?x.invites:[]});na++;}
+  for(const t of j.tokens||[]){if(/^[a-f0-9]{64}$/.test(t.h)&&store.get(km(t.k))){store.importTok(t.h,km(t.k),t.t);nt++;}}
+  for(const m of j.tgm||[]){const k=km(m.k);if(/^\d{3,15}$/.test(m.id)&&store.get(k)){store.tgSet(m.id,k);ng++;}}
+  return {accounts:na,skipped:ns,tokens:nt,tgLinks:ng};}
+const impI=process.argv.indexOf('--import-php');
+if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
+else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));

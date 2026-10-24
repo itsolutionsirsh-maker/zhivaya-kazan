@@ -5,4 +5,5 @@ return [
     'api_key'  => '',                          // ключ OpenAI-совместимого API (sk-...)
     'api_base' => 'https://api.openai.com/v1', // с российского хостинга OpenAI напрямую не отвечает — укажите адрес прокси-сервиса, например https://api.proxyapi.ru/openai/v1
     'model'    => 'gpt-4o-mini',
+    'tg_bot_token' => '',                      // токен бота от @BotFather — для входа из мини-приложения Телеги (вписываете сами, никому не пересылайте)
 ];

@@ -21,6 +21,8 @@ body = re.sub(r'src="js/([\w.-]+\.js)"', _ver, body)
 open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(head + body + '</body></html>')
 shutil.copytree(os.path.join(SITE, 'js'), os.path.join(OUT, 'js'))
 shutil.copy(os.path.join(SITE, 'kazan.json'), OUT)
+if os.path.exists(os.path.join(SITE, 'mod.html')):
+    shutil.copy(os.path.join(SITE, 'mod.html'), OUT)   # страница модератора (работает с сервером на VPS)
 if os.path.isdir(os.path.join(SITE, 'img')):
     shutil.copytree(os.path.join(SITE, 'img'), os.path.join(OUT, 'img'))
 shutil.copy(os.path.join(SERVER, 'api.php'), OUT)
