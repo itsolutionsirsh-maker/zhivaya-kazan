@@ -15,6 +15,9 @@ const ENV=process.env;
 const PORT=+ENV.PORT||8080;
 const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
+// ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
+const SECRETS=path.join(DATA,'secrets.json');
+try{const sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'));for(const k of ['TG_BOT_TOKEN','ADMIN_TG_ID','LLM_API_KEY'])if(!ENV[k]&&typeof sec[k]==='string'&&sec[k])ENV[k]=sec[k];}catch(e){}
 const LLM={key:ENV.LLM_API_KEY||'',base:(ENV.LLM_API_BASE||'https://api.openai.com/v1').replace(/\/+$/,''),model:ENV.LLM_MODEL||'gpt-4o-mini',
   maxTokens:+ENV.LLM_MAX_TOKENS||160,perPlayerDay:+ENV.LLM_PER_PLAYER_DAY||60,perDay:+ENV.LLM_DAILY_LIMIT||20000};
 const VIEW_R=+ENV.VIEW_RADIUS||350, VIEW_K=+ENV.VIEW_K||80, VIEW_K_CROWD=+ENV.VIEW_K_CROWD||50, NEAR_R=120, CELL=50;
@@ -223,6 +226,39 @@ async function apiLlm(body,ip){if(!LLM.key)return {err:'no_llm'};if(!allow('llm:
     const j=await r.json().catch(()=>null);const text=j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
     if(!r.ok||typeof text!=='string')return {err:'upstream_error',code:r.status};return {text:text.trim()};}catch(e){return {err:'upstream_error'};}}
 
+// ---------- первая настройка: /setup — токен бота, id админа, ключ ИИ и перенос игроков с PHP-хостинга ----------
+// Открыта, только пока токен бота не задан. Принимает лишь настоящий токен нашего бота (проверка getMe у Телеги),
+// поэтому чужой бот подставить нельзя. После сохранения служба перезапускается с новыми ключами.
+const SETUP_BOT=(ENV.SETUP_BOT||'zhivaya_kazan_bot').toLowerCase().replace(/^@/,'');
+const OLD_API=ENV.OLD_API_URL||'https://iks-ai-systems.ru/kazan/api.php';
+function modKeyOk(got){const key=String(ENV.MOD_TOKEN||'');got=String(got||'');return key.length>=16&&got.length===key.length&&crypto.timingSafeEqual(Buffer.from(got),Buffer.from(key));}
+async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rate_limited'};if(TG_TOKEN&&!modKeyOk(body.mod))return {err:'already'};
+  const token=String(body.token||'').trim(),admin=String(body.admin||'').trim(),llm=String(body.llm||'').trim();
+  if(!/^\d{5,12}:[A-Za-z0-9_-]{30,60}$/.test(token))return {err:'token_format'};
+  if(admin&&!/^\d{3,15}$/.test(admin))return {err:'admin_format'};if(llm.length>300)return {err:'llm_format'};
+  let me=null;try{me=await fetch(`https://api.telegram.org/bot${token}/getMe`,{signal:AbortSignal.timeout(10000)}).then(r=>r.json());}catch(e){return {err:'tg_unreachable'};}
+  if(!me||!me.ok)return {err:'token_wrong'};const uname=String(me.result&&me.result.username||'').toLowerCase();if(uname!==SETUP_BOT)return {err:'other_bot',bot:uname};
+  const sec={TG_BOT_TOKEN:token};if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
+  fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);
+  let imported=null;if(body.migrate!==false){try{imported=await importPhp(OLD_API,token);}catch(e){imported={err:e.message};}}
+  log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':'')+'; перенос:',JSON.stringify(imported));
+  setTimeout(()=>process.exit(0),1500);   // systemd запустит заново уже с ключами
+  return {ok:1,bot:uname,imported,mod:ENV.MOD_TOKEN||''};}
+const SETUP_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Настройка · Живая Казань</title>
+<style>body{margin:0;background:#10161A;color:#E8EEF0;font:16px/1.45 system-ui,sans-serif}main{max-width:560px;margin:0 auto;padding:20px}h1{font-size:22px}label{display:block;margin:16px 0 6px;font-weight:600}small{color:#8FA3AE;display:block;margin-top:4px}input{width:100%;box-sizing:border-box;background:#18222A;color:#E8EEF0;border:1px solid #2A3842;border-radius:10px;padding:12px;font:inherit}button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:10px;background:#2F9E6B;color:#fff;font:600 17px system-ui;cursor:pointer}#st{margin-top:16px;white-space:pre-wrap}.ok{color:#7ee2a8}.bad{color:#ff9aa5}</style></head><body><main>
+<h1>Настройка сервера «Живой Казани»</h1><p>Один раз: вставьте ключи и нажмите «Сохранить». Сервер проверит токен у Телеги, перенесёт игроков со старого сайта и перезапустится.</p>
+<div id="mw" hidden><label for="m">Ключ модератора</label><input id="m" autocomplete="off"><small>Сервер уже настроен. Чтобы сменить ключи (например, после нового токена у @BotFather), нужен ключ модератора — его показали при первой настройке.</small></div>
+<label for="t">Токен бота от @BotFather</label><input id="t" autocomplete="off" placeholder="1234567890:AAH…"><small>@BotFather → /mybots → @zhivaya_kazan_bot → API Token → нажать на строку, чтобы скопировать.</small>
+<label for="a">Ваш id в Телеге (число)</label><input id="a" inputmode="numeric" placeholder="123456789"><small>Напишите боту @userinfobot — он ответит числом. Сюда будут приходить сводка по утрам и тревоги.</small>
+<label for="l">Ключ ИИ для жителей (по желанию)</label><input id="l" autocomplete="off" placeholder="sk-…"><small>Можно оставить пустым — жители будут говорить заготовленными фразами.</small>
+<button id="go">Сохранить</button><div id="st"></div></main><script>
+const E={token_format:'Это не похоже на токен бота: он вида 1234567890:AAH…',token_wrong:'Телега не приняла этот токен — скопируйте его заново у @BotFather',other_bot:'Это токен другого бота',admin_format:'id — только цифры',tg_unreachable:'Сервер не достучался до Телеги, попробуйте ещё раз через минуту',already:'Уже настроено — нужен верный ключ модератора',rate_limited:'Слишком много попыток, подождите 10 минут'};
+if(location.hash==='#change'||window.__configured)mw.hidden=false;
+go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
+ go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';
+ const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\n'+(im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\n\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\n\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
+</script></body></html>`;
+
 // ---------- HTTP ----------
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};
 function send(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(b);}
@@ -237,7 +273,9 @@ const server=http.createServer(async(req,res)=>{
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
+    if(a==='mod'&&body.do==='import'){const r=modAdmin(req,{do:'stats'});if(r.err)return send(res,200,r);try{return send(res,200,Object.assign({ok:1},await importPhp(OLD_API)));}catch(e){return send(res,200,{err:e.message});}}
     if(a==='mod')return send(res,200,modAdmin(req,body));
+    if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
@@ -247,6 +285,7 @@ const server=http.createServer(async(req,res)=>{
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     return send(res,404,{err:'unknown_action'});}
+  if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
   const file=path.join(ROOT,path.normalize(rel).replace(/^([/\\])+/,''));
@@ -311,8 +350,8 @@ function dailyTick(){const d=mskDay(),h=mskHour();if(h>=4&&daily.backup!==d)doBa
 setInterval(dailyTick,300000).unref();setTimeout(dailyTick,60000).unref();
 
 // переезд с PHP-хостинга: node server.js --import-php https://сайт/kazan/api.php — забирает аккаунты, ключи входа и привязки Телеги
-async function importPhp(url){if(!TG_TOKEN)throw new Error('нужен TG_BOT_TOKEN в окружении — им подписан ключ выгрузки');
-  const key=sha('export:'+TG_TOKEN).slice(0,40);const r=await fetch(url.replace(/\?.*$/,'')+'?a=export',{headers:{'X-Export-Key':key},signal:AbortSignal.timeout(60000)});const j=await r.json();if(!j.ok)throw new Error('выгрузка: '+(j.err||r.status));
+async function importPhp(url,token){token=token||TG_TOKEN;if(!token)throw new Error('нужен TG_BOT_TOKEN в окружении — им подписан ключ выгрузки');
+  const key=sha('export:'+token).slice(0,40);const r=await fetch(url.replace(/\?.*$/,'')+'?a=export',{headers:{'X-Export-Key':key},signal:AbortSignal.timeout(60000)});const j=await r.json();if(!j.ok)throw new Error('выгрузка: '+(j.err||r.status));
   const km=k=>typeof k==='string'&&k.startsWith('n:')?k.slice(2):k;let na=0,ns=0,nt=0,ng=0;
   for(const x of j.accounts||[]){const k=km(x.k);const cur=store.get(k);if(cur&&(cur.updated||0)>=(x.updated||0)){ns++;continue;}
     store.importAcc({k,name:clean(x.name,24)||'Игрок',salt:x.pin?'bcrypt':'',pin:x.pin||'',state:x.state,profile:x.profile,city:x.city,created:x.created,updated:x.updated,tg:x.tg?String(x.tg):null,refBy:km(x.refBy)||null,invites:Array.isArray(x.invites)?x.invites:[]});na++;}

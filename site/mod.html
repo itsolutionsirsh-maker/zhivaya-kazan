@@ -22,6 +22,7 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <div class="row"><input id="tok" type="password" placeholder="Ключ модератора" autocomplete="off"><button class="go" id="load">Обновить</button></div>
 <p class="msg" id="st"></p>
 <h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
+<div class="row" style="margin-top:10px"><button id="imp">Перенести игроков со старого сайта (Beget)</button><span class="msg" id="impst"></span></div>
 <h2>Жалобы (новые сверху)</h2><div id="reps"></div>
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
 <h2>Баны</h2><div id="bans"></div>
@@ -54,7 +55,8 @@ async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e
   const T=$('#days');T.innerHTML='';const h=el('tr');for(const t of ['День','Игроков','Новых','Вернулись на 2-й день','Вернулись через неделю'])h.append(el('th',null,t));T.append(h);
   for(const r of j.rows){const tr=el('tr');tr.append(el('td',null,r.d.slice(8)+'.'+r.d.slice(5,7)),el('td',null,String(r.dau)),el('td',null,String(r.nu)),el('td',null,pc(r.r1,r.nu,r.r1ready)),el('td',null,pc(r.r7,r.nu,r.r7ready)));T.append(tr);}
   $('#srcs').textContent=j.src.length?'Откуда пришли (3 недели): '+j.src.map(s=>`${s.src||'—'} ${s.n}`).join(' · '):'';}
-$('#load').onclick=()=>{load();loadStats();};$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
+$('#load').onclick=()=>{load();loadStats();};
+$('#imp').onclick=async()=>{if(!confirm('Забрать аккаунты со старого сайта? Новые данные на этом сервере не затираются.'))return;$('#impst').textContent='Переношу…';const j=await call({do:'import'}).catch(()=>({err:'нет связи'}));$('#impst').textContent=j.ok?`Перенесено аккаунтов: ${j.accounts}, пропущено (здесь новее): ${j.skipped}, входов: ${j.tokens}, привязок Телеги: ${j.tgLinks}`:'Ошибка: '+(j.err||'?');};$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
 </script>
 </body>
 </html>
