@@ -1,3 +1,7 @@
+// откуда пришёл игрок — для цифр на сервере: Телега, ссылка друга, метка в адресе (?from=vk) или сайт-источник
+function netSrc(){try{if(typeof TG!=='undefined'&&TG.on)return /^ref_/.test(TG.startParam)?'ref':(TG.startParam?('tg:'+TG.startParam).slice(0,24):'tg');
+  const q=new URLSearchParams(location.search),u=q.get('from')||q.get('utm_source');if(u)return ('web:'+u).slice(0,24);
+  const r=document.referrer?new URL(document.referrer).hostname:'';return r&&r!==location.hostname?('web:'+r).slice(0,24):'web';}catch(e){return 'web';}}
 // ===== Сеть: комната claude.ai или свой сервер (api.php) =====
 // Режимы: 'room' — внутри claude.ai; 'http' — на своём сайте; 'off' — одиночная игра.
 const Net={mode:'off',me:null,peers:[],llm:false};
@@ -29,7 +33,7 @@ function readRoomMsgs(list){for(const p of list){const m=p.presence.m;if(!Array.
   lastSeen.set(p.peer,max);}}
 
 async function httpLoop(){for(;;){
-  try{const body={a:'sync',id:myCid,p:buildPresence(),out:httpOut.splice(0),since:httpSince};
+  try{const body={a:'sync',id:myCid,p:buildPresence(),out:httpOut.splice(0),since:httpSince,src:netSrc()};
     const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
     if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myCid){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myCid)continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
@@ -60,7 +64,7 @@ function wsApply(d){
   Net.peers=[...wsPeers.values()];syncPeers(Net.peers);setNetStatus(true);}
 function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';let opened=false;
   try{wsSock=new WebSocket(url);}catch(e){wsFallback();return;}
-  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
+  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p,src:netSrc()}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
   wsSock.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.t==='w')wsApply(d);
     else if(d.t==='msg'){const m=d.m;if(m.from===myCid)return;if(m.to&&m.to!==myCid)return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}

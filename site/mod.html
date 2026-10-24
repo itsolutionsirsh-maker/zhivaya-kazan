@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Модерация · Живая Казань</title>
+<title>Модерация и цифры · Живая Казань</title>
 <style>
 :root{--bg:#10161A;--panel:#18222A;--line:#2A3842;--fg:#E8EEF0;--muted:#8FA3AE;--accent:#2F9E6B;--warn:#E07B39;--bad:#D7263D}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -12,7 +12,7 @@ main{max-width:860px;margin:0 auto;padding:16px}h1{font-size:20px;margin:4px 0 1
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{flex:1;min-width:0;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit}
 button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}button.go{background:var(--accent);border-color:var(--accent);color:#fff}button.bad{border-color:var(--bad);color:#ffb3bc}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}.meta{color:var(--muted);font-size:12px}.txt{margin:6px 0;overflow-wrap:anywhere}
-.msg{color:var(--muted);margin:8px 0}.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.msg{color:var(--muted);margin:8px 0}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600;font-size:12px}.wrap{overflow-x:auto}.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -21,6 +21,7 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <p class="msg">Работает на игровом сервере (VPS). Ключ — строка <b>MOD_TOKEN</b> из <code>/etc/zhivaya-kazan.env</code>. Ключ хранится только в этом браузере.</p>
 <div class="row"><input id="tok" type="password" placeholder="Ключ модератора" autocomplete="off"><button class="go" id="load">Обновить</button></div>
 <p class="msg" id="st"></p>
+<h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
 <h2>Жалобы (новые сверху)</h2><div id="reps"></div>
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
 <h2>Баны</h2><div id="bans"></div>
@@ -47,7 +48,13 @@ async function load(){$('#st').textContent='Загружаю…';let j;try{j=awa
   const M=$('#mutes');M.innerHTML='';if(!j.mutes.length)M.append(el('p','msg','Никого'));for(const m of j.mutes){const c=el('div','card');c.append(el('div','meta',`${m.id} · до ${fmt(m.until)}`),actions(m.id,m.id));M.append(c);}
   const B=$('#bans');B.innerHTML='';const bans=Object.entries(j.bans);if(!bans.length)B.append(el('p','msg','Никого'));for(const [id,b] of bans){const c=el('div','card');c.append(el('div','meta',`${id} · до ${fmt(b.until)} · ${b.why||''}`),actions(id,id));B.append(c);}
   const O=$('#online');O.innerHTML='';if(!j.online.length)O.append(el('p','msg','Никого'));for(const p of j.online){const c=el('div','card');c.append(el('div','meta',`${p.n} · ${p.id}`),actions(p.id,p.n));O.append(c);}}
-$('#load').onclick=load;$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter')load();});if($('#tok').value)load();
+async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e){return;}if(!j.ok){$('#sum').textContent=j.err==='no_sqlite'?'Цифры есть только с базой SQLite (Node 22+)':'';return;}
+  const pc=(a,b,ready)=>!ready?'…':b?Math.round(a/b*100)+'%':'—';
+  $('#sum').textContent=`Всего игроков за всё время: ${j.everyone} · сейчас в игре: ${j.online} · пик сегодня: ${j.peakToday}. «…» — день ещё не наступил.`;
+  const T=$('#days');T.innerHTML='';const h=el('tr');for(const t of ['День','Игроков','Новых','Вернулись на 2-й день','Вернулись через неделю'])h.append(el('th',null,t));T.append(h);
+  for(const r of j.rows){const tr=el('tr');tr.append(el('td',null,r.d.slice(8)+'.'+r.d.slice(5,7)),el('td',null,String(r.dau)),el('td',null,String(r.nu)),el('td',null,pc(r.r1,r.nu,r.r1ready)),el('td',null,pc(r.r7,r.nu,r.r7ready)));T.append(tr);}
+  $('#srcs').textContent=j.src.length?'Откуда пришли (3 недели): '+j.src.map(s=>`${s.src||'—'} ${s.n}`).join(' · '):'';}
+$('#load').onclick=()=>{load();loadStats();};$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
 </script>
 </body>
 </html>
