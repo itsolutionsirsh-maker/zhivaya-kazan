@@ -6,6 +6,8 @@ function netSrc(){try{if(typeof TG!=='undefined'&&TG.on)return /^ref_/.test(TG.s
 // Режимы: 'room' — внутри claude.ai; 'http' — на своём сайте; 'off' — одиночная игра.
 const Net={mode:'off',me:null,peers:[],llm:false};
 let myCid=null;try{myCid=localStorage.getItem('zk.cid');}catch(e){}
+// zk.cid — секрет игрока, уходит только серверу; в чате и в мире у игрока публичный номер (pid), его присылает сервер
+function myPid(){return (typeof Net!=='undefined'&&Net.pid)||myCid;}
 if(!myCid||!/^[a-f0-9]{16}$/.test(myCid)){myCid=Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b=>b.toString(16).padStart(2,'0')).join('');try{localStorage.setItem('zk.cid',myCid);}catch(e){}}
 let outSeq=0;const outbox=[];        // последние исходящие (для комнаты)
 const lastSeen=new Map();             // peer → последний прочитанный номер сообщения
@@ -36,7 +38,7 @@ async function httpLoop(){for(;;){
   try{const body={a:'sync',id:myCid,p:buildPresence(),out:httpOut.splice(0),since:httpSince,src:netSrc()};
     const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
-    if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myCid){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myCid)continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
+    if(j.pid)Net.pid=j.pid;if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myPid()){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myPid())continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
     if(typeof j.seq==='number')httpSince=j.seq;httpFirst=false;setNetStatus(true);
   }catch(e){setNetStatus(false);}
   await new Promise(r=>setTimeout(r,document.hidden?3000:800));}}
@@ -67,8 +69,8 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
   wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p,src:netSrc()}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
   wsSock.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.t==='w')wsApply(d);
-    else if(d.t==='msg'){const m=d.m;if(m.from===myCid)return;if(m.to&&m.to!==myCid)return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
-    else if(d.t==='hist'){for(const m of d.msgs||[]){if(m.from===myCid)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
+    else if(d.t==='msg'){const m=d.m;if(m.from===myPid())return;if(m.to&&m.to!==myPid())return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
+    else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
     else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
   wsSock.onclose=()=>{setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
