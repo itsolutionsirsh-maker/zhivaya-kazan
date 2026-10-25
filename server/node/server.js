@@ -172,7 +172,7 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
   const lm=msg&&msg.chat&&/^\/start\s+login_([A-Za-z0-9_-]{8,40})\s*$/.exec(text);
   if(lm){const e=tgwGet(lm[1]);if(!e||e.st!=='wait'||msg.chat.type!=='private')return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Ссылка для входа устарела. Нажмите «Войти через Телеграм» в игре ещё раз.'}];
     const hm=new Date((e.t+3*3600)*1000).toISOString().slice(11,16);
-    return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Вход в «Живую Казань» на сайте\nУстройство: '+uaShort(e.ua)+', '+hm+' по Москве\n\nЕсли это вы — нажмите «Да, войти»: на сайте откроется ваша игра из Телеги. Если вы сейчас не входили на сайт — нажмите «Нет».',
+    return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Вход в «Живую Казань» на сайте\nУстройство: '+uaShort(e.ua)+', '+hm+' по Москве\n\nЕсли это вы — нажмите «Да, войти»: на сайте откроется ваша игра из Телеги. Если вы сейчас не входили на сайт сами (например, ссылку вам кто-то прислал) — нажмите «Нет», иначе этот человек получит вашу игру.',
       reply_markup:{inline_keyboard:[[{text:'✅ Да, войти',callback_data:'login:'+lm[1]},{text:'Нет',callback_data:'nologin:'+lm[1]}]]}}];}
   // /key — ключ модератора, только админу (ADMIN_TG_ID) и только в личке с ботом
   if(msg&&msg.chat&&/^\/key\b/.test(text)){const admin=String(ENV.ADMIN_TG_ID||'');const isAdmin=admin&&msg.chat.type==='private'&&String(msg.from&&msg.from.id)===admin;
