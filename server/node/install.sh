@@ -94,8 +94,7 @@ grep -q '^ADMIN_TG_ID=' "$ENVF" || printf '# Ваш id в Телеге для с
 grep -q '^BACKUP_TO_TG=' "$ENVF" || printf '# 1 — раз в сутки присылать копию базы игроков в Телегу админу (копии на сервере делаются всегда)\nBACKUP_TO_TG=0\n' >> "$ENVF"
 # адрес игры: для кнопки «Играть» в боте и вебхука Телеги (обновляется при каждом запуске install.sh с новым доменом)
 if grep -q '^PUBLIC_URL=' "$ENVF"; then sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN/|" "$ENVF"; else echo "PUBLIC_URL=https://$DOMAIN/" >> "$ENVF"; fi
-# ключ модератора для страницы /mod.html — создаётся один раз
-if ! grep -q '^MOD_TOKEN=.\+' "$ENVF"; then sed -i '/^MOD_TOKEN=/d' "$ENVF"; echo "MOD_TOKEN=$(python3 -c 'import secrets; print(secrets.token_hex(24))')" >> "$ENVF"; fi
+# ключ модератора для страницы /mod.html сервер создаёт сам (в /var/lib/zk/data/secrets.json) и показывает на странице /setup
 chown root:zk "$ENVF"; chmod 640 "$ENVF"
 mkdir -p /var/lib/zk/data; chown -R zk:zk /var/lib/zk
 
@@ -212,7 +211,7 @@ if curl -fsS -m 3 http://127.0.0.1:8080/health >/dev/null; then
   echo
   echo "Готово: https://$DOMAIN"
   echo "Токен бота, ваш id в Телеге и ключ ИИ: откройте https://$DOMAIN/setup и вставьте их там"
-  echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ — MOD_TOKEN: sudo grep MOD_TOKEN $ENVF)"
+  echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ показан на странице /setup; ещё он лежит в /var/lib/zk/data/secrets.json)"
   echo "Журнал игры: journalctl -u zhivaya-kazan -f"
 else
   echo "Сервер игры не ответил. Посмотрите: journalctl -u zhivaya-kazan -n 50"
