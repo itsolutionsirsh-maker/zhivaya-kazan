@@ -21,7 +21,7 @@ const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=nu
 // Тогда сервер сам собирает карту из того, что есть (дыры — пара кварталов без домов, дороги там всё равно будут из соседних плиток);
 // докачка продолжается, и citymap.sh потом пересоберёт целиком.
 // Какие плитки нужны — из raw/city_plan.json (fetch_city.py берёт границу города из OSM и дополняет сетку окраинами), без него — прежние 12×14.
-// Докачали окраины после сборки — тоже собирает сам, когда новых файлов нет 45 минут (не чаще раза в 6 часов).
+// Докачали окраины после сборки — тоже собирает сам, когда новых файлов нет 45 минут (не чаще раза в 6 часов, не во время докачки).
 const MAPB={running:false,last:null,err:null};
 const pad2=n=>(n<0?'-':'')+String(Math.abs(n)).padStart(n<0?1:2,'0');
 function mapStatus(){const root=path.join(__dirname,'..','..','raw');const dir=path.join(root,'city');let files=[];try{files=fs.readdirSync(dir);}catch(e){}
@@ -33,9 +33,26 @@ function mapStatus(){const root=path.join(__dirname,'..','..','raw');const dir=p
   const missing=[];for(const k of need)if(!tiles.has(k))missing.push(k+(quarters[k]?':'+[...quarters[k]].join(''):''));
   const have=need.length-missing.length,idle=last?(Date.now()-last)/60000:0;
   const stale=built&&last>built.getTime()&&(!MAPB.last||Date.now()-MAPB.last>6*3600e3);
-  if(!MAPB.running&&(!built&&!MAPB.last||stale)&&missing.length<=2&&idle>45)mapBuild();
+  if(!MAPB.running&&!MAPF.running&&(!built&&!MAPB.last||stale)&&missing.length<=2&&idle>45)mapBuild();
+  // окраины до границы города сервер докачивает сам, без консоли: плана плиток ещё нет или плиток не хватает, а докачка стоит полчаса
+  if(files.length&&!MAPB.running&&(!plan||missing.length&&idle>30))mapFetch();   // только там, где карту всего города уже качали (не на машине разработчика)
+  const fs0=mapFetchState();
   return {ok:1,tiles:have,of:need.length,missing,added:plan&&plan.added?plan.added.length:0,boundary:plan?plan.boundary:null,bbox:plan?plan.bbox:null,
-    idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err};}
+    idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err,
+    fetching:MAPF.running,fetchTries:fs0.n||0,fetchLast:fs0.t?new Date(fs0.t).toISOString():null,fetchCode:MAPF.code===undefined?null:MAPF.code};}
+// докачка: tools/fetch_city.py --all (граница из OSM, недостающие плитки, маршруты и площади окраин) — не чаще раза в 2 часа и не больше 6 раз
+// (счёт в data/mapfetch.json, переживает перезапуски); ход — в raw/city_fetch.log. Карту потом собирает mapBuild, когда всё скачано.
+const MAPF={running:false};
+function mapFetchState(){try{return JSON.parse(fs.readFileSync(path.join(DATA,'mapfetch.json'),'utf8'))||{};}catch(e){return {};}}
+function mapFetch(){const st=mapFetchState();if(MAPF.running||(st.n||0)>=6||Date.now()-(st.t||0)<2*3600e3)return;
+  st.n=(st.n||0)+1;st.t=Date.now();try{fs.writeFileSync(path.join(DATA,'mapfetch.json'),JSON.stringify(st));}catch(e){return;}
+  const root=path.join(__dirname,'..','..');let out='ignore';try{fs.mkdirSync(path.join(root,'raw'),{recursive:true});out=fs.openSync(path.join(root,'raw','city_fetch.log'),'a');}catch(e){}
+  MAPF.running=true;MAPF.code=undefined;log('карта: докачиваю окраины до границы города, попытка '+st.n);
+  let cp;try{cp=require('child_process').spawn('python3',['tools/fetch_city.py','--all'],{cwd:root,stdio:['ignore',out,out]});}catch(e){MAPF.running=false;MAPF.code=e.message;return;}
+  if(typeof out==='number')fs.close(out,()=>{});
+  cp.on('error',e=>{MAPF.running=false;MAPF.code=e.message;});
+  cp.on('close',code=>{MAPF.running=false;MAPF.code=code;log('карта: докачка закончилась, код',code);try{mapStatus();}catch(e){}});}
+setTimeout(()=>{try{mapStatus();}catch(e){}},2*60*1000);
 function mapBuild(){MAPB.running=true;MAPB.last=Date.now();const root=path.join(__dirname,'..','..');const tmp=MAP_D+'.srv';
   log('карта: собираю из скачанного (не хватает пары плиток)');
   const cp=require('child_process').spawn('python3',['tools/build_city.py',tmp],{cwd:root,stdio:['ignore','ignore','pipe']});let err='';cp.stderr.on('data',d=>{err=(err+d).slice(-600);});

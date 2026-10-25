@@ -114,7 +114,7 @@ const SCRIPTED={police:['Проходите, не задерживайтесь. 
 function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
   $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
   if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
-  $('#brainLbl').textContent=sampleFn?'думает сам: мозги на Claude':'реплики по сценарию (без ИИ)';
+  $('#brainLbl').textContent=sampleFn?'думает сам: отвечает ИИ':'реплики по сценарию (без ИИ)';
   if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
 function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
