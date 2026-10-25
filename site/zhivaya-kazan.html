@@ -157,7 +157,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
       <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
       <button class="btn" id="speedBtn" title="Скорость времени">×8</button>
-      <button class="btn" id="routeBtn" title="Куда поехать">🧭</button><button class="btn" id="jobsBtn" title="Работа и жильё">💼</button><button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
+      <button class="btn" id="routeBtn" title="Куда поехать">🧭</button><button class="btn" id="questBtn" title="Задания на сегодня">🎯</button><button class="btn" id="jobsBtn" title="Работа и жильё">💼</button><button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
     <div class="card needs">
       <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
@@ -248,6 +248,15 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   <div class="cp-in"><input type="text" id="cpInput" maxlength="240" placeholder="Сказать вслух"><button class="btn primary" id="cpSend">➤</button></div>
 </div>
 
+<div class="modal" id="questModal" hidden>
+  <div class="box">
+    <h2>Задания на сегодня</h2>
+    <p class="hint">Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.</p>
+    <div id="qList" class="stack"></div>
+    <p class="hint" id="qAch"></p>
+    <div class="row"><button class="btn" id="qClose">Закрыть</button></div>
+  </div>
+</div>
 <div class="modal" id="routeModal" hidden>
   <div class="box">
     <h2 id="rtTitle">Куда поехать?</h2>
@@ -362,5 +371,5 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/events.js"></script>
 <script src="js/people.js"></script>
 <script src="js/phone.js"></script>
-<script src="js/render.js"></script>
+<script src="js/engine.js"></script><script src="js/render.js"></script>
 <script src="js/main.js"></script>
