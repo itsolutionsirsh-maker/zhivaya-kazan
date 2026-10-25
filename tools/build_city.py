@@ -10,8 +10,13 @@ import json, math, sys, collections, os, glob, hashlib
 DSTDIR = sys.argv[1] if len(sys.argv) > 1 else 'site/map'
 CHUNK = 2000.0   # метров
 
-# bbox карты: юг, запад, север, восток (можно задать CITY="S,W,N,E")
-S, W, N, E = (float(v) for v in os.environ.get('CITY', '55.66,48.86,55.93,49.33').split(','))
+# bbox карты: юг, запад, север, восток (можно задать CITY="S,W,N,E"); если fetch_city.py нашёл границу города —
+# рамка из его плана плиток (raw/city_plan.json): прежний прямоугольник плюс окраины, которые за него выходят
+try:
+    _plan_bbox = ','.join(str(v) for v in json.load(open('raw/city_plan.json'))['bbox'])
+except Exception:
+    _plan_bbox = None
+S, W, N, E = (float(v) for v in (os.environ.get('CITY') or _plan_bbox or '55.66,48.86,55.93,49.33').split(','))
 # начало координат фиксировано (центр первой версии карты), чтобы сохранения не сдвигались
 lat0, lon0 = 55.793, 49.114
 M_LAT = 111320.0

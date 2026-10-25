@@ -183,11 +183,12 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <div class="modal" id="profileModal" hidden>
   <div class="box">
     <h2>Кто вы в Казани?</h2>
-    <p>Персонаж появится на улице Баумана. Фото и описание видят другие игроки и жители города.</p>
+    <p>Персонаж появится на улице Баумана или во дворе вашего района. Фото и описание видят другие игроки и жители города.</p>
     <div class="avatarPick"><div class="pv" id="avPreview">?</div><label class="btn" for="avFile">Загрузить фото</label><input type="file" id="avFile" accept="image/*"></div>
     <div class="field"><label for="pName">Имя</label><input type="text" id="pName" maxlength="24" placeholder="Например, Иршат"></div>
     <div class="field"><label for="pDesc">О себе</label><textarea id="pDesc" maxlength="160" placeholder="Кто вы, чем занимаетесь, какой характер — жители будут это знать"></textarea></div>
     <div class="field"><label>Одежда</label><div id="clothes"><span class="sw on" data-c="#2F9E6B" style="background:#2F9E6B"></span><span class="sw" data-c="#D64545" style="background:#D64545"></span><span class="sw" data-c="#3E8ED0" style="background:#3E8ED0"></span><span class="sw" data-c="#F4B400" style="background:#F4B400"></span><span class="sw" data-c="#8E44AD" style="background:#8E44AD"></span><span class="sw" data-c="#212121" style="background:#212121"></span><span class="sw" data-c="#ECEFF1" style="background:#ECEFF1"></span><span class="sw" data-c="#E07B39" style="background:#E07B39"></span></div></div>
+    <div class="field"><label for="pDistrict">Где живёте</label><select id="pDistrict"><option value="">В центре, у Баумана</option></select></div>
     <div class="row"><div class="field" style="flex:1"><label for="pRole">Роль</label><select id="pRole"><option value="resident">Житель</option><option value="tourist">Турист</option><option value="courier">Курьер</option><option value="student">Студент КФУ</option></select></div>
       <div class="field"><label for="pCar">Своя машина</label><div class="row" style="gap:8px"><input type="checkbox" id="pCar" checked><input type="color" id="pCarColor" value="#C62828" title="Цвет машины"></div></div></div>
     <div class="row"><button class="btn primary" id="startBtn">Выйти в город</button></div>
@@ -250,8 +251,8 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 
 <div class="modal" id="questModal" hidden>
   <div class="box">
-    <h2>Задания на сегодня</h2>
-    <p class="hint">Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.</p>
+    <h2 id="qTitle">Задания на сегодня</h2>
+    <p class="hint" id="qSub">Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.</p>
     <div id="qList" class="stack"></div>
     <p class="hint" id="qAch"></p>
     <div class="row"><button class="btn" id="qClose">Закрыть</button></div>
@@ -371,5 +372,5 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/events.js"></script>
 <script src="js/people.js"></script>
 <script src="js/phone.js"></script>
-<script src="js/engine.js"></script><script src="js/render.js"></script>
+<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/render.js"></script>
 <script src="js/main.js"></script>

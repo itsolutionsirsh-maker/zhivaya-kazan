@@ -16,6 +16,32 @@ const PORT=+ENV.PORT||8080;
 const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
 const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=null,mapChk=0;
+// как идёт сборка карты всей Казани (tools/citymap.sh качает плитки в raw/city): сколько плиток готово, каких нет, собрана ли карта.
+// Если скачано почти всё (не хватает 1–2 плиток), а новых файлов нет больше 45 минут — Overpass упёрся в самые плотные кварталы.
+// Тогда сервер сам собирает карту из того, что есть (дыры — пара кварталов без домов, дороги там всё равно будут из соседних плиток);
+// докачка продолжается, и citymap.sh потом пересоберёт целиком.
+// Какие плитки нужны — из raw/city_plan.json (fetch_city.py берёт границу города из OSM и дополняет сетку окраинами), без него — прежние 12×14.
+// Докачали окраины после сборки — тоже собирает сам, когда новых файлов нет 45 минут (не чаще раза в 6 часов).
+const MAPB={running:false,last:null,err:null};
+const pad2=n=>(n<0?'-':'')+String(Math.abs(n)).padStart(n<0?1:2,'0');
+function mapStatus(){const root=path.join(__dirname,'..','..','raw');const dir=path.join(root,'city');let files=[];try{files=fs.readdirSync(dir);}catch(e){}
+  let plan=null;try{plan=JSON.parse(fs.readFileSync(path.join(root,'city_plan.json'),'utf8'));}catch(e){}
+  const need=plan&&Array.isArray(plan.cells)?plan.cells.map(c=>pad2(c[0])+'_'+pad2(c[1])):[];if(!need.length)for(let y=0;y<12;y++)for(let x=0;x<14;x++)need.push(pad2(y)+'_'+pad2(x));
+  const tiles=new Set(),quarters={};let last=0;for(const f of files){const m=/^(-?\d+_-?\d+)(?:_([a-d]))?\.json$/.exec(f);if(!m)continue;if(m[2]){(quarters[m[1]]=quarters[m[1]]||new Set()).add(m[2]);}else tiles.add(m[1]);
+    try{last=Math.max(last,fs.statSync(path.join(dir,f)).mtimeMs);}catch(e){}}
+  for(const k in quarters)if(quarters[k].size===4)tiles.add(k);let built=null;try{built=fs.statSync(path.join(MAP_D,'base.json')).mtime;}catch(e){}
+  const missing=[];for(const k of need)if(!tiles.has(k))missing.push(k+(quarters[k]?':'+[...quarters[k]].join(''):''));
+  const have=need.length-missing.length,idle=last?(Date.now()-last)/60000:0;
+  const stale=built&&last>built.getTime()&&(!MAPB.last||Date.now()-MAPB.last>6*3600e3);
+  if(!MAPB.running&&(!built&&!MAPB.last||stale)&&missing.length<=2&&idle>45)mapBuild();
+  return {ok:1,tiles:have,of:need.length,missing,added:plan&&plan.added?plan.added.length:0,boundary:plan?plan.boundary:null,bbox:plan?plan.bbox:null,
+    idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err};}
+function mapBuild(){MAPB.running=true;MAPB.last=Date.now();const root=path.join(__dirname,'..','..');const tmp=MAP_D+'.srv';
+  log('карта: собираю из скачанного (не хватает пары плиток)');
+  const cp=require('child_process').spawn('python3',['tools/build_city.py',tmp],{cwd:root,stdio:['ignore','ignore','pipe']});let err='';cp.stderr.on('data',d=>{err=(err+d).slice(-600);});
+  cp.on('close',code=>{MAPB.running=false;if(code!==0){MAPB.err=err||('код '+code);log('карта: сборка не вышла',MAPB.err);return;}
+    try{if(fs.existsSync(MAP_D)){fs.rmSync(MAP_D+'.old',{recursive:true,force:true});fs.renameSync(MAP_D,MAP_D+'.old');}fs.renameSync(tmp,MAP_D);fs.rmSync(MAP_D+'.old',{recursive:true,force:true});mapChk=0;log('карта: готово',MAP_D);}catch(e){MAPB.err=e.message;}});}
+setInterval(()=>{try{mapStatus();}catch(e){}},10*60*1000);
 function mapDir(){const t=Date.now();if(t-mapChk>30000){mapChk=t;try{MAP_DIR=fs.statSync(path.join(MAP_D,'base.json')).isFile()?MAP_D:null;}catch(e){MAP_DIR=null;}}return MAP_DIR;}
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
@@ -280,6 +306,7 @@ const server=http.createServer(async(req,res)=>{
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
+    if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod'&&body.do==='import'){const r=modAdmin(req,{do:'stats'});if(r.err)return send(res,200,r);try{return send(res,200,Object.assign({ok:1},await importPhp(OLD_API)));}catch(e){return send(res,200,{err:e.message});}}
