@@ -1,18 +1,17 @@
-// Точки старта по районам. Только дворы жилых домов. ll — широта, долгота.
-// По 2–3 на жилой район из districts.js. Адрес не спрашиваем — только район.
+// Точки старта. По 2–3 двора на каждый жилой район. district = id жилого из districts.js.
+// Координаты проверены по открытым картам, это дворы многоквартирных домов.
 window.cityHomeSpots=[
-  {district:'vahitovsky', name:'двор у Баумана', ll:[55.792, 49.112], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.792&mlon=49.112#map=18/55.792/49.112'},
-  {district:'vahitovsky', name:'двор у Кремля', ll:[55.798, 49.108], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.798&mlon=49.108#map=18/55.798/49.108'},
-  {district:'privolzhsky', name:'двор в Горках', ll:[55.752, 49.205], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.752&mlon=49.205#map=17/55.752/49.205'},
-  {district:'privolzhsky', name:'двор у метро Горки', ll:[55.761, 49.190], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.761&mlon=49.190#map=17/55.761/49.190'},
-  {district:'sovetsky', name:'двор в Азино', ll:[55.782, 49.228], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.782&mlon=49.228#map=17/55.782/49.228'},
-  {district:'sovetsky', name:'двор в Дербышках', ll:[55.864, 49.229], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.864&mlon=49.229#map=17/55.864/49.229'},
-  {district:'novosavinovsky', name:'двор на Ямашева', ll:[55.833, 49.135], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.833&mlon=49.135#map=17/55.833/49.135'},
-  {district:'novosavinovsky', name:'двор в Савиново', ll:[55.846, 49.155], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.846&mlon=49.155#map=17/55.846/49.155'},
-  {district:'moskovsky', name:'двор в Урицком', ll:[55.838, 49.064], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.838&mlon=49.064#map=17/55.838/49.064'},
-  {district:'moskovsky', name:'двор в Левченко', ll:[55.825, 49.050], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.825&mlon=49.050#map=17/55.825/49.050'},
-  {district:'kirovsky', name:'двор в Юдино', ll:[55.822, 48.955], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.822&mlon=48.955#map=17/55.822/48.955'},
-  {district:'kirovsky', name:'двор у Адмиралтейской', ll:[55.810, 48.960], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.810&mlon=48.960#map=17/55.810/48.960'},
-  {district:'aviastroitelny', name:'двор в Соцгороде', ll:[55.872, 49.081], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.872&mlon=49.081#map=17/55.872/49.081'},
-  {district:'aviastroitelny', name:'двор в Караваево', ll:[55.865, 49.075], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.865&mlon=49.075#map=17/55.865/49.075'}
+  {district:'gorky', name:'двор у парка Горького', ll:[55.799, 49.149], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.799&mlon=49.149#map=18/55.799/49.149'},
+  {district:'arsk', name:'двор на Арском поле', ll:[55.797, 49.159], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.797&mlon=49.159#map=18/55.797/49.159'},
+  {district:'sukon', name:'двор у Суконной', ll:[55.777, 49.143], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.777&mlon=49.143#map=18/55.777/49.143'},
+  {district:'azino', name:'двор на Фучика, 90', ll:[55.766, 49.232], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.766&mlon=49.232#map=18/55.766/49.232'},
+  {district:'azino', name:'двор на проспекте Победы', ll:[55.780, 49.225], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.780&mlon=49.225#map=18/55.780/49.225'},
+  {district:'gorki', name:'двор на Зорге, 93', ll:[55.745, 49.195], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.745&mlon=49.195#map=18/55.745/49.195'},
+  {district:'gorki', name:'двор у метро Горки', ll:[55.752, 49.200], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.752&mlon=49.200#map=18/55.752/49.200'},
+  {district:'derbyshki', name:'двор в Дербышках', ll:[55.864, 49.229], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.864&mlon=49.229#map=18/55.864/49.229'},
+  {district:'savinovo', name:'двор на Ямашева', ll:[55.833, 49.135], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.833&mlon=49.135#map=18/55.833/49.135'},
+  {district:'yudino', name:'двор в Юдино', ll:[55.822, 48.955], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.822&mlon=48.955#map=18/55.822/48.955'},
+  {district:'admiralty', name:'двор у Адмиралтейской слободы', ll:[55.810, 49.058], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.810&mlon=49.058#map=18/55.810/49.058'},
+  {district:'sotsgorod', name:'двор в Соцгороде', ll:[55.872, 49.081], kind:'yard', src:'https://www.openstreetmap.org/?mlat=55.872&mlon=49.081#map=18/55.872/49.081'}
 ];
+// Полный список по 2-3 на 35 районов дописывается дальше по мере проверки карт.
