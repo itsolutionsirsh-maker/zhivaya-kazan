@@ -19,9 +19,12 @@ function onChunkAdded(rec){if(typeof _sideOff!=='undefined')_sideOff.clear();if(
 async function loadChunksAround(points,R){const ks=new Set();for(const p of points)for(const k of chunkKeysNear(p[0],p[1],R))ks.add(k);
   const list=[...ks];let i=0;const worker=async()=>{while(i<list.length){const k=list[i++];await loadChunk(k);}};await Promise.all([worker(),worker(),worker(),worker()]);}
 function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUNKS.t>0)return;CHUNKS.t=0.3;
-  const focus=[[player.x,player.y]];if(cam.free&&cam.z>0.5)focus.push([cam.x,cam.y]);
+  // камера, отведённая от игрока, тоже подгружает при любом масштабе: на обзоре всего города видно дома там, куда смотришь,
+  // а не только там, где игрок уже был; пока карту быстро тянут (больше 400 м за такт) — не качаем то, мимо чего пролетели
+  const focus=[[player.x,player.y]],load=[[player.x,player.y]];
+  if(cam.free){focus.push([cam.x,cam.y]);const lc=CHUNKS.cam;if(lc&&Math.hypot(cam.x-lc[0],cam.y-lc[1])<400)load.push([cam.x,cam.y]);CHUNKS.cam=[cam.x,cam.y];}else CHUNKS.cam=null;
   if(CHUNKS.busy<CHUNKS.max){const now=performance.now();
-    for(const f of focus){for(const k of chunkKeysNear(f[0],f[1],CHUNKS.loadR)){if(CHUNKS.busy>=CHUNKS.max)break;if(CHUNKS.state.has(k))continue;const ft=CHUNKS.fail.get(k);if(ft&&now-ft<15000)continue;loadChunk(k);}}}
+    for(const f of load){for(const k of chunkKeysNear(f[0],f[1],CHUNKS.loadR)){if(CHUNKS.busy>=CHUNKS.max)break;if(CHUNKS.state.has(k))continue;const ft=CHUNKS.fail.get(k);if(ft&&now-ft<15000)continue;loadChunk(k);}}}
   // выгрузка далёких
   const C=chunkSize();for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
     let near=false;for(const f of focus){if(Math.abs(f[0]-mx)<CHUNKS.dropR&&Math.abs(f[1]-my)<CHUNKS.dropR){near=true;break;}}
