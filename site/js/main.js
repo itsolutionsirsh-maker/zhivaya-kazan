@@ -213,7 +213,7 @@ function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.rando
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
-    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);
+    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);engineTick(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
@@ -261,7 +261,7 @@ async function boot(){
     $('#loading').hidden=true;
     if(prof){addEvent(`${player.name} снова в городе`);if(!flags.howtoSeen)showHowto();}else showProfile();
     addEvent(world.meta.chunks?'Казань: '+Object.keys(world.meta.chunks).length+' кварталов по 2×2 км, '+world.crossings.length.toLocaleString('ru-RU')+' переходов. Дома вокруг подгружаются, пока вы идёте или едете':'Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
-    initCaps();requestAnimationFrame(frame);
+    engineInit();initCaps();requestAnimationFrame(frame);
   }catch(e){$('#loadMsg').textContent='Не удалось загрузить карту: '+e.message;const pr=document.querySelector('#loading .pr');if(pr)pr.hidden=true;console.error(e);}
 }
 boot();
