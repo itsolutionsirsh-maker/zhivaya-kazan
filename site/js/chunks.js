@@ -1,13 +1,14 @@
 // ===== Подгрузка карты кусками 2×2 км: вокруг игрока (и вокруг камеры, если игрок смотрит в сторону) =====
 // Всё, что нужно везде (крупные улицы, маршруты, остановки, вода, больницы и т. п.), лежит в base.json и есть сразу.
 // Дома, дворы, тропинки, парки, магазины и кафе приходят кусками; далёкие куски выгружаются, чтобы телефону хватало памяти.
-const CHUNKS={loadR:3600,dropR:6500,busy:0,max:6,t:0,state:new Map(),fail:new Map()};
+const CHUNKS={wait:new Map(),loadR:3600,dropR:6500,busy:0,max:6,t:0,state:new Map(),fail:new Map()};
 function chunkSize(){return (world.meta.chunk||20000)/10;}
 function chunkKeysNear(x,y,R){const C=chunkSize(),idx=world.meta.chunks||{};const out=[];
   for(let cx=Math.floor((x-R)/C);cx<=Math.floor((x+R)/C);cx++)for(let cy=Math.floor((y-R)/C);cy<=Math.floor((y+R)/C);cy++){const k=cx+'_'+cy;if(!idx[k])continue;
     const d=Math.hypot(Math.max(0,Math.abs(x-(cx+0.5)*C)-C/2),Math.max(0,Math.abs(y-(cy+0.5)*C)-C/2));if(d<=R)out.push([d,k]);}
   out.sort((a,b)=>a[0]-b[0]);return out.map(o=>o[1]);}
-async function loadChunk(k){if(CHUNKS.state.has(k))return;CHUNKS.state.set(k,'loading');CHUNKS.busy++;
+function loadChunk(k){if(CHUNKS.state.has(k))return CHUNKS.wait.get(k)||Promise.resolve();const pr=loadChunkNow(k);CHUNKS.wait.set(k,pr);pr.finally(()=>CHUNKS.wait.delete(k));return pr;}
+async function loadChunkNow(k){CHUNKS.state.set(k,'loading');CHUNKS.busy++;
   try{const r=await fetch('map/c_'+k+'.json?v='+(world.meta.v||'1'));if(!r.ok)throw new Error(r.status);const d=await r.json();
     if(CHUNKS.state.get(k)!=='loading')return;const rec=addMapPart(d,k);CHUNKS.state.set(k,'ready');CHUNKS.fail.delete(k);onChunkAdded(rec);}
   catch(e){CHUNKS.state.delete(k);CHUNKS.fail.set(k,performance.now());}

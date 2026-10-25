@@ -28,7 +28,7 @@ defSit('promoter',{title:'Промоутер',auto:true,weight:1.5,cool:900,
           onTimeout:()=>{say(w,'Ну, как хотите…');promoLeave(s);}});}
       else if(s.t>40)promoLeave(s);}
     if(s.phase==='leave'){if(stepActor(w,dt))endSit(s);}
-    if(s.phase==='claim'){s.cw-=dt;if(s.cw<=0){if(Math.random()<0.6){sitMoney(3500,'Претензия сработала: договор расторгли, взнос вернули');sitMood(10);}else addEvent('Претензию отклонили. «Обращайтесь в суд». Кредит придётся гасить','alert');endSit(s);}}
+    if(s.phase==='claim'){s.cw-=dt;if(s.cw<=0){if(Math.random()<0.6){sitMoney(s.paid||0,'Претензия сработала: договор расторгли, взнос вернули');sitMood(10);}else addEvent('Претензию отклонили. «Обращайтесь в суд». Кредит придётся гасить','alert');endSit(s);}}
     if(s.phase==='loan'){s.lw-=dt;if(s.lw<=0){s.phase='loan2';
       sitCard({s,icon:'📩',tone:'alert',title:'СМС из банка',text:'«Оформлен кредит на 34 500 ₽ по договору с ООО „Оптика-Плюс“». Очки, которые «всего 3 500», оказались в кредит. По закону можно потребовать расторжения — написать претензию.',ttl:0,
         choices:[{t:'Написать претензию',primary:true,run:()=>{s.phase='claim';s.cw=rnd(80,140);addEvent('Претензия отправлена. Ждём ответа');}},{t:'Смириться',run:()=>{sitMood(-10);endSit(s);}}]});}}},
@@ -36,4 +36,4 @@ defSit('promoter',{title:'Промоутер',auto:true,weight:1.5,cool:900,
 function promoLeave(s){const w=s.w;s.phase='leave';const q=awayPoint(w,40);moveActor(w,q[0],q[1],2.4);}
 function promoSalon(s){clock.minutes+=40;s.phase='salon';releaseActor(s.w);s.actors=[];addEvent('Сорок минут «проверки» в тесном кабинете…');
   sitCard({s,icon:'👓',tone:'alert',title:'«Серьёзные проблемы со зрением»',text:'«Доктор» качает головой: срочно нужны очки за 38 000 ₽. Но сегодня по акции — «всего» 3 500 ₽ первый взнос, подпишите тут и тут.',ttl:0,
-    choices:[{t:'Отказаться и уйти',primary:true,run:()=>{sitMood(-3);addEvent('Вы ушли. Потеряли только время');endSit(s);}},{t:'Подписать договор',run:()=>{sitMoney(-Math.min(3500,player.money),'Первый взнос за очки');sitMood(-12);s.phase='loan';s.lw=rnd(60,120);}}]});}
+    choices:[{t:'Отказаться и уйти',primary:true,run:()=>{sitMood(-3);addEvent('Вы ушли. Потеряли только время');endSit(s);}},{t:'Подписать договор',run:()=>{s.paid=Math.min(3500,player.money);sitMoney(-s.paid,'Первый взнос за очки');sitMood(-12);s.phase='loan';s.lw=rnd(60,120);}}]});}
