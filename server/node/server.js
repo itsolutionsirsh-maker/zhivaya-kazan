@@ -291,9 +291,17 @@ const seen={d:'',set:new Set()};const peak={d:'',n:0};
 function visit(id,src){const d=mskDay();if(seen.d!==d){seen.d=d;seen.set.clear();}if(seen.set.has(id))return;seen.set.add(id);
   try{store.visit(id,d,clean(src,24).replace(/[^\w:.\-]/g,'')||'web');}catch(e){log('журнал заходов:',e.message);}}
 function notePeak(){const d=mskDay();if(peak.d!==d){peak.d=d;peak.n=0;}if(players.size>peak.n)peak.n=players.size;}
+// как долго у игроков грузится игра (без имён и IP): последние 500 заходов в памяти; на mod.html — медиана и «у 9 из 10»
+// ms — сколько прошло от открытия страницы: scripts (скрипты загружены), base (карта улиц пришла), build (построена), chunks (дома вокруг), shown (игра на экране)
+const BOOT=[],BOOT_K=['scripts','base','build','chunks','shown'];
+function bootReport(body,ip){if(!allow('boot:'+ip,6,600))return {ok:1};const ms=body&&body.ms;if(!ms||typeof ms!=='object')return {err:'bad'};
+  const o={t:now(),tg:!!body.tg,conn:clean(String(body.conn||''),8)};for(const k of BOOT_K)o[k]=Math.max(0,Math.min(600000,Math.round(+ms[k]||0)));
+  BOOT.push(o);if(BOOT.length>500)BOOT.shift();return {ok:1};}
+function bootStats(){const day=BOOT.filter(o=>now()-o.t<86400);const q=(a,p)=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.floor(p*s.length))];};
+  const out={n:day.length,tg:day.filter(o=>o.tg).length,slow:day.filter(o=>/2g|3g/.test(o.conn)).length};for(const k of BOOT_K){const a=day.map(o=>o[k]).filter(v=>v>0);out[k]=[q(a,0.5),q(a,0.9)];}return out;}
 function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);if(!st)return {err:'no_sqlite'};const rows=[];
   for(let i=0;i<days;i++){const d=mskDay(-i);const nu=st.nu[d]||0;rows.push({d,dau:st.dau[d]||0,nu,r1:st.r1[d]||0,r7:st.r7[d]||0,r1ready:i>=1,r7ready:i>=7});}
-  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n};}
+  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,boot:bootStats()};}
 
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
 function apiSync(body,ip){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;p.ip=ip;setPresence(p,body.p);visit(id,body.src);notePeak();
@@ -349,10 +357,12 @@ go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.dis
 // ---------- HTTP ----------
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};
 function send(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(b);}
-function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{ok(ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{});}catch(e){ok({});}});req.on('error',bad);});}
+function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{const v=ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{};ok(v&&typeof v==='object'&&!Array.isArray(v)?v:{});}catch(e){ok({});}});req.on('error',bad);});}
 function ipOf(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'x').split(',')[0].trim();}
 const stats={bytesOut:0,msgsOut:0,tickMs:0,since:now()};
-const server=http.createServer(async(req,res)=>{
+const server=http.createServer((req,res)=>{handleReq(req,res).catch(e=>{log('ошибка запроса',req.method,String(req.url).slice(0,80),e&&e.stack||e);
+  try{if(!res.headersSent){res.writeHead(500,{'Content-Type':'application/json; charset=utf-8'});res.end('{"err":"server"}');}else res.destroy();}catch(_){}});});
+async function handleReq(req,res){
   const u=new URL(req.url,'http://x');const ip=ipOf(req);
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
@@ -373,6 +383,7 @@ const server=http.createServer(async(req,res)=>{
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     if(a==='tgweb')return send(res,200,tgWebStart(req,ip));
+    if(a==='boot')return send(res,200,bootReport(body,ip));
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
@@ -396,7 +407,7 @@ const server=http.createServer(async(req,res)=>{
     if(!zip)return plain();
     // сжатое заранее: file.gz рядом, делается один раз в фоне — дальше сервер и Caddy не жмут файл на каждый запрос
     const gzf=file+'.gz';fs.stat(gzf,(e2,gs)=>{if(e2||gs.mtimeMs<st.mtimeMs){gzLater(file,gzf);return plain();}
-      h['Content-Encoding']='gzip';h['Content-Length']=gs.size;h['ETag']='W/"'+core+'-gz"';res.writeHead(200,h);if(req.method==='HEAD')return res.end();fs.createReadStream(gzf).pipe(res);});});});
+      h['Content-Encoding']='gzip';h['Content-Length']=gs.size;h['ETag']='W/"'+core+'-gz"';res.writeHead(200,h);if(req.method==='HEAD')return res.end();fs.createReadStream(gzf).pipe(res);});});}
 const STATIC_ZIP=/^\.(json|js|html|css|svg|txt)$/;const GZ_BUSY=new Set(),GZ_FAIL=new Map();
 function gzLater(file,gzf){if(GZ_BUSY.has(file)||GZ_BUSY.size>=2||(GZ_FAIL.get(file)||0)>Date.now()-3600e3)return;GZ_BUSY.add(file);const tmp=gzf+'.'+process.pid+'.tmp';
   const done=e=>{GZ_BUSY.delete(file);if(e){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}else fs.rename(tmp,gzf,e3=>{if(e3){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}});};
@@ -468,3 +479,6 @@ const impI=process.argv.indexOf('--import-php');
 if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
 else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));
+// последняя страховка: ошибка, которую не поймали выше, — в журнал, а не падение всего сервера (с ним вылетают все игроки)
+process.on('unhandledRejection',e=>log('необработанная ошибка (сервер работает дальше):',e&&e.stack||e));
+process.on('uncaughtException',e=>log('необработанное исключение (сервер работает дальше):',e&&e.stack||e));
