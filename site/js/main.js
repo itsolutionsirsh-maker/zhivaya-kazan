@@ -172,8 +172,9 @@ $('#howtoBtn').addEventListener('click',()=>{$('#menuModal').hidden=true;showHow
 $('#changeChar').addEventListener('click',()=>{$('#menuModal').hidden=true;showProfile();});
 // «Начать заново»: второе нажатие подтверждает. Стирает только своё: прогресс здесь и в аккаунте на сервере (имя и вход остаются)
 let resetArm=0;$('#resetBtn').addEventListener('click',async()=>{const b=$('#resetBtn');if(Date.now()-resetArm>4000){resetArm=Date.now();b.textContent='Точно? Всё сбросится — нажмите ещё раз';setTimeout(()=>{if(Date.now()-resetArm>=4000)b.textContent='Начать заново';},4100);return;}
-  window.zkNoSave=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function')await acctCall('reset',{token:acct.token});}catch(e){}
-  try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk'])localStorage.removeItem(k);}catch(e){}location.reload();});
+  window.zkNoSave=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function'){const r=await acctCall('reset',{token:acct.token});if(r&&r.updated&&typeof setRev==='function')setRev(r.updated);}}catch(e){}
+  // zk.prog — задания, значки, обучение; zk.invq — приглашения: тоже с начала (раньше оставались и гасили вечерние события новой игры)
+  try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk','zk.prog','zk.invq'])localStorage.removeItem(k);}catch(e){}location.reload();});
 $('#speedBtn').addEventListener('click',()=>{const i=(TIME_SCALES.indexOf(clock.scale)+1)%TIME_SCALES.length;clock.scale=TIME_SCALES[i];$('#speedBtn').textContent='×'+clock.scale;});
 $('#centerBtn').addEventListener('click',followPlayer);
 mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;$('#centerBtn').hidden=false;clampCam();});

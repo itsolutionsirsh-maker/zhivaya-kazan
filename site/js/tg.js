@@ -39,9 +39,7 @@ async function tgLogin(){const W=TG.W;if(!W||!W.initData){TG.state='nodata';retu
 function tgAfter(j){if(typeof renderAcct==='function')renderAcct();
   // приглашения: запомним до перезагрузки, покажем после
   try{const q=JSON.parse(localStorage.getItem('zk.invq')||'[]');if(j.invitedBy)q.push(['invited',j.invitedBy]);for(const v of (j.invites||[]))q.push(['inviter',v.name]);localStorage.setItem('zk.invq',JSON.stringify(q.slice(-10)));}catch(e){}
-  let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}
-  if(j.state&&(j.state.t||0)>((local&&local.t)||0)+5000){acctApply(j);return;}   // на сервере свежее — загрузим и перезапустим
-  if(!j.state&&typeof acctSave==='function')acctSave();                           // новый игрок: сразу положим то, что есть
+  if(acctBootSync(j))return;   // на сервере новее (другое устройство) — загрузим и перезапустим; иначе своя игра и сразу на сервер (net.js)
   tgMsg(j.created?'Вы вошли через Телеграм. Прогресс сохраняется на сервере':'Вошли через Телеграм. Прогресс на сервере');
   setTimeout(tgInvites,4000);}
 // показать приглашения: у второго программиста — window.cityOnInvite(kind,name) в people.js; без неё — короткая запись и чуть настроения

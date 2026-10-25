@@ -137,8 +137,11 @@ function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.leng
 function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
   try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
-function saveFor(token,state,profile,city){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
-  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};try{store.save(a.k,state||a.state,profile||a.profile,city||a.city);}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}return {ok:1};}
+// base — версия (updated), которую устройство видело последней. Сервер новее (сохраняло другое устройство или «Начать заново») —
+// отказ conflict с серверной копией: устройство берёт её, а не затирает. Без base (старый клиент) — как раньше, последний пишет.
+function saveFor(token,state,profile,city,base){const a=accByToken(token);if(!a)return {err:'auth'};
+  if(typeof base==='number'&&isFinite(base)&&(a.updated||0)>base+0.001)return accOut(a,{ok:0,err:'conflict'});const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
+  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};try{store.save(a.k,state||a.state,profile||a.profile,city||a.city);}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
 // мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
 const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
@@ -215,7 +218,7 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
   body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -376,7 +379,7 @@ const server=http.createServer((req,res)=>{handleReq(req,res).catch(e=>{log('о�
 async function handleReq(req,res){
   const u=new URL(req.url,'http://x');const ip=ipOf(req);
   if(u.pathname==='/api.php'||u.pathname==='/api'){
-    let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
+    let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
     if(a==='mapstatus')return send(res,200,mapStatus());
@@ -387,7 +390,7 @@ async function handleReq(req,res){
     if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
-    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base));
     if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
     if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
     if(a==='reset')return send(res,200,resetFor(body.token));
