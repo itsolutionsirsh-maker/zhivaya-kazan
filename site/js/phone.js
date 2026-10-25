@@ -81,13 +81,13 @@
 
   const btn=document.createElement('button');
   btn.type='button'; btn.id='zkToday'; btn.textContent='Сегодня';
-  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:30;border:0;border-radius:999px;padding:12px 16px;min-height:44px;min-width:44px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
+  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:19;border:0;border-radius:999px;padding:12px 16px;min-height:44px;min-width:44px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
   const panel=document.createElement('section');
   panel.id='zkTodayPanel';
   panel.hidden=true;
-  panel.style.cssText='position:fixed;left:16px;top:130px;z-index:30;width:min(320px,calc(100vw - 32px));max-height:60vh;overflow:auto;overflow-wrap:anywhere;word-break:break-word;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px 14px 12px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.45 "IBM Plex Sans",system-ui';
+  panel.style.cssText='position:fixed;left:16px;top:130px;z-index:19;width:min(320px,calc(100vw - 32px));max-height:60vh;overflow:auto;overflow-wrap:anywhere;word-break:break-word;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px 14px 12px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.45 "IBM Plex Sans",system-ui';
   const fit=document.createElement('style');
-  fit.textContent='@media (max-width:640px){#zkToday{top:148px}#zkTodayPanel{top:204px}}';
+  fit.textContent='@media (max-width:640px){#zkToday{top:148px!important}#zkTodayPanel{top:204px!important}}';
   let tab='feed';
   function mount(){if(!document.body||btn.parentNode) return; document.head.append(fit); document.body.append(btn,panel);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&','<':'<','>':'>','"':'"'}[c];});}

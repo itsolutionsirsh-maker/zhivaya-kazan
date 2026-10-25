@@ -1,0 +1,36 @@
+// Сезон декабря. Бесплатная ветка сама по себе: на каждом уровне деньги и видимая вещь.
+// Платную ветку движок прячет, где cityPlatform.canPay ложь. В paid только вид из shop.js, не сила.
+// На одном уровне free и paid не выдают одну и ту же вещь.
+window.citySeason = {id:'2026-12', title:'Зима на Баумана', from:'2026-12-01', to:'2026-12-31',
+  levels:[
+    {lvl:1, xp:100, free:{money:80, item:'cap-wool'}, paid:{item:'car-cream'}},
+    {lvl:2, xp:120, free:{money:95, item:'scarf-wool'}, paid:{item:'frame-gold'}},
+    {lvl:3, xp:140, free:{money:110, item:'glasses-half'}, paid:{item:'bag-leather'}},
+    {lvl:4, xp:160, free:{money:125, item:'bag-net'}, paid:{item:'car-night'}},
+    {lvl:5, xp:180, free:{money:140, item:'name-pin'}, paid:{item:'car-sedan'}},
+    {lvl:6, xp:200, free:{money:155, item:'cap-flat'}, paid:{item:'coat-ink'}},
+    {lvl:7, xp:220, free:{money:170, item:'glasses-clear'}, paid:{item:'car-hatch'}},
+    {lvl:8, xp:240, free:{money:185, item:'bag-cloth'}, paid:{item:'car-brick'}},
+    {lvl:9, xp:260, free:{money:200, item:'furn-rug'}, paid:{item:'car-river'}},
+    {lvl:10, xp:280, free:{money:215, item:'tubeteika'}, paid:{item:'car-pine'}},
+    {lvl:11, xp:300, free:{money:230, item:'glasses-round'}, paid:{item:'car-wagon'}},
+    {lvl:12, xp:320, free:{money:245, item:'frame-thread'}, paid:{item:'car-pickup'}},
+    {lvl:13, xp:340, free:{money:260, item:'furn-shelf'}, paid:{item:'car-compact'}},
+    {lvl:14, xp:360, free:{money:275, item:'hat-felt'}, paid:{item:'frame-gold'}},
+    {lvl:15, xp:380, free:{money:290, item:'sweater-brick'}, paid:{item:'bag-leather'}},
+    {lvl:16, xp:400, free:{money:305, item:'bag-cross'}, paid:{item:'hood-green'}},
+    {lvl:17, xp:420, free:{money:320, item:'glasses-brow'}, paid:{item:'jacket-sand'}},
+    {lvl:18, xp:440, free:{money:335, item:'furn-chair'}, paid:{item:'sweater-brick'}},
+    {lvl:19, xp:460, free:{money:350, item:'shirt-cream'}, paid:{item:'hat-felt'}},
+    {lvl:20, xp:480, free:{money:365, item:'frame-wood'}, paid:{item:'glasses-sun'}},
+    {lvl:21, xp:500, free:{money:380, item:'backpack-ink'}, paid:{item:'scarf-wool'}},
+    {lvl:22, xp:520, free:{money:395, item:'glasses-sun'}, paid:{item:'tubeteika'}},
+    {lvl:23, xp:540, free:{money:410, item:'jacket-sand'}, paid:{item:'backpack-ink'}},
+    {lvl:24, xp:560, free:{money:425, item:'furn-lamp'}, paid:{item:'furn-samovar'}},
+    {lvl:25, xp:580, free:{money:440, item:'hood-green'}, paid:{item:'furn-lamp'}},
+    {lvl:26, xp:600, free:{money:455, item:'frame-ink'}, paid:{item:'name-pin'}},
+    {lvl:27, xp:620, free:{money:470, item:'furn-samovar'}, paid:{item:'shirt-cream'}},
+    {lvl:28, xp:640, free:{money:485, item:'car-cream'}, paid:{item:'car-sedan'}},
+    {lvl:29, xp:660, free:{money:500, item:'car-pine'}, paid:{item:'car-night'}},
+    {lvl:30, xp:680, free:{money:515, item:'coat-ink'}, paid:{item:'car-pickup'}}
+  ]};
