@@ -8,6 +8,8 @@ function destCandidates(q){const n=norm(q);const out=[];const seen=new Set();
   if(world.kremlin&&(!n||'казанский кремль'.includes(n)||norm('Казанский Кремль').includes(n)))add(world.kremlin.x,world.kremlin.y,'Казанский Кремль','достопримечательность',2.5);
   for(const s of world.squares){const sn=norm(s.n);if(!n||sn.includes(n))add(s.x,s.y,s.n,'площадь',sn.startsWith(n)?2:1.5);}
   if(n.length>=2)for(const p of world.pois){if(!p.n)continue;const pn=norm(p.n);if(!pn.includes(n))continue;add(p.x,p.y,p.n,POI_RU[p.t]||'место',pn.startsWith(n)?2:1);}
+  // места по всему городу (map/places.json): кафе и магазины в кварталах, которые сейчас не загружены
+  if(n.length>=2&&PLACES.list){let k=0;for(const p of PLACES.list){const pn=norm(p[0]);if(!pn.includes(n))continue;add(p[2]/10,p[3]/10,p[0],POI_RU[p[1]]||'место',pn.startsWith(n)?1.9:0.9);if(++k>60)break;}}
   if(n.length>=3){const best=new Map();for(const r of world.roads){if(!r.n||r.c>8)continue;const rn=norm(r.n);if(!rn.includes(n))continue;const mid=world.nodes[r.p[r.p.length>>1]];const d=dist(mid[0],mid[1],player.x,player.y);const o=best.get(r.n);if(!o||d<o.d)best.set(r.n,{x:mid[0],y:mid[1],d});}
     for(const [name,o] of best){const sc=norm(name).startsWith(n)?1.8:1.2;add(o.x,o.y,name,'улица',sc);if(out.length>40)break;}}
   else if(!n){for(const p of placesNear(player.x,player.y,600,8))add(p.x,p.y,p.n,POI_RU[p.t]||'место',0.5);}
@@ -15,7 +17,10 @@ function destCandidates(q){const n=norm(q);const out=[];const seen=new Set();
 function fmtDist(m){return m<1000?Math.round(m/10)*10+' м':(m/1000).toFixed(1).replace('.',',')+' км';}
 function fmtMin(sec){const m=Math.max(1,Math.round(sec/60));return m+' мин';}
 
-function openRouteModal(dest){rtDest=dest||null;$('#routeModal').hidden=false;player.busy=true;$('#rtSearch').value='';renderRouteModal();setTimeout(()=>{if(!rtDest)$('#rtSearch').focus();},40);}
+const PLACES={list:null,loading:false};
+function loadPlaces(){if(PLACES.list||PLACES.loading||!world||!world.meta.chunks)return;PLACES.loading=true;
+  fetch('map/places.json?v='+(world.meta.v||'1')).then(r=>r.ok?r.json():null).then(j=>{PLACES.list=Array.isArray(j)?j:[];PLACES.loading=false;if(!$('#routeModal').hidden&&!rtDest)renderRouteModal();}).catch(()=>{PLACES.loading=false;});}
+function openRouteModal(dest){loadPlaces();rtDest=dest||null;$('#routeModal').hidden=false;player.busy=true;$('#rtSearch').value='';renderRouteModal();setTimeout(()=>{if(!rtDest)$('#rtSearch').focus();},40);}
 function closeRouteModal(){$('#routeModal').hidden=true;player.busy=false;}
 $('#routeBtn').addEventListener('click',()=>openRouteModal());
 $('#rtClose').addEventListener('click',closeRouteModal);

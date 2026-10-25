@@ -546,6 +546,10 @@ for (cx, cy), c in sorted(chunks.items()):
     open(os.path.join(DSTDIR, f'c_{key}.json'), 'w').write(txt)
     index[key] = [len(c['buildings']), len(txt) // 1024]
     total += len(txt)
+# поиск в навигаторе по всему городу: все места с названиями из кусков (сами куски могут быть не загружены)
+places = [[p['n'], p['t'], p['x'], p['y']] for c in chunks.values() for p in c['pois'] if p.get('n')]
+json.dump(places, open(os.path.join(DSTDIR, 'places.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+print('мест для поиска:', len(places), os.path.getsize(os.path.join(DSTDIR, 'places.json')) // 1024, 'КБ')
 ver = hashlib.sha1(json.dumps(index, sort_keys=True).encode() + str(len(base_roads)).encode()).hexdigest()[:10]
 out = {
     'meta': {'lat0': lat0, 'lon0': lon0, 'mlat': M_LAT, 'mlon': M_LON,
