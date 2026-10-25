@@ -8,6 +8,12 @@ ST=/var/lib/zk-health.state   # вне папки игры: её может ме
 PORT=$(grep -m1 '^PORT=' "$ENVF" 2>/dev/null | cut -d= -f2); PORT=${PORT:-8080}
 TOKEN=$(grep -m1 '^TG_BOT_TOKEN=' "$ENVF" 2>/dev/null | cut -d= -f2-)
 ADMIN=$(grep -m1 '^ADMIN_TG_ID=' "$ENVF" 2>/dev/null | cut -d= -f2- | tr -cd '0-9')
+# ключи, введённые на странице /setup, лежат в файле службы игры
+SEC=/var/lib/zk/data/secrets.json
+if [ -f "$SEC" ]; then
+  [ -n "$TOKEN" ] || TOKEN=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("TG_BOT_TOKEN",""))' "$SEC" 2>/dev/null)
+  [ -n "$ADMIN" ] || ADMIN=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("ADMIN_TG_ID",""))' "$SEC" 2>/dev/null | tr -cd '0-9')
+fi
 
 say() {  # токен не попадает в список процессов: адрес передаётся curl через stdin
   [ -n "$TOKEN" ] && [ -n "$ADMIN" ] || return 0

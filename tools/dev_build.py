@@ -13,6 +13,10 @@ if os.path.isdir(os.path.join(DST, 'js')):
     shutil.rmtree(os.path.join(DST, 'js'))
 shutil.copytree(os.path.join(SRC, 'js'), os.path.join(DST, 'js'))
 shutil.copy(os.path.join(SRC, 'kazan.json'), os.path.join(DST, 'kazan.json'))
+if os.path.isdir(os.path.join(DST, 'map')):
+    shutil.rmtree(os.path.join(DST, 'map'))
+if os.path.isdir(os.path.join(SRC, 'map')):
+    shutil.copytree(os.path.join(SRC, 'map'), os.path.join(DST, 'map'))
 if os.path.isdir(os.path.join(DST, 'img')):
     shutil.rmtree(os.path.join(DST, 'img'))
 if os.path.isdir(os.path.join(SRC, 'img')):

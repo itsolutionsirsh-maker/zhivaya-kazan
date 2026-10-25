@@ -7,23 +7,12 @@ const EXT=[0.22,-0.5];       // направление «выдавливани�
 const CAR_COLORS=['#C8CCD1','#2E3A46','#9AA3AD','#1F2A3A','#B33A3A','#3B5A8C','#DADDE0','#5A6B52','#7A4A3A','#E1E3E6','#8A6D3B','#4B4F55'];
 let world=null;
 
-function buildWorld(d){
-  const nodes=d.nodes.map(p=>[p[0]/10,p[1]/10]);const N=nodes.length;
-  const roads=d.roads.map((r,i)=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of r.p){const p=nodes[n];if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}
-    const w=r.l?Math.min(ROAD_W[r.c]*1.4,r.l*3.1+1):ROAD_W[r.c];
-    return {c:r.c,n:r.n||'',o:r.o||0,p:r.p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i,speed:(r.s?Math.min(r.s/3.6*0.9,20):ROAD_SPEED[r.c])||0,lim:r.s||60,lanes:r.l||0};});
-  const pedAdj=Array.from({length:N},()=>[]),carAdj=Array.from({length:N},()=>[]);
-  const rgrid=new Grid(60);
-  for(const r of roads){for(let i=0;i<r.p.length-1;i++){const a=r.p[i],b=r.p[i+1];const pa=nodes[a],pb=nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);if(L<0.05)continue;
-    if(r.c>=2){pedAdj[a].push([b,L,r.i]);pedAdj[b].push([a,L,r.i]);}
-    if(r.c<=8){if(r.o!==-1)carAdj[a].push([b,L,r.i]);if(r.o!==1)carAdj[b].push([a,L,r.i]);
-      const seg={r,a,b,ax:pa[0],ay:pa[1],bx:pb[0],by:pb[1],L};rgrid.add(seg,Math.min(pa[0],pb[0])-r.hw-1,Math.min(pa[1],pb[1])-r.hw-1,Math.max(pa[0],pb[0])+r.hw+1,Math.max(pa[1],pb[1])+r.hw+1);}}}
-  // здания
-  const WALLS=['#EDE3CF','#F1E8D6','#E4D9C4','#EADFCB','#F3EBDD','#E7DCCB','#F0E4CE','#DFD3BE','#F2E6D2','#E9E0D4'];
-  const ROOFS=['#A9937A','#8F7B66','#6F8F7C','#8F5F52','#9C9C94','#7E8C78','#A08A72','#8B7355'];
-  const bgrid=new Grid(80);
-  const buildings=d.buildings.map((b,i)=>{const p=new Float32Array(b.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,cx=0,cy=0;for(let k=0;k<b.p.length;k+=2){const x=b.p[k]/10,y=b.p[k+1]/10;p[k]=x;p[k+1]=y;cx+=x;cy+=y;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
-    const n=b.p.length/2;const t=b.t||'';const hsh=Math.imul(i+1,2654435761)>>>0;let wall,roof;
+// Карта приходит частями: base (крупные улицы, остановки, маршруты, вода, важные места) и куски 2×2 км (дома, дворы, тропинки,
+// парки, магазины), которые подгружаются вокруг игрока (см. chunks.js). Старый цельный kazan.json — это тот же base, только со всем сразу.
+const WALLS=['#EDE3CF','#F1E8D6','#E4D9C4','#EADFCB','#F3EBDD','#E7DCCB','#F0E4CE','#DFD3BE','#F2E6D2','#E9E0D4'];
+const ROOFS=['#A9937A','#8F7B66','#6F8F7C','#8F5F52','#9C9C94','#7E8C78','#A08A72','#8B7355'];
+function makeBuilding(b){const p=new Float32Array(b.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,cx=0,cy=0;for(let k=0;k<b.p.length;k+=2){const x=b.p[k]/10,y=b.p[k+1]/10;p[k]=x;p[k+1]=y;cx+=x;cy+=y;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+    const n=b.p.length/2;const t=b.t||'';const hsh=Math.imul((b.p[0]*73856093)^(b.p[1]*19349663)^(n*83492791),2654435761)>>>0;let wall,roof;  // цвет от координат: тот же дом — тот же цвет при любой подгрузке
     if(/church|cathedral|mosque|chapel|worship|temple|minaret/.test(t)){wall='#F3EBDD';roof='#5F8F7C';}
     else if(/commercial|retail|mall|supermarket|shop|office|kiosk/.test(t)){wall=['#E6E2DA','#DFDCD6','#E8E4DC'][hsh%3];roof=['#9A9A94','#8C9096','#A39E96'][(hsh>>>8)%3];}
     else if(/industrial|warehouse|garage|garages|service|hangar|shed/.test(t)){wall='#CDD0D3';roof='#8A8F94';}
@@ -40,38 +29,58 @@ function buildWorld(d){
     else if(/mosque/.test(t)||/мечеть/i.test(nm)){wall='#F4F1EA';roof='#D3E2DE';dome='#3FA39B';minarets=1;}
     else if(t==='place_of_worship'){wall='#F4F1EA';roof='#D8D6CC';dome='#3FA39B';}
     const hm=Math.min(levels,22)*3.1*K_H;
-    const o={p,h:levels,hm,n:b.n||'',t,bb:[x0,y0,x1,y1],cx:cx/n,cy:cy/n,i,wall,roof,sgn:area>0?1:-1,area:absA,lit:(hsh>>>4)%10<7,dash:(hsh>>>12)%7*0.3,dome,minarets,spire,pass};bgrid.add(o,x0,y0,x1,y1);return o;});
-  // площади
-  const areas=d.areas.map(a=>{const p=new Float32Array(a.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let k=0;k<a.p.length;k+=2){p[k]=a.p[k]/10;p[k+1]=a.p[k+1]/10;if(p[k]<x0)x0=p[k];if(p[k]>x1)x1=p[k];if(p[k+1]<y0)y0=p[k+1];if(p[k+1]>y1)y1=p[k+1];}return {k:a.k,p,bb:[x0,y0,x1,y1]};});
-  // деревья и припаркованные машины
-  const rng=seeded(7);const trees=[];const tgrid=new Grid(100);
-  for(const a of areas){
-    if(/park|forest|grass|cemetery/.test(a.k)){const A=Math.abs(polyArea(a.p));const dens=a.k==='forest'?60:a.k==='park'?150:a.k==='cemetery'?130:300;let n=Math.min(450,Math.floor(A/dens));const bb=a.bb;let tries=0;
-      while(n>0&&tries<n*8+40){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;const r=a.k==='forest'?2.2+rng()*2.2:1.7+rng()*2.3;const t={x,y,r,c:Math.floor(rng()*3)};trees.push(t);tgrid.add(t,x-r,y-r,x+r,y+r);n--;}}
-    if(a.k==='parking'){const A=Math.abs(polyArea(a.p));a.cars=[];if(A<140)continue;const n=Math.min(16,Math.floor(A/95));const bb=a.bb;let tries=0;const ang=(bb[2]-bb[0]>bb[3]-bb[1])?0:Math.PI/2;
-      while(a.cars.length<n&&tries<300){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;if(a.cars.some(c=>dist(c.x,c.y,x,y)<3.4))continue;a.cars.push({x,y,ang,color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});}}}
-  const stops=d.stops.map((s,i)=>({x:s.x/10,y:s.y/10,n:s.n,k:s.k,i}));
-  const pois=d.pois.map((p,i)=>({x:p.x/10,y:p.y/10,t:p.t,n:p.n||'',st:p.st||'',i}));
-  const routes=d.routes.map((r,i)=>{const pts=[];for(let k=0;k<r.p.length;k+=2)pts.push([r.p[k]/10,r.p[k+1]/10]);const cum=[0];for(let k=0;k<pts.length-1;k++)cum.push(cum[k]+dist(pts[k][0],pts[k][1],pts[k+1][0],pts[k+1][1]));
+    return {p,h:levels,hm,n:b.n||'',t,bb:[x0,y0,x1,y1],cx:cx/n,cy:cy/n,i:world.bseq++,wall,roof,sgn:area>0?1:-1,area:absA,lit:(hsh>>>4)%10<7,dash:(hsh>>>12)%7*0.3,dome,minarets,spire,pass};}
+function strHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+
+function buildWorld(d){
+  world={nodes:[],N:0,roads:[],pedAdj:[],carAdj:[],emAdj:[],pedNodes:[],carNodes:[],buildings:[],bgrid:new Grid(80),areas:[],stops:[],pois:[],routes:[],
+    ngrid:new Grid(60),rgrid:new Grid(60),trees:[],tgrid:new Grid(100),bbox:d.meta.bbox.map(v=>v/10),meta:d.meta,crossings:[],cgrid:new Grid(40),
+    lamps:[],lgrid:new Grid(120),bseq:0,pseq:0,parts:new Map(),base:d};
+  addMapPart(d,null);world.baseN=world.nodes.length;
+  world.stops=d.stops.map((s,i)=>({x:s.x/10,y:s.y/10,n:s.n,k:s.k,i}));
+  world.routes=d.routes.map((r,i)=>{const pts=[];for(let k=0;k<r.p.length;k+=2)pts.push([r.p[k]/10,r.p[k+1]/10]);const cum=[0];for(let k=0;k<pts.length-1;k++)cum.push(cum[k]+dist(pts[k][0],pts[k][1],pts[k+1][0],pts[k+1][1]));
     return {ref:r.ref,name:r.name,type:r.type,pts,cum,len:cum[cum.length-1],stops:r.s.map(s=>({s:s[0],n:s[1]})),i};});
-  const ngrid=new Grid(60);nodes.forEach((p,i)=>ngrid.add(i,p[0],p[1],p[0],p[1]));
-  const bb=d.meta.bbox.map(v=>v/10);
-  world={nodes,N,roads,pedAdj,carAdj,buildings,bgrid,areas,stops,pois,routes,ngrid,rgrid,trees,tgrid,bbox:bb,meta:d.meta,crossings:[],cgrid:new Grid(40)};
   // переходы: привязываем к ближайшей дороге
   for(const c of (d.crossings||[])){const x=c.x/10,y=c.y/10;const ns=nearestRoadSeg(x,y,9);if(!ns||ns.seg.r.c>8)continue;const s=ns.seg;const dx=(s.bx-s.ax)/s.L,dy=(s.by-s.ay)/s.L;
-    if(world.crossings.some(o=>dist(o.x,o.y,ns.px,ns.py)<3))continue;
+    let dup=false;world.cgrid.query(ns.px-3,ns.py-3,ns.px+3,ns.py+3,o=>{if(dist(o.x,o.y,ns.px,ns.py)<3){dup=true;return false;}});if(dup)continue;
     const o={x:ns.px,y:ns.py,dx,dy,w:s.r.w,hw:s.r.hw,sig:!!c.s,road:s.r};world.crossings.push(o);world.cgrid.add(o,o.x-12,o.y-12,o.x+12,o.y+12);}
   // фонари вдоль улиц каждые ~28 м
-  const lamps=[];const lgrid=new Grid(120);for(const r of roads){if(r.c>7||r.c<1)continue;let acc=14;for(let i=0;i<r.p.length-1;i++){const a=nodes[r.p[i]],b=nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);let s=acc;while(s<L){const t=s/L;const x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t;const l=[x,y];lamps.push(l);lgrid.add(l,x,y,x,y);s+=28;}acc=s-L;}}
-  world.lamps=lamps;world.lgrid=lgrid;
-  // для скорой и полиции с мигалкой: те же дороги, но без запрета одностороннего движения
-  const emAdj=Array.from({length:N},()=>[]);for(let i=0;i<N;i++)for(const e of carAdj[i]){emAdj[i].push(e);if(!carAdj[e[0]].some(f=>f[0]===i))emAdj[e[0]].push([i,e[1],e[2]]);}
-  world.emAdj=emAdj;
-  const pedNodes=[],carNodes=[];for(let i=0;i<N;i++){if(pedAdj[i].length)pedNodes.push(i);if(carAdj[i].length)carNodes.push(i);}
-  world.pedNodes=pedNodes;world.carNodes=carNodes;
+  for(const r of world.roads){if(r.c>7||r.c<1)continue;let acc=14;for(let i=0;i<r.p.length-1;i++){const a=world.nodes[r.p[i]],b=world.nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);let s=acc;while(s<L){const t=s/L;const x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t;const l=[x,y];world.lamps.push(l);world.lgrid.add(l,x,y,x,y);s+=28;}acc=s-L;}}
   initLandmarks(d);
   return world;
 }
+// добавить часть карты: узлы, дороги (граф для пешеходов, машин и скорой), дома, площади с деревьями и парковками, места.
+// В кусках ссылка на узел < 0 — это узел base (-(i+1)), иначе — свой узел куска.
+function addMapPart(d,key){const W=world;const off=W.nodes.length;
+  for(const p of d.nodes){const i=W.nodes.length;const q=[p[0]/10,p[1]/10];W.nodes.push(q);W.pedAdj.push([]);W.carAdj.push([]);W.emAdj.push([]);W.ngrid.add(i,q[0],q[1],q[0],q[1]);}
+  W.N=W.nodes.length;
+  const rec={key,buildings:[],areas:[],pois:[],trees:[],roads:[]};const touched=new Set();
+  for(const r0 of d.roads){const p=key===null?r0.p:r0.p.map(v=>v<0?-v-1:v+off);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of p){const q=W.nodes[n];if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1];}
+    const w=r0.l?Math.min(ROAD_W[r0.c]*1.4,r0.l*3.1+1):ROAD_W[r0.c];
+    const r={c:r0.c,n:r0.n||'',o:r0.o||0,p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i:W.roads.length,speed:(r0.s?Math.min(r0.s/3.6*0.9,20):ROAD_SPEED[r0.c])||0,lim:r0.s||60,lanes:r0.l||0};W.roads.push(r);rec.roads.push(r);
+    for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];const pa=W.nodes[a],pb=W.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);if(L<0.05)continue;touched.add(a);touched.add(b);
+      if(r.c>=2){W.pedAdj[a].push([b,L,r.i]);W.pedAdj[b].push([a,L,r.i]);}
+      if(r.c<=8){if(r.o!==-1)W.carAdj[a].push([b,L,r.i]);if(r.o!==1)W.carAdj[b].push([a,L,r.i]);W.emAdj[a].push([b,L,r.i]);W.emAdj[b].push([a,L,r.i]);
+        const seg={r,a,b,ax:pa[0],ay:pa[1],bx:pb[0],by:pb[1],L};W.rgrid.add(seg,Math.min(pa[0],pb[0])-r.hw-1,Math.min(pa[1],pb[1])-r.hw-1,Math.max(pa[0],pb[0])+r.hw+1,Math.max(pa[1],pb[1])+r.hw+1);}}}
+  if(!W.pedMark){W.pedMark=new Set();W.carMark=new Set();}
+  for(const n of touched){if(W.pedAdj[n].length&&!W.pedMark.has(n)){W.pedMark.add(n);W.pedNodes.push(n);}if(W.carAdj[n].length&&!W.carMark.has(n)){W.carMark.add(n);W.carNodes.push(n);}}
+  for(const b of d.buildings||[]){const o=makeBuilding(b);W.buildings.push(o);rec.buildings.push(o);W.bgrid.add(o,o.bb[0],o.bb[1],o.bb[2],o.bb[3]);}
+  const rng=seeded(key===null?7:strHash(key));
+  for(const a0 of d.areas||[]){const p=new Float32Array(a0.p.length);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(let k=0;k<a0.p.length;k+=2){p[k]=a0.p[k]/10;p[k+1]=a0.p[k+1]/10;if(p[k]<x0)x0=p[k];if(p[k]>x1)x1=p[k];if(p[k+1]<y0)y0=p[k+1];if(p[k+1]>y1)y1=p[k+1];}
+    const a={k:a0.k,p,bb:[x0,y0,x1,y1]};W.areas.push(a);rec.areas.push(a);
+    // деревья и припаркованные машины
+    if(/park|forest|grass|cemetery/.test(a.k)){const A=Math.abs(polyArea(a.p));const dens=a.k==='forest'?60:a.k==='park'?150:a.k==='cemetery'?130:300;let n=Math.min(450,Math.floor(A/dens));const bb=a.bb;let tries=0;
+      while(n>0&&tries<n*8+40){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;const r=a.k==='forest'?2.2+rng()*2.2:1.7+rng()*2.3;const t={x,y,r,c:Math.floor(rng()*3)};W.trees.push(t);rec.trees.push(t);W.tgrid.add(t,x-r,y-r,x+r,y+r);n--;}}
+    if(a.k==='parking'){const A=Math.abs(polyArea(a.p));a.cars=[];if(A<140)continue;const n=Math.min(16,Math.floor(A/95));const bb=a.bb;let tries=0;const ang=(bb[2]-bb[0]>bb[3]-bb[1])?0:Math.PI/2;
+      while(a.cars.length<n&&tries<300){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;if(a.cars.some(c=>dist(c.x,c.y,x,y)<3.4))continue;a.cars.push({x,y,ang,color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});}}}
+  for(const p0 of d.pois||[]){const o={x:p0.x/10,y:p0.y/10,t:p0.t,n:p0.n||'',st:p0.st||'',i:W.pseq++};W.pois.push(o);rec.pois.push(o);}
+  W.parts.set(key===null?'base':key,rec);return rec;}
+// выгрузить кусок: дома, площади, деревья и места уходят из памяти; узлы и дороги остаются (на них могут ехать машины и идти люди)
+function removeMapPart(key){const W=world;const rec=W.parts.get(key);if(!rec||key==='base')return;W.parts.delete(key);
+  const drop=(arr,list)=>{if(!list.length)return arr;const s=new Set(list);return arr.filter(o=>!s.has(o));};
+  for(const o of rec.buildings)W.bgrid.remove(o,o.bb[0],o.bb[1],o.bb[2],o.bb[3]);W.buildings=drop(W.buildings,rec.buildings);
+  for(const t of rec.trees)W.tgrid.remove(t,t.x-t.r,t.y-t.r,t.x+t.r,t.y+t.r);W.trees=drop(W.trees,rec.trees);
+  W.areas=drop(W.areas,rec.areas);W.pois=drop(W.pois,rec.pois);}
 
 function nearestRoadSeg(x,y,maxR){let best=null;world.rgrid.query(x-maxR,y-maxR,x+maxR,y+maxR,s=>{const vx=s.bx-s.ax,vy=s.by-s.ay;let t=((x-s.ax)*vx+(y-s.ay)*vy)/(s.L*s.L);t=clamp(t,0,1);const px=s.ax+vx*t,py=s.ay+vy*t;const d=Math.hypot(px-x,py-y);if(d<maxR&&(!best||d<best.d))best={seg:s,d,t,px,py};});return best;}
 function nearestNode(x,y,adj,maxR){let best=-1,bd=(maxR||120)**2;
@@ -82,6 +91,13 @@ function nearestRoadName(x,y){const ns=nearestRoadSeg(x,y,60);if(ns&&ns.seg.r.n)
 // если пешеходная дорожка попала внутрь проезжей части — сдвинуть на тротуар (переходы поперёк дороги не трогаем)
 function pushOffRoad(x,y,dx,dy){const ns=nearestRoadSeg(x,y,12);if(!ns||ns.seg.r.c>8||ns.d>=ns.seg.r.hw+0.9)return null;const s=ns.seg;const ux=(s.bx-s.ax)/s.L,uy=(s.by-s.ay)/s.L;if(Math.abs(dx*ux+dy*uy)<0.55)return null;
   let nx=x-ns.px,ny=y-ns.py;const d=Math.hypot(nx,ny);if(d<0.05){nx=-uy;ny=ux;}else{nx/=d;ny/=d;}const off=s.r.hw+1.2;return [ns.px+nx*off,ns.py+ny*off];}
+// сдвиг тротуара от оси дороги a→b (вправо по ходу), но так, чтобы не залезть в дом: в старом центре дома стоят вплотную к проезжей части,
+// и полный сдвиг уводил пешеходов сквозь стены. Проверяем точки вдоль отрезка и берём самый большой сдвиг без домов. Считается один раз на ребро.
+const _sideOff=new Map();
+function safeSideOff(a,b,want){if(want<=0.05)return want;const k=a*4194304+b;let o=_sideOff.get(k);if(o!==undefined)return Math.min(o,want);
+  const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;const n=Math.min(14,Math.max(2,Math.ceil(L/3)));
+  const free=off=>{for(let i=0;i<=n;i++){const t=i/n*L;if(inBuilding(pa[0]+dx*t-dy*off,pa[1]+dy*t+dx*off))return false;}return true;};
+  o=0;for(const f of [1,0.8,0.6,0.42,0.25]){if(free(want*f)){o=want*f;break;}}_sideOff.set(k,o);return o;}
 // точка на тротуаре рядом с узлом (а не на оси дороги)
 function sidewalkPos(node){const p=world.nodes[node];let best=null;for(const e of world.pedAdj[node]||[]){const r=world.roads[e[2]];if(r.c>8)return [p[0],p[1]];if(!best||r.hw>best.r.hw)best={e,r};}
   if(!best)return [p[0],p[1]];const q=world.nodes[best.e[0]];const L=dist(p[0],p[1],q[0],q[1])||1;const dx=(q[0]-p[0])/L,dy=(q[1]-p[1])/L;const off=best.r.hw+SIDEWALK*0.55;const sgn=Math.random()<0.5?1:-1;
@@ -92,7 +108,7 @@ function nodeNear(list,center,R){const adj=list===world.carNodes?world.carAdj:wo
 let gArr,stampArr,cameArr,gen=0;
 function astar(adj,start,goal,costFn){
   if(start<0||goal<0)return null;if(start===goal)return [start];
-  if(!gArr){gArr=new Float64Array(world.N);stampArr=new Int32Array(world.N);cameArr=new Int32Array(world.N);}
+  if(!gArr||gArr.length<world.N){const n=Math.ceil(world.N*1.25)+1024;gArr=new Float64Array(n);stampArr=new Int32Array(n);cameArr=new Int32Array(n);gen=0;}   // узлов становится больше, когда подгружаются куски
   gen++;const nodes=world.nodes,gx=nodes[goal][0],gy=nodes[goal][1];
   const h=new Heap();gArr[start]=0;stampArr[start]=gen;cameArr[start]=-1;h.push(0,start);let iter=0;
   while(h.size){const [,u]=h.pop();if(u===goal){const path=[];let c=u;while(c!==-1){path.push(c);c=cameArr[c];}return path.reverse();}
@@ -107,7 +123,7 @@ function processPaths(n){while(n-->0&&pathQueue.length){const q=pathQueue.shift(
 // Путь по узлам → точки с учётом тротуара/полосы. side: 'ped' (тротуар справа) | 'car' (полоса справа)
 function pathToWaypoints(path,adj,side){const wps=[];if(!path||path.length<2)return wps;
   for(let i=0;i<path.length-1;i++){const a=world.nodes[path[i]],b=world.nodes[path[i+1]];const L=dist(a[0],a[1],b[0],b[1])||1;const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;const e=adj[path[i]].find(q=>q[0]===path[i+1]);const r=e?world.roads[e[2]]:null;
-    const off=side==='car'?(r?Math.max(1.2,r.hw*0.5):1.5):(r&&r.c<=8?r.hw+1.3:0);
+    const off=side==='car'?(r?Math.max(1.2,r.hw*0.5):1.5):(r&&r.c<=8?safeSideOff(path[i],path[i+1],r.hw+1.3):0);
     let p1=[a[0]-dy*off,a[1]+dx*off],p2=[b[0]-dy*off,b[1]+dx*off];if(side==='ped'&&r&&r.c>8){p1=pushOffRoad(p1[0],p1[1],dx,dy)||p1;p2=pushOffRoad(p2[0],p2[1],dx,dy)||p2;}
     wps.push(p1);wps.push(p2);}
   return wps;}

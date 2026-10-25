@@ -48,11 +48,11 @@ class Walker{
     while(step>0){const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);
       if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
-    const edge=world.pedAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;this.road=r;const off=(r&&r.c<=8?r.hw+1.3:0)+this.off;
+    const edge=world.pedAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;this.road=r;const want=r&&r.c<=8?r.hw+1.3:0;const off=want?Math.min(safeSideOff(a,b,want+0.6),want+this.off):this.off;
     this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;
     if(r&&r.c>8&&Math.abs(this.x-player.x)<450&&Math.abs(this.y-player.y)<450){const q=pushOffRoad(this.x,this.y,dx,dy);if(q){this.x=q[0];this.y=q[1];}}}
   arrive(){this.path=null;if(this.rallySlot){this.x=this.rallySlot[0];this.y=this.rallySlot[1];this.state='rally';rallyFace(this);return;}if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
-    if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);}
+    if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);if(inBuilding(this.x,this.y)){const q=toSidewalk(this.x,this.y);if(!inBuilding(q[0],q[1])){this.x=q[0]+rnd(-0.8,0.8);this.y=q[1]+rnd(-0.8,0.8);}}}
     this.state='idle';this.ttl=rnd(6,45);}
   // перебежать дорогу не по переходу
   startCross(){if(this.state!=='walk'||!this.path)return false;const a=this.path[this.seg],b=this.path[this.seg+1];const e=world.pedAdj[a].find(q=>q[0]===b);if(!e)return false;const r=world.roads[e[2]];if(r.c>7||r.c<2||r.w<6)return false;
@@ -145,7 +145,7 @@ function busWord(t){return t==='tram'?'Трамвай':t==='trolleybus'?'Тро�
 function spawnPopulation(spawn){
   // сколько народу и машин держит город: меньше — легче телефону и серверу (было 420 / 130 / до 3 машин на маршрут)
   for(let i=0;i<POP.walkers;i++){const role=i<4?'police':i<14?'courier':'resident';const w=new Walker(role,nodeNear(world.pedNodes,spawn,i<POP.walkers*0.6?160:300));if(role==='police')w.anchor=[spawn[0]+rnd(-150,150),spawn[1]+rnd(-150,150)];walkers.push(w);}
-  const guardSpots=world.pois.filter(p=>p.t==='bank'||p.t==='market'||p.t==='museum');for(const g of guardSpots.slice(0,16)){const n=nearestNode(g.x,g.y,world.pedAdj,80);if(n<0)continue;const w=new Walker('guard',n);w.x=g.x+rnd(-2,2);w.y=g.y+rnd(-2,2);w.gx=w.x;w.gy=w.y;w.state='idle';w.ttl=9e9;walkers.push(w);}
+  const guardSpots=world.pois.filter(p=>p.t==='bank'||p.t==='market'||p.t==='museum');for(const g of guardSpots.slice(0,16)){const n=nearestNode(g.x,g.y,world.pedAdj,80);if(n<0)continue;const w=new Walker('guard',n);w.x=g.x+rnd(-2,2);w.y=g.y+rnd(-2,2);if(inBuilding(w.x,w.y)){const q=toSidewalk(w.x,w.y);if(!inBuilding(q[0],q[1])){w.x=q[0];w.y=q[1];}}w.gx=w.x;w.gy=w.y;w.state='idle';w.ttl=9e9;walkers.push(w);}
   for(let i=0;i<POP.cars;i++){const c=new Car(i<8?'taxi':'car',nodeNear(world.carNodes,spawn,i<POP.cars*0.55?300:600));c.ttl=rnd(0,2);cars.push(c);}
   for(let i=0;i<3;i++){const c=new Car('police',nodeNear(world.carNodes,spawn,700));c.vmax=16;c.ttl=rnd(0,2);cars.push(c);policeCars.push(c);}
   for(const r of world.routes){const n=clamp(Math.round(r.len/POP.busEvery),1,POP.busMax);for(let i=0;i<n;i++){buses.push(new Bus(r,r.len*(i+0.3)/n,i%2?-1:1));}}

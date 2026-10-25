@@ -78,6 +78,8 @@ function render(){
   // ---- игрок и другие игроки
   for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,{clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},t,false);}
   if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,{clothes:player.clothes,skin:player.skin,hair:player.hair,role:'player'},t,true);
+  // линия навигатора: оставшийся путь пешком или на машине
+  {const wl=player.vehicle?(player.vehicle.auto&&player.vehicle.auto.wps):(!player.bus&&player.waypoints);if(wl&&wl.length){ctx.save();ctx.strokeStyle='rgba(43,176,98,.75)';ctx.lineWidth=Math.max(0.8,2.2/z);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([Math.max(1.2,4/z),Math.max(1,3/z)]);ctx.beginPath();ctx.moveTo(player.x,player.y);for(let i=(player.vehicle?player.vehicle.auto.i||0:0);i<wl.length;i++)ctx.lineTo(wl[i][0],wl[i][1]);ctx.stroke();ctx.restore();}}
   if(player.waypoints&&!player.vehicle){const w=player.waypoints[player.waypoints.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(w[0],w[1],1.6+Math.sin(t*6)*0.3,0,TAU);ctx.stroke();}
   if(player.vehicle&&player.vehicle.auto){const a=player.vehicle.auto;const w=a.wps[a.wps.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.35;ctx.beginPath();ctx.arc(w[0],w[1],2+Math.sin(t*6)*0.3,0,TAU);ctx.stroke();ctx.setLineDash([2,2]);ctx.lineWidth=0.3;ctx.strokeStyle='rgba(43,176,98,.5)';ctx.beginPath();ctx.moveTo(player.x,player.y);for(let i=a.i;i<a.wps.length;i++)ctx.lineTo(a.wps[i][0],a.wps[i][1]);ctx.stroke();ctx.setLineDash([]);}
   if(player.home&&z>1.1){const hx=player.home.cx,hy=player.home.cy;ctx.fillStyle='rgba(43,176,98,.9)';ctx.beginPath();ctx.moveTo(hx,hy-3.2);ctx.lineTo(hx+2.4,hy-0.8);ctx.lineTo(hx-2.4,hy-0.8);ctx.closePath();ctx.fill();ctx.fillRect(hx-1.6,hy-0.8,3.2,2.6);}
@@ -227,6 +229,14 @@ function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((
   g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of world.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}
   for(const w of world.walls||[]){if(w.k!=='kremlin')continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
   overview=c;}
+// подгруженный кусок дорисовываем на обзорную картинку (выгруженные остаются на ней — как память о виденном)
+function overviewAddPart(rec){if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
+  const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
+  for(const a of rec.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
+  g.lineCap='round';g.lineJoin='round';g.strokeStyle='#D2CCBC';g.lineWidth=2.2;g.beginPath();for(const r of rec.roads){if(r.c<10)continue;const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();
+  for(const r of rec.roads){if(r.c!==8)continue;g.strokeStyle='#9C9A94';g.lineWidth=ROAD_W[8]+3.5;g.beginPath();const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}g.stroke();g.strokeStyle='#F1EFEA';g.lineWidth=ROAD_W[8]+1.5;g.stroke();}
+  for(const b of rec.buildings){g.fillStyle=b.roof;pl(b.p);g.fill();}
+  g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of rec.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}}
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;
   ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);
   if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}

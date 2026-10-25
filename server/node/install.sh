@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # «Живая Казань» — установка на чистый сервер Ubuntu 22.04 / 24.04.
-#   sudo bash install.sh game.iks-ai-systems.ru
+#   sudo bash install.sh game.iks-ai-systems.ru [запасной.адрес ...]
+# Первый адрес — основной (кнопка «Играть» в боте). Остальные тоже открывают игру: например, временный
+# <IP-через-дефисы>.sslip.io, пока основной домен ещё не заработал.
 # Ставит Node.js 22 (встроенный SQLite для аккаунтов), Caddy (сам получает HTTPS-сертификат), скачивает игру с GitHub,
 # запускает её как службу и раз в 5 минут подтягивает обновления из ветки main.
 # Перед запуском у домена должна быть A-запись на IP этого сервера.
@@ -8,6 +10,7 @@ set -euo pipefail
 
 DOMAIN="${1:-}"
 if [ -z "$DOMAIN" ]; then echo "Укажите домен: sudo bash install.sh game.example.ru"; exit 1; fi
+SITES="$*"; SITES="${SITES// /, }"   # для Caddy: «a.ru, b.ru»
 if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo"; exit 1; fi
 REPO="${REPO:-https://github.com/itsolutionsirsh-maker/zhivaya-kazan.git}"
 APP=/opt/zhivaya-kazan
@@ -24,7 +27,20 @@ fi
 echo "== Пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y git curl python3 ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y git curl python3 ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https unattended-upgrades fail2ban
+
+echo "== Защита: обновления безопасности ставятся сами, подбор пароля к SSH блокируется"
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
+cat > /etc/fail2ban/jail.d/zk-sshd.conf <<EOF
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 6
+findtime = 10m
+bantime = 1h
+EOF
+systemctl enable fail2ban >/dev/null 2>&1 || true
+systemctl restart fail2ban >/dev/null 2>&1 || true
 
 echo "== Node.js"
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 22 ]; then
@@ -78,8 +94,7 @@ grep -q '^ADMIN_TG_ID=' "$ENVF" || printf '# Ваш id в Телеге для с
 grep -q '^BACKUP_TO_TG=' "$ENVF" || printf '# 1 — раз в сутки присылать копию базы игроков в Телегу админу (копии на сервере делаются всегда)\nBACKUP_TO_TG=0\n' >> "$ENVF"
 # адрес игры: для кнопки «Играть» в боте и вебхука Телеги (обновляется при каждом запуске install.sh с новым доменом)
 if grep -q '^PUBLIC_URL=' "$ENVF"; then sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN/|" "$ENVF"; else echo "PUBLIC_URL=https://$DOMAIN/" >> "$ENVF"; fi
-# ключ модератора для страницы /mod.html — создаётся один раз
-if ! grep -q '^MOD_TOKEN=.\+' "$ENVF"; then sed -i '/^MOD_TOKEN=/d' "$ENVF"; echo "MOD_TOKEN=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" >> "$ENVF"; fi
+# ключ модератора для страницы /mod.html сервер создаёт сам (в /var/lib/zk/data/secrets.json) и показывает на странице /setup
 chown root:zk "$ENVF"; chmod 640 "$ENVF"
 mkdir -p /var/lib/zk/data; chown -R zk:zk /var/lib/zk
 
@@ -157,19 +172,32 @@ OnUnitActiveSec=5min
 WantedBy=timers.target
 EOF
 
-echo "== Caddy: $DOMAIN → игра"
+echo "== Caddy: $SITES → игра"
 cat > /etc/caddy/Caddyfile <<EOF
-$DOMAIN {
+$SITES {
 	encode gzip
 	reverse_proxy 127.0.0.1:8080
 }
 EOF
+# игра на поддомене (kazan.lifegorod.com), а сам домен и www тоже смотрят на этот сервер — они пересылают в игру
+MYIP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++)if($i=="src")print $(i+1)}')
+APEX="${DOMAIN#*.}"
+if [ "$APEX" != "$DOMAIN" ] && [ "${APEX#*.}" != "$APEX" ] && [ -n "$MYIP" ]; then
+  RED=""
+  for h in "$APEX" "www.$APEX"; do
+    [ "$(getent ahostsv4 "$h" | awk 'NR==1{print $1}')" = "$MYIP" ] && RED="${RED:+$RED, }$h"
+  done
+  if [ -n "$RED" ]; then
+    echo "   $RED → https://$DOMAIN"
+    printf '\n%s {\n\tredir https://%s{uri} 302\n}\n' "$RED" "$DOMAIN" >> /etc/caddy/Caddyfile
+  fi
+fi
 
 echo "== Брандмауэр: открыты только SSH, 80 и 443"
 if command -v ufw >/dev/null 2>&1; then
-  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}'); SSHP=${SSHP:-22}
+  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}' || true); SSHP=${SSHP:-22}
   ufw allow "$SSHP"/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
-  ufw --force enable >/dev/null
+  ufw --force enable >/dev/null || true
 fi
 
 systemctl daemon-reload
@@ -178,12 +206,12 @@ systemctl restart zhivaya-kazan
 systemctl enable --now zhivaya-kazan-update.timer zhivaya-kazan-health.timer
 systemctl reload caddy || systemctl restart caddy
 
-sleep 2
-if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+for i in $(seq 1 20); do curl -fsS -m 3 http://127.0.0.1:8080/health >/dev/null 2>&1 && break; sleep 1; done
+if curl -fsS -m 3 http://127.0.0.1:8080/health >/dev/null; then
   echo
   echo "Готово: https://$DOMAIN"
-  echo "Ключ ИИ для жителей, токен бота и ваш id в Телеге (LLM_API_KEY, TG_BOT_TOKEN, ADMIN_TG_ID): sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
-  echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ — MOD_TOKEN: sudo grep MOD_TOKEN $ENVF)"
+  echo "Токен бота, ваш id в Телеге и ключ ИИ: откройте https://$DOMAIN/setup и вставьте их там"
+  echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ показан на странице /setup; ещё он лежит в /var/lib/zk/data/secrets.json)"
   echo "Журнал игры: journalctl -u zhivaya-kazan -f"
 else
   echo "Сервер игры не ответил. Посмотрите: journalctl -u zhivaya-kazan -n 50"

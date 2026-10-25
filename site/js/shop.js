@@ -9,7 +9,7 @@ window.cityShop=[
   {id:'cap-wool', kind:'hat', title:'Вязаная шапка', stars:15, color:'#243E34', text:'На ночной остановке.'},
   {id:'tubeteika', kind:'hat', title:'Тюбетейка простая', stars:20, color:'#1F6B4A', text:'Без вышивки чужого герба.'},
   {id:'cap-flat', kind:'hat', title:'Кепка плоская', stars:18, color:'#2C2C2C', text:'Козырёк короткий.'},
-  {id:'hood-hat', kind:'hat', title:'Капюшон отдельно', stars:22, color:'#5C4A3A', text:'Если куртка без своего.'},
+  {id:'scarf-wool', kind:'hat', title:'Шарф вязаный', stars:22, color:'#6B2E2A', text:'Длинный, концы в карман.'},
   {id:'glasses-round', kind:'glasses', title:'Круглые очки', stars:25, text:'Стекло чистое, оправа тонкая.'},
   {id:'glasses-sun', kind:'glasses', title:'Тёмные очки', stars:30, text:'От низкого солнца на площади.'},
   {id:'glasses-half', kind:'glasses', title:'Очки для чтения', stars:15, text:'Только когда смотришь в телефон.'},
@@ -39,5 +39,5 @@ window.cityShop=[
   {id:'frame-wood', kind:'frame', title:'Деревянная рамка имени', stars:30, text:'Простая, как табличка на двери.'},
   {id:'frame-ink', kind:'frame', title:'Чернильная рамка имени', stars:40, text:'Тёмная обводка.'},
   {id:'frame-thread', kind:'frame', title:'Рамка тонкой нитью', stars:35, text:'Почти незаметная.'},
-  {id:'frame-none', kind:'frame', title:'Имя без рамки', stars:15, text:'Как было, только чуть крупнее.'}
+  {id:'name-pin', kind:'frame', title:'Значок у имени', stars:20, text:'Маленький знак рядом с именем.'}
 ];

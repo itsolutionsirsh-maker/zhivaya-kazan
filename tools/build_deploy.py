@@ -21,6 +21,8 @@ body = re.sub(r'src="js/([\w.-]+\.js)"', _ver, body)
 open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(head + body + '</body></html>')
 shutil.copytree(os.path.join(SITE, 'js'), os.path.join(OUT, 'js'))
 shutil.copy(os.path.join(SITE, 'kazan.json'), OUT)
+if os.path.isdir(os.path.join(SITE, 'map')):
+    shutil.copytree(os.path.join(SITE, 'map'), os.path.join(OUT, 'map'))   # карта всей Казани кусками
 if os.path.exists(os.path.join(SITE, 'mod.html')):
     shutil.copy(os.path.join(SITE, 'mod.html'), OUT)   # страница модератора (работает с сервером на VPS)
 if os.path.isdir(os.path.join(SITE, 'img')):
@@ -31,6 +33,8 @@ shutil.copy(os.path.join(SERVER, 'data.htaccess'), os.path.join(OUT, 'data', '.h
 zp = os.path.join(ROOT, 'deploy', 'kazan.zip')
 with zipfile.ZipFile(zp, 'w', zipfile.ZIP_DEFLATED) as z:
     for d, _, fs in os.walk(OUT):
+        if os.path.relpath(d, OUT).split(os.sep)[0] == 'map':
+            continue   # кусковая карта — только для своего сервера, на старый хостинг не нужна
         for f in fs:
             full = os.path.join(d, f); z.write(full, os.path.relpath(full, os.path.dirname(OUT)))
 print('deploy →', OUT, '| zip', os.path.getsize(zp) // 1024, 'КБ')

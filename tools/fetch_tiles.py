@@ -2,7 +2,7 @@
 """Загрузка OSM по плиткам (большой bbox не пролезает в таймаут Overpass) и склейка без дублей."""
 import json, subprocess, sys, time, os
 # bbox карты: юг, запад, север, восток (тот же, что в build_map.py; можно задать BBOX="S,W,N,E")
-S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.768,49.071,55.8205,49.160').split(','))
+S, W, N, E = (float(v) for v in os.environ.get('BBOX', '55.752,49.050,55.838,49.190').split(','))
 NX, NY = 3, 3
 OUT = next((a for a in sys.argv[1:] if not a.startswith('--')), 'raw/kazan_osm.json')
 MIRRORS = ["https://overpass.kumi.systems/api/interpreter",
@@ -40,7 +40,7 @@ def fetch(q, tag, soft=False):
     for attempt in range(2 if soft else 5):
         for url in MIRRORS:
             host = url.split('/')[2]
-            r = subprocess.run(['curl', '-sS', '-m', '240', '-o', tmp, '-w', '%{http_code}', url,
+            r = subprocess.run(['curl', '-sS', '-m', '240', '-A', 'ZhivayaKazan/1.0 (+https://kazan.lifegorod.com; map tiles)', '-o', tmp, '-w', '%{http_code}', url,
                                 '--data-urlencode', 'data=' + q], capture_output=True, text=True)
             code = r.stdout.strip()
             if code == '200':

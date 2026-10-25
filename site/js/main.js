@@ -17,10 +17,13 @@ function fmtTime(){const h=Math.floor(clock.minutes/60)%24,m=Math.floor(clock.mi
 let hintTtl=0;function setHint(t){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=5;}
 
 // ---------- старт мира ----------
-function spawnAll(){
-  const bb=world.bbox;const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
+// точка старта новичка: середина улицы Баумана (если её нет на карте — центр карты)
+function startPoint(){const bb=world.bbox;const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
   const bauman=world.roads.filter(r=>/Баумана/i.test(r.n)&&r.c===9).sort((a,b)=>(b.bb[2]-b.bb[0])+(b.bb[3]-b.bb[1])-((a.bb[2]-a.bb[0])+(a.bb[3]-a.bb[1])));const br=bauman.length?bauman[0]:null;
   let spawn=[cx,cy];if(br){let tot=0;const cum=[0];for(let i=0;i<br.p.length-1;i++){const a=world.nodes[br.p[i]],b=world.nodes[br.p[i+1]];tot+=dist(a[0],a[1],b[0],b[1]);cum.push(tot);}let k=0;while(k<cum.length-1&&cum[k]<tot/2)k++;spawn=world.nodes[br.p[k]];}
+  return spawn;}
+function spawnAll(){
+  const spawn=startPoint();
   player.x=spawn[0];player.y=spawn[1];cam.x=player.x;cam.y=player.y;
   spawnPopulation(spawn);
   const homes=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,player.x,player.y)<400);player.home=homes.length?pick(homes):null;
@@ -172,7 +175,7 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
   player.talkTarget=null;walkTo(wx,wy);});
-function walkTo(wx,wy,keepTarget){if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
+function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
   const path=astar(world.pedAdj,s,g,pedCost);const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=wps;}
 const joy=$('#joy'),joyKnob=joy.querySelector('i');let joyVec=[0,0],joyId=null,joyOrigin=null;
 joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joyOrigin=[e.clientX,e.clientY];joy.setPointerCapture(e.pointerId);});
@@ -189,10 +192,14 @@ function updatePlayer(dt){
   const m=Math.hypot(mx,my);const run=keys.shift||keys.ShiftLeft;
   if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
   if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
-  if(m>0.05){if(cam.free)followPlayer();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
+  if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
   else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{let [sx,sy,dk]=drunkSway((w[0]-player.x)/d,(w[1]-player.y)/d);const sp=3.0*dt*dk;let dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);if(!inBuilding(player.x+sx*step,player.y+sy*step)){dx=sx;dy=sy;}const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
-    if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;player.x=nx;player.y=ny;player.phase+=dt*8;}}}
-function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!inBuilding(x,y)&&!wallBlocks(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}
+    if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;
+    if(blockedStep(player.x,player.y,nx,ny)){const px=player.x,py=player.y;tryMove(dx*step,dy*step);player.phase+=dt*8;if(dist(px,py,player.x,player.y)<step*0.3){player.stuckT=(player.stuckT||0)+dt;if(player.stuckT>1.2){player.stuckT=0;const last=player.waypoints[player.waypoints.length-1];player.waypoints=null;player.replans=(player.replans||0)+1;if(player.replans<=2)walkTo(last[0],last[1],true);else{player.replans=0;setHint('Сюда не пройти — мешает здание');}}}return;}
+    player.stuckT=0;player.x=nx;player.y=ny;player.phase+=dt*8;}}}
+// шаг упирается в стену дома или кремля (если уже внутри контура — например, вышли из помещения — выпускаем)
+function blockedStep(x0,y0,x1,y1){if(wallBlocks(x0,y0,x1,y1))return true;return !!inBuilding(x1,y1)&&!inBuilding(x0,y0);}
+function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!blockedStep(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}
 function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.bus)return;if(player.vehicle&&player.vehicle.kind!=='scooter')return;
   for(const v of cars.concat(buses)){if(v.crashed||v.speed<2.2||v.remove)continue;const ox=player.x-v.x,oy=player.y-v.y;if(Math.abs(ox)>9||Math.abs(oy)>9)continue;const f=ox*v.hx+oy*v.hy;const s=Math.abs(-ox*v.hy+oy*v.hx);if(Math.abs(f)<v.len*0.5+0.35&&s<v.wid*0.5+0.5){playerHitByCar(v);return;}}}
 function updateNeeds(gameMin){player.energy=clamp(player.energy-gameMin*0.085,0,100);player.food=clamp(player.food-gameMin*0.12,0,100);let target=55;if(player.food<25)target-=20;if(player.energy<20)target-=20;if(weather.kind==='rain')target-=5;player.mood=lerp(player.mood,target,Math.min(1,gameMin*0.004));}
@@ -206,7 +213,7 @@ function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.rando
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
-    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();
+    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
@@ -230,7 +237,7 @@ function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0
 // ---------- мультиплеер ----------
 function syncPeers(list){peers=list;const seen=new Set();
   for(const p of peers){seen.add(p.peer);let pr=peerRender.get(p.peer);if(!pr){pr={key:p.peer,x:p.presence.x,y:p.presence.y,tx:0,ty:0,name:'',img:null,imgSrc:null,hx:0,hy:1,b:0,c:'#4A90E2',veh:null};peerRender.set(p.peer,pr);}
-    pr.tx=p.presence.x;pr.ty=p.presence.y;pr.name=modName(p.presence.n);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
+    pr.tx=p.presence.x;pr.ty=p.presence.y;if(Math.abs(pr.x-pr.tx)+Math.abs(pr.y-pr.ty)>40){pr.x=pr.tx;pr.y=pr.ty;}pr.name=modName(p.presence.n);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
     onPeerSay(pr,p.presence.sy);
     const g=p.presence.g;if(g&&typeof g==='object'&&world.squares[g.s]&&RALLY_KIND[g.k]){const sq=world.squares[g.s];let r=rallyAt(sq);if(!r)r=startRally(sq,g.k,modClean(String(g.t||'').slice(0,60)),'peer');if(r&&r.by==='peer')r.seen=performance.now();}
     const a=typeof p.presence.a==='string'&&p.presence.a.startsWith('data:image/')?p.presence.a:null;if(a&&a!==pr.imgSrc){pr.imgSrc=a;const im=new Image();im.onload=()=>{pr.img=im;};im.src=a;}if(!a){pr.img=null;pr.imgSrc=null;}}
@@ -242,15 +249,18 @@ function initCaps(){netInit();}
 // ---------- старт ----------
 async function boot(){
   try{
-    const res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
-    $('#loadMsg').textContent='Строим улицы и дома…';const data=await res.json();
+    // карта всей Казани кусками (map/base.json + map/c_*.json); если её нет — старый цельный kazan.json
+    let res=await fetch('map/base.json',{cache:'no-cache'});if(!res.ok)res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
+    $('#loadMsg').textContent='Строим улицы…';const data=await res.json();
     await new Promise(r=>setTimeout(r,30));buildWorld(data);
+    if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);}catch(e){}
+      await loadChunksAround(pts,2600);initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
     $('#loading').hidden=true;
     if(prof){addEvent(`${player.name} снова в городе`);if(!flags.howtoSeen)showHowto();}else showProfile();
-    addEvent('Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
+    addEvent(world.meta.chunks?'Казань: '+Object.keys(world.meta.chunks).length+' кварталов по 2×2 км, '+world.crossings.length.toLocaleString('ru-RU')+' переходов. Дома вокруг подгружаются, пока вы идёте или едете':'Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
     initCaps();requestAnimationFrame(frame);
   }catch(e){$('#loadMsg').textContent='Не удалось загрузить карту: '+e.message;const pr=document.querySelector('#loading .pr');if(pr)pr.hidden=true;console.error(e);}
 }
