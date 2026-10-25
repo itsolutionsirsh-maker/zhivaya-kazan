@@ -17,6 +17,7 @@ class Grid{
   constructor(cell){this.cell=cell;this.m=new Map();}
   key(cx,cy){return (cx+8192)*16384+(cy+8192);}
   add(item,x0,y0,x1,y1){const c=this.cell;for(let cx=Math.floor(x0/c);cx<=Math.floor(x1/c);cx++)for(let cy=Math.floor(y0/c);cy<=Math.floor(y1/c);cy++){const k=this.key(cx,cy);let a=this.m.get(k);if(!a){a=[];this.m.set(k,a);}a.push(item);}}
+  remove(item,x0,y0,x1,y1){const c=this.cell;for(let cx=Math.floor(x0/c);cx<=Math.floor(x1/c);cx++)for(let cy=Math.floor(y0/c);cy<=Math.floor(y1/c);cy++){const k=this.key(cx,cy);const a=this.m.get(k);if(!a)continue;const i=a.indexOf(item);if(i>=0){a.splice(i,1);if(!a.length)this.m.delete(k);}}}
   query(x0,y0,x1,y1,cb){const c=this.cell,seen=new Set();for(let cx=Math.floor(x0/c);cx<=Math.floor(x1/c);cx++)for(let cy=Math.floor(y0/c);cy<=Math.floor(y1/c);cy++){const a=this.m.get(this.key(cx,cy));if(!a)continue;for(const it of a){if(seen.has(it))continue;seen.add(it);if(cb(it)===false)return;}}}
 }
 class Heap{

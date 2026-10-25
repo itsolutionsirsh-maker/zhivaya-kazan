@@ -229,6 +229,14 @@ function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((
   g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of world.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}
   for(const w of world.walls||[]){if(w.k!=='kremlin')continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
   overview=c;}
+// подгруженный кусок дорисовываем на обзорную картинку (выгруженные остаются на ней — как память о виденном)
+function overviewAddPart(rec){if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
+  const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
+  for(const a of rec.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
+  g.lineCap='round';g.lineJoin='round';g.strokeStyle='#D2CCBC';g.lineWidth=2.2;g.beginPath();for(const r of rec.roads){if(r.c<10)continue;const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();
+  for(const r of rec.roads){if(r.c!==8)continue;g.strokeStyle='#9C9A94';g.lineWidth=ROAD_W[8]+3.5;g.beginPath();const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}g.stroke();g.strokeStyle='#F1EFEA';g.lineWidth=ROAD_W[8]+1.5;g.stroke();}
+  for(const b of rec.buildings){g.fillStyle=b.roof;pl(b.p);g.fill();}
+  g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of rec.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}}
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;
   ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);
   if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}

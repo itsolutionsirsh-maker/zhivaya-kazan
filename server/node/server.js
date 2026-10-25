@@ -15,6 +15,8 @@ const ENV=process.env;
 const PORT=+ENV.PORT||8080;
 const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
+const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=null,mapChk=0;
+function mapDir(){const t=Date.now();if(t-mapChk>30000){mapChk=t;try{MAP_DIR=fs.statSync(path.join(MAP_D,'base.json')).isFile()?MAP_D:null;}catch(e){MAP_DIR=null;}}return MAP_DIR;}
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
 {let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}
@@ -295,11 +297,13 @@ const server=http.createServer(async(req,res)=>{
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
-  const file=path.join(ROOT,path.normalize(rel).replace(/^([/\\])+/,''));
-  if(!file.startsWith(ROOT+path.sep))return send(res,403,{err:'forbidden'});
+  // карта всей Казани кусками собирается на сервере (tools/make_city_map.sh) в MAP_DIR и отдаётся по /map/…
+  let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
+  const file=path.join(root,path.normalize(rel).replace(/^([/\\])+/,''));
+  if(!file.startsWith(root+path.sep))return send(res,403,{err:'forbidden'});
   const ext=path.extname(file).toLowerCase();if(ext==='.php'||file.includes(path.sep+'data'+path.sep))return send(res,404,{err:'not_found'});
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Не найдено');}
-    const cache=ext==='.html'?'no-cache':(ext==='.json'?'public, max-age=3600':'public, max-age=300');
+    const cache=ext==='.html'||root===MAP_DIR&&/base\.json$/.test(file)?'no-cache':(root===MAP_DIR?'public, max-age=2592000, immutable':(ext==='.json'?'public, max-age=3600':'public, max-age=300'));
     res.writeHead(200,{'Content-Type':MIME[ext]||'application/octet-stream','Content-Length':st.size,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});
     if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});});
 

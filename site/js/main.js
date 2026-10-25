@@ -17,10 +17,13 @@ function fmtTime(){const h=Math.floor(clock.minutes/60)%24,m=Math.floor(clock.mi
 let hintTtl=0;function setHint(t){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=5;}
 
 // ---------- старт мира ----------
-function spawnAll(){
-  const bb=world.bbox;const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
+// точка старта новичка: середина улицы Баумана (если её нет на карте — центр карты)
+function startPoint(){const bb=world.bbox;const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
   const bauman=world.roads.filter(r=>/Баумана/i.test(r.n)&&r.c===9).sort((a,b)=>(b.bb[2]-b.bb[0])+(b.bb[3]-b.bb[1])-((a.bb[2]-a.bb[0])+(a.bb[3]-a.bb[1])));const br=bauman.length?bauman[0]:null;
   let spawn=[cx,cy];if(br){let tot=0;const cum=[0];for(let i=0;i<br.p.length-1;i++){const a=world.nodes[br.p[i]],b=world.nodes[br.p[i+1]];tot+=dist(a[0],a[1],b[0],b[1]);cum.push(tot);}let k=0;while(k<cum.length-1&&cum[k]<tot/2)k++;spawn=world.nodes[br.p[k]];}
+  return spawn;}
+function spawnAll(){
+  const spawn=startPoint();
   player.x=spawn[0];player.y=spawn[1];cam.x=player.x;cam.y=player.y;
   spawnPopulation(spawn);
   const homes=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,player.x,player.y)<400);player.home=homes.length?pick(homes):null;
@@ -210,7 +213,7 @@ function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.rando
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
-    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();
+    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
@@ -246,15 +249,18 @@ function initCaps(){netInit();}
 // ---------- старт ----------
 async function boot(){
   try{
-    const res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
-    $('#loadMsg').textContent='Строим улицы и дома…';const data=await res.json();
+    // карта всей Казани кусками (map/base.json + map/c_*.json); если её нет — старый цельный kazan.json
+    let res=await fetch('map/base.json',{cache:'no-cache'});if(!res.ok)res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
+    $('#loadMsg').textContent='Строим улицы…';const data=await res.json();
     await new Promise(r=>setTimeout(r,30));buildWorld(data);
+    if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);}catch(e){}
+      await loadChunksAround(pts,2600);initLandmarks(data);}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
     $('#loading').hidden=true;
     if(prof){addEvent(`${player.name} снова в городе`);if(!flags.howtoSeen)showHowto();}else showProfile();
-    addEvent('Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
+    addEvent(world.meta.chunks?'Казань: '+Object.keys(world.meta.chunks).length+' кварталов по 2×2 км, '+world.crossings.length.toLocaleString('ru-RU')+' переходов. Дома вокруг подгружаются, пока вы идёте или едете':'Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
     initCaps();requestAnimationFrame(frame);
   }catch(e){$('#loadMsg').textContent='Не удалось загрузить карту: '+e.message;const pr=document.querySelector('#loading .pr');if(pr)pr.hidden=true;console.error(e);}
 }
