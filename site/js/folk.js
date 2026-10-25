@@ -77,6 +77,8 @@ function folkInit(){if(FOLK.ready||!world||!player.home)return;FOLK.ready=true;f
   for(const src of folkSrc()){const f=Object.assign({},src);f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
     f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);}
   window.cityFolkWhere=folkWhere;window.cityFolkAll=()=>FOLK.list.map(f=>folkWhere(f.id));}
+// игрок переехал (свой район в анкете или дом из сохранения догрузился): соседи по двору (ward 'yard') живут и работают у нового дома
+function folkReanchor(){if(!FOLK.ready)return;const A=folkAnchors();for(const f of FOLK.list){if(f.ward!=='yard')continue;folkDrop(f);f.trip=null;f.places=folkPlaces(f,A);f.at=folkWant(f);}}
 // где должен быть по часам
 function folkWant(f){const h=cityHour();const off=f.dayOff&&isWeekend();const D=(off?f.dayOff:f.day)||[[0,'home'],[9,'work'],[18,'haunt'],[22,'home']];let at=D[D.length-1][1];for(const [hh,k] of D){if(h>=hh)at=k;}
   // закрытое место — значит не там
