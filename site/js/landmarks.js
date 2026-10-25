@@ -69,4 +69,16 @@ window.cityLandmarks=[
   {name:'Горки, метро', alias:['горки метро'], ll:[55.76072, 49.18969], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.76072&mlon=49.18969#map=18/55.76072/49.18969'},
   {name:'Проспект Победы', alias:['проспект победы', 'җиңү проспекты'], ll:[55.75070, 49.20858], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.75070&mlon=49.20858#map=18/55.75070/49.20858'},
   {name:'Дубравная', alias:['дубравная'], ll:[55.74471, 49.21835], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.74471&mlon=49.21835#map=18/55.74471/49.21835'},
+
+  {name:'Поликлиника на Победы, 158', alias:['поликлиника азино', 'победы 158'], ll:[55.78356, 49.22101], kind:'hospital', src:'https://www.openstreetmap.org/?mlat=55.78356&mlon=49.22101#map=18/55.78356/49.22101'},
+  {name:'Мечеть посёлка Отары', alias:['мечеть отары', 'калинина 44б'], ll:[55.71397, 49.10076], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.71397&mlon=49.10076#map=18/55.71397/49.10076'},
+  {name:'Дом культуры «Мирный»', alias:['дк мирный', 'дом культуры мирный'], ll:[55.71077, 49.14769], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.71077&mlon=49.14769#map=18/55.71077/49.14769'},
+  {name:'Станция Юдино', alias:['станция юдино', 'юдино вокзал'], ll:[55.81643, 48.89216], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.81643&mlon=48.89216#map=18/55.81643/48.89216'},
+  {name:'Школа № 153', alias:['школа 153', 'бирюзовая'], ll:[55.82089, 48.8957], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.82089&mlon=48.8957#map=18/55.82089/48.8957'},
+  {name:'Амбулатория в Кадышево', alias:['амбулатория кадышево', 'калинина кадышево'], ll:[55.90002, 49.13302], kind:'hospital', src:'https://www.openstreetmap.org/?mlat=55.90002&mlon=49.13302#map=18/55.90002/49.13302'},
+  {name:'Парк Крылья Советов', alias:['крылья советов'], ll:[55.85179, 49.08884], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.85179&mlon=49.08884#map=18/55.85179/49.08884'},
+  {name:'Поликлиника на Карбышева, 12А', alias:['поликлиника карбышева', 'мкдц'], ll:[55.75238, 49.17194], kind:'hospital', src:'https://www.openstreetmap.org/?mlat=55.75238&mlon=49.17194#map=18/55.75238/49.17194'},
+  {name:'СК «Форвард»', alias:['форвард', 'химиков 40'], ll:[55.87495, 49.01475], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.87495&mlon=49.01475#map=18/55.87495/49.01475'},
+  {name:'Остановка «станция Дербышки»', alias:['станция дербышки'], ll:[55.85234, 49.19313], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.85234&mlon=49.19313#map=18/55.85234/49.19313'},
+  {name:'Кировская дамба', alias:['кировская дамба', 'дамба'], ll:[55.79923, 49.07355], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.79923&mlon=49.07355#map=18/55.79923/49.07355'},
 ];
