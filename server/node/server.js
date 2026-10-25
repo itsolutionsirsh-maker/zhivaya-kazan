@@ -114,6 +114,9 @@ const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
 function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
   if(!TG_TOKEN||got.length!==want.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(want)))return [403,{err:'forbidden'}];
   const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
+  // /key — ключ модератора, только админу (ADMIN_TG_ID) и только в личке с ботом
+  if(msg&&msg.chat&&/^\/key\b/.test(text)){const admin=String(ENV.ADMIN_TG_ID||'');const isAdmin=admin&&msg.chat.type==='private'&&String(msg.from&&msg.from.id)===admin;
+    return [200,{method:'sendMessage',chat_id:msg.chat.id,text:isAdmin?'Ключ модератора для '+(PUBLIC_URL||'')+'mod.html:\n'+String(ENV.MOD_TOKEN||'')+'\n\nНикому не пересылайте. Это сообщение можно удалить.':'Эта команда только для владельца игры.'}];}
   if(!msg||!msg.chat||msg.chat.id==null||!/^\/(start|play|help)\b/.test(text))return [200,{ok:1}];
   const url=PUBLIC_URL||('https://'+String(req.headers.host||'').replace(/[^a-z0-9.:-]/gi,'')+'/');const name=clean((msg.from&&msg.from.first_name)||'',40);
   return [200,{method:'sendMessage',chat_id:msg.chat.id,
