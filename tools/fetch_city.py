@@ -58,17 +58,25 @@ def main():
         return
     all_t = list(tiles())
     print(f'плиток всего {len(all_t)}', flush=True)
+    # плотный центр Overpass часто не отдаёт целиком (502/504) — со второго круга такую плитку качаем четвертинками
+    def quarters(n, bb):
+        S, W, N, E = bb; my, mx = (S + N) / 2, (W + E) / 2
+        return [(f'{n}_a', (S, W, my, mx)), (f'{n}_b', (S, mx, my, E)), (f'{n}_c', (my, W, N, mx)), (f'{n}_d', (my, mx, N, E))]
+    def done(n, bb):
+        return os.path.exists(f'{OUTDIR}/{n}.json') or all(os.path.exists(f'{OUTDIR}/{q}.json') for q, _ in quarters(n, bb))
     for rnd_ in range(40):
-        left = [(n, bb) for n, bb in all_t if not os.path.exists(f'{OUTDIR}/{n}.json')]
+        left = [(n, bb) for n, bb in all_t if not done(n, bb)]
         if not left: break
         print(f'круг {rnd_ + 1}: осталось {len(left)}', flush=True)
         for n, bb in left:
-            els = fetch(query(bb, False), n, soft=True)
-            if els is not None:
-                json.dump(els, open(f'{OUTDIR}/{n}.json', 'w'))
-                print(f'  готово {n}: {len(els)}', flush=True)
+            parts = [(n, bb)] if rnd_ == 0 else [(q, qb) for q, qb in quarters(n, bb) if not os.path.exists(f'{OUTDIR}/{q}.json')]
+            for pn, pbb in parts:
+                els = fetch(query(pbb, False), pn, soft=True)
+                if els is not None:
+                    json.dump(els, open(f'{OUTDIR}/{pn}.json', 'w'))
+                    print(f'  готово {pn}: {len(els)}', flush=True)
         time.sleep(30)
-    left = [n for n, bb in all_t if not os.path.exists(f'{OUTDIR}/{n}.json')]
+    left = [n for n, bb in all_t if not done(n, bb)]
     print('ОСТАЛОСЬ: ' + ','.join(left) if left else 'ВСЁ СКАЧАНО', flush=True)
     if left:
         sys.exit(1)
