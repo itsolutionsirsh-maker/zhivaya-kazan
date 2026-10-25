@@ -162,6 +162,20 @@
 
     window.cityOnInvite=function(kind, name){
       const who=String(name||'друг').slice(0,40);
+      if(kind==='invite3'){
+        note(who+' играет третий день');
+        if(typeof sitMood==='function') sitMood(6);
+        if(typeof sitMoney==='function') sitMoney(400,'Друг в городе третий день');
+        if(typeof sitCard==='function') sitCard({
+          icon:'🧣', tone:'good', title:'Третий день',
+          gift:'cap-wool',
+          text:who+' заходит третий день. Вам обоим шапка и 400 ₽. Движок отдаёт ту же вещь и тому, кто пришёл.',
+          ttl:12,
+          choices:[{t:'Спасибо', primary:true, run:function(){}}]
+        });
+        life.save();
+        return;
+      }
       const invited=kind==='invited';
       life.wards.yard=(life.wards.yard||0)+2;
       note(invited?('Вас позвал '+who):('По вашей ссылке пришёл '+who));

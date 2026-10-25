@@ -1,0 +1,31 @@
+// Домашние матчи и праздники. Время московское. Пустое time — на сайте клуба времени не было.
+// Сабантуй 2027 в календарь не ставил: даты Казани на 2027 ещё нет. В 2026 главный день был 20 июня.
+window.cityFixtures = [
+  {date:'2026-10-31', time:'15:15', kind:'match', title:'«Рубин» — «Факел»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2026-11-04', time:'', kind:'holiday', title:'День народного единства', hints:['кремл','свобод'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2026-11-21', time:'17:30', kind:'match', title:'«Рубин» — «Зенит»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2026-11-25', time:'20:30', kind:'match', title:'«Рубин» — «Родина»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2026-11-28', time:'14:00', kind:'match', title:'«Рубин» — «Акрон»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2026-12-01', time:'', kind:'match', title:'«Ак Барс» — «Салават Юлаев»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2026-12-16', time:'', kind:'match', title:'«Ак Барс» — «Салават Юлаев»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-01-01', time:'', kind:'holiday', title:'Новый год', hints:['бауман','кремл'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-01-03', time:'', kind:'match', title:'«Ак Барс» — «Автомобилист»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-01-06', time:'', kind:'match', title:'«Ак Барс» — «Адмирал»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-01-07', time:'', kind:'holiday', title:'Рождество', hints:['кремл','благовещен'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-01-08', time:'', kind:'match', title:'«Ак Барс» — ЦСКА', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-01-10', time:'', kind:'match', title:'«Ак Барс» — «Сибирь»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-02-09', time:'', kind:'match', title:'«Ак Барс» — «Салават Юлаев»', hints:['татнефть','ак барс'], src:'https://www.ak-bars.ru/news/27922'},
+  {date:'2027-02-23', time:'', kind:'holiday', title:'День защитника Отечества', hints:['побед','свобод'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-03-08', time:'', kind:'holiday', title:'8 марта', hints:['бауман','свобод'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-03-09', time:'', kind:'holiday', title:'Ураза-байрам', hints:['кремл','мечет'], src:'https://www.tatar-inform.ru/news/dum-rt-utverdilo-daty-uraza-bairama-i-kurban-bairama-na-2027-god-6038365'},
+  {date:'2027-03-14', time:'', kind:'match', title:'«Рубин» — «Ростов»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-03-21', time:'', kind:'match', title:'«Рубин» — «Спартак»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-04-18', time:'', kind:'match', title:'«Рубин» — «Балтика»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-04-25', time:'', kind:'match', title:'«Рубин» — «Локомотив»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-05-01', time:'', kind:'holiday', title:'Праздник Весны и Труда', hints:['бауман','свобод'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-05-09', time:'', kind:'holiday', title:'День Победы', hints:['побед','свобод'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'},
+  {date:'2027-05-16', time:'', kind:'holiday', title:'Курбан-байрам', hints:['кремл','мечет'], src:'https://www.tatar-inform.ru/news/dum-rt-utverdilo-daty-uraza-bairama-i-kurban-bairama-na-2027-god-6038365'},
+  {date:'2027-05-16', time:'', kind:'match', title:'«Рубин» — ЦСКА', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-05-23', time:'', kind:'match', title:'«Рубин» — «Родина»', hints:['ак барс арен','стадион'], src:'https://www.rubin-kazan.ru/calendar/upcoming/'},
+  {date:'2027-06-12', time:'', kind:'holiday', title:'День России', hints:['кремл','бауман'], src:'https://www.consultant.ru/document/cons_doc_LAW_34683/'}
+];
