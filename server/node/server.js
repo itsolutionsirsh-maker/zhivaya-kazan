@@ -260,7 +260,7 @@ const E={token_format:'Это не похоже на токен бота: он �
 if(location.hash==='#change'||window.__configured)mw.hidden=false;
 go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
  go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';
- const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\n'+(im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\n\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\n\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
+ const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n'+(im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
 </script></body></html>`;
 
 // ---------- HTTP ----------
