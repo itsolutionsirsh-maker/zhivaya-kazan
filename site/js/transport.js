@@ -8,6 +8,10 @@ function destCandidates(q){const n=norm(q);const out=[];const seen=new Set();
   if(world.kremlin&&(!n||'казанский кремль'.includes(n)||norm('Казанский Кремль').includes(n)))add(world.kremlin.x,world.kremlin.y,'Казанский Кремль','достопримечательность',2.5);
   for(const s of world.squares){const sn=norm(s.n);if(!n||sn.includes(n))add(s.x,s.y,s.n,'площадь',sn.startsWith(n)?2:1.5);}
   if(n.length>=2)for(const p of world.pois){if(!p.n)continue;const pn=norm(p.n);if(!pn.includes(n))continue;add(p.x,p.y,p.n,POI_RU[p.t]||'место',pn.startsWith(n)?2:1);}
+  // ориентиры, как их называют в жизни (landmarks.js): «Кольцо», «Мега», «Ак Барс Арена»…
+  const LMK={mall:'торговый центр',station:'вокзал, станция',park:'парк',stadium:'стадион, арена',sight:'достопримечательность',univ:'университет',hospital:'больница',market:'рынок'};
+  if(n.length>=2&&world)for(const l of window.cityLandmarks||[]){const names=[l.name].concat(l.alias||[]).map(norm);if(!names.some(x=>x.includes(n)))continue;const m=world.meta;
+    add((l.ll[1]-m.lon0)*m.mlon,-(l.ll[0]-m.lat0)*m.mlat,l.name,LMK[l.kind]||'место',names.some(x=>x.startsWith(n))?2.6:2.2);}
   // места по всему городу (map/places.json): кафе и магазины в кварталах, которые сейчас не загружены
   if(n.length>=2&&PLACES.list){let k=0;for(const p of PLACES.list){const pn=norm(p[0]);if(!pn.includes(n))continue;add(p[2]/10,p[3]/10,p[0],POI_RU[p[1]]||'место',pn.startsWith(n)?1.9:0.9);if(++k>60)break;}}
   if(n.length>=3){const best=new Map();for(const r of world.roads){if(!r.n||r.c>8)continue;const rn=norm(r.n);if(!rn.includes(n))continue;const mid=world.nodes[r.p[r.p.length>>1]];const d=dist(mid[0],mid[1],player.x,player.y);const o=best.get(r.n);if(!o||d<o.d)best.set(r.n,{x:mid[0],y:mid[1],d});}

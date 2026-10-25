@@ -68,17 +68,31 @@ function eventsTick(dt){EVT.t-=dt;if(EVT.t>0||!world||typeof clock==='undefined'
     if(h>=d.hour+2&&Array.isArray(st.place)&&!st.closed){st.closed=1;unmark('event:'+k);progSave();}}
   const keep=Object.keys(PROG.ev).filter(k=>+k.split(':')[0]>=(clock.day||1)-2);if(keep.length<Object.keys(PROG.ev).length){const n={};for(const k of keep)n[k]=PROG.ev[k];PROG.ev=n;}}
 
-// ---------- районы: «Вы в районе …» и один факт ----------
-const DIST={t:0,cur:null};
+// ---------- районы: «Вы в районе …» и один факт (districts.js: жилые места с center, административные с kind:'admin') ----------
+const DIST={t:0,cur:null,adm:null};
+function llToXY(ll){const m=world.meta;return [(ll[1]-m.lon0)*m.mlon,-(ll[0]-m.lat0)*m.mlat];}
 function districtsTick(dt){DIST.t-=dt;if(DIST.t>0||!world||player.inside||player.bus)return;DIST.t=4;const list=window.cityDistricts||[];if(!list.length)return;
-  let found=null,bd=1e9;
-  for(const d of list){if(Array.isArray(d.center)){const m=world.meta;const x=(d.center[1]-m.lon0)*m.mlon,y=-(d.center[0]-m.lat0)*m.mlat;const r=d.r||900;const dd=dist(x,y,player.x,player.y);if(dd<r&&dd<bd){bd=dd;found=d;}}}
+  let found=null,bd=1e9,adm=null,ad=1e9;
+  for(const d of list){if(!Array.isArray(d.center))continue;const [x,y]=llToXY(d.center);const dd=dist(x,y,player.x,player.y);
+    if(d.kind==='admin'){if(dd<ad){ad=dd;adm=d;}}else if(dd<(d.r||1200)&&dd<bd){bd=dd;found=d;}}
   if(!found){const street=(nearestRoadName(player.x,player.y)||'').toLowerCase();const near=placesNear(player.x,player.y,120,6).map(p=>p.n.toLowerCase()).join(' ');const hay=street+' '+near;
-    for(const d of list){if(Array.isArray(d.center))continue;if((d.hints||[]).some(h=>hay.includes(String(h).toLowerCase()))){found=d;break;}}}
-  if(!found||found.id===DIST.cur)return;DIST.cur=found.id;
-  if(!PROG.seenD.includes(found.id)){PROG.seenD.push(found.id);progSave();const f=(found.facts||[])[Math.floor(Math.random()*(found.facts||[]).length)];
-    addEvent(`📍 ${found.name}${f?'. '+f:''}`,'say');}
-  else{const l=(found.lines||[])[Math.floor(Math.random()*(found.lines||[]).length)];setHint(`📍 ${found.name}${l?' — '+l:''}`);}}
+    for(const d of list){if(d.kind==='admin'||Array.isArray(d.center))continue;if((d.hints||[]).some(h=>hay.includes(String(h).toLowerCase()))){found=d;break;}}}
+  if(adm&&ad>6000)adm=null;
+  const parent=found&&found.parent?list.find(x=>x.id===found.parent):null;const admin=parent||adm;
+  const cur=found||admin;if(!cur||cur.id===DIST.cur)return;DIST.cur=cur.id;
+  const where=found?found.name+(admin&&admin!==found?' · '+admin.name:''):admin.name;
+  if(!PROG.seenD.includes(cur.id)){PROG.seenD.push(cur.id);progSave();const f=(cur.facts||[])[Math.floor(Math.random()*(cur.facts||[]).length)];
+    addEvent(`📍 ${where}${f?'. '+f:''}`,'say');}
+  else{const l=(cur.lines||[])[Math.floor(Math.random()*(cur.lines||[]).length)];setHint(`📍 ${where}${l?' — '+l:''}`);}}
+
+// ---------- матчи и праздники (fixtures.js): в день события — в ленту «Сегодня» и в новости ----------
+function fixturesTick(){const list=window.cityFixtures||[];if(!list.length)return;const today=mskDate();const tom=new Date(Date.parse(today)+86400e3).toISOString().slice(0,10);
+  PROG.fx=PROG.fx||{};
+  for(const f of list){if(f.date!==today&&f.date!==tom)continue;const k=f.date+f.title;if(PROG.fx[k])continue;PROG.fx[k]=1;
+    const when=f.date===today?'Сегодня':'Завтра';const pl=f.kind==='match'&&world?placeByHints(f.hints):null;
+    const text=`${when}${f.time?' в '+f.time:''}: ${f.title}${pl?' — '+pl.n:''}`;addEvent(`${f.kind==='match'?'⚽':'🎉'} ${text}`,'say');
+    if(window.cityPhone)window.cityPhone.push({from:f.kind==='match'?'Матч':'Праздник',text,kind:'fixture'});}
+  for(const k of Object.keys(PROG.fx))if(k.slice(0,10)<today)delete PROG.fx[k];progSave();}
 
 // ---------- шаги пешком ----------
 const WALK={x:null,y:null,acc:0,t:0};
@@ -107,7 +121,7 @@ function engineInit(){
   wrap('netSend',(r,a)=>{if(r)cityTrack('chat',{to:a[0]||''});});
   wrap('shiftEnd',(r,a)=>{ENG.quiet=false;const j=a[0];if(j&&j.len&&j.present/(j.len*60)>=0.7)cityTrack('work');},()=>{ENG.quiet=true;});   // репутация за смену — не «помощь»
   if(typeof window.cityOnInvite==='function')wrap('cityOnInvite',(r,a)=>{if(a[0]==='invited')cityTrack('friends');});
-  daysTick();questsRoll();updateQuestBtn();}
+  daysTick();questsRoll();updateQuestBtn();setTimeout(fixturesTick,4000);}
 function engineTick(dt){walkTick(dt);eventsTick(dt);districtsTick(dt);}
 
 // ---------- окно «Задания» ----------
