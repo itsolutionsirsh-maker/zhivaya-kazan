@@ -31,8 +31,8 @@ def main():
     src = open(os.path.join(os.path.dirname(__file__), 'fetch_tiles.py'), encoding='utf8').read()
     src = src.split("os.makedirs('raw', exist_ok=True)")[0]
     g = {'__name__': 'ft'}; exec(src, g)
-    g['MIRRORS'][:] = ["https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-                       "https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+    g['MIRRORS'][:] = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+                       "https://overpass.kumi.systems/api/interpreter"]
     query, fetch = g['query'], g['fetch']
     os.makedirs(OUTDIR, exist_ok=True)
     # маршруты транспорта и «особое» (площади, пешеходные зоны, стены Кремля) — крупными кусками 3×3

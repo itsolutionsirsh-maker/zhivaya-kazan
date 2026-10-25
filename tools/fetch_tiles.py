@@ -40,7 +40,7 @@ def fetch(q, tag, soft=False):
     for attempt in range(2 if soft else 5):
         for url in MIRRORS:
             host = url.split('/')[2]
-            r = subprocess.run(['curl', '-sS', '-m', '240', '-o', tmp, '-w', '%{http_code}', url,
+            r = subprocess.run(['curl', '-sS', '-m', '240', '-A', 'ZhivayaKazan/1.0 (+https://kazan.lifegorod.com; map tiles)', '-o', tmp, '-w', '%{http_code}', url,
                                 '--data-urlencode', 'data=' + q], capture_output=True, text=True)
             code = r.stdout.strip()
             if code == '200':
