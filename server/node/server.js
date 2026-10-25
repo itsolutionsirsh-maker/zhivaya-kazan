@@ -16,12 +16,25 @@ const PORT=+ENV.PORT||8080;
 const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
 const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=null,mapChk=0;
-// как идёт сборка карты всей Казани (tools/citymap.sh качает плитки в raw/city): сколько плиток готово, собрана ли карта
+// как идёт сборка карты всей Казани (tools/citymap.sh качает плитки в raw/city): сколько плиток готово, каких нет, собрана ли карта.
+// Если скачано почти всё (не хватает 1–2 плиток), а новых файлов нет больше 45 минут — Overpass упёрся в самые плотные кварталы.
+// Тогда сервер сам собирает карту из того, что есть (дыры — пара кварталов без домов, дороги там всё равно будут из соседних плиток);
+// докачка продолжается, и citymap.sh потом пересоберёт целиком.
+const MAPB={running:false,last:null,err:null};
 function mapStatus(){const dir=path.join(__dirname,'..','..','raw','city');let files=[];try{files=fs.readdirSync(dir);}catch(e){}
   const tiles=new Set(),quarters={};let last=0;for(const f of files){const m=/^(\d\d_\d\d)(?:_([a-d]))?\.json$/.exec(f);if(!m)continue;if(m[2]){(quarters[m[1]]=quarters[m[1]]||new Set()).add(m[2]);}else tiles.add(m[1]);
     try{last=Math.max(last,fs.statSync(path.join(dir,f)).mtimeMs);}catch(e){}}
   for(const k in quarters)if(quarters[k].size===4)tiles.add(k);let built=null;try{built=fs.statSync(path.join(MAP_D,'base.json')).mtime;}catch(e){}
-  return {ok:1,tiles:tiles.size,of:168,lastFile:last?new Date(last).toISOString():null,built};}
+  const missing=[];for(let y=0;y<12;y++)for(let x=0;x<14;x++){const k=String(y).padStart(2,'0')+'_'+String(x).padStart(2,'0');if(!tiles.has(k))missing.push(k+(quarters[k]?':'+[...quarters[k]].join(''):''));}
+  const idle=last?(Date.now()-last)/60000:0;
+  if(!built&&!MAPB.running&&!MAPB.last&&tiles.size>=166&&idle>45)mapBuild();
+  return {ok:1,tiles:tiles.size,of:168,missing,idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err};}
+function mapBuild(){MAPB.running=true;MAPB.last=Date.now();const root=path.join(__dirname,'..','..');const tmp=MAP_D+'.srv';
+  log('карта: собираю из скачанного (не хватает пары плиток)');
+  const cp=require('child_process').spawn('python3',['tools/build_city.py',tmp],{cwd:root,stdio:['ignore','ignore','pipe']});let err='';cp.stderr.on('data',d=>{err=(err+d).slice(-600);});
+  cp.on('close',code=>{MAPB.running=false;if(code!==0){MAPB.err=err||('код '+code);log('карта: сборка не вышла',MAPB.err);return;}
+    try{if(fs.existsSync(MAP_D)){fs.rmSync(MAP_D+'.old',{recursive:true,force:true});fs.renameSync(MAP_D,MAP_D+'.old');}fs.renameSync(tmp,MAP_D);fs.rmSync(MAP_D+'.old',{recursive:true,force:true});mapChk=0;log('карта: готово',MAP_D);}catch(e){MAPB.err=e.message;}});}
+setInterval(()=>{try{mapStatus();}catch(e){}},10*60*1000);
 function mapDir(){const t=Date.now();if(t-mapChk>30000){mapChk=t;try{MAP_DIR=fs.statSync(path.join(MAP_D,'base.json')).isFile()?MAP_D:null;}catch(e){MAP_DIR=null;}}return MAP_DIR;}
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
