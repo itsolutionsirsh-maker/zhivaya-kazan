@@ -1,7 +1,7 @@
 // ===== Подгрузка карты кусками 2×2 км: вокруг игрока (и вокруг камеры, если игрок смотрит в сторону) =====
 // Всё, что нужно везде (крупные улицы, маршруты, остановки, вода, больницы и т. п.), лежит в base.json и есть сразу.
 // Дома, дворы, тропинки, парки, магазины и кафе приходят кусками; далёкие куски выгружаются, чтобы телефону хватало памяти.
-const CHUNKS={loadR:3600,dropR:6500,busy:0,max:2,t:0,state:new Map(),fail:new Map()};
+const CHUNKS={loadR:3600,dropR:6500,busy:0,max:4,t:0,state:new Map(),fail:new Map()};
 function chunkSize(){return (world.meta.chunk||20000)/10;}
 function chunkKeysNear(x,y,R){const C=chunkSize(),idx=world.meta.chunks||{};const out=[];
   for(let cx=Math.floor((x-R)/C);cx<=Math.floor((x+R)/C);cx++)for(let cy=Math.floor((y-R)/C);cy<=Math.floor((y+R)/C);cy++){const k=cx+'_'+cy;if(!idx[k])continue;
@@ -16,7 +16,7 @@ function onChunkAdded(rec){if(typeof _sideOff!=='undefined')_sideOff.clear();if(
 // куски вокруг точек старта — до показа игры, чтобы город вокруг был сразу
 async function loadChunksAround(points,R){const ks=new Set();for(const p of points)for(const k of chunkKeysNear(p[0],p[1],R))ks.add(k);
   const list=[...ks];let i=0;const worker=async()=>{while(i<list.length){const k=list[i++];await loadChunk(k);}};await Promise.all([worker(),worker(),worker(),worker()]);}
-function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUNKS.t>0)return;CHUNKS.t=0.6;
+function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUNKS.t>0)return;CHUNKS.t=0.3;
   const focus=[[player.x,player.y]];if(cam.free&&cam.z>0.5)focus.push([cam.x,cam.y]);
   if(CHUNKS.busy<CHUNKS.max){const now=performance.now();
     for(const f of focus){for(const k of chunkKeysNear(f[0],f[1],CHUNKS.loadR)){if(CHUNKS.busy>=CHUNKS.max)break;if(CHUNKS.state.has(k))continue;const ft=CHUNKS.fail.get(k);if(ft&&now-ft<15000)continue;loadChunk(k);}}}
