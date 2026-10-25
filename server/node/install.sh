@@ -196,9 +196,9 @@ fi
 
 echo "== Брандмауэр: открыты только SSH, 80 и 443"
 if command -v ufw >/dev/null 2>&1; then
-  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}'); SSHP=${SSHP:-22}
+  SSHP=$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}' || true); SSHP=${SSHP:-22}
   ufw allow "$SSHP"/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
-  ufw --force enable >/dev/null
+  ufw --force enable >/dev/null || true
 fi
 
 systemctl daemon-reload
