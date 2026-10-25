@@ -146,7 +146,9 @@ function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096|
   const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return h.length===hash.length&&crypto.timingSafeEqual(Buffer.from(h),Buffer.from(hash.toLowerCase()));});
   if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
   return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
-function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};
+function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};return tgAccount(u);}
+// аккаунт игрока Телеги (u = {id, name, start}): тот же и в мини-приложении, и на сайте после входа через бота
+function tgAccount(u){
   let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false,invitedBy=null;
   if(!a){store.createTg(k,u.name,u.id);created=true;
     // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
@@ -161,7 +163,13 @@ const PUBLIC_URL=ENV.PUBLIC_URL?ENV.PUBLIC_URL.replace(/\/*$/,'/'):'';
 const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
 function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
   if(!TG_TOKEN||got.length!==want.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(want)))return [403,{err:'forbidden'}];
+  const cq=body&&body.callback_query;if(cq)return [200,tgWebConfirm(cq)];
   const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
+  const lm=msg&&msg.chat&&/^\/start\s+login_([A-Za-z0-9_-]{8,40})\s*$/.exec(text);
+  if(lm){const e=tgwGet(lm[1]);if(!e||e.st!=='wait'||msg.chat.type!=='private')return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Ссылка для входа устарела. Нажмите «Войти через Телеграм» в игре ещё раз.'}];
+    const hm=new Date((e.t+3*3600)*1000).toISOString().slice(11,16);
+    return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Вход в «Живую Казань» на сайте\nУстройство: '+uaShort(e.ua)+', '+hm+' по Москве\n\nЕсли это вы — нажмите «Да, войти»: на сайте откроется ваша игра из Телеги. Если вы сейчас не входили на сайт — нажмите «Нет».',
+      reply_markup:{inline_keyboard:[[{text:'✅ Да, войти',callback_data:'login:'+lm[1]},{text:'Нет',callback_data:'nologin:'+lm[1]}]]}}];}
   // /key — ключ модератора, только админу (ADMIN_TG_ID) и только в личке с ботом
   if(msg&&msg.chat&&/^\/key\b/.test(text)){const admin=String(ENV.ADMIN_TG_ID||'');const isAdmin=admin&&msg.chat.type==='private'&&String(msg.from&&msg.from.id)===admin;
     return [200,{method:'sendMessage',chat_id:msg.chat.id,text:isAdmin?'Ключ модератора для '+(PUBLIC_URL||'')+'mod.html:\n'+String(ENV.MOD_TOKEN||'')+'\n\nНикому не пересылайте. Это сообщение можно удалить.':'Эта команда только для владельца игры.'}];}
@@ -173,10 +181,34 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
 // при запуске: вебхук на этот сервер и кнопка меню бота на эту игру; не вышло — повтор через 10 минут
 async function tgSetup(){if(!TG_TOKEN||!PUBLIC_URL)return;
   const call=(m,p)=>fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(10000)}).then(r=>r.json());
-  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message'],drop_pending_updates:true});
+  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message','callback_query'],drop_pending_updates:true});
     if(w&&w.ok){await call('setChatMenuButton',{menu_button:{type:'web_app',text:'Играть',web_app:{url:PUBLIC_URL}}}).catch(()=>null);log('Телега: вебхук и кнопка меню →',PUBLIC_URL);return;}
     log('Телега: вебхук не поставился:',w&&w.description);}catch(e){log('Телега: нет связи с api.telegram.org:',e.message);}
   setTimeout(tgSetup,600000).unref();}
+// Вход на сайте через Телеграм: сайт получает одноразовый код и свой секрет; игрок открывает t.me/<бот>?start=login_<код>,
+// бот показывает, с какого устройства вход, и спрашивает «Да, войти»; после этого сайт по секрету получает аккаунт Телеги.
+// Код живёт 5 минут и срабатывает один раз; подтверждение кнопкой — чтобы чужая ссылка не открыла кому-то ваш аккаунт.
+const TGW=new Map(),TGW_POLL=new Map(),TGW_TTL=300;
+function tgwGet(code){const e=TGW.get(code);if(!e)return null;if(now()-e.t>TGW_TTL){TGW.delete(code);TGW_POLL.delete(e.poll);return null;}return e;}
+function tgWebStart(req,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tgweb:'+ip,10,600)||TGW.size>5000)return {err:'rate_limited'};
+  const code=crypto.randomBytes(12).toString('base64url'),poll=crypto.randomBytes(18).toString('base64url');
+  TGW.set(code,{poll,t:now(),st:'wait',ua:clean(String(req.headers['user-agent']||''),300),tg:null,name:''});TGW_POLL.set(poll,code);
+  return {ok:1,poll,ttl:TGW_TTL,link:'https://t.me/'+SETUP_BOT+'?start=login_'+code};}
+function tgWebPoll(poll,ip){if(!allow('tgwp:'+ip,150,60))return {err:'rate_limited'};const code=typeof poll==='string'?TGW_POLL.get(poll):null;const e=code?tgwGet(code):null;
+  if(!e)return {err:'expired'};if(e.st==='wait')return {wait:1};TGW.delete(code);TGW_POLL.delete(poll);if(e.st!=='ok')return {err:'denied'};
+  return Object.assign(tgAccount({id:e.tg,name:e.name||'Игрок',start:''}),{tgId:e.tg});}
+function uaShort(ua){const b=/YaBrowser/.test(ua)?'Яндекс Браузер':/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'браузер';
+  const o=/iPhone|iPad/.test(ua)?'iPhone/iPad':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac OS X/.test(ua)?'Mac':/Linux/.test(ua)?'Linux':'';return b+(o?', '+o:'');}
+setInterval(()=>{for(const code of TGW.keys())tgwGet(code);},60000).unref();
+function tgWebConfirm(cq){const m=/^(no)?login:([A-Za-z0-9_-]{8,40})$/.exec(String(cq.data||''));const e=m?tgwGet(m[2]):null;const from=cq.from||{};
+  const answer=t=>({method:'answerCallbackQuery',callback_query_id:String(cq.id||''),text:t,show_alert:true});
+  if(!e||e.st!=='wait'||!from.id)return answer('Ссылка устарела или уже использована. Нажмите «Войти через Телеграм» в игре ещё раз.');
+  if(m[1]){e.st='no';tgEditDone(cq,'Вход на сайте отменён.');return answer('Вход отменён');}
+  e.st='ok';e.tg=String(Math.trunc(+from.id));e.name=clean(((from.first_name||'')+' '+(from.last_name||'')).trim(),24);
+  tgEditDone(cq,'✅ Вы вошли на сайте. Вернитесь в браузер — игра откроется сама.');return answer('Готово! Вернитесь в браузер — игра откроется сама');}
+// убрать кнопки у сообщения о входе (если у сервера есть выход в api.telegram.org; нет — кнопки просто останутся)
+function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetch(`https://api.telegram.org/bot${TG_TOKEN}/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
 function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
@@ -340,6 +372,8 @@ const server=http.createServer(async(req,res)=>{
     if(a==='reset')return send(res,200,resetFor(body.token));
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
+    if(a==='tgweb')return send(res,200,tgWebStart(req,ip));
+    if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}

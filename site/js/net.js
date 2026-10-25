@@ -95,13 +95,37 @@ async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).ca
   await acctSave();$('#acctMsg').textContent=j.created?'Аккаунт создан. Прогресс сохраняется на сервере':'Вошли. Прогресс сохраняется на сервере';renderAcct();}
 function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
   const tg=acct&&acct.tg;const p=inForm.querySelector('p');const go=$('#acctGo');const ob=$('#acctOutBtn');
-  if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=true;return;}
+  const inTg=typeof TG!=='undefined'&&TG.on;const tr=$('#acctTgRow');if(tr)tr.hidden=!Net.tg||inTg||!!acct;const pr=$('#pTgRow');if(pr)pr.hidden=!Net.tg||inTg||!!acct;
+  if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=inTg;return;}
   if(p)p.textContent='Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.';if(go)go.textContent='Войти';if(ob)ob.hidden=false;
   if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}}
 if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 setInterval(acctSave,30000);
 window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token},snap))],{type:'application/json'}));}catch(e){}});
+// ---------- вход на сайте через Телеграм: тот же аккаунт и прогресс, что в мини-приложении ----------
+// сервер даёт ссылку на бота с одноразовым кодом; игрок жмёт в боте «Да, войти»; сайт ждёт по своему секрету (до 5 минут)
+const TGW={poll:null,timer:null,until:0,link:''};
+function tgwMsg(t){const m=$('#acctMsg');if(m)m.textContent=t;if(!$('#profileModal').hidden)setHint(t);}
+async function acctTgStart(){if(TGW.poll&&performance.now()<TGW.until){if(TGW.link)window.open(TGW.link,'_blank');return;}
+  const j=await acctCall('tgweb',{}).catch(()=>({err:'net'}));
+  if(!j.ok){tgwMsg(j.err==='rate_limited'?'Слишком часто. Попробуйте через пару минут':j.err==='no_tg'?'Вход через Телеграм ещё не настроен на сервере':'Нет связи с сервером');return;}
+  TGW.poll=j.poll;TGW.link=j.link;TGW.until=performance.now()+(j.ttl||300)*1000;window.open(j.link,'_blank');
+  tgwMsg('Откройте Телеграм: в чате с ботом нажмите «Запустить», потом «Да, войти». Ждём…');clearTimeout(TGW.timer);TGW.timer=setTimeout(tgwPoll,2500);}
+async function tgwPoll(){if(!TGW.poll)return;if(performance.now()>TGW.until){TGW.poll=null;tgwMsg('Время на вход вышло. Нажмите «Войти через Телеграм» ещё раз');return;}
+  let j=null;try{j=await acctCall('tgwebpoll',{poll:TGW.poll});}catch(e){}
+  if(!j||j.wait){TGW.timer=setTimeout(tgwPoll,document.hidden?5000:2000);return;}
+  TGW.poll=null;if(!j.ok){tgwMsg(j.err==='denied'?'Вход отменён в Телеге':'Ссылка устарела. Нажмите «Войти через Телеграм» ещё раз');return;}
+  // в Телеге уже есть игра — загрузится она (как при входе по имени и PIN); новый аккаунт — положим туда то, что уже есть в браузере
+  if(!j.created&&j.state){let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}
+    // спрашиваем, только если в браузере уже своя игра: персонаж создан и деньги или время ушли от стартовых
+    const mine=!!localStorage.getItem('zk.profile')&&local&&(local.money!==3000||(local.minutes||0)>10*60);
+    if(mine&&!confirm('В Телеге у вас уже есть игра — загрузить её? Прогресс этого браузера заменится.')){tgwMsg('Вход отменён: остаётся игра этого браузера');return;}}
+  acct={token:j.token,name:j.name,tg:true,tgId:j.tgId};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
+  if(!j.created&&j.state){acctApply(j);return;}
+  await acctSave();tgwMsg('Вы вошли через Телеграм. Прогресс сохраняется на сервере и открывается и в Телеге, и здесь');renderAcct();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TGW.poll){clearTimeout(TGW.timer);tgwPoll();}});
+for(const id of ['#acctTgBtn','#pTgBtn'])if($(id))$(id).addEventListener('click',acctTgStart);
 // загрузить прогресс с сервера и перезапустить (локальные сохранения на это время выключены)
 function acctApply(j){window.zkNoSave=true;try{localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
 // при запуске: если на сервере сохранение новее (играли с другого устройства) — взять его
@@ -115,5 +139,5 @@ async function netInit(){
     const r=await window.claude.use('room').catch(()=>null);
     if(r){roomNs=r;Net.mode='room';r.onPeers(()=>{const list=roomPeers();Net.peers=list;syncPeers(list);readRoomMsgs(list);setNetStatus(true);},()=>{roomNs=null;Net.mode='off';peerRender.clear();setNetStatus(false);});pushPresence();setNetStatus(true);return;}}
   if(location.protocol.startsWith('http')&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
-    try{const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){Net.llm=!!j.llm;Net.acct=!!j.acct;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
+    try{const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
   Net.mode='off';setNetStatus(false);}

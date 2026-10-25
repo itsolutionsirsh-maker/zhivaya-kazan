@@ -184,6 +184,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   <div class="box">
     <h2>Кто вы в Казани?</h2>
     <p>Персонаж появится на улице Баумана или во дворе вашего района. Фото и описание видят другие игроки и жители города.</p>
+    <p id="pTgRow" hidden>Уже играете в Телеге? <button class="btn" id="pTgBtn">Войти через Телеграм</button> — откроется ваша игра.</p>
     <div class="avatarPick"><div class="pv" id="avPreview">?</div><label class="btn" for="avFile">Загрузить фото</label><input type="file" id="avFile" accept="image/*"></div>
     <div class="field"><label for="pName">Имя</label><input type="text" id="pName" maxlength="24" placeholder="Например, Иршат"></div>
     <div class="field"><label for="pDesc">О себе</label><textarea id="pDesc" maxlength="160" placeholder="Кто вы, чем занимаетесь, какой характер — жители будут это знать"></textarea></div>
@@ -328,6 +329,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
     </div>
     <div id="acctBox" hidden>
       <h3 class="sub">Аккаунт</h3>
+      <div class="row" id="acctTgRow" hidden><button class="btn primary" id="acctTgBtn">Войти через Телеграм</button></div>
       <div id="acctForm"><p>Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.</p>
         <div class="row"><input type="text" id="acctName" maxlength="24" placeholder="Имя" autocomplete="username" style="flex:1;min-width:0"><input type="password" id="acctPin" maxlength="8" inputmode="numeric" placeholder="PIN 4–8 цифр" autocomplete="current-password" style="width:120px"><button class="btn primary" id="acctGo">Войти</button></div></div>
       <div id="acctOut" hidden><p>Вы вошли как <b id="acctWho"></b>. Прогресс сохраняется на сервере каждые 30 секунд.</p><div class="row"><button class="btn" id="acctOutBtn">Выйти</button></div></div>
