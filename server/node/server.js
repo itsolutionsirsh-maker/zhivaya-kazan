@@ -16,6 +16,12 @@ const PORT=+ENV.PORT||8080;
 const ROOT=path.resolve(ENV.GAME_DIR||path.join(__dirname,'../../deploy/kazan'));
 const DATA=path.resolve(ENV.DATA_DIR||path.join(__dirname,'data'));
 const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=null,mapChk=0;
+// как идёт сборка карты всей Казани (tools/citymap.sh качает плитки в raw/city): сколько плиток готово, собрана ли карта
+function mapStatus(){const dir=path.join(__dirname,'..','..','raw','city');let files=[];try{files=fs.readdirSync(dir);}catch(e){}
+  const tiles=new Set(),quarters={};let last=0;for(const f of files){const m=/^(\d\d_\d\d)(?:_([a-d]))?\.json$/.exec(f);if(!m)continue;if(m[2]){(quarters[m[1]]=quarters[m[1]]||new Set()).add(m[2]);}else tiles.add(m[1]);
+    try{last=Math.max(last,fs.statSync(path.join(dir,f)).mtimeMs);}catch(e){}}
+  for(const k in quarters)if(quarters[k].size===4)tiles.add(k);let built=null;try{built=fs.statSync(path.join(MAP_D,'base.json')).mtime;}catch(e){}
+  return {ok:1,tiles:tiles.size,of:168,lastFile:last?new Date(last).toISOString():null,built};}
 function mapDir(){const t=Date.now();if(t-mapChk>30000){mapChk=t;try{MAP_DIR=fs.statSync(path.join(MAP_D,'base.json')).isFile()?MAP_D:null;}catch(e){MAP_DIR=null;}}return MAP_DIR;}
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
@@ -280,6 +286,7 @@ const server=http.createServer(async(req,res)=>{
     let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
+    if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod'&&body.do==='import'){const r=modAdmin(req,{do:'stats'});if(r.err)return send(res,200,r);try{return send(res,200,Object.assign({ok:1},await importPhp(OLD_API)));}catch(e){return send(res,200,{err:e.message});}}
