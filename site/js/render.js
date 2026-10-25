@@ -230,15 +230,46 @@ function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((
   for(const w of world.walls||[]){if(w.k!=='kremlin')continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
   overview=c;}
 // подгруженный кусок дорисовываем на обзорную картинку (выгруженные остаются на ней — как память о виденном)
-function overviewAddPart(rec){if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
+function overviewAddPart(rec){
+  if(rec.key&&typeof chunkSize==='function'){const C=chunkSize();const [cx,cy]=rec.key.split('_').map(Number);ovtDrop(cx*C-60,cy*C-60,(cx+1)*C+60,(cy+1)*C+60);}
+  if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of rec.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
   g.lineCap='round';g.lineJoin='round';g.strokeStyle='#D2CCBC';g.lineWidth=2.2;g.beginPath();for(const r of rec.roads){if(r.c<10)continue;const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();
   for(const r of rec.roads){if(r.c!==8)continue;g.strokeStyle='#9C9A94';g.lineWidth=ROAD_W[8]+3.5;g.beginPath();const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}g.stroke();g.strokeStyle='#F1EFEA';g.lineWidth=ROAD_W[8]+1.5;g.stroke();}
   for(const b of rec.buildings){g.fillStyle=b.roof;pl(b.p);g.fill();}
   g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of rec.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}}
+// ---------- обзор плитками: чётко на любом отдалении ----------
+// Одна картинка на всю Казань — около 0,1 точки на метр (больше не влезает в память телефона), на среднем масштабе она мутная.
+// Поверх неё — плитки 512×512 в разрешении текущего масштаба из тех же данных: не больше ~8 мс рисования за кадр, готовые хранятся,
+// подгруженный квартал стирает плитки на своём месте — они перерисуются уже с домами. Пока плитки нет, видна общая картинка.
+const OVT={px:512,tiles:new Map(),max:32};
+function ovtScale(z){const r=z*DPR/OV_S;if(r<1.3)return 0;return Math.min(1.6,OV_S*Math.pow(2,Math.ceil(Math.log2(r))));}
+function ovtDraw(s,tx,ty){const T=OVT.px/s,x0=tx*T,y0=ty*T,x1=x0+T,y1=y0+T;const c=document.createElement('canvas');c.width=c.height=OVT.px;const g=c.getContext('2d');
+  g.fillStyle=GROUND;g.fillRect(0,0,OVT.px,OVT.px);g.setTransform(s,0,0,s,-x0*s,-y0*s);
+  const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
+  const hit=bb=>bb[2]>=x0&&bb[0]<=x1&&bb[3]>=y0&&bb[1]<=y1;
+  for(const a of world.areas){if(!hit(a.bb))continue;g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
+  if(world.kremlin&&world.kremlin.hull){g.fillStyle='#ECE5D6';g.beginPath();world.kremlin.hull.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.closePath();g.fill();}
+  g.lineCap='round';g.lineJoin='round';const byC=[[],[],[],[],[],[],[],[],[],[],[],[],[]];for(const r of world.roads)if(hit(r.bb))byC[r.c].push(r);
+  const strokeC=(list,color,wd)=>{if(!list.length)return;g.strokeStyle=color;g.lineWidth=wd;g.beginPath();for(const r of list){const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();};
+  for(let k=10;k<=12;k++)strokeC(byC[k],'#D2CCBC',2.2);
+  strokeC(byC[9],'#DAD3C3',9);
+  for(let k=8;k>=0;k--)strokeC(byC[k],'#9C9A94',ROAD_W[k]+3.5);
+  for(let k=8;k>=0;k--)strokeC(byC[k],k<=4?'#FFFFFF':'#F1EFEA',ROAD_W[k]+1.5);
+  const bs=[];world.bgrid.query(x0,y0,x1,y1,b=>{bs.push(b);});
+  for(const b of bs){g.fillStyle=b.roof;pl(b.p);g.fill();}
+  g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of bs){if(b.area<300)continue;pl(b.p);g.stroke();}
+  for(const w of world.walls||[]){if(w.k!=='kremlin'||!hit(w.bb))continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
+  return c;}
+function ovtRender(z,vx0,vy0,vx1,vy1){const s=ovtScale(z);if(!s)return;const T=OVT.px/s,o=0.6/z;const t0=performance.now();
+  for(let tx=Math.floor(vx0/T);tx<=Math.floor(vx1/T);tx++)for(let ty=Math.floor(vy0/T);ty<=Math.floor(vy1/T);ty++){const k=s+':'+tx+':'+ty;let c=OVT.tiles.get(k);
+    if(c){OVT.tiles.delete(k);OVT.tiles.set(k,c);}
+    else{if(performance.now()-t0>8)continue;c=ovtDraw(s,tx,ty);OVT.tiles.set(k,c);if(OVT.tiles.size>OVT.max)OVT.tiles.delete(OVT.tiles.keys().next().value);}
+    ctx.drawImage(c,tx*T,ty*T,T+o,T+o);}}
+function ovtDrop(x0,y0,x1,y1){for(const k of [...OVT.tiles.keys()]){const [s,tx,ty]=k.split(':').map(Number);const T=OVT.px/s;if(tx*T<=x1&&(tx+1)*T>=x0&&ty*T<=y1&&(ty+1)*T>=y0)OVT.tiles.delete(k);}}
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;
-  ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ovtRender(z,vx0,vy0,vx1,vy1);
   if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const dot=(x,y,r,c)=>{const [sx,sy]=toS(x,y);if(sx<-5||sx>W+5||sy<-5||sy>H+5)return;ctx.fillStyle=c;ctx.beginPath();ctx.arc(sx,sy,r,0,TAU);ctx.fill();};

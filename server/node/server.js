@@ -330,9 +330,23 @@ const server=http.createServer(async(req,res)=>{
   if(!file.startsWith(root+path.sep))return send(res,403,{err:'forbidden'});
   const ext=path.extname(file).toLowerCase();if(ext==='.php'||file.includes(path.sep+'data'+path.sep))return send(res,404,{err:'not_found'});
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Не найдено');}
-    const cache=ext==='.html'||root===MAP_DIR&&/base\.json$/.test(file)?'no-cache':(root===MAP_DIR?'public, max-age=2592000, immutable':(ext==='.json'?'public, max-age=3600':'public, max-age=300'));
-    res.writeHead(200,{'Content-Type':MIME[ext]||'application/octet-stream','Content-Length':st.size,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});
-    if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});});
+    // страница и base.json — каждый раз «не изменилось?» (тогда 304, без тела); с ?v= (скрипты сборки, кварталы карты) — навсегда
+    const cache=ext==='.html'||root===MAP_DIR&&/base\.json$/.test(file)?'no-cache':(u.searchParams.has('v')||root===MAP_DIR?'public, max-age=31536000, immutable':(ext==='.json'?'public, max-age=3600':'public, max-age=300'));
+    const core=st.size.toString(36)+'-'+Math.floor(st.mtimeMs).toString(36);
+    const zip=STATIC_ZIP.test(ext)&&st.size>1024&&/\bgzip\b/.test(req.headers['accept-encoding']||'');
+    const h={'Content-Type':MIME[ext]||'application/octet-stream','Cache-Control':cache,'ETag':'W/"'+core+'"','Last-Modified':st.mtime.toUTCString(),'Vary':'Accept-Encoding','X-Content-Type-Options':'nosniff'};
+    // ETag сравниваем по сути (размер и время файла): Caddy при своём сжатии дописывает к нему суффикс
+    const inm=req.headers['if-none-match'],ims=Date.parse(req.headers['if-modified-since']||'');
+    if(inm?inm.includes(core):ims>=Math.floor(st.mtimeMs/1000)*1000){res.writeHead(304,h);return res.end();}
+    const plain=()=>{h['Content-Length']=st.size;res.writeHead(200,h);if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);};
+    if(!zip)return plain();
+    // сжатое заранее: file.gz рядом, делается один раз в фоне — дальше сервер и Caddy не жмут файл на каждый запрос
+    const gzf=file+'.gz';fs.stat(gzf,(e2,gs)=>{if(e2||gs.mtimeMs<st.mtimeMs){gzLater(file,gzf);return plain();}
+      h['Content-Encoding']='gzip';h['Content-Length']=gs.size;h['ETag']='W/"'+core+'-gz"';res.writeHead(200,h);if(req.method==='HEAD')return res.end();fs.createReadStream(gzf).pipe(res);});});});
+const STATIC_ZIP=/^\.(json|js|html|css|svg|txt)$/;const GZ_BUSY=new Set(),GZ_FAIL=new Map();
+function gzLater(file,gzf){if(GZ_BUSY.has(file)||GZ_BUSY.size>=2||(GZ_FAIL.get(file)||0)>Date.now()-3600e3)return;GZ_BUSY.add(file);const tmp=gzf+'.'+process.pid+'.tmp';
+  const done=e=>{GZ_BUSY.delete(file);if(e){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}else fs.rename(tmp,gzf,e3=>{if(e3){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}});};
+  const out=fs.createWriteStream(tmp);out.on('error',done);out.on('finish',()=>done());fs.createReadStream(file).on('error',done).pipe(require('zlib').createGzip({level:9})).on('error',done).pipe(out);}
 
 // ---------- WebSocket ----------
 const wss=new WebSocketServer({server,path:'/ws',maxPayload:16*1024,perMessageDeflate:false});

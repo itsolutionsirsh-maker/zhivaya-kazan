@@ -42,7 +42,7 @@ function homeAt(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(Math.abs(b.cx
 async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id):null;if(id&&!d)return null;
   // точка двора дальше 2,5 км от центра своего района — скорее ошибка в данных (попала в соседний район): такую не берём
   const spots=d?(window.cityHomeSpots||[]).filter(s=>s.district===id&&Array.isArray(s.ll)&&(q=>dist(q[0],q[1],d.x,d.y)<2500)(llToXY(s.ll))):[];const at=d?(spots.length?llToXY(pick(spots).ll):[d.x,d.y]):startPoint();
-  if(world.meta.chunks){setHint(d?`Строим дома: ${d.name}…`:'Строим дома вокруг…');await loadChunksAround([at],1800);}
+  if(world.meta.chunks){setHint(d?`Строим дома: ${d.name}…`:'Строим дома вокруг…');await loadChunksAround([at],1200);}
   let best=null,bd=d?2500:400;for(const b of world.buildings){if(!HOME_T.has(b.t||''))continue;const k=dist(b.cx,b.cy,at[0],at[1])+((b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3?0:250);if(k<bd){bd=k;best=b;}}
   if(!best)return null;const n=nearestNode(best.cx,best.cy,world.pedAdj,250);if(n<0)return null;const q=sidewalkPos(n);
   player.x=q[0];player.y=q[1];cam.x=q[0];cam.y=q[1];player.waypoints=null;player.home=best;player.homeAt=null;
@@ -146,12 +146,14 @@ $('#startBtn').addEventListener('click',()=>{const nm0=$('#pName').value.trim();
   if((first&&p.district)||(!first&&p.district!==(prev.district||'')))settleInDistrict(p.district).then(d=>addEvent(d&&d.name?`${player.name} вышел во двор: ${d.name}${d.parent?' · '+d.parent:''}`:`${player.name} вышел в город на улицу Баумана`));
   else addEvent(`${player.name} вышел в город на улицу Баумана`);if(first||!flags.howtoSeen)showHowto();});
 $('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').click();});
+// самое сильное отдаление: чтобы вся карта помещалась на экран (для старой маленькой карты — как раньше, 0,22)
+function zMin(){const bb=world&&world.bbox;if(!bb||typeof W==='undefined')return 0.22;return Math.min(0.22,Math.max(0.01,0.9*Math.min(W/(bb[2]-bb[0]),H/(bb[3]-bb[1]))));}
 function showHowto(){$('#howtoModal').hidden=false;player.busy=true;}
 $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;player.busy=false;flags.howtoSeen=true;try{localStorage.setItem('zk.howto','1');}catch(e){}});
 
 // ---------- сохранение ----------
 function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,home:player.home?{x:player.home.cx,y:player.home.cy}:(player.homeAt?{x:player.homeAt[0],y:player.homeAt[1]}:null),own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object')player.job=s.job;if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else player.homeAt=[s.home.x,s.home.y];}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object')player.job=s.job;if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,zMin(),16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else player.homeAt=[s.home.x,s.home.y];}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
@@ -175,8 +177,8 @@ let resetArm=0;$('#resetBtn').addEventListener('click',async()=>{const b=$('#res
 $('#speedBtn').addEventListener('click',()=>{const i=(TIME_SCALES.indexOf(clock.scale)+1)%TIME_SCALES.length;clock.scale=TIME_SCALES[i];$('#speedBtn').textContent='×'+clock.scale;});
 $('#centerBtn').addEventListener('click',followPlayer);
 mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;$('#centerBtn').hidden=false;clampCam();});
-$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.22,16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.22,16);});
-canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.22,16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
+$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,zMin(),16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,zMin(),16);});
+canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),zMin(),16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
 let pdown=null,dragging=false,pinch=null;const ptrs=new Map();
 function followPlayer(){cam.free=false;$('#centerBtn').hidden=true;}
 function clampCam(){const bb=world.bbox;cam.x=clamp(cam.x,bb[0],bb[2]);cam.y=clamp(cam.y,bb[1],bb[3]);}
@@ -184,7 +186,7 @@ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:cam.zt};pdown=null;dragging=false;return;}
   pdown={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now()};dragging=false;});
 canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,0.22,16);return;}
+  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,zMin(),16);return;}
   if(!pdown||scene!=='city')return;if(!dragging&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>6){dragging=true;cam.free=true;$('#centerBtn').hidden=false;canvas.style.cursor='grabbing';}
   if(dragging){cam.x-=(e.clientX-pdown.lx)/cam.z;cam.y-=(e.clientY-pdown.ly)/cam.z;pdown.lx=e.clientX;pdown.ly=e.clientY;clampCam();}});
 canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;pdown=null;dragging=false;canvas.style.cursor='';});
@@ -277,7 +279,7 @@ async function boot(){
     $('#loadMsg').textContent='Строим улицы…';const data=await res.json();
     await new Promise(r=>setTimeout(r,30));buildWorld(data);
     if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);if(s&&s.home&&isFinite(s.home.x)&&isFinite(s.home.y))pts.push([s.home.x,s.home.y]);}catch(e){}
-      await loadChunksAround(pts,2600);initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
+      await loadChunksAround(pts,1200);initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}

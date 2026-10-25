@@ -52,9 +52,13 @@ function buildWorld(d){
 // добавить часть карты: узлы, дороги (граф для пешеходов, машин и скорой), дома, площади с деревьями и парковками, места.
 // В кусках ссылка на узел < 0 — это узел base (-(i+1)), иначе — свой узел куска.
 function addMapPart(d,key){const W=world;const off=W.nodes.length;
+  // квартал грузят второй раз (после выгрузки): его узлы и улицы остались в городе — не добавляем их снова, только дома, площади, места
+  const kept=key!==null&&W.keptRoads?W.keptRoads.get(key):null;
+  if(kept)d={nodes:[],roads:[],buildings:d.buildings,areas:d.areas,pois:d.pois};
   for(const p of d.nodes){const i=W.nodes.length;const q=[p[0]/10,p[1]/10];W.nodes.push(q);W.pedAdj.push([]);W.carAdj.push([]);W.emAdj.push([]);W.ngrid.add(i,q[0],q[1],q[0],q[1]);}
   W.N=W.nodes.length;
-  const rec={key,buildings:[],areas:[],pois:[],trees:[],roads:[]};const touched=new Set();
+  const rec={key,buildings:[],areas:[],pois:[],trees:[],roads:kept||[]};const touched=new Set();
+  if(key!==null&&!kept)(W.keptRoads||(W.keptRoads=new Map())).set(key,rec.roads);
   for(const r0 of d.roads){const p=key===null?r0.p:r0.p.map(v=>v<0?-v-1:v+off);let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const n of p){const q=W.nodes[n];if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1];}
     const w=r0.l?Math.min(ROAD_W[r0.c]*1.4,r0.l*3.1+1):ROAD_W[r0.c];
     const r={c:r0.c,n:r0.n||'',o:r0.o||0,p,w,hw:w/2,bb:[x0-w,y0-w,x1+w,y1+w],i:W.roads.length,speed:(r0.s?Math.min(r0.s/3.6*0.9,20):ROAD_SPEED[r0.c])||0,lim:r0.s||60,lanes:r0.l||0};W.roads.push(r);rec.roads.push(r);
