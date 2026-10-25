@@ -82,6 +82,13 @@ function nearestRoadName(x,y){const ns=nearestRoadSeg(x,y,60);if(ns&&ns.seg.r.n)
 // если пешеходная дорожка попала внутрь проезжей части — сдвинуть на тротуар (переходы поперёк дороги не трогаем)
 function pushOffRoad(x,y,dx,dy){const ns=nearestRoadSeg(x,y,12);if(!ns||ns.seg.r.c>8||ns.d>=ns.seg.r.hw+0.9)return null;const s=ns.seg;const ux=(s.bx-s.ax)/s.L,uy=(s.by-s.ay)/s.L;if(Math.abs(dx*ux+dy*uy)<0.55)return null;
   let nx=x-ns.px,ny=y-ns.py;const d=Math.hypot(nx,ny);if(d<0.05){nx=-uy;ny=ux;}else{nx/=d;ny/=d;}const off=s.r.hw+1.2;return [ns.px+nx*off,ns.py+ny*off];}
+// сдвиг тротуара от оси дороги a→b (вправо по ходу), но так, чтобы не залезть в дом: в старом центре дома стоят вплотную к проезжей части,
+// и полный сдвиг уводил пешеходов сквозь стены. Проверяем точки вдоль отрезка и берём самый большой сдвиг без домов. Считается один раз на ребро.
+const _sideOff=new Map();
+function safeSideOff(a,b,want){if(want<=0.05)return want;const k=a*4194304+b;let o=_sideOff.get(k);if(o!==undefined)return Math.min(o,want);
+  const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;const n=Math.min(14,Math.max(2,Math.ceil(L/3)));
+  const free=off=>{for(let i=0;i<=n;i++){const t=i/n*L;if(inBuilding(pa[0]+dx*t-dy*off,pa[1]+dy*t+dx*off))return false;}return true;};
+  o=0;for(const f of [1,0.8,0.6,0.42,0.25]){if(free(want*f)){o=want*f;break;}}_sideOff.set(k,o);return o;}
 // точка на тротуаре рядом с узлом (а не на оси дороги)
 function sidewalkPos(node){const p=world.nodes[node];let best=null;for(const e of world.pedAdj[node]||[]){const r=world.roads[e[2]];if(r.c>8)return [p[0],p[1]];if(!best||r.hw>best.r.hw)best={e,r};}
   if(!best)return [p[0],p[1]];const q=world.nodes[best.e[0]];const L=dist(p[0],p[1],q[0],q[1])||1;const dx=(q[0]-p[0])/L,dy=(q[1]-p[1])/L;const off=best.r.hw+SIDEWALK*0.55;const sgn=Math.random()<0.5?1:-1;
@@ -107,7 +114,7 @@ function processPaths(n){while(n-->0&&pathQueue.length){const q=pathQueue.shift(
 // Путь по узлам → точки с учётом тротуара/полосы. side: 'ped' (тротуар справа) | 'car' (полоса справа)
 function pathToWaypoints(path,adj,side){const wps=[];if(!path||path.length<2)return wps;
   for(let i=0;i<path.length-1;i++){const a=world.nodes[path[i]],b=world.nodes[path[i+1]];const L=dist(a[0],a[1],b[0],b[1])||1;const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;const e=adj[path[i]].find(q=>q[0]===path[i+1]);const r=e?world.roads[e[2]]:null;
-    const off=side==='car'?(r?Math.max(1.2,r.hw*0.5):1.5):(r&&r.c<=8?r.hw+1.3:0);
+    const off=side==='car'?(r?Math.max(1.2,r.hw*0.5):1.5):(r&&r.c<=8?safeSideOff(path[i],path[i+1],r.hw+1.3):0);
     let p1=[a[0]-dy*off,a[1]+dx*off],p2=[b[0]-dy*off,b[1]+dx*off];if(side==='ped'&&r&&r.c>8){p1=pushOffRoad(p1[0],p1[1],dx,dy)||p1;p2=pushOffRoad(p2[0],p2[1],dx,dy)||p2;}
     wps.push(p1);wps.push(p2);}
   return wps;}
