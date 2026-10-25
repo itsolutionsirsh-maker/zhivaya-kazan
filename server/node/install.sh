@@ -27,7 +27,20 @@ fi
 echo "== Пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y git curl python3 ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y git curl python3 ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https unattended-upgrades fail2ban
+
+echo "== Защита: обновления безопасности ставятся сами, подбор пароля к SSH блокируется"
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
+cat > /etc/fail2ban/jail.d/zk-sshd.conf <<EOF
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 6
+findtime = 10m
+bantime = 1h
+EOF
+systemctl enable fail2ban >/dev/null 2>&1 || true
+systemctl restart fail2ban >/dev/null 2>&1 || true
 
 echo "== Node.js"
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 22 ]; then
@@ -167,6 +180,19 @@ $SITES {
 	reverse_proxy 127.0.0.1:8080
 }
 EOF
+# игра на поддомене (kazan.lifegorod.com), а сам домен и www тоже смотрят на этот сервер — они пересылают в игру
+MYIP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++)if($i=="src")print $(i+1)}')
+APEX="${DOMAIN#*.}"
+if [ "$APEX" != "$DOMAIN" ] && [ "${APEX#*.}" != "$APEX" ] && [ -n "$MYIP" ]; then
+  RED=""
+  for h in "$APEX" "www.$APEX"; do
+    [ "$(getent ahostsv4 "$h" | awk 'NR==1{print $1}')" = "$MYIP" ] && RED="${RED:+$RED, }$h"
+  done
+  if [ -n "$RED" ]; then
+    echo "   $RED → https://$DOMAIN"
+    printf '\n%s {\n\tredir https://%s{uri} 302\n}\n' "$RED" "$DOMAIN" >> /etc/caddy/Caddyfile
+  fi
+fi
 
 echo "== Брандмауэр: открыты только SSH, 80 и 443"
 if command -v ufw >/dev/null 2>&1; then
@@ -181,11 +207,11 @@ systemctl restart zhivaya-kazan
 systemctl enable --now zhivaya-kazan-update.timer zhivaya-kazan-health.timer
 systemctl reload caddy || systemctl restart caddy
 
-sleep 2
-if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+for i in $(seq 1 20); do curl -fsS -m 3 http://127.0.0.1:8080/health >/dev/null 2>&1 && break; sleep 1; done
+if curl -fsS -m 3 http://127.0.0.1:8080/health >/dev/null; then
   echo
   echo "Готово: https://$DOMAIN"
-  echo "Ключ ИИ для жителей, токен бота и ваш id в Телеге (LLM_API_KEY, TG_BOT_TOKEN, ADMIN_TG_ID): sudo nano $ENVF, затем sudo systemctl restart zhivaya-kazan"
+  echo "Токен бота, ваш id в Телеге и ключ ИИ: откройте https://$DOMAIN/setup и вставьте их там"
   echo "Модерация и цифры по игрокам: https://$DOMAIN/mod.html (ключ — MOD_TOKEN: sudo grep MOD_TOKEN $ENVF)"
   echo "Журнал игры: journalctl -u zhivaya-kazan -f"
 else
