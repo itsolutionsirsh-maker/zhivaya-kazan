@@ -12,10 +12,22 @@ function mskDate(){return new Date(Date.now()+3*3600e3).toISOString().slice(0,10
 function cityTrack(kind,info){info=info||{};const add=info.n||1;PROG.c[kind]=(PROG.c[kind]||0)+add;
   if(kind==='metro'&&info.to&&!PROG.metroSt.includes(info.to))PROG.metroSt.push(info.to);
   if(kind==='talk'&&info.folk&&!PROG.folk.includes(info.folk))PROG.folk.push(info.folk);
-  questsOn(kind,info,add);achCheck();progSave();}
+  tutOn(kind,info,add);questsOn(kind,info,add);achCheck();progSave();}
 window.cityTrack=cityTrack;
 function hintsMatch(hints,info){if(!hints||!hints.length)return true;const hay=((info.name||'')+' '+(info.street||'')+' '+(info.kind||'')).toLowerCase();return hints.some(h=>hay.includes(String(h).toLowerCase()));}
 function targetOk(q,info){const t=q.target;if(!t)return true;if(t.to&&info.to!==t.to)return false;if(t.folk&&info.folk!==t.folk)return false;if(t.hints&&!hintsMatch(t.hints,info))return false;return true;}
+
+// ---------- первые шаги (tutorial.js → cityTutorial): по одному шагу, пока новичок не освоится ----------
+function tutList(){return (window.cityTutorial||[]).filter(t=>t&&t.id);}
+function tutActive(){const L=tutList();if(!L.length)return false;PROG.tut=PROG.tut||{i:0,p:0,end:false};
+  if(!PROG.tut.started&&(PROG.days.total||1)>2){PROG.tut.end=true;}   // давно играет — обучение не навязываем
+  return !PROG.tut.end&&PROG.tut.i<L.length;}
+function tutStep(){return tutActive()?tutList()[PROG.tut.i]:null;}
+function tutShow(){const t=tutStep();if(!t)return;PROG.tut.started=true;setHint(`👣 Шаг ${PROG.tut.i+1} из ${tutList().length}: ${t.title}. ${t.text||''}`);updateQuestBtn();}
+function tutOn(kind,info,add){const t=tutStep();if(!t||t.check!==kind||!targetOk(t,info))return;PROG.tut.p+=add;if(PROG.tut.p<(t.n||1))return;
+  PROG.tut.i++;PROG.tut.p=0;player.money+=50;addEvent(`👣 Готово: «${t.title}» +${fmtMoney(50)}`,'say');
+  if(PROG.tut.i>=tutList().length){PROG.tut.end=true;player.money+=300;addEvent(`🎉 Первые шаги пройдены, +${fmtMoney(300)}. Дальше — задания дня 🎯 и навигатор 🧭`,'say');updateQuestBtn();}
+  else setTimeout(tutShow,1500);}
 
 // ---------- задания дня: три в сутки, сложнее по мере игры ----------
 function questLevel(){const d=PROG.days.total||1;return d<=2?1:d<=5?2:3;}
@@ -121,12 +133,16 @@ function engineInit(){
   wrap('netSend',(r,a)=>{if(r)cityTrack('chat',{to:a[0]||''});});
   wrap('shiftEnd',(r,a)=>{ENG.quiet=false;const j=a[0];if(j&&j.len&&j.present/(j.len*60)>=0.7)cityTrack('work');},()=>{ENG.quiet=true;});   // репутация за смену — не «помощь»
   if(typeof window.cityOnInvite==='function')wrap('cityOnInvite',(r,a)=>{if(a[0]==='invited')cityTrack('friends');});
-  daysTick();questsRoll();updateQuestBtn();setTimeout(fixturesTick,4000);}
+  daysTick();questsRoll();updateQuestBtn();setTimeout(fixturesTick,4000);setTimeout(tutShow,6000);}
 function engineTick(dt){walkTick(dt);eventsTick(dt);districtsTick(dt);}
 
 // ---------- окно «Задания» ----------
-function updateQuestBtn(){const b=$('#questBtn');if(!b)return;const n=PROG.q.ids.length-PROG.q.done.length;b.textContent=n>0?'🎯'+n:'🎯';b.title=n>0?`Задания на сегодня: осталось ${n}`:'Задания на сегодня сделаны';}
+function updateQuestBtn(){const b=$('#questBtn');if(!b)return;if(tutActive()){b.textContent='👣'+(PROG.tut.i+1);b.title='Первые шаги';return;}const n=PROG.q.ids.length-PROG.q.done.length;b.textContent=n>0?'🎯'+n:'🎯';b.title=n>0?`Задания на сегодня: осталось ${n}`:'Задания на сегодня сделаны';}
 function openQuests(){questsRoll();const box=$('#qList');box.innerHTML='';
+  $('#qTitle').textContent=tutActive()?'Первые шаги':'Задания на сегодня';$('#qSub').textContent=tutActive()?'Восемь коротких шагов, чтобы освоиться в городе. За каждый — немного денег.':'Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.';
+  if(tutActive()){const L=tutList();L.forEach((t,i)=>{const el=document.createElement('div');el.className='rt-card';const h=document.createElement('b');h.textContent=(i<PROG.tut.i?'✅ ':i===PROG.tut.i?'👣 ':'· ')+t.title;const x=document.createElement('span');x.textContent=i===PROG.tut.i?(t.text||''):'';el.append(h,x);if(i>PROG.tut.i)el.style.opacity='.5';box.append(el);});
+    const sk=document.createElement('button');sk.className='btn';sk.textContent='Пропустить обучение';sk.addEventListener('click',()=>{PROG.tut.end=true;progSave();updateQuestBtn();openQuests();});box.append(sk);
+    $('#qAch').textContent='Пройдите первые шаги — потом каждый день будут три задания.';$('#questModal').hidden=false;player.busy=true;return;}
   for(const q of questsToday()){const done=PROG.q.done.includes(q.id);const n=Math.min(PROG.q.p[q.id]||0,q.n||1);const el=document.createElement('div');el.className='rt-card';
     const h=document.createElement('b');h.textContent=(done?'✅ ':'🎯 ')+q.title;const t=document.createElement('span');t.textContent=q.text||'';
     const p=document.createElement('span');const r=q.reward||{};p.textContent=(done?'Готово':`${q.check==='walk'?Math.round(n)+' из '+q.n+' м':n+' из '+(q.n||1)}`)+' · награда '+(r.money?fmtMoney(r.money):'')+(r.mood?' и настроение':'');

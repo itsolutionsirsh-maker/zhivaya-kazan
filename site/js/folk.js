@@ -101,8 +101,15 @@ function folkGo(f,to){const from=f.places[f.at],dst=f.places[to];f.trip=null;
 const FOLK_HI=['Привет, {n}!','О, {n}! Как сам?','{n}, здравствуй!','Салям, {n}!'];
 const FOLK_HI_F={fidania:['Улым, здравствуй! Покушал сегодня?','Ой, сосед! Как дела?'],lenar:['{n}! Послушай, новую выучил ♪','Братан, привет!'],marat:['Э, {n}! Куда едем?','Салям, {n}! Опять пробки…'],alsu:['Зай, привет. Заходи вечером','{n}, живой? Привет'],zulfiya:['Здравствуйте, {n}!'],gulnara:['Здравствуйте, {n}. Как самочувствие?'],ildar:['{n}! Наши сегодня играют, ты в курсе?'],rinat:['{n}! Голодный? Заходи']};
 const BUSK=['♪ Казан, Казан, син минем җаным… ♪','♪ (перебирает струны) ♪','♪ Ещё одну для хороших людей ♪','Спасибо, люди добрые!'];
+// жители районов (folk2.js → window.cityFolk2): появляются, когда игрок впервые оказывается рядом с их районом (там уже подгружены дома и места)
+function folkDistrictTick(){const ext=window.cityFolk2;if(!Array.isArray(ext)||!ext.length||!FOLK.ready)return;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;
+  for(const src of ext){if(have.has(src.id))continue;const d=ds.find(x=>x.id===src.district);if(!d||!Array.isArray(d.center))continue;
+    const c=[(d.center[1]-m.lon0)*m.mlon,-(d.center[0]-m.lat0)*m.mlat];if(dist(c[0],c[1],player.x,player.y)>2200)continue;
+    const A0=folkAnchors();const A=src.district==='vahitovsky'?A0:{freedom:c,kremlin:c,bauman:c,stadium:c,yard:[c[0]+40,c[1]+30]};A[src.district]=c;
+    const f=Object.assign({ward:src.district},src);f.ward=src.district;f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
+    f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);break;}}   // по одному за раз — не тормозить
 function updateFolk(rdt){if(!world)return;if(!FOLK.ready){folkInit();if(!FOLK.ready)return;}
-  FOLK.t-=rdt;if(FOLK.t>0)return;FOLK.t=0.5;
+  FOLK.t-=rdt;if(FOLK.t>0)return;FOLK.t=0.5;FOLK.dt=(FOLK.dt||0)+1;if(FOLK.dt%10===0)folkDistrictTick();
   for(const f of FOLK.list){
     if(f.w&&walkers.indexOf(f.w)<0)f.w=null;           // убрали чужим кодом
     if(f.w&&folkBusy(f.w))continue;                   // занят ситуацией, митингом, разговором
