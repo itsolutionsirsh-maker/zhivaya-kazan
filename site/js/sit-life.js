@@ -30,7 +30,7 @@ function renderJobs(){renderHome();const box=$('#jobsList');box.innerHTML='';con
     s1.textContent=J.courier?'Свободный график: выходите на линию, когда удобно. 180–350 ₽ за заказ + чаевые':`Ежедневно ${fmtHM(J.start)}–${fmtHM(J.start+J.len)} · ${fmtMoney(J.pay)} за смену · ${Math.round(dist(v.p.x,v.p.y,player.x,player.y))} м`;
     const btn=document.createElement('button');btn.className='btn primary';btn.textContent=j?'Сменить работу':'Устроиться';btn.addEventListener('click',()=>{hire(v);renderJobs();});c.append(b,s1,btn);box.append(c);}}
 function hire(v){if(player.job)quitJob(null);const J=v.J;
-  const j=player.job=J.courier?{id:'courier',t:J.t,courier:true,online:true,offerT:4,delivered:0,rating:5}:{id:v.id,t:J.t,key:'poi'+v.p.i,name:v.p.n,kind:v.p.t,x:v.p.x,y:v.p.y,start:J.start,len:J.len,pay:J.pay,strikes:0};
+  const j=player.job=J.courier?{id:'courier',t:J.t,courier:true,online:true,offerT:4,delivered:0,rating:5}:{id:v.id,t:J.t,key:poiKey(v.p),name:v.p.n,kind:v.p.t,x:v.p.x,y:v.p.y,start:J.start,len:J.len,pay:J.pay,strikes:0};
   if(!j.courier){Object.assign(j,{day:clock.day,done:gMin()>=j.start*60,present:0,late:false,entered:false,remind:false,taskT:rnd(10,20),task:null,tasksDone:0,missed:0});mark(null,'job',j.x,j.y,'💼',j.name,{arrow:true,color:'#2BB062'});}
   addEvent(j.courier?'🛵 Вы курьер доставки. Вы на линии — заказы будут приходить сами':`💼 Вы устроились: ${j.t} в «${j.name}». Смена каждый день ${fmtHM(j.start)}–${fmtHM(j.start+j.len)}${j.done?' (сегодняшняя уже идёт — начинаете завтра)':''}`,'say');
   startSit('job');}

@@ -28,7 +28,7 @@ function openRouteModal(dest){loadPlaces();rtDest=dest||null;$('#routeModal').hi
 function closeRouteModal(){$('#routeModal').hidden=true;player.busy=false;}
 $('#routeBtn').addEventListener('click',()=>openRouteModal());
 $('#rtClose').addEventListener('click',closeRouteModal);
-$('#rtSearch').addEventListener('input',()=>{rtDest=null;renderRouteModal();});
+let rtSearchT=0;$('#rtSearch').addEventListener('input',()=>{rtDest=null;clearTimeout(rtSearchT);rtSearchT=setTimeout(renderRouteModal,200);});   // искать, когда перестали печатать: на каждую букву перебор всех улиц и мест
 $('#rtSearch').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')closeRouteModal();if(e.key==='Enter'){const c=destCandidates($('#rtSearch').value)[0];if(c){rtDest=c;renderRouteModal();}}});
 $('#rtPick').addEventListener('click',()=>{closeRouteModal();pickingDest=true;setHint('Нажмите на карте, куда нужно попасть');canvas.style.cursor='crosshair';});
 function pickDestAt(wx,wy){pickingDest=false;canvas.style.cursor='';const near=placesNear(wx,wy,40,1)[0];openRouteModal(near?{x:near.x,y:near.y,n:near.n,kind:POI_RU[near.t]||'место'}:{x:wx,y:wy,n:nearestRoadName(wx,wy)||'точка на карте',kind:'точка'});}

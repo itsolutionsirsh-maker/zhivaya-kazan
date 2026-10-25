@@ -47,7 +47,7 @@ function render(){
   if(z>1.6)for(const a of world.areas){if(a.k!=='parking'||!a.cars||a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;for(const c of a.cars)drawCarSprite(c.x,c.y,Math.cos(c.ang),Math.sin(c.ang),4.3,1.8,c.color,'car',t,null);}
   // ---- тени зданий
   const bvis=[];world.bgrid.query(vx0,vy0,vx1,vy1,b=>{if(b.bb[2]<vx0||b.bb[0]>vx1||b.bb[3]<vy0||b.bb[1]>vy1)return;bvis.push(b);});
-  if(z>1.4){ctx.fillStyle='rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=0.38*b.hm,sy=0.3*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);ctx.closePath();}ctx.fill();}
+  if(z>1.4){ctx.fillStyle='rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=0.38*b.hm,sy=0.3*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);}ctx.fill();}
   // ---- деревья
   if(z>0.9){const tv=[];world.tgrid.query(vx0,vy0,vx1,vy1,tr=>{if(tr.x<vx0||tr.x>vx1||tr.y<vy0||tr.y>vy1)return;tv.push(tr);});
     if(z>1.4){ctx.fillStyle='rgba(40,50,25,.22)';ctx.beginPath();for(const tr of tv){ctx.moveTo(tr.x+tr.r*0.4+tr.r,tr.y+tr.r*0.35);ctx.arc(tr.x+tr.r*0.4,tr.y+tr.r*0.35,tr.r,0,TAU);}ctx.fill();}
@@ -59,8 +59,9 @@ function render(){
   winDark.length=0;winLit.length=0;
   for(const b of bvis)drawBuilding(b,z,night);
   if(z>1.1)drawLandmarks(bvis,z);
-  if(winDark.length){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winDark){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}
-  if(winLit.length&&night<=0.3){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}
+  // окна и тени — одним путём без closePath: fill() замыкает каждую фигуру сам, а closePath в длинном пути в Chrome стоит квадратично (на телефоне было ~10 кадров в секунду)
+  if(winDark.length){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winDark){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
+  if(winLit.length&&night<=0.3){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
   // ---- остановки
   if(z>1.2)for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(s.x-1.4,s.y-0.5,3,1.5);ctx.fillStyle=s.k==='tram'?'#C9B3D9':'#B9CCE3';rrect(ctx,s.x-1.5,s.y-0.7,3,1.4,0.2);ctx.fill();ctx.fillStyle=s.k==='tram'?'#8E3478':'#2F6DB5';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.45,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.2,0,TAU);ctx.fill();}
   // ---- прокат и своя машина
@@ -88,7 +89,7 @@ function render(){
     world.lgrid.query(vx0,vy0,vx1,vy1,l=>{if(l[0]<vx0||l[0]>vx1||l[1]<vy0||l[1]>vy1)return;ctx.drawImage(lampSprite,l[0]-13,l[1]-13,26,26);});
     const allv=cars.concat(buses);if(player.vehicle)allv.push(vehProxy(player.vehicle));for(const v of allv){if(v.crashed||v.x<vx0||v.x>vx1||v.y<vy0||v.y>vy1)continue;ctx.save();ctx.translate(v.x+v.hx*(v.len/2-0.5),v.y+v.hy*(v.len/2-0.5));ctx.rotate(Math.atan2(v.hy,v.hx));ctx.drawImage(beamSprite,0,-6,20,12);ctx.restore();}
     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-    if(winLit.length&&night>0.3){ctx.fillStyle=`rgba(255,214,130,${0.5+0.45*night})`;ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}}
+    if(winLit.length&&night>0.3){ctx.fillStyle=`rgba(255,214,130,${0.5+0.45*night})`;ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}}
   // ---- подписи
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if(z>2.1){ctx.font='500 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const done=new Set();
@@ -199,7 +200,7 @@ function labelPlayer(sx,sy,name,me,img){ctx.save();ctx.font='600 12px "IBM Plex 
   if(img){ctx.save();ctx.beginPath();ctx.arc(x0+12,y0+11,9,0,TAU);ctx.clip();ctx.drawImage(img,x0+3,y0+2,18,18);ctx.restore();}
   ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,x0+7+aw,y0+11.5);ctx.restore();}
 let miniBg=null;
-function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
+function renderMini(){const tn=performance.now();if(!renderMini.t||tn-renderMini.t>500){renderMini.t=tn;renderMini.vis=mini.offsetParent!==null;}if(!renderMini.vis)return;/* видимость — раз в полсекунды: offsetParent каждый кадр пересчитывал раскладку страницы */const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
   if(!miniBg){miniBg=document.createElement('canvas');miniBg.width=mw;miniBg.height=mh;const m=miniBg.getContext('2d');m.fillStyle='#DAD5C7';m.fillRect(0,0,mw,mh);m.setTransform(s,0,0,s,ox-bb[0]*s,oy-bb[1]*s);for(const a of world.areas){if(a.k!=='water'&&a.k!=='park'&&a.k!=='forest')continue;m.fillStyle=AREA_FILL[a.k];m.beginPath();m.moveTo(a.p[0],a.p[1]);for(let i=2;i<a.p.length;i+=2)m.lineTo(a.p[i],a.p[i+1]);m.closePath();m.fill();}
     for(const w of world.walls||[]){if(w.k!=='kremlin')continue;m.strokeStyle='#C9B79A';m.lineWidth=14;m.beginPath();m.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)m.lineTo(w.p[i],w.p[i+1]);m.stroke();}
     m.lineCap='round';for(const r of world.roads){if(r.c>7)continue;m.strokeStyle=r.c<=4?'#fff':'#EFEBE2';m.lineWidth=r.c<=4?10:5;m.beginPath();const p0=world.nodes[r.p[0]];m.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];m.lineTo(p[0],p[1]);}m.stroke();}}
@@ -214,7 +215,8 @@ function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=
 // ---------- мелкий масштаб: готовая картинка города + движущиеся точки ----------
 let overview=null;let OV_S=0.75;
 // обзорная картинка всей карты: не больше ~9 млн точек (iOS не держит холст больше ~16 млн, а память телефона не резиновая)
-function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+function buildOverview(){const bb=world.bbox;const px=matchMedia('(pointer:coarse)').matches||(navigator.deviceMemory||8)<=4?4e6:9e6;   // на телефоне — 4 млн точек: вдвое быстрее строится и меньше памяти, чёткость дают плитки
+  OV_S=Math.min(0.75,Math.sqrt(px/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   g.fillStyle=GROUND;g.fillRect(0,0,w,h);g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of world.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
@@ -262,10 +264,12 @@ function ovtDraw(s,tx,ty){const T=OVT.px/s,x0=tx*T,y0=ty*T,x1=x0+T,y1=y0+T;const
   g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of bs){if(b.area<300)continue;pl(b.p);g.stroke();}
   for(const w of world.walls||[]){if(w.k!=='kremlin'||!hit(w.bb))continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
   return c;}
-function ovtRender(z,vx0,vy0,vx1,vy1){const s=ovtScale(z);if(!s)return;const T=OVT.px/s,o=0.6/z;const t0=performance.now();
-  for(let tx=Math.floor(vx0/T);tx<=Math.floor(vx1/T);tx++)for(let ty=Math.floor(vy0/T);ty<=Math.floor(vy1/T);ty++){const k=s+':'+tx+':'+ty;let c=OVT.tiles.get(k);
+function ovtRender(z,vx0,vy0,vx1,vy1){const s=ovtScale(z);if(!s)return;const T=OVT.px/s,o=0.6/z;
+  // хранить вдвое больше, чем видно (большой экран), и считать время только на рисование новых плиток — хотя бы одна за кадр
+  const tx0=Math.floor(vx0/T),tx1=Math.floor(vx1/T),ty0=Math.floor(vy0/T),ty1=Math.floor(vy1/T);OVT.max=Math.max(32,2*(tx1-tx0+1)*(ty1-ty0+1));let spent=0,drew=0;
+  for(let tx=tx0;tx<=tx1;tx++)for(let ty=ty0;ty<=ty1;ty++){const k=s+':'+tx+':'+ty;let c=OVT.tiles.get(k);
     if(c){OVT.tiles.delete(k);OVT.tiles.set(k,c);}
-    else{if(performance.now()-t0>8)continue;c=ovtDraw(s,tx,ty);OVT.tiles.set(k,c);if(OVT.tiles.size>OVT.max)OVT.tiles.delete(OVT.tiles.keys().next().value);}
+    else{if(drew&&spent>8)continue;const t1=performance.now();c=ovtDraw(s,tx,ty);spent+=performance.now()-t1;drew++;OVT.tiles.set(k,c);if(OVT.tiles.size>OVT.max)OVT.tiles.delete(OVT.tiles.keys().next().value);}
     ctx.drawImage(c,tx*T,ty*T,T+o,T+o);}}
 function ovtDrop(x0,y0,x1,y1){for(const k of [...OVT.tiles.keys()]){const [s,tx,ty]=k.split(':').map(Number);const T=OVT.px/s;if(tx*T<=x1&&(tx+1)*T>=x0&&ty*T<=y1&&(ty+1)*T>=y0)OVT.tiles.delete(k);}}
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;

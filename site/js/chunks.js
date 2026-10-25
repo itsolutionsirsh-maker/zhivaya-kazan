@@ -27,9 +27,9 @@ function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUN
   if(CHUNKS.busy<CHUNKS.max){const now=performance.now();
     for(const f of load){for(const k of chunkKeysNear(f[0],f[1],CHUNKS.loadR)){if(CHUNKS.busy>=CHUNKS.max)break;if(CHUNKS.state.has(k))continue;const ft=CHUNKS.fail.get(k);if(ft&&now-ft<15000)continue;loadChunk(k);}}}
   // выгрузка далёких
-  const C=chunkSize();for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
+  const C=chunkSize();let dropped=0;for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
     let near=false;for(const f of focus){if(Math.abs(f[0]-mx)<CHUNKS.dropR&&Math.abs(f[1]-my)<CHUNKS.dropR){near=true;break;}}
-    if(!near){CHUNKS.state.delete(k);removeMapPart(k);}}}
+    if(!near){CHUNKS.state.delete(k);removeMapPart(k);if(++dropped>=2)break;}}}   // не больше двух за такт: после дальней поездки выгрузка 16 кварталов разом давала подвисание на полсекунды
 // сразу после переезда (старт в своём районе) — всех, кого можно, поближе, не дожидаясь populationFollow
 function populationJump(px,py){
   for(const w of walkers){if(w.bus||w.inside||w.companion||w.keep||w.sitBy!=null||w.folk||w.rally||w.rallySlot||w.isInterior||w.temp)continue;

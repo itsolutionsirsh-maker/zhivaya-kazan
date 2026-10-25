@@ -13,6 +13,8 @@ function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt
 function angDiff(a,b){let d=b-a;while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;return d;}
 function fmtMoney(v){return Math.round(v).toLocaleString('ru-RU')+' ₽';}
 
+// постоянный ключ места (кафе, работа, отдел полиции): по координатам — номер p.i зависит от порядка загрузки кварталов и после перезагрузки другой
+function poiKey(p){return 'p'+Math.round(p.x)+'_'+Math.round(p.y);}
 class Grid{
   constructor(cell){this.cell=cell;this.m=new Map();}
   key(cx,cy){return (cx+8192)*16384+(cy+8192);}

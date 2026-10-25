@@ -35,7 +35,7 @@ function strHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt
 function buildWorld(d){
   world={nodes:[],N:0,roads:[],pedAdj:[],carAdj:[],emAdj:[],pedNodes:[],carNodes:[],buildings:[],bgrid:new Grid(80),areas:[],stops:[],pois:[],routes:[],
     ngrid:new Grid(60),rgrid:new Grid(60),trees:[],tgrid:new Grid(100),bbox:d.meta.bbox.map(v=>v/10),meta:d.meta,crossings:[],cgrid:new Grid(40),
-    lamps:[],lgrid:new Grid(120),bseq:0,pseq:0,parts:new Map(),base:d};
+    lamps:[],lgrid:new Grid(120),bseq:0,pseq:0,parts:new Map()};
   addMapPart(d,null);world.baseN=world.nodes.length;
   world.stops=d.stops.map((s,i)=>({x:s.x/10,y:s.y/10,n:s.n,k:s.k,i}));
   world.routes=d.routes.map((r,i)=>{const pts=[];for(let k=0;k<r.p.length;k+=2)pts.push([r.p[k]/10,r.p[k+1]/10]);const cum=[0];for(let k=0;k<pts.length-1;k++)cum.push(cum[k]+dist(pts[k][0],pts[k][1],pts[k+1][0],pts[k+1][1]));
@@ -87,8 +87,9 @@ function removeMapPart(key){const W=world;const rec=W.parts.get(key);if(!rec||ke
   W.areas=drop(W.areas,rec.areas);W.pois=drop(W.pois,rec.pois);}
 
 function nearestRoadSeg(x,y,maxR){let best=null;world.rgrid.query(x-maxR,y-maxR,x+maxR,y+maxR,s=>{const vx=s.bx-s.ax,vy=s.by-s.ay;let t=((x-s.ax)*vx+(y-s.ay)*vy)/(s.L*s.L);t=clamp(t,0,1);const px=s.ax+vx*t,py=s.ay+vy*t;const d=Math.hypot(px-x,py-y);if(d<maxR&&(!best||d<best.d))best={seg:s,d,t,px,py};});return best;}
-function nearestNode(x,y,adj,maxR){let best=-1,bd=(maxR||120)**2;
-  for(let r=60;r<=(maxR||120);r+=60){world.ngrid.query(x-r,y-r,x+r,y+r,i=>{if(adj&&adj[i].length===0)return;const p=world.nodes[i];const d=(p[0]-x)**2+(p[1]-y)**2;if(d<bd){bd=d;best=i;}});if(best>=0)break;}
+function nearestNode(x,y,adj,maxR){const R=maxR||120;let best=-1,bd=R*R;
+  // кольцами по 60 м, последнее — ровно на весь радиус (раньше при 80 или 150 м искало только 60 или 120, промах кидал жителя в случайную точку города)
+  for(let r=Math.min(60,R);;r=Math.min(r+60,R)){world.ngrid.query(x-r,y-r,x+r,y+r,i=>{if(adj&&adj[i].length===0)return;const p=world.nodes[i];const d=(p[0]-x)**2+(p[1]-y)**2;if(d<bd){bd=d;best=i;}});if(best>=0||r>=R)break;}
   return best;}
 function inBuilding(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(b.pass)return;if(x<b.bb[0]||x>b.bb[2]||y<b.bb[1]||y>b.bb[3])return;if(pointInPoly(b.p,x,y)){hit=b;return false;}});return hit;}
 function nearestRoadName(x,y){const ns=nearestRoadSeg(x,y,60);if(ns&&ns.seg.r.n)return ns.seg.r.n;let best='',bd=80*80;world.rgrid.query(x-80,y-80,x+80,y+80,s=>{if(!s.r.n)return;const d=(s.ax-x)**2+(s.ay-y)**2;if(d<bd){bd=d;best=s.r.n;}});return best;}

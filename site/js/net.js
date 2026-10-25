@@ -55,7 +55,10 @@ function setNetStatus(ok){const el=$('#netLbl');if(!el)return;const n=Net.online
 // ---------- WebSocket (свой сервер на VPS): мгновенные позиции и чат ----------
 // Сервер присылает только соседей: {t:'w', p:[[sid,x10,y10,hx100,hy100,b]], m:[[sid,id,meta]], g:[sid], c:[[cx,cy,n]], n:онлайн}
 let wsSock=null,wsFails=0,wsLastPush=0,wsLastMeta='';const wsPeers=new Map();
-function wsPush(){const t=performance.now();if(!wsSock||wsSock.readyState!==1||t-wsLastPush<140)return;wsLastPush=t;const p=buildPresence();
+let wsLastP=null;
+// координаты — только если сдвинулся или повернулся, а стоя на месте — раз в 3 секунды (раньше ~7 раз в секунду всегда: трафик и батарея)
+function wsPush(){const t=performance.now();if(!wsSock||wsSock.readyState!==1||t-wsLastPush<140)return;const p=buildPresence();
+  const q=wsLastP;if(q&&t-wsLastPush<3000&&Math.abs(q.x-p.x)<0.05&&Math.abs(q.y-p.y)<0.05&&Math.abs(q.hx-p.hx)<0.02&&Math.abs(q.hy-p.hy)<0.02&&q.b===p.b)return;wsLastPush=t;wsLastP={x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b};
   wsSock.send(JSON.stringify({t:'p',x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b}));
   const m={n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a};const ms=JSON.stringify(m);if(ms!==wsLastMeta){wsLastMeta=ms;wsSock.send(JSON.stringify({t:'m',m}));}}
 function wsApply(d){
