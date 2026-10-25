@@ -40,7 +40,8 @@ function fillDistricts(cur){const sel=$('#pDistrict');if(!sel)return;sel.innerHT
   sel.value=cur||'';if(sel.value!==(cur||''))sel.value='';}
 function homeAt(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(Math.abs(b.cx-x)<2&&Math.abs(b.cy-y)<2){hit=b;return false;}});return hit;}
 async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id):null;if(id&&!d)return null;
-  const spots=id?(window.cityHomeSpots||[]).filter(s=>s.district===id&&Array.isArray(s.ll)):[];const at=d?(spots.length?llToXY(pick(spots).ll):[d.x,d.y]):startPoint();
+  // точка двора дальше 2,5 км от центра своего района — скорее ошибка в данных (попала в соседний район): такую не берём
+  const spots=d?(window.cityHomeSpots||[]).filter(s=>s.district===id&&Array.isArray(s.ll)&&(q=>dist(q[0],q[1],d.x,d.y)<2500)(llToXY(s.ll))):[];const at=d?(spots.length?llToXY(pick(spots).ll):[d.x,d.y]):startPoint();
   if(world.meta.chunks){setHint(d?`Строим дома: ${d.name}…`:'Строим дома вокруг…');await loadChunksAround([at],1800);}
   let best=null,bd=d?2500:400;for(const b of world.buildings){if(!HOME_T.has(b.t||''))continue;const k=dist(b.cx,b.cy,at[0],at[1])+((b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3?0:250);if(k<bd){bd=k;best=b;}}
   if(!best)return null;const n=nearestNode(best.cx,best.cy,world.pedAdj,250);if(n<0)return null;const q=sidewalkPos(n);

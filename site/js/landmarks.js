@@ -1,20 +1,20 @@
 // Ориентиры для навигатора. Только данные. ll — вход или точка OSM, не центр квартала.
-// Кольцо: запрос торгового центра в Nominatim не попал. Точка — вход метро «Площадь Тукая», OSM.
-// Кремль: отдельная точка Кул-Шариф не взята, первый ответ OSM был не у мечети. Имя в alias.
-// ЦУМ, Чёрное озеро, Колхозный рынок, автовокзал, РКБ — ответы OSM были остановками или чужим городом, их нет.
-// Аэропорт: OSM отдал тип platform, не здание терминала.
+// Добавлены ЦУМ, Чёрное озеро, Колхозный рынок, автовокзал, РКБ, ДРКБ, КГЭУ, речной порт.
+// Точка для «Кольца» обновлена на вход ТРК. Отдельная точка для Кул-Шарифа.
 window.cityLandmarks=[
-  {name:'ТРК «Кольцо»', alias:['кольцо', 'трц кольцо', 'трк кольцо'], ll:[55.78699, 49.12230], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.78699&mlon=49.12230#map=18/55.78699/49.12230'},
+  {name:'ТРК «Кольцо»', alias:['кольцо', 'трц кольцо', 'трк кольцо'], ll:[55.78654, 49.12415], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.78654&mlon=49.12415#map=18/55.78654/49.12415'},
   {name:'Мега', alias:['мега', 'мега казань'], ll:[55.78079, 49.21302], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.78079&mlon=49.21302#map=17/55.78079/49.21302'},
   {name:'Парк Хаус', alias:['парк хаус', 'парк-хаус'], ll:[55.82960, 49.11851], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.82960&mlon=49.11851#map=17/55.82960/49.11851'},
   {name:'Сувар Плаза', alias:['сувар', 'сувар плаза'], ll:[55.77847, 49.12949], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.77847&mlon=49.12949#map=17/55.77847/49.12949'},
   {name:'Пирамида', alias:['пирамида'], ll:[55.79480, 49.10307], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.79480&mlon=49.10307#map=18/55.79480/49.10307'},
+  {name:'ЦУМ', alias:['цум', 'центральный универмаг'], ll:[55.78638, 49.11824], kind:'mall', src:'https://www.openstreetmap.org/?mlat=55.78638&mlon=49.11824#map=18/55.78638/49.11824'},
   {name:'Ак Барс Арена', alias:['казань арена', 'ак барс арена', 'ак барс арен'], ll:[55.82115, 49.16050], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.82115&mlon=49.16050#map=17/55.82115/49.16050'},
   {name:'Татнефть Арена', alias:['татнефть', 'татнефть арена'], ll:[55.81746, 49.12503], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.81746&mlon=49.12503#map=17/55.81746/49.12503'},
   {name:'Баскет-холл', alias:['баскет холл', 'баскет-холл'], ll:[55.78191, 49.12691], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.78191&mlon=49.12691#map=17/55.78191/49.12691'},
   {name:'Дворец спорта', alias:['дворец спорта'], ll:[55.79404, 49.09954], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.79404&mlon=49.09954#map=18/55.79404/49.09954'},
   {name:'Центральный стадион', alias:['центральный стадион', 'ташаяк'], ll:[55.79641, 49.09719], kind:'stadium', src:'https://www.openstreetmap.org/?mlat=55.79641&mlon=49.09719#map=18/55.79641/49.09719'},
-  {name:'Казанский Кремль', alias:['кремль', 'казанский кремль', 'кул-шариф', 'кул шариф'], ll:[55.79902, 49.10617], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.79902&mlon=49.10617#map=17/55.79902/49.10617'},
+  {name:'Казанский Кремль', alias:['кремль', 'казанский кремль'], ll:[55.79902, 49.10617], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.79902&mlon=49.10617#map=17/55.79902/49.10617'},
+  {name:'Мечеть Кул-Шариф', alias:['кул-шариф', 'кул шариф', 'мечеть кул-шариф'], ll:[55.79837, 49.10524], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.79837&mlon=49.10524#map=18/55.79837/49.10524'},
   {name:'Башня Сююмбике', alias:['сююмбике', 'башня сююмбике'], ll:[55.80047, 49.10518], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.80047&mlon=49.10518#map=18/55.80047/49.10518'},
   {name:'Благовещенский собор', alias:['благовещенский', 'благовещенский собор'], ll:[55.79985, 49.10602], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.79985&mlon=49.10602#map=18/55.79985/49.10602'},
   {name:'Центр семьи «Казан»', alias:['чаша', 'центр семьи', 'казан чаша'], ll:[55.81289, 49.10815], kind:'sight', src:'https://www.openstreetmap.org/?mlat=55.81289&mlon=49.10815#map=17/55.81289/49.10815'},
@@ -35,6 +35,7 @@ window.cityLandmarks=[
   {name:'Парк Горького', alias:['парк горького', 'горького'], ll:[55.79935, 49.14867], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.79935&mlon=49.14867#map=16/55.79935/49.14867'},
   {name:'Парк Тысячелетия', alias:['парк тысячелетия', 'тысячелетия', 'кабан парк'], ll:[55.78337, 49.12373], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.78337&mlon=49.12373#map=17/55.78337/49.12373'},
   {name:'Ленинский сад', alias:['ленинский сад'], ll:[55.79368, 49.12317], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.79368&mlon=49.12317#map=17/55.79368/49.12317'},
+  {name:'Чёрное озеро', alias:['чёрное озеро', 'черное озеро', 'парк чёрное озеро'], ll:[55.79479, 49.11859], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.79479&mlon=49.11859#map=17/55.79479/49.11859'},
   {name:'Парк Урицкого', alias:['урицкого', 'парк урицкого'], ll:[55.83771, 49.06350], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.83771&mlon=49.06350#map=16/55.83771/49.06350'},
   {name:'Парк Победы', alias:['парк победы'], ll:[55.82957, 49.10729], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.82957&mlon=49.10729#map=16/55.82957/49.10729'},
   {name:'Горкинско-Ометьевский лес', alias:['ометьевский лес', 'горкинский лес'], ll:[55.76198, 49.20655], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.76198&mlon=49.20655#map=15/55.76198/49.20655'},
@@ -44,13 +45,19 @@ window.cityLandmarks=[
   {name:'Верхний Кабан', alias:['верхний кабан'], ll:[55.72481, 49.15373], kind:'park', src:'https://www.openstreetmap.org/?mlat=55.72481&mlon=49.15373#map=15/55.72481/49.15373'},
   {name:'Казань-Пассажирская', alias:['казань пассажирская', 'жд вокзал', 'вокзал', 'казанский вокзал'], ll:[55.78863, 49.09970], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.78863&mlon=49.09970#map=17/55.78863/49.09970'},
   {name:'Северный вокзал', alias:['северный вокзал'], ll:[55.84199, 49.08222], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.84199&mlon=49.08222#map=17/55.84199/49.08222'},
+  {name:'Автовокзал', alias:['автовокзал', 'центральный автовокзал', 'столичный'], ll:[55.77330, 49.10394], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.77330&mlon=49.10394#map=17/55.77330/49.10394'},
+  {name:'Речной порт', alias:['речной порт', 'речной вокзал'], ll:[55.77336, 49.09140], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.77336&mlon=49.09140#map=17/55.77336/49.09140'},
   {name:'Аэропорт Казань', alias:['аэропорт', 'казань аэропорт'], ll:[55.60936, 49.29943], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.60936&mlon=49.29943#map=15/55.60936/49.29943'},
   {name:'КФУ', alias:['кфу', 'университет', 'казанский университет'], ll:[55.79037, 49.12071], kind:'univ', src:'https://www.openstreetmap.org/?mlat=55.79037&mlon=49.12071#map=17/55.79037/49.12071'},
   {name:'КНИТУ-КАИ', alias:['каи', 'книту-каи', 'книту каи'], ll:[55.79664, 49.11515], kind:'univ', src:'https://www.openstreetmap.org/?mlat=55.79664&mlon=49.11515#map=18/55.79664/49.11515'},
   {name:'КГМУ', alias:['кгму', 'медуниверситет'], ll:[55.79169, 49.14131], kind:'univ', src:'https://www.openstreetmap.org/?mlat=55.79169&mlon=49.14131#map=17/55.79169/49.14131'},
+  {name:'КГЭУ', alias:['кгэу', 'энергетический университет'], ll:[55.81474, 49.09471], kind:'univ', src:'https://www.openstreetmap.org/?mlat=55.81474&mlon=49.09471#map=17/55.81474/49.09471'},
   {name:'Рынок Привоз', alias:['привоз'], ll:[55.84385, 49.14464], kind:'market', src:'https://www.openstreetmap.org/?mlat=55.84385&mlon=49.14464#map=16/55.84385/49.14464'},
   {name:'Московский рынок', alias:['московский рынок'], ll:[55.82867, 49.08027], kind:'market', src:'https://www.openstreetmap.org/?mlat=55.82867&mlon=49.08027#map=16/55.82867/49.08027'},
+  {name:'Колхозный рынок', alias:['колхозный рынок', 'центральный рынок', 'колхозка'], ll:[55.78655, 49.10838], kind:'market', src:'https://www.openstreetmap.org/?mlat=55.78655&mlon=49.10838#map=17/55.78655/49.10838'},
   {name:'Казанская ярмарка', alias:['казанская ярмарка', 'оренбургский тракт ярмарка'], ll:[55.75903, 49.14960], kind:'market', src:'https://www.openstreetmap.org/?mlat=55.75903&mlon=49.14960#map=16/55.75903/49.14960'},
+  {name:'РКБ', alias:['ркб', 'республиканская больница'], ll:[55.72940, 49.18870], kind:'hospital', src:'https://www.openstreetmap.org/?mlat=55.72940&mlon=49.18870#map=16/55.72940/49.18870'},
+  {name:'ДРКБ', alias:['дркб', 'детская республиканская больница'], ll:[55.72850, 49.17880], kind:'hospital', src:'https://www.openstreetmap.org/?mlat=55.72850&mlon=49.17880#map=16/55.72850/49.17880'},
   {name:'Авиастроительная', alias:['авиастроительная', 'авиатөзелеш'], ll:[55.85674, 49.08503], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.85674&mlon=49.08503#map=18/55.85674/49.08503'},
   {name:'Северный вокзал, метро', alias:['северный вокзал метро', 'төньяк вокзал'], ll:[55.84284, 49.08176], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.84284&mlon=49.08176#map=18/55.84284/49.08176'},
   {name:'Яшьлек', alias:['яшьлек'], ll:[55.82865, 49.08169], kind:'station', src:'https://www.openstreetmap.org/?mlat=55.82865&mlon=49.08169#map=18/55.82865/49.08169'},
