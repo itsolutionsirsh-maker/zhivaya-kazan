@@ -297,7 +297,7 @@ const server=http.createServer(async(req,res)=>{
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
-  // карта всей Казани кусками собирается на сервере (tools/make_city_map.sh) в MAP_DIR и отдаётся по /map/…
+  // карта всей Казани кусками собирается на сервере (tools/citymap.sh) в MAP_DIR и отдаётся по /map/…
   let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
   const file=path.join(root,path.normalize(rel).replace(/^([/\\])+/,''));
   if(!file.startsWith(root+path.sep))return send(res,403,{err:'forbidden'});

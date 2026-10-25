@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Карта всей Казани на сервере: качает OSM (Overpass) и собирает куски в /var/lib/zk/map — игра отдаёт их по адресу /map/…
 # Запуск (в фоне, от пользователя игры):
-#   sudo systemd-run --uid=zk --unit=zkmap --working-directory=/opt/zhivaya-kazan bash tools/make_city_map.sh
+#   sudo systemd-run --uid=zk --unit=zkmap --working-directory=/opt/zhivaya-kazan bash tools/citymap.sh
 #   journalctl -u zkmap -f        — ход дела
 # Качает плитками; если оборвётся — запустите снова, докачает только недостающее.
 set -euo pipefail
