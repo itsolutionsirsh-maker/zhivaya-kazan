@@ -69,7 +69,7 @@ def main():
         if not left: break
         print(f'круг {rnd_ + 1}: осталось {len(left)}', flush=True)
         for n, bb in left:
-            parts = [(n, bb)] if rnd_ == 0 else [(q, qb) for q, qb in quarters(n, bb) if not os.path.exists(f'{OUTDIR}/{q}.json')]
+            parts = [(n, bb)] if rnd_ == 0 and not os.environ.get('QUARTERS') else [(q, qb) for q, qb in quarters(n, bb) if not os.path.exists(f'{OUTDIR}/{q}.json')]
             for pn, pbb in parts:
                 els = fetch(query(pbb, False), pn, soft=True)
                 if els is not None:
