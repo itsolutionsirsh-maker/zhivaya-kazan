@@ -213,7 +213,7 @@ function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.rando
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
-    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);
+    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
@@ -254,7 +254,7 @@ async function boot(){
     $('#loadMsg').textContent='Строим улицы…';const data=await res.json();
     await new Promise(r=>setTimeout(r,30));buildWorld(data);
     if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);}catch(e){}
-      await loadChunksAround(pts,2600);initLandmarks(data);}
+      await loadChunksAround(pts,2600);initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}

@@ -24,3 +24,20 @@ function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUN
   const C=chunkSize();for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
     let near=false;for(const f of focus){if(Math.abs(f[0]-mx)<CHUNKS.dropR&&Math.abs(f[1]-my)<CHUNKS.dropR){near=true;break;}}
     if(!near){CHUNKS.state.delete(k);removeMapPart(k);}}}
+// ---------- город вокруг игрока: кто остался далеко позади, тихо «переезжает» поближе (за пределами экрана) ----------
+// Иначе после поездки на такси или метро на другой конец Казани вокруг было бы пусто: все жители остались бы на Баумана.
+const FOLLOW={t:0,walkR:1100,carR:1500};
+function populationFollow(dt){FOLLOW.t-=dt;if(FOLLOW.t>0||!world)return;FOLLOW.t=1.5;if(player.inside)return;
+  const px=player.x,py=player.y;const vw=(typeof W!=='undefined'?W:1200)/Math.max(0.3,cam.z)/2+40,vh=(typeof H!=='undefined'?H:800)/Math.max(0.3,cam.z)/2+40;
+  const offscreen=(x,y)=>Math.abs(x-cam.x)>vw||Math.abs(y-cam.y)>vh;
+  let moved=0;
+  for(const w of walkers){if(moved>=8)break;if(w.bus||w.inside||w.companion||w.keep||w.sitBy!=null||w.folk||w.rallySlot||w.isInterior||w.temp)continue;
+    if(w.role!=='resident'&&w.role!=='courier'&&w.role!=='police')continue;if(!/^(idle|walk|routing|wait)$/.test(w.state))continue;
+    if(Math.abs(w.x-px)<FOLLOW.walkR&&Math.abs(w.y-py)<FOLLOW.walkR)continue;
+    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(260,650);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.pedAdj,120);if(n<0)continue;const q=sidewalkPos(n);if(!offscreen(q[0],q[1]))continue;
+      w.node=n;w.x=q[0];w.y=q[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0.5,6);if(w.anchor)w.anchor=[px+rnd(-150,150),py+rnd(-150,150)];moved++;break;}}
+  moved=0;
+  for(const c of cars){if(moved>=5)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.taxiFor||c.target!=null||c.state==='scene'||c.remove)continue;
+    if(Math.abs(c.x-px)<FOLLOW.carR&&Math.abs(c.y-py)<FOLLOW.carR)continue;
+    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!world.carAdj[n].length)continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
+      c.node=n;c.x=q[0];c.y=q[1];c.path=null;c.creep=null;c.speed=0;c.state='idle';c.ttl=rnd(0.2,2);moved++;break;}}}
