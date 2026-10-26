@@ -29,19 +29,29 @@ function folkStore(){if(window.zkNoSave)return;const o={};for(const f of FOLK.li
 function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Math.floor(r()*a.length)];
   const p={id:nextId++,name:f.name,job:f.job,trait:f.trait||P(TRAITS),mood:pick(MOODS),age:f.age||Math.floor(18+r()*50),clothes:P(CLOTHES),skin:P(SKINS),hair:P(HAIRS),female:!!f.female,role:'resident',memory:[],
     hairStyle:f.female?P([0,1,1,2]):((f.age||30)>55?3:P([0,0,2])),bag:r()<0.4?P(['#3A3A3A','#7A4A2A','#C24A3A','#2A4A7A']):null,pants:P(['#2B2F3A','#3C3C3C','#4A5A7A','#6B5A4A','#1F1F1F']),bio:f.bio||'',speech:f.speech||'',folk:f.id};
-  if(f.id==='fidania'){p.hair='#B8B8B8';p.hairStyle=2;}return p;}
+  if(f.id==='fidania'){p.hair='#B8B8B8';p.hairStyle=2;}
+  // свои люди из folk3.js: типаж, фразы, одежда и предмет в руках (рисует render.js: p.item)
+  if(f.type)p.type=f.type;if(Array.isArray(f.lines)&&f.lines.length)p.lines=f.lines;
+  const lk=f.look;if(lk){if(/^#[0-9a-f]{6}$/i.test(lk.coat||''))p.clothes=lk.coat;if(lk.hat==='cap')p.hat={k:'cap',c:shade(p.clothes,0.7)};else if(lk.hat==='beanie')p.hat={k:'knit',c:P(['#5A6B8C','#8C3A32','#3F6B4A','#6E7378'])};if(lk.item&&lk.item!=='none')p.item=lk.item;}
+  return p;}
 // ---------- места ----------
 function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){if(!test(p))continue;const d=dist(p.x,p.y,x,y);if(d<bd){bd=d;best=p;}}return best;}
 function poiPlace(p,kind){return p?{x:p.x,y:p.y,inside:true,key:poiKey(p),poi:p,name:p.n||KIND_RU[p.t]||'',kind}:null;}
 function spotPlace(x,y,name,kind){const n=nearestNode(x,y,world.pedAdj,150);if(n<0)return null;const sp=sidewalkPos(n);return {x:sp[0],y:sp[1],inside:false,node:n,name,kind};}
-function folkAnchors(){const A={};
-  const sq=(world.squares||[]).find(s=>/свобод/i.test(s.n));A.freedom=sq?[sq.x,sq.y]:[player.x,player.y];
-  const kr=world.pois.find(p=>/кремл/i.test(p.n||''));A.kremlin=kr?[kr.x,kr.y]:[A.freedom[0]-1200,A.freedom[1]-250];
-  let sx=0,sy=0,n=0;for(const p of world.pois){if(Math.abs(p.x-A.freedom[0])>1600||Math.abs(p.y-A.freedom[1])>1600)continue;const r=nearestRoadName(p.x,p.y)||'';if(/Бауман/.test(r)){sx+=p.x;sy+=p.y;n++;}if(n>60)break;}
-  A.bauman=n?[sx/n,sy/n]:[(A.freedom[0]+A.kremlin[0])/2,(A.freedom[1]+A.kremlin[1])/2];
-  A.yard=player.home?[player.home.cx,player.home.cy]:[player.x,player.y];
-  const sb=world.pois.find(p=>p.t==='bar'&&/спорт|sport|футбол|паб|pub/i.test(p.n||''));A.stadium=sb?[sb.x,sb.y]:A.freedom;return A;}
-function homeNear(x,y,r,seed){const c=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,x,y)<r);if(!c.length)return null;const b=c[seed%c.length];
+// опорные точки центра считаем один раз на карту (раньше — перебор тысяч мест на каждого жителя); вызывающие правят копию
+let FOLK_ANCH=null;
+function folkAnchors(){const key=world.roads.length+':'+world.pois.length;
+  if(!FOLK_ANCH||FOLK_ANCH.w!==world||FOLK_ANCH.key!==key){const A={};
+    const sq=(world.squares||[]).find(s=>/свобод/i.test(s.n));A.freedom=sq?[sq.x,sq.y]:[player.x,player.y];
+    const kr=world.pois.find(p=>/кремл/i.test(p.n||''));A.kremlin=kr?[kr.x,kr.y]:[A.freedom[0]-1200,A.freedom[1]-250];
+    // Баумана пешеходная — её нет в сетке «ближайшей улицы»; середина — по точкам самой улицы рядом с площадью Свободы
+    let sx=0,sy=0,n=0;for(const r of world.roads){if(!r||!/Баумана/.test(r.n||'')||!r.p)continue;for(const i of r.p){const q=world.nodes[i];if(!q||dist(q[0],q[1],A.freedom[0],A.freedom[1])>2000)continue;sx+=q[0];sy+=q[1];n++;}}
+    A.bauman=n?[sx/n,sy/n]:[(A.freedom[0]+A.kremlin[0])/2,(A.freedom[1]+A.kremlin[1])/2];
+    const sb=world.pois.find(p=>p.t==='bar'&&/спорт|sport|футбол|паб|pub/i.test(p.n||''));A.stadium=sb?[sb.x,sb.y]:A.freedom;
+    FOLK_ANCH={w:world,key,A};}
+  const A=Object.assign({},FOLK_ANCH.A);A.yard=player.home?[player.home.cx,player.home.cy]:[player.x,player.y];return A;}
+function homeNear(x,y,r,seed){const s=new Set();world.bgrid.query(x-r,y-r,x+r,y+r,b=>{if((b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,x,y)<r)s.add(b);});   // по сетке, а не по всем домам города
+  const c=[...s].sort((u,v)=>u.i-v.i);if(!c.length)return null;const b=c[seed%c.length];
   const pts=[[b.cx,b.bb[3]+3],[b.cx,b.bb[1]-3],[b.bb[0]-3,b.cy],[b.bb[2]+3,b.cy]];for(const q of pts){if(!inBuilding(q[0],q[1]))return {x:q[0],y:q[1],inside:true,key:'home:'+seed,name:'дом',kind:'home',b};}return {x:b.cx,y:b.bb[3]+3,inside:true,key:'home:'+seed,name:'дом',kind:'home',b};}
 // описание места: строка из моих запасных ('bar','busk',…) или объект второго программиста {kind, hints, label}
 const SPEC_STR={bar:{kind:'bar'},busk:{kind:'street'},pharmacy:{kind:'pharmacy'},school:{kind:'school'},cafe:{kind:'cafe'},shop:{kind:'shop'},yard:{kind:'yard'},taxi:{kind:'taxi'},chai:{kind:'cafe',hints:['чайхан']},kremlin:{kind:'street',hints:['кремл']}};
@@ -104,12 +114,12 @@ const FOLK_HI=['Привет, {n}!','О, {n}! Как сам?','{n}, здравс
 const FOLK_HI_F={fidania:['Улым, здравствуй! Покушал сегодня?','Ой, сосед! Как дела?'],lenar:['{n}! Послушай, новую выучил ♪','Братан, привет!'],marat:['Э, {n}! Куда едем?','Салям, {n}! Опять пробки…'],alsu:['Зай, привет. Заходи вечером','{n}, живой? Привет'],zulfiya:['Здравствуйте, {n}!'],gulnara:['Здравствуйте, {n}. Как самочувствие?'],ildar:['{n}! Наши сегодня играют, ты в курсе?'],rinat:['{n}! Голодный? Заходи']};
 const BUSK=['♪ Казан, Казан, син минем җаным… ♪','♪ (перебирает струны) ♪','♪ Ещё одну для хороших людей ♪','Спасибо, люди добрые!'];
 // жители районов (folk2.js → window.cityFolk2): появляются, когда игрок впервые оказывается рядом с их районом (там уже подгружены дома и места)
-function folkDistrictTick(){const ext=window.cityFolk2;if(!Array.isArray(ext)||!ext.length||!FOLK.ready)return;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;
+function folkDistrictTick(){const ext=[...(window.cityFolk2||[]),...(window.cityFolk3||[])];if(!ext.length||!FOLK.ready)return;let added=0;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;let A0=null;
   for(const src of ext){if(have.has(src.id))continue;const d=ds.find(x=>x.id===src.district);if(!d||!Array.isArray(d.center))continue;
     const c=[(d.center[1]-m.lon0)*m.mlon,-(d.center[0]-m.lat0)*m.mlat];if(dist(c[0],c[1],player.x,player.y)>2200)continue;
-    const A0=folkAnchors();const A=src.district==='vahitovsky'?A0:{freedom:c,kremlin:c,bauman:c,stadium:c,yard:[c[0]+40,c[1]+30]};A[src.district]=c;
+    A0=A0||folkAnchors();const A=src.district==='vahitovsky'?A0:{freedom:c,kremlin:c,bauman:c,stadium:c,yard:[c[0]+40,c[1]+30]};A[src.district]=c;
     const f=Object.assign({ward:src.district},src);f.ward=src.district;f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
-    f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);break;}}   // по одному за раз — не тормозить
+    f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);if(++added>=3)break;}}   // по трое за раз — не тормозить
 function updateFolk(rdt){if(!world)return;if(!FOLK.ready){folkInit();if(!FOLK.ready)return;}
   FOLK.t-=rdt;if(FOLK.t>0)return;FOLK.t=0.5;FOLK.dt=(FOLK.dt||0)+1;if(FOLK.dt%10===0)folkDistrictTick();
   for(const f of FOLK.list){
@@ -139,7 +149,9 @@ function folkOnChat(w){const id=w&&(w.folk||(w.p&&w.p.folk));if(!id)return;const
 function folkContext(w){const id=w&&(w.folk||(w.p&&w.p.folk));if(!id)return '';const f=FOLK.list.find(q=>q.id===id);if(!f)return '';
   const bio=f.bio?` О тебе: ${f.bio}`:'';const sp=f.speech?` Манера речи: ${String(f.speech).replace(/\.?$/,'.')}`:'';
   const rel=f.met>1?` Собеседник — ${player.name}, вы знакомы: виделись ${f.met} ${f.met<5?'раза':'раз'}, последний раз ${clock.day-f.last<=0?'сегодня':clock.day-f.last===1?'вчера':(clock.day-f.last)+' дн. назад'}. Общайся как со знакомым.`:f.met===1?` Собеседник — ${player.name}, вы только что познакомились.`:` Собеседника (${player.name}) ты раньше не встречал${f.female?'а':''}.`;
-  return bio+sp+rel;}
+  const ex=Array.isArray(f.lines)&&f.lines.length?` Твои словечки, для примера (не повторяй дословно): «${f.lines[hashStr(f.id+clock.day)%f.lines.length]}», «${f.lines[(hashStr(f.id)+1)%f.lines.length]}».`:'';
+  const TY={drinker:' Любишь выпить, но выпивку не хвалишь и отказ спокойно принимаешь; ты немного грустный и смешной.',homeless:' У тебя нет дома, но ты держишься с достоинством, знаешь все дворы и не жалуешься на жизнь.',bombila:' Подвозишь без лицензии и хитришь с ценой, но без угроз — можно и поторговаться.',blogger:' Ведёшь свой канал, всё снимаешь на телефон и зовёшь подписаться; шумный, но не злой.',granny:' Сидишь у подъезда, всё про всех знаешь и жалуешься на порядок во дворе.',activist:' Пишешь жалобы в мэрию и всех зовёшь подписать.'};
+  return bio+sp+(TY[f.type]||'')+ex+rel;}
 // внутри заведения: свой человек за стойкой или за столиком
 function folkInterior(it){if(!FOLK.ready||!it)return;
   for(const n of it.npcs)if(n.origP){n.p=n.origP;n.origP=null;n.folk=null;}
