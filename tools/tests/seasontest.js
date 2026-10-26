@@ -54,7 +54,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const at = await pg.evaluate(`(()=>{window.zkTestDay='2026-12-07';clock.day=3;clock.minutes=(3-1)*1440+21*60+5;PROG.ev={};EVT.t=0;eventsTick(1);const k=Object.keys(PROG.ev).find(k=>PROG.ev[k].place&&PROG.ev[k].place[2]==='Тест по точке');const p=k&&PROG.ev[k].place;const q=llToXY([55.81909,48.89666]);return p?{x:Math.round(p[0]),y:Math.round(p[1]),ждём:[Math.round(q[0]),Math.round(q[1])]}:'не поставлен';})()`);
     console.log('9) вечер по точке:', JSON.stringify(at));
     // прийти на вечер — награда и опыт
-    const came = await pg.evaluate(`(()=>{const k=Object.keys(PROG.ev).find(k=>PROG.ev[k].place&&PROG.ev[k].place[2]==='Тест по точке');const p=PROG.ev[k].place;player.x=p[0];player.y=p[1];const xp0=seasonState().xp,l0=seasonState().lvl;EVT.t=0;eventsTick(1);return {got:!!PROG.ev[k].got,feed:feed[0].text,xp:seasonState().xp-xp0,lvl:seasonState().lvl-l0};})()`);
+    const came = await pg.evaluate(`(()=>{window.zkTestDay='2026-12-07';clock.day=3;clock.minutes=(3-1)*1440+21*60+5;PROG.ev={};EVT.t=0;eventsTick(1);   // часы общие: между вызовами день вернулся к настоящему — ставим заново
+      const k=Object.keys(PROG.ev).find(k=>PROG.ev[k].place&&PROG.ev[k].place[2]==='Тест по точке');const p=PROG.ev[k].place;player.x=p[0];player.y=p[1];const xp0=seasonState().xp,l0=seasonState().lvl;EVT.t=0;eventsTick(1);return {got:!!PROG.ev[k].got,feed:feed[0].text,xp:seasonState().xp-xp0,lvl:seasonState().lvl-l0};})()`);
     console.log('10) пришёл на вечер:', JSON.stringify(came));
     // мебель дома
     await pg.evaluate(`(()=>{invAdd(shopItem('furn-shelf'));invAdd(shopItem('furn-chair'));invAdd(shopItem('furn-lamp'));invAdd(shopItem('furn-rug'));invAdd(shopItem('furn-samovar'));const h=player.home;player.x=h.cx;player.y=h.bb[3]+3;enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y});})()`);
