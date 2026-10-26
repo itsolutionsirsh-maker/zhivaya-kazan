@@ -95,6 +95,14 @@ function eventsTick(dt){EVT.t-=dt;if(EVT.t>0||!world||typeof clock==='undefined'
   for(const k in PROG.ev){const st=PROG.ev[k];if(st.on&&!st.closed&&!live.has(k)){st.closed=1;unmark('event:'+k);progSave();}}
   const keep=Object.keys(PROG.ev).filter(k=>k.startsWith('d:')?k.slice(2,12)>=today:+k.split(':')[0]>=(clock.day||1)-2);if(keep.length<Object.keys(PROG.ev).length){const n={};for(const k of keep)n[k]=PROG.ev[k];PROG.ev=n;}}
 
+// что сейчас в городе по данным игры — житель может упомянуть в разговоре: сезон, сегодняшние вечера, матчи и праздники
+function cityNewsForNpc(){const out=[];const S=typeof seasonData==='function'?seasonData():null;if(S&&seasonOn())out.push(`в городе сезон «${S.title}»`);
+  const dow=gameDow(),today=mskDate(),list=window.cityDaily||[];const plain=list.find(d=>!d.season&&!d.date&&d.dow===dow);
+  const ev=list.filter(d=>(d.season&&seasonOn(d.season)&&(d.date?d.date===today:d.dow===dow))||(d.date&&!d.season&&d.date===today));if(plain)ev.push(plain);
+  if(ev.length)out.push('сегодня вечером: '+ev.slice(0,3).map(d=>`${d.title} в ${d.hour}:00`).join(', '));
+  const fx=(window.cityFixtures||[]).filter(f=>f.date===today);if(fx.length)out.push('сегодня: '+fx.slice(0,2).map(f=>f.title+(f.time?' в '+f.time:'')).join(', '));
+  return out.join('; ');}
+
 // ---------- районы: «Вы в районе …» и один факт (districts.js: жилые места с center, административные с kind:'admin') ----------
 const DIST={t:0,cur:null,adm:null};
 function llToXY(ll){const m=world.meta;return [(ll[1]-m.lon0)*m.mlon,-(ll[0]-m.lat0)*m.mlat];}

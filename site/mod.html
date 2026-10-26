@@ -21,7 +21,7 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <p class="msg">Работает на игровом сервере (VPS). Ключ — строка <b>MOD_TOKEN</b> из <code>/etc/zhivaya-kazan.env</code>. Ключ хранится только в этом браузере.</p>
 <div class="row"><input id="tok" type="password" placeholder="Ключ модератора" autocomplete="off"><button class="go" id="load">Обновить</button></div>
 <p class="msg" id="st"></p>
-<h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><p class="msg" id="boot"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
+<h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><p class="msg" id="boot"></p><p class="msg" id="llm"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
 <div class="row" style="margin-top:10px"><button id="imp">Перенести игроков со старого сайта (Beget)</button><span class="msg" id="impst"></span></div>
 <h2>Жалобы (новые сверху)</h2><div id="reps"></div>
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
@@ -53,6 +53,9 @@ async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e
   const pc=(a,b,ready)=>!ready?'…':b?Math.round(a/b*100)+'%':'—';
   $('#sum').textContent=`Всего игроков за всё время: ${j.everyone} · сейчас в игре: ${j.online} · пик сегодня: ${j.peakToday}. «…» — день ещё не наступил.`;
   const b=j.boot,sec=v=>v==null?'—':(v/1000).toFixed(1).replace('.',',')+' с',pair=k=>b[k]?`${sec(b[k][0])} (у 9 из 10 — до ${sec(b[k][1])})`:'—';
+  {const L=j.llm,t=L&&L.today;if(L)$('#llm').textContent=!L.on?'ИИ жителей выключен: на /setup нет ключа Claude (или сервер ещё не поставил пакет).':
+    `ИИ жителей: ${L.model}, сегодня ответов ${t.n}, токенов на входе ${t.tin}, на выходе ${t.tout}${/haiku-5-5/.test(L.model)?` (≈ $${(t.tin*0.1/1e6+t.tout*0.5/1e6).toFixed(2)} по тарифу Haiku 5.5)`:''}. `+
+    `Новости для жителей${L.news.t?' от '+new Date(L.news.t).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):''}: ${L.news.text?L.news.text.replace(/\n/g,' '):'пока нет'}${L.news.err?' (последняя попытка: '+L.news.err+')':''}${L.news.src&&L.news.src.length?' · источники: '+L.news.src.join(', '):''}.`;}
   $('#boot').textContent=!b||!b.n?'Загрузка игры: за сутки замеров ещё нет (появятся после заходов игроков; после перезапуска сервера счёт начинается заново).':
     `Загрузка игры за сутки, ${b.n} заходов (из Телеги ${b.tg}, медленный интернет ${b.slow}), от открытия страницы: скрипты — ${pair('scripts')}; карта улиц пришла — ${pair('base')}; построена — ${pair('build')}; дома вокруг — ${pair('chunks')}; игра на экране — ${pair('shown')}.`;
   const T=$('#days');T.innerHTML='';const h=el('tr');for(const t of ['День','Игроков','Новых','Вернулись на 2-й день','Вернулись через неделю'])h.append(el('th',null,t));T.append(h);

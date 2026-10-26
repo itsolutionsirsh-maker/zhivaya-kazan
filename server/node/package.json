@@ -4,7 +4,15 @@
   "private": true,
   "description": "Сервер «Живой Казани»: раздаёт игру, онлайн по WebSocket, чат, аккаунты и сохранения, прокси к ИИ",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" },
-  "dependencies": { "ws": "8.18.0", "bcryptjs": "2.4.3" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
+    "bcryptjs": "2.4.3",
+    "ws": "8.18.0"
+  }
 }

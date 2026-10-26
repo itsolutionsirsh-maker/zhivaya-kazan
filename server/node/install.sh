@@ -73,15 +73,14 @@ if [ ! -f "$ENVF" ]; then
 PORT=8080
 GAME_DIR=$APP/deploy/kazan
 DATA_DIR=/var/lib/zk/data
-# Ключ для «живых» ответов жителей (OpenAI-совместимый API). Впишите сами: sudo nano $ENVF
+# Ключ Claude (Anthropic) для «живых» ответов жителей — проще ввести на странице /setup; здесь — если без неё: sudo nano $ENVF,
 # затем: sudo systemctl restart zhivaya-kazan
 LLM_API_KEY=
-LLM_API_BASE=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
-# Лимиты, чтобы счёт за ИИ не обогнал сервер: ответов на игрока в день, всего в день, длина ответа
+LLM_MODEL=claude-haiku-5-5
+# Лимиты, чтобы счёт за ИИ не обогнал сервер: ответов на игрока в день, всего в день, предел длины ответа (с обдумыванием)
 LLM_PER_PLAYER_DAY=60
 LLM_DAILY_LIMIT=20000
-LLM_MAX_TOKENS=160
+LLM_MAX_TOKENS=1200
 # Токен бота от @BotFather — для входа из мини-приложения Телеги. Впишите сами, никому не пересылайте
 TG_BOT_TOKEN=
 # Сколько соседей видно и в каком радиусе (м)
