@@ -109,7 +109,8 @@ function render(){
   {// в толпе подписываем только ближайших, иначе имена слипаются в кашу
     const arr=[...peerRender.values()];if(arr.length>12)arr.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img,pr.look&&pr.look.frame);}}
-  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg,myLook().frame);}
+  let playerNameBox=null;
+  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);playerNameBox=labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg,myLook().frame);}
   drawRallyLabels(toS,z);
   drawCrowd(toS,z);drawSpeedCams(toS,z);drawCityBubbles(toS,z);
   drawCompanionMark(toS,z);drawSituations(toS,z);
@@ -118,7 +119,7 @@ function render(){
   for(const w of walkers){if(w.state!=='cross'||z<2.5)continue;const [sx,sy]=toS(w.x,w.y);ctx.fillStyle='rgba(235,187,75,.95)';rrect(ctx,sx-8,sy-22,16,14,4);ctx.fill();ctx.fillStyle='#2B2200';ctx.fillText('!',sx,sy-15);}
   if(typeof drawMetroSigns==='function')drawMetroSigns(vx0,vy0,vx1,vy1,z,toS);
   // Навигационные метки поверх ночного затемнения. Издалека — прежнее рисование без новых проходов.
-  if(z>=3){drawTransportMarks(toS,z,vx0,vy0,vx1,vy1);drawPlayerBeacon(toS,z);drawActionTarget(toS,z);}
+  if(z>=3){drawTransportMarks(toS,z,vx0,vy0,vx1,vy1);drawPlayerBeacon(toS,z);drawActionTarget(toS,z,playerNameBox);}
   // свои люди: имя над головой у тех, с кем уже знакомы
   if(z>2.2&&typeof FOLK!=='undefined'){ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';for(const f of FOLK.list){const w=f.w;if(!w||!f.met||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;const [sx,sy]=toS(w.x,w.y);const t='★ '+f.name;const tw=ctx.measureText(t).width+12;ctx.fillStyle='rgba(20,60,40,.85)';rrect(ctx,sx-tw/2,sy-46*Math.min(1.6,z/4)-9,tw,18,9);ctx.fill();ctx.fillStyle='#E9FFF1';ctx.fillText(t,sx,sy-46*Math.min(1.6,z/4));}}
   if(weather.rain.length){ctx.strokeStyle='rgba(120,150,190,.45)';ctx.lineWidth=1;ctx.beginPath();for(const r of weather.rain){const x=r[0]*W,y=r[1]*H;ctx.moveTo(x,y);ctx.lineTo(x-2,y+9*r[2]);}ctx.stroke();ctx.fillStyle='rgba(60,80,110,.12)';ctx.fillRect(0,0,W,H);}
@@ -167,10 +168,12 @@ function drawPlayerBeacon(toS,z){
   ctx.rotate(Math.atan2(player.hy,player.hx));ctx.beginPath();ctx.moveTo(r+7,0);ctx.lineTo(r+1,-4);ctx.lineTo(r+1,4);ctx.closePath();
   ctx.strokeStyle='#102E28';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#FFFFFF';ctx.fill();ctx.restore();
 }
-function drawActionTarget(toS,z){
+function drawActionTarget(toS,z,nameBox){
   const a=currentAction;
   if(scene==='interior'||!a||!a.at||!a.tk||!Number.isFinite(a.at.x)||!Number.isFinite(a.at.y))return;
   ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  // Скобки и контур тоже могут проходить под именем: оставляем всю подпись читаемой.
+  if(nameBox){ctx.beginPath();ctx.rect(0,0,W,H);ctx.rect(nameBox.x,nameBox.y,nameBox.w,nameBox.h);ctx.clip('evenodd');}
   let x=a.at.x,y=a.at.y,r=12;
   const b=a.bld;
   if(b&&b.p&&b.p.length>=6&&(a.tk==='poi'||a.tk==='home'||a.tk==='building')){
@@ -195,7 +198,18 @@ function drawActionTarget(toS,z){
   ctx.strokeStyle='#142B27';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2.5;ctx.stroke();
   // Значок с внешней стороны цели, дальше от игрока. Координаты читаем с живого at, без таймеров и пульсации.
   const dx=x-player.x,dy=y-player.y,L=Math.hypot(dx,dy);
-  const bx=sx+(L>0.01?dx/L:0)*(r+13),by=sy+(L>0.01?dy/L:-1)*(r+13);
+  let bx=sx+(L>0.01?dx/L:0)*(r+13),by=sy+(L>0.01?dy/L:-1)*(r+13);
+  // Уже измеренная рамка имени, включая аватар и украшение; без повторного measureText.
+  if(nameBox){const n=nameBox,hit=(x,y)=>x+13>n.x&&x-13<n.x+n.w&&y+13>n.y&&y-13<n.y+n.h;
+    if(hit(bx,by)){
+      const gap=r+13,candidates=[[sx+gap,sy],[sx-gap,sy],[sx,sy+gap],[sx,sy-gap],
+        [bx,n.y-13],[bx,n.y+n.h+13],[n.x-13,by],[n.x+n.w+13,by]];
+      let best=Infinity,nx=bx,ny=by;
+      for(const q of candidates){const x=clamp(q[0],12,W-12),y=clamp(q[1],12,H-12);if(hit(x,y))continue;
+        const d=(x-bx)**2+(y-by)**2;if(d<best){best=d;nx=x;ny=y;}}
+      bx=nx;by=ny;
+    }
+  }
   ctx.fillStyle='#142B27';rrect(ctx,bx-11,by-11,22,22,6);ctx.fill();ctx.fillStyle='#FFDA69';rrect(ctx,bx-9,by-9,18,18,4);ctx.fill();
   ctx.fillStyle='#142B27';ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('E',bx,by+0.5);ctx.restore();
 }
@@ -292,7 +306,8 @@ function labelPlayer(sx,sy,name,me,img,frame){ctx.save();ctx.font='600 12px "IBM
   ctx.fillStyle=me?'rgba(43,176,98,.95)':'rgba(20,30,26,.85)';rrect(ctx,x0,y0,w,22,8);ctx.fill();
   if(frame)drawNameFrame(frame,x0,y0,w);
   if(img){ctx.save();ctx.beginPath();ctx.arc(x0+12,y0+11,9,0,TAU);ctx.clip();ctx.drawImage(img,x0+3,y0+2,18,18);ctx.restore();}
-  ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,x0+7+aw,y0+11.5);ctx.restore();}
+  ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,x0+7+aw,y0+11.5);ctx.restore();
+  if(me&&cam.z>=3)return {x:x0-3,y:y0-4,w:w+(frame?17:6),h:30};}
 // рамка имени из вещей: обводка; «значок» — точка у имени, «снежинка» — ❄ сбоку, «гирлянда» — огоньки по верху
 function drawNameFrame(f,x0,y0,w){ctx.save();if(f.k!=='pin'){ctx.strokeStyle=f.c;ctx.lineWidth=f.k==='thread'?1:2.2;rrect(ctx,x0-1.5,y0-1.5,w+3,25,9.5);ctx.stroke();}
   if(f.k==='pin'){ctx.fillStyle=f.c;ctx.beginPath();ctx.arc(x0+w+5,y0+11,4,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();}
