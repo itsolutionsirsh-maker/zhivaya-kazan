@@ -25,8 +25,8 @@ function metroSpots(){metroInit();const out=[];for(const s of METRO.st)for(const
 function metroAction(){if(!world||player.vehicle||player.bus)return null;metroInit();let best=null,bd=7;
   for(const s of METRO.st)for(const e of s.ents){const d=dist(e.x,e.y,player.x,player.y);if(d<bd){bd=d;best={s,e};}}
   if(!best)return null;const s=best.s;const d=bd;
-  if(!metroOpen())return {d,label:`Метро «${stName(s)}» закрыто · откроется в 6:00`,run:()=>setHint('Метро работает с 6:00 до полуночи. Ночью — такси')};
-  return {d,label:`Спуститься в метро «${stName(s)}» · ${METRO.fare} ₽`,run:()=>{
+  if(!metroOpen())return {d,at:best.e,tk:'metro',label:`Метро «${stName(s)}» закрыто · откроется в 6:00`,run:()=>setHint('Метро работает с 6:00 до полуночи. Ночью — такси')};
+  return {d,at:best.e,tk:'metro',label:`Спуститься в метро «${stName(s)}» · ${METRO.fare} ₽`,run:()=>{
     if(player.money<METRO.fare){setHint(`На проезд нужно ${METRO.fare} ₽`);return;}
     player.money-=METRO.fare;METRO.ride=null;METRO.at=s.id;METRO.ent=best.e;
     enterInterior({kind:'metro',name:`Станция «${stName(s)}»`,key:'metro:'+s.id,x:player.x,y:player.y});

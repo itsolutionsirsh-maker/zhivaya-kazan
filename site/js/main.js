@@ -64,12 +64,15 @@ function leaveBus(stop){const b=player.bus;player.bus=null;player.fare=null;play
 
 // ---------- действия ----------
 let currentAction=null;
+// у действия E есть цель: at — объект с x,y (живой: человек, машина, место), tk — что это, bld — здание (для входа).
+// Рисование может подсветить цель; в интерьере at — в координатах помещения.
+function actTarget(a,at,tk,bld){if(a&&at){a.at=at;a.tk=tk;if(bld)a.bld=bld;}return a;}
 function findAction(){
   if(scene==='interior')return findActionInterior();
   if(player.state==='hurt')return {label:accidents.some(a=>a.victim==='player'&&a.amb&&a.amb.state==='scene')?'Врачи скорой осматривают вас…':'Ждём скорую…',run:()=>{}};
   if(player.bus)return {label:'Выйти на следующей остановке',run:()=>{player.exitNext=true;setHint('Выйдем на следующей остановке');}};
   if(player.vehicle&&player.vehicle.kind==='taxi')return {label:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
-  if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return {label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi};
+  if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return actTarget({label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi},taxiCall.car,'taxi');
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
     if(v.kind==='own'&&v.speed<1&&typeof ECON!=='undefined'&&ECON.carCond<95&&world.pois.some(p=>p.t==='fuel'&&dist(p.x,p.y,v.x,v.y)<18))return repairAction(false);
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
@@ -77,26 +80,26 @@ function findAction(){
   {const sa=sitAction();if(sa)return sa;}
   if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;if(player.busPlan)cancelTrip(true);setHint('Вы передумали ехать');}};
   // пришли с жителем к месту, о котором договорились — E заводит внутрь обоих (а не открывает разговор с ним)
-  if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return {label:`${a.label} (${companion.w.p.name} с вами)`,run:a.run};}
+  if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return actTarget({label:`${a.label} (${companion.w.p.name} с вами)`,run:a.run},companion.dest.poi,'poi',poiBuilding(companion.dest.poi));}
   const ra=rallyAction();if(ra&&!/^Собрать/.test(ra.label))return ra;
   {const ma=typeof metroAction==='function'?metroAction():null;if(ma&&ma.d<3.5)return ma;}   // у самого знака «М» вход важнее разговора
   let best=null,bd=1e9;
-  for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(w.role==='guard'&&d>2.2)continue;if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};}}
+  for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(w.role==='guard'&&d>2.2)continue;if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};actTarget(best,w,'person');}}
   if(best)return best;
-  for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best=r.kind==='scooter'?{label:'Взять самокат · 50 ₽ + 6 ₽/мин',run:()=>enterVehicle(r)}:{label:'Взять каршеринг · 200 ₽ + 10 ₽/мин',run:()=>enterVehicle(r)};}}
-  if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best=(typeof ECON!=='undefined'&&ECON.carCond<12)?repairAction(true):{label:`Сесть в свою машину${typeof ECON!=='undefined'&&ECON.carCond<60?' · '+Math.round(ECON.carCond)+'%':''}`,run:()=>enterVehicle(ownCar)};}}
+  for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best=r.kind==='scooter'?{label:'Взять самокат · 50 ₽ + 6 ₽/мин',run:()=>enterVehicle(r)}:{label:'Взять каршеринг · 200 ₽ + 10 ₽/мин',run:()=>enterVehicle(r)};actTarget(best,r,r.kind==='scooter'?'scooter':'share');}}
+  if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best=(typeof ECON!=='undefined'&&ECON.carCond<12)?repairAction(true):{label:`Сесть в свою машину${typeof ECON!=='undefined'&&ECON.carCond<60?' · '+Math.round(ECON.carCond)+'%':''}`,run:()=>enterVehicle(ownCar)};actTarget(best,ownCar,'own');}}
   if(best)return best;
   {const ma=typeof metroAction==='function'?metroAction():null;if(ma&&!world.stops.some(q=>dist(q.x,q.y,player.x,player.y)<ma.d-0.5&&routesAtStop(q).length))return ma;}
-  for(const s of world.stops){const d=dist(s.x,s.y,player.x,player.y);if(d<9&&d<bd){const rts=routesAtStop(s);if(!rts.length)continue;bd=d;best={label:`Остановка «${s.n}»: ждать ${rts.map(r=>r.ref).join(', ')}`,run:()=>{player.waitingStop=s;player.x=s.x;player.y=s.y;setHint('Ждём транспорт… первый подошедший — ваш');}};}}
+  for(const s of world.stops){const d=dist(s.x,s.y,player.x,player.y);if(d<9&&d<bd){const rts=routesAtStop(s);if(!rts.length)continue;bd=d;best={label:`Остановка «${s.n}»: ждать ${rts.map(r=>r.ref).join(', ')}`,run:()=>{player.waitingStop=s;player.x=s.x;player.y=s.y;setHint('Ждём транспорт… первый подошедший — ваш');}};actTarget(best,s,'stop');}}
   if(best)return best;
   const nearHome=player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8);
-  for(const poi of world.pois){if(Math.abs(poi.x-player.x)>120||Math.abs(poi.y-player.y)>120)continue;const d=poiDist(poi,player.x,player.y);if(nearHome&&d>4)continue;if(d<11&&d<bd){const a=poiAction(poi);if(!a)continue;bd=d;best=a;}}
+  for(const poi of world.pois){if(Math.abs(poi.x-player.x)>120||Math.abs(poi.y-player.y)>120)continue;const d=poiDist(poi,player.x,player.y);if(nearHome&&d>4)continue;if(d<11&&d<bd){const a=poiAction(poi);if(!a)continue;bd=d;best=actTarget(a,poi,'poi',poiBuilding(poi));}}
   if(best)return best;
   if(ra)return ra;
-  if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return {label:'Зайти домой',run:()=>enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y})};}
-  for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return {label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}};}}
-  if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return {label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)};
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return ca;}if(b&&b.n)return {label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y})};
+  if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return actTarget({label:'Зайти домой',run:()=>enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y})},{x:player.home.cx,y:player.home.cy},'home',player.home);}
+  for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return actTarget({label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}},ac,'accident');}}
+  if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return actTarget({label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)},companion.w,'person');
+  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n)return actTarget({label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y})},{x:b.cx,y:b.cy},'building',b);
   return null;}
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}

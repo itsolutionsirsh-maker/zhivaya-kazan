@@ -57,9 +57,9 @@ function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
 function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
   if(it.kind==='metro'&&py<3.8&&typeof metroTrainAction==='function'){const ma=metroTrainAction();if(ma)return ma;}   // у края платформы — поезд важнее разговора
-  for(const n of it.npcs){if(n.companionOf&&n.tableF&&!n.tableF.ordered)continue;const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best={label:`Поговорить: ${n.p.name}${n.companionOf?'':', '+n.p.job}`,run:()=>openChat(n)};}}
+  for(const n of it.npcs){if(n.companionOf&&n.tableF&&!n.tableF.ordered)continue;const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best=actTarget({label:`Поговорить: ${n.p.name}${n.companionOf?'':', '+n.p.job}`,run:()=>openChat(n)},n,'person');}}
   if(best)return best;
-  for(const f of it.furn){if(!f.spot)continue;const d=Math.max(Math.abs(px-f.x)-f.w/2,Math.abs(py-f.y)-f.h/2);if(d<1.0&&d<bd){const a=spotAction(f,it);if(a){bd=d;best=a;}}}
+  for(const f of it.furn){if(!f.spot)continue;const d=Math.max(Math.abs(px-f.x)-f.w/2,Math.abs(py-f.y)-f.h/2);if(d<1.0&&d<bd){const a=spotAction(f,it);if(a){bd=d;best=actTarget(a,f,'spot');}}}
   if(best)return best;
   if(dist(px,py,it.door.x,it.door.y)<1.8)return {label:'Выйти на улицу',run:exitInterior};
   return null;}

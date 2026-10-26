@@ -70,7 +70,7 @@ defSit('prosecutor',{title:'Прокурор',quiet:true,always:true,
   start(){return true;},
   update(s,dt){PROS.t-=dt;if(PROS.t>0)return;PROS.t=1;prosPlace();const D=prosData();if(!D||!world)return;const S=prosState();
     // вернулся после «ухода»
-    if(S.gone&&!S.back&&S.gone<=clock.minutes){S.back=1;progSave();addEvent('📰 Бирэн абый вернулся в приёмную. Говорит, желание прошло','say');}
+    if(S.gone&&!S.back&&S.gone<=clock.minutes){S.back=1;progSave();addEvent('📰 '+(pick(D.T.back||[])||'Бирэн абый вернулся в приёмную. Говорит, желание прошло'),'say');}   // cityTexts.prosecutor.back — свои варианты, если второй программист добавит
     // новость дня — раз в игровые сутки, к обеду
     if(S.newsDay!==clock.day&&gHour()>=11&&gHour()<21){S.newsDay=clock.day;progSave();const L=(D.T.news||[]).filter(t=>prosGone()===/собственному/.test(t));if(L.length){const t=pick(L);addEvent('📰 '+t);if(window.cityPhone)try{window.cityPhone.push({from:'Городская газета',text:t,kind:'news'});}catch(e){}}}
     // сюжет начинается после первого приёма, когда игрок снова на улице
