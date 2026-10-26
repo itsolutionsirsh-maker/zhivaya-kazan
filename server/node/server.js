@@ -21,7 +21,8 @@ const MAP_D=path.resolve(ENV.MAP_DIR||path.join(DATA,'..','map'));let MAP_DIR=nu
 // Тогда сервер сам собирает карту из того, что есть (дыры — пара кварталов без домов, дороги там всё равно будут из соседних плиток);
 // докачка продолжается, и citymap.sh потом пересоберёт целиком.
 // Какие плитки нужны — из raw/city_plan.json (fetch_city.py берёт границу города из OSM и дополняет сетку окраинами), без него — прежние 12×14.
-// Докачали окраины после сборки — тоже собирает сам, когда новых файлов нет 45 минут (не чаще раза в 6 часов).
+// Докачали окраины после сборки — тоже собирает сам, когда новых файлов нет 45 минут: ночью по Москве, не чаще раза в 6 часов, не во время докачки.
+// Сборка и докачка — с самым низким приоритетом (nice 19), чтобы игра на том же ядре не тормозила.
 const MAPB={running:false,last:null,err:null};
 const pad2=n=>(n<0?'-':'')+String(Math.abs(n)).padStart(n<0?1:2,'0');
 function mapStatus(){const root=path.join(__dirname,'..','..','raw');const dir=path.join(root,'city');let files=[];try{files=fs.readdirSync(dir);}catch(e){}
@@ -33,12 +34,31 @@ function mapStatus(){const root=path.join(__dirname,'..','..','raw');const dir=p
   const missing=[];for(const k of need)if(!tiles.has(k))missing.push(k+(quarters[k]?':'+[...quarters[k]].join(''):''));
   const have=need.length-missing.length,idle=last?(Date.now()-last)/60000:0;
   const stale=built&&last>built.getTime()&&(!MAPB.last||Date.now()-MAPB.last>6*3600e3);
-  if(!MAPB.running&&(!built&&!MAPB.last||stale)&&missing.length<=2&&idle>45)mapBuild();
+  // сборка тяжёлая (1 ядро, 1 ГБ): первая — сразу, пересборка с докачанными окраинами — только ночью по Москве (3–7 ч), когда игроков мало
+  const night=(new Date(Date.now()+3*3600e3).getUTCHours()+24)%24;
+  if(!MAPB.running&&!MAPF.running&&(!built&&!MAPB.last||stale&&night>=3&&night<7)&&missing.length<=2&&idle>45)mapBuild();
+  // окраины до границы города сервер докачивает сам, без консоли: плана плиток ещё нет или плиток не хватает, а докачка стоит полчаса
+  if(files.length&&!MAPB.running&&(!plan||missing.length&&idle>30))mapFetch();   // только там, где карту всего города уже качали (не на машине разработчика)
+  const fs0=mapFetchState();
   return {ok:1,tiles:have,of:need.length,missing,added:plan&&plan.added?plan.added.length:0,boundary:plan?plan.boundary:null,bbox:plan?plan.bbox:null,
-    idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err};}
+    idleMin:Math.round(idle),lastFile:last?new Date(last).toISOString():null,built,building:MAPB.running,buildErr:MAPB.err,
+    fetching:MAPF.running,fetchTries:fs0.n||0,fetchLast:fs0.t?new Date(fs0.t).toISOString():null,fetchCode:MAPF.code===undefined?null:MAPF.code};}
+// докачка: tools/fetch_city.py --all (граница из OSM, недостающие плитки, маршруты и площади окраин) — не чаще раза в 2 часа и не больше 6 раз
+// (счёт в data/mapfetch.json, переживает перезапуски); ход — в raw/city_fetch.log. Карту потом собирает mapBuild, когда всё скачано.
+const MAPF={running:false};
+function mapFetchState(){try{return JSON.parse(fs.readFileSync(path.join(DATA,'mapfetch.json'),'utf8'))||{};}catch(e){return {};}}
+function mapFetch(){const st=mapFetchState();if(MAPF.running||(st.n||0)>=6||Date.now()-(st.t||0)<2*3600e3)return;
+  st.n=(st.n||0)+1;st.t=Date.now();try{fs.writeFileSync(path.join(DATA,'mapfetch.json'),JSON.stringify(st));}catch(e){return;}
+  const root=path.join(__dirname,'..','..');let out='ignore';try{fs.mkdirSync(path.join(root,'raw'),{recursive:true});out=fs.openSync(path.join(root,'raw','city_fetch.log'),'a');}catch(e){}
+  MAPF.running=true;MAPF.code=undefined;log('карта: докачиваю окраины до границы города, попытка '+st.n);
+  let cp;try{cp=require('child_process').spawn('nice',['-n','19','python3','tools/fetch_city.py','--all'],{cwd:root,stdio:['ignore',out,out]});}catch(e){MAPF.running=false;MAPF.code=e.message;return;}
+  if(typeof out==='number')fs.close(out,()=>{});
+  cp.on('error',e=>{MAPF.running=false;MAPF.code=e.message;});
+  cp.on('close',code=>{MAPF.running=false;MAPF.code=code;log('карта: докачка закончилась, код',code);try{mapStatus();}catch(e){}});}
+setTimeout(()=>{try{mapStatus();}catch(e){}},2*60*1000);
 function mapBuild(){MAPB.running=true;MAPB.last=Date.now();const root=path.join(__dirname,'..','..');const tmp=MAP_D+'.srv';
   log('карта: собираю из скачанного (не хватает пары плиток)');
-  const cp=require('child_process').spawn('python3',['tools/build_city.py',tmp],{cwd:root,stdio:['ignore','ignore','pipe']});let err='';cp.stderr.on('data',d=>{err=(err+d).slice(-600);});
+  const cp=require('child_process').spawn('nice',['-n','19','python3','tools/build_city.py',tmp],{cwd:root,stdio:['ignore','ignore','pipe']});let err='';cp.stderr.on('data',d=>{err=(err+d).slice(-600);});
   cp.on('close',code=>{MAPB.running=false;if(code!==0){MAPB.err=err||('код '+code);log('карта: сборка не вышла',MAPB.err);return;}
     try{if(fs.existsSync(MAP_D)){fs.rmSync(MAP_D+'.old',{recursive:true,force:true});fs.renameSync(MAP_D,MAP_D+'.old');}fs.renameSync(tmp,MAP_D);fs.rmSync(MAP_D+'.old',{recursive:true,force:true});mapChk=0;log('карта: готово',MAP_D);}catch(e){MAPB.err=e.message;}});}
 setInterval(()=>{try{mapStatus();}catch(e){}},10*60*1000);
@@ -72,7 +92,7 @@ setInterval(()=>{const t=now();for(const [k,b] of buckets){if(!b.length||t-b[b.l
 
 // ---------- хранилище аккаунтов: SQLite (Node 22+), иначе JSON ----------
 const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqlite=require('node:sqlite');}catch(e){}
-  if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;');
+  if(sqlite){const db=new sqlite.DatabaseSync(path.join(DATA,'game.db'));db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=NORMAL;PRAGMA busy_timeout=3000;');
     db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);CREATE TABLE IF NOT EXISTS tokens(tok TEXT PRIMARY KEY,k TEXT,t REAL);CREATE TABLE IF NOT EXISTS tgmap(id TEXT PRIMARY KEY,k TEXT);');
     // журнал заходов для цифр: только случайный номер устройства и день, без имён и адресов
     db.exec('CREATE TABLE IF NOT EXISTS visits(d TEXT,id TEXT,PRIMARY KEY(d,id)) WITHOUT ROWID;CREATE TABLE IF NOT EXISTS firsts(id TEXT PRIMARY KEY,d TEXT,src TEXT) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS firsts_d ON firsts(d);');
@@ -105,7 +125,9 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file)};})();
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
-function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2)return {err:'name'};if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
+// секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
+const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
+function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2||name.includes(':'))return {err:'name'};   // «tg:…» — ключи аккаунтов Телегиif(!/^\d{4,8}$/.test(pin))return {err:'pin'};
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
   if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
@@ -115,19 +137,26 @@ function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.leng
 function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
   try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
-function saveFor(token,state,profile,city){const a=accByToken(token);if(!a)return {err:'auth'};const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
-  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};store.save(a.k,state||a.state,profile||a.profile,city||a.city);return {ok:1};}
+// base — версия (updated), которую устройство видело последней. Сервер новее (сохраняло другое устройство или «Начать заново») —
+// отказ conflict с серверной копией: устройство берёт её, а не затирает. Без base (старый клиент) — как раньше, последний пишет.
+function saveFor(token,state,profile,city,base){const a=accByToken(token);if(!a)return {err:'auth'};
+  if(typeof base==='number'&&isFinite(base)&&(a.updated||0)>base+0.001)return accOut(a,{ok:0,err:'conflict'});const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
+  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};try{store.save(a.k,state||a.state,profile||a.profile,city||a.city);}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
 // мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
 const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
 function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096||!TG_TOKEN)return null;let sp;try{sp=new URLSearchParams(initData);}catch(e){return null;}
   const hash=sp.get('hash');if(!hash)return null;const pairs=[];for(const [k,v] of sp)if(k!=='hash')pairs.push([k,v]);
   const secret=crypto.createHmac('sha256','WebAppData').update(TG_TOKEN).digest();
-  const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return h.length===hash.length&&crypto.timingSafeEqual(Buffer.from(h),Buffer.from(hash.toLowerCase()));});
+  const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return safeEq(h,hash.toLowerCase());});
   if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
   return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
-function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};
+function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};return tgAccount(u);}
+// аккаунт игрока Телеги (u = {id, name, start}): тот же и в мини-приложении, и на сайте после входа через бота
+function tgAccount(u){
   let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false,invitedBy=null;
+  // под ключом tg:<id> лежит аккаунт, созданный не Телегой (имя «tg:…» до запрета) — владельцу Телеги его не отдаём
+  if(a&&!store.tgGet(u.id)&&String(a.tg||'')!==u.id){log('Телега: ключ',k,'занят не Телегой — беру tgid:'+u.id);k='tgid:'+u.id;a=store.get(k);}
   if(!a){store.createTg(k,u.name,u.id);created=true;
     // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
     const m=/^ref_(\d{3,15})$/.exec(u.start);
@@ -140,8 +169,14 @@ function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+
 const PUBLIC_URL=ENV.PUBLIC_URL?ENV.PUBLIC_URL.replace(/\/*$/,'/'):'';
 const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
 function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
-  if(!TG_TOKEN||got.length!==want.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(want)))return [403,{err:'forbidden'}];
+  if(!TG_TOKEN||!safeEq(got,want))return [403,{err:'forbidden'}];
+  const cq=body&&body.callback_query;if(cq)return [200,tgWebConfirm(cq)];
   const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
+  const lm=msg&&msg.chat&&/^\/start\s+login_([A-Za-z0-9_-]{8,40})\s*$/.exec(text);
+  if(lm){const e=tgwGet(lm[1]);if(!e||e.st!=='wait'||msg.chat.type!=='private')return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Ссылка для входа устарела. Нажмите «Войти через Телеграм» в игре ещё раз.'}];
+    const hm=new Date((e.t+3*3600)*1000).toISOString().slice(11,16);
+    return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Вход в «Живую Казань» на сайте\nУстройство: '+uaShort(e.ua)+', '+hm+' по Москве\n\nЕсли это вы — нажмите «Да, войти»: на сайте откроется ваша игра из Телеги. Если вы сейчас не входили на сайт сами (например, ссылку вам кто-то прислал) — нажмите «Нет», иначе этот человек получит вашу игру.',
+      reply_markup:{inline_keyboard:[[{text:'✅ Да, войти',callback_data:'login:'+lm[1]},{text:'Нет',callback_data:'nologin:'+lm[1]}]]}}];}
   // /key — ключ модератора, только админу (ADMIN_TG_ID) и только в личке с ботом
   if(msg&&msg.chat&&/^\/key\b/.test(text)){const admin=String(ENV.ADMIN_TG_ID||'');const isAdmin=admin&&msg.chat.type==='private'&&String(msg.from&&msg.from.id)===admin;
     return [200,{method:'sendMessage',chat_id:msg.chat.id,text:isAdmin?'Ключ модератора для '+(PUBLIC_URL||'')+'mod.html:\n'+String(ENV.MOD_TOKEN||'')+'\n\nНикому не пересылайте. Это сообщение можно удалить.':'Эта команда только для владельца игры.'}];}
@@ -153,13 +188,37 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
 // при запуске: вебхук на этот сервер и кнопка меню бота на эту игру; не вышло — повтор через 10 минут
 async function tgSetup(){if(!TG_TOKEN||!PUBLIC_URL)return;
   const call=(m,p)=>fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(10000)}).then(r=>r.json());
-  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message'],drop_pending_updates:true});
+  try{const w=await call('setWebhook',{url:PUBLIC_URL+'api.php?a=tgwebhook',secret_token:tgSecret(),allowed_updates:['message','callback_query'],drop_pending_updates:true});
     if(w&&w.ok){await call('setChatMenuButton',{menu_button:{type:'web_app',text:'Играть',web_app:{url:PUBLIC_URL}}}).catch(()=>null);log('Телега: вебхук и кнопка меню →',PUBLIC_URL);return;}
     log('Телега: вебхук не поставился:',w&&w.description);}catch(e){log('Телега: нет связи с api.telegram.org:',e.message);}
   setTimeout(tgSetup,600000).unref();}
+// Вход на сайте через Телеграм: сайт получает одноразовый код и свой секрет; игрок открывает t.me/<бот>?start=login_<код>,
+// бот показывает, с какого устройства вход, и спрашивает «Да, войти»; после этого сайт по секрету получает аккаунт Телеги.
+// Код живёт 5 минут и срабатывает один раз; подтверждение кнопкой — чтобы чужая ссылка не открыла кому-то ваш аккаунт.
+const TGW=new Map(),TGW_POLL=new Map(),TGW_TTL=300;
+function tgwGet(code){const e=TGW.get(code);if(!e)return null;if(now()-e.t>TGW_TTL){TGW.delete(code);TGW_POLL.delete(e.poll);return null;}return e;}
+function tgWebStart(req,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tgweb:'+ip,10,600)||TGW.size>5000)return {err:'rate_limited'};
+  const code=crypto.randomBytes(12).toString('base64url'),poll=crypto.randomBytes(18).toString('base64url');
+  TGW.set(code,{poll,t:now(),st:'wait',ua:clean(String(req.headers['user-agent']||''),300),tg:null,name:''});TGW_POLL.set(poll,code);
+  return {ok:1,poll,ttl:TGW_TTL,link:'https://t.me/'+SETUP_BOT+'?start=login_'+code};}
+function tgWebPoll(poll,ip){if(!allow('tgwp:'+ip,150,60))return {err:'rate_limited'};const code=typeof poll==='string'?TGW_POLL.get(poll):null;const e=code?tgwGet(code):null;
+  if(!e)return {err:'expired'};if(e.st==='wait')return {wait:1};TGW.delete(code);TGW_POLL.delete(poll);if(e.st!=='ok')return {err:'denied'};
+  return Object.assign(tgAccount({id:e.tg,name:e.name||'Игрок',start:''}),{tgId:e.tg});}
+function uaShort(ua){const b=/YaBrowser/.test(ua)?'Яндекс Браузер':/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'браузер';
+  const o=/iPhone|iPad/.test(ua)?'iPhone/iPad':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac OS X/.test(ua)?'Mac':/Linux/.test(ua)?'Linux':'';return b+(o?', '+o:'');}
+setInterval(()=>{for(const code of TGW.keys())tgwGet(code);},60000).unref();
+function tgWebConfirm(cq){const m=/^(no)?login:([A-Za-z0-9_-]{8,40})$/.exec(String(cq.data||''));const e=m?tgwGet(m[2]):null;const from=cq.from||{};
+  const answer=t=>({method:'answerCallbackQuery',callback_query_id:String(cq.id||''),text:t,show_alert:true});
+  if(!e||e.st!=='wait'||!from.id)return answer('Ссылка устарела или уже использована. Нажмите «Войти через Телеграм» в игре ещё раз.');
+  if(m[1]){e.st='no';tgEditDone(cq,'Вход на сайте отменён.');return answer('Вход отменён');}
+  e.st='ok';e.tg=String(Math.trunc(+from.id));e.name=clean(((from.first_name||'')+' '+(from.last_name||'')).trim(),24);
+  tgEditDone(cq,'✅ Вы вошли на сайте. Вернитесь в браузер — игра откроется сама.');return answer('Готово! Вернитесь в браузер — игра откроется сама');}
+// убрать кнопки у сообщения о входе (если у сервера есть выход в api.telegram.org; нет — кнопки просто останутся)
+function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetch(`https://api.telegram.org/bot${TG_TOKEN}/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);return {ok:1};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -183,12 +242,13 @@ function nearest(p,R,K,out){out.length=0;const c0=Math.floor((p.x-R)/CELL),c1=Ma
 // толпа: сколько людей в каждой клетке 10 м в радиусе R (клиент сам вычтет тех, кого видит)
 function crowdCells(p,R){const res=[];const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);
   for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(!c)continue;for(const [fk,n] of c.fine){res.push([Math.floor(fk/20000)-5000,fk%20000-5000,n]);if(res.length>=800)return res;}}return res;}
-const META_KEYS=['n','r','c','v','vc','sy','g','a'];
+const META_KEYS=['n','r','c','v','vc','sy','g','a','w'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
   if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
   if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
     if(m.sy&&typeof m.sy==='object'){if(modBlocked(p))m.sy=null;else if(typeof m.sy.t==='string')m.sy={t:Mod.clean(clean(m.sy.t,140)),i:+m.sy.i||0};}
+    if('w' in m){const w=m.w,o={};if(w&&typeof w==='object')for(const k of ['h','s','g','b','f'])if(typeof w[k]==='string'&&/^[a-z0-9-]{1,24}$/.test(w[k]))o[k]=w[k];m.w=o;}   // надетые вещи — только номера вещей витрины
     if(m.g&&typeof m.g==='object'&&typeof m.g.t==='string')m.g=Object.assign({},m.g,{t:Mod.clean(clean(m.g.t,60))});if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
@@ -214,7 +274,7 @@ function postMsg(p,toRaw,textRaw){if(!allow('msg:'+p.id,6,10))return 'rate';if(m
 const MODF=path.join(DATA,'mod.json');let modState={bans:{},ipbans:{}};try{modState=Object.assign(modState,JSON.parse(fs.readFileSync(MODF,'utf8')));}catch(e){}
 const mutes=new Map(),repRecent=new Map();
 function modSave(){try{fs.writeFileSync(MODF+'.tmp',JSON.stringify(modState));fs.renameSync(MODF+'.tmp',MODF);}catch(e){}}
-function modBlocked(p){const t=now();const b=modState.bans[p.id];if(b&&(!b.until||b.until>t))return true;const ib=p.ip&&modState.ipbans[p.ip];return !!(ib&&(!ib.until||ib.until>t));}
+function modBlocked(p){const t=now();const b=modState.bans[p.id]||(p.priv&&modState.bans[p.priv]);if(b&&(!b.until||b.until>t))return true;const ib=p.ip&&modState.ipbans[p.ip];return !!(ib&&(!ib.until||ib.until>t));}
 function modMuted(p){const u=mutes.get(p.id);if(u&&u>now())return true;if(u)mutes.delete(p.id);return false;}
 function modReport(body,ip){const from=idstr(body.id),target=idstr(body.target);if(target.length<8||from===target)return {err:'bad_target'};if(!allow('rep:'+ip,10,3600))return {err:'rate_limited'};
   const tp=players.get(target);const rec={t:Math.floor(now()),from,ip,target,targetIp:tp&&tp.ip||null,name:clean(body.name,24),kind:clean(body.kind,10)||'chat',text:clean(body.text,240)};
@@ -223,7 +283,7 @@ function modReport(body,ip){const from=idstr(body.id),target=idstr(body.target);
   if(list.length>=3&&!modMuted({id:target})){mutes.set(target,t+3600);log('Модерация: общий чат отключён на час для',target,rec.name);}
   return {ok:1};}
 function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String(req.headers['x-mod-token']||body.token||'');
-  if(key.length<16||got.length!==key.length||!crypto.timingSafeEqual(Buffer.from(got),Buffer.from(key)))return {err:'forbidden'};
+  if(key.length<16||!safeEq(got,key))return {err:'forbidden'};
   const t=now();const target=idstr(body.target||'');const act=String(body.do||'list');
   if(act==='stats')return statsOut(Math.min(60,Math.max(7,+body.days||14)));
   if(act==='ban'&&target.length>=8){const h=Math.max(0,+body.hours||0);const until=h?t+h*3600:0;const pl=players.get(target);modState.bans[target]={until,why:clean(body.why,120),t:Math.floor(t)};
@@ -236,24 +296,37 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
 
 // ---------- цифры: кто зашёл сегодня (раз в сутки на устройство), пик онлайна ----------
 const seen={d:'',set:new Set()};const peak={d:'',n:0};
-function visit(id,src){const d=mskDay();if(seen.d!==d){seen.d=d;seen.set.clear();}if(seen.set.has(id))return;seen.set.add(id);
+// Номер игрока из его браузера (zk.cid) — секрет: по нему сервер узнаёт игрока. Другим (в мире, чате, личных) виден только
+// публичный номер — хэш от секрета, обратно не восстановить; раньше секрет рассылался соседям, и по нему можно было читать чужие личные.
+const pubOf=priv=>sha('pid:'+priv).slice(0,16);
+function visit(id,src,ip){const d=mskDay();if(seen.d!==d){seen.d=d;seen.set.clear();}if(seen.set.has(id))return;if(ip&&!allow('visit:'+ip,30,3600))return;seen.set.add(id);   // поток новых номеров с одного адреса не раздувает базу
   try{store.visit(id,d,clean(src,24).replace(/[^\w:.\-]/g,'')||'web');}catch(e){log('журнал заходов:',e.message);}}
 function notePeak(){const d=mskDay();if(peak.d!==d){peak.d=d;peak.n=0;}if(players.size>peak.n)peak.n=players.size;}
+// как долго у игроков грузится игра (без имён и IP): последние 500 заходов в памяти; на mod.html — медиана и «у 9 из 10»
+// ms — сколько прошло от открытия страницы: scripts (скрипты загружены), base (карта улиц пришла), build (построена), chunks (дома вокруг), shown (игра на экране)
+const BOOT=[],BOOT_K=['scripts','base','build','chunks','shown'];
+function bootReport(body,ip){if(!allow('boot:'+ip,6,600))return {ok:1};const ms=body&&body.ms;if(!ms||typeof ms!=='object')return {err:'bad'};
+  const o={t:now(),tg:!!body.tg,conn:clean(String(body.conn||''),8)};for(const k of BOOT_K)o[k]=Math.max(0,Math.min(600000,Math.round(+ms[k]||0)));
+  BOOT.push(o);if(BOOT.length>500)BOOT.shift();return {ok:1};}
+function bootStats(){const day=BOOT.filter(o=>now()-o.t<86400);const q=(a,p)=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.floor(p*s.length))];};
+  const out={n:day.length,tg:day.filter(o=>o.tg).length,slow:day.filter(o=>/2g|3g/.test(o.conn)).length};for(const k of BOOT_K){const a=day.map(o=>o[k]).filter(v=>v>0);out[k]=[q(a,0.5),q(a,0.9)];}return out;}
 function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);if(!st)return {err:'no_sqlite'};const rows=[];
   for(let i=0;i<days;i++){const d=mskDay(-i);const nu=st.nu[d]||0;rows.push({d,dau:st.dau[d]||0,nu,r1:st.r1[d]||0,r7:st.r7[d]||0,r1ready:i>=1,r7ready:i>=7});}
-  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n};}
+  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,boot:bootStats()};}
 
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
-function apiSync(body,ip){const id=idstr(body.id);if(id.length<8)return {err:'bad_id'};const p=addPlayer(id,null);p.http=true;p.ip=ip;setPresence(p,body.p);visit(id,body.src);notePeak();
+function apiSync(body,ip){const priv=idstr(body.id);if(priv.length<8)return {err:'bad_id'};const id=pubOf(priv);const p=addPlayer(id,null);p.priv=priv;p.http=true;p.ip=ip;setPresence(p,body.p);visit(priv,body.src,ip);notePeak();
   for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const list=[];around(p.x,p.y,VIEW_R,o=>{if(o!==p&&list.length<VIEW_K)list.push({id:o.id,p:Object.assign({},o.meta,{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b})});});
-  return {players:list,msgs:mine,seq,online:players.size};}
+  return {players:list,msgs:mine,seq,online:players.size,pid:id};}
 
 // ---------- ИИ: лимит на игрока в день и общий лимит в день ----------
 const llmDay={d:day(),total:0,per:new Map()};
-function llmQuota(who){const d=day();if(llmDay.d!==d){llmDay.d=d;llmDay.total=0;llmDay.per.clear();}if(llmDay.total>=LLM.perDay)return 'budget';const n=llmDay.per.get(who)||0;if(n>=LLM.perPlayerDay)return 'quota';llmDay.per.set(who,n+1);llmDay.total++;return null;}
-async function apiLlm(body,ip){if(!LLM.key)return {err:'no_llm'};if(!allow('llm:'+ip,30,60))return {err:'rate_limited'};const who=idstr(body.id)||ip;const q=llmQuota(who);if(q)return {err:q};
+function llmQuota(who,ip){const d=day();if(llmDay.d!==d){llmDay.d=d;llmDay.total=0;llmDay.per.clear();}if(llmDay.total>=LLM.perDay)return 'budget';const n=llmDay.per.get(who)||0;if(n>=LLM.perPlayerDay)return 'quota';
+  // номер игрока клиент может менять — поэтому ещё и лимит на адрес (втрое больше: семья или общежитие за одним IP)
+  const ik='ip:'+(ip||'x'),ni=llmDay.per.get(ik)||0;if(ni>=LLM.perPlayerDay*3)return 'quota';llmDay.per.set(who,n+1);llmDay.per.set(ik,ni+1);llmDay.total++;return null;}
+async function apiLlm(body,ip){if(!LLM.key)return {err:'no_llm'};if(!allow('llm:'+ip,30,60))return {err:'rate_limited'};const who=idstr(body.id)||ip;const q=llmQuota(who,ip);if(q)return {err:q};
   const ms=[];for(const m of (Array.isArray(body.messages)?body.messages:[]).slice(-12)){const c=clean(m&&m.content,4000);if(c)ms.push({role:m.role==='assistant'?'assistant':'user',content:c});}if(!ms.length)return {err:'empty'};
   const req={model:LLM.model,messages:ms,max_tokens:LLM.maxTokens,temperature:0.8};if(body.json)req.response_format={type:'json_object'};
   const call=()=>{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),30000);return fetch(LLM.base+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+LLM.key},body:JSON.stringify(req),signal:ctl.signal}).finally(()=>clearTimeout(to));};
@@ -266,7 +339,7 @@ async function apiLlm(body,ip){if(!LLM.key)return {err:'no_llm'};if(!allow('llm:
 // поэтому чужой бот подставить нельзя. После сохранения служба перезапускается с новыми ключами.
 const SETUP_BOT=(ENV.SETUP_BOT||'zhivaya_kazan_bot').toLowerCase().replace(/^@/,'');
 const OLD_API=ENV.OLD_API_URL||'https://iks-ai-systems.ru/kazan/api.php';
-function modKeyOk(got){const key=String(ENV.MOD_TOKEN||'');got=String(got||'');return key.length>=16&&got.length===key.length&&crypto.timingSafeEqual(Buffer.from(got),Buffer.from(key));}
+function modKeyOk(got){const key=String(ENV.MOD_TOKEN||'');got=String(got||'');return key.length>=16&&safeEq(got,key);}
 async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rate_limited'};if(TG_TOKEN&&!modKeyOk(body.mod))return {err:'already'};
   const token=String(body.token||'').trim(),admin=String(body.admin||'').trim(),llm=String(body.llm||'').trim();
   if(!/^\d{5,12}:[A-Za-z0-9_-]{30,60}$/.test(token))return {err:'token_format'};
@@ -297,13 +370,17 @@ go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.dis
 // ---------- HTTP ----------
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};
 function send(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(b);}
-function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{ok(ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{});}catch(e){ok({});}});req.on('error',bad);});}
-function ipOf(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'x').split(',')[0].trim();}
+function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{const v=ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{};ok(v&&typeof v==='object'&&!Array.isArray(v)?v:{});}catch(e){ok({});}});req.on('error',bad);});}
+function ipOf(req){const peer=String(req.socket&&req.socket.remoteAddress||'x');const xf=req.headers['x-forwarded-for'];
+  // X-Forwarded-For верим только от Caddy с этой же машины и берём последний адрес — его дописал сам Caddy; первый мог подставить кто угодно
+  if(xf&&/^(127\.|::1$|::ffff:127\.)/.test(peer)){const l=String(xf).split(',');return l[l.length-1].trim()||peer;}return peer;}
 const stats={bytesOut:0,msgsOut:0,tickMs:0,since:now()};
-const server=http.createServer(async(req,res)=>{
+const server=http.createServer((req,res)=>{handleReq(req,res).catch(e=>{log('ошибка запроса',req.method,String(req.url).slice(0,80),e&&e.stack||e);
+  try{if(!res.headersSent){res.writeHead(500,{'Content-Type':'application/json; charset=utf-8'});res.end('{"err":"server"}');}else res.destroy();}catch(_){}});});
+async function handleReq(req,res){
   const u=new URL(req.url,'http://x');const ip=ipOf(req);
   if(u.pathname==='/api.php'||u.pathname==='/api'){
-    let body={};if(req.method==='POST'){try{body=await readBody(req,200000);}catch(e){return send(res,413,{err:'too_big'});}}
+    let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
     if(a==='mapstatus')return send(res,200,mapStatus());
@@ -314,12 +391,15 @@ const server=http.createServer(async(req,res)=>{
     if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
-    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city));
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base));
     if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
     if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
     if(a==='reset')return send(res,200,resetFor(body.token));
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
+    if(a==='tgweb')return send(res,200,tgWebStart(req,ip));
+    if(a==='boot')return send(res,200,bootReport(body,ip));
+    if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
@@ -330,9 +410,25 @@ const server=http.createServer(async(req,res)=>{
   if(!file.startsWith(root+path.sep))return send(res,403,{err:'forbidden'});
   const ext=path.extname(file).toLowerCase();if(ext==='.php'||file.includes(path.sep+'data'+path.sep))return send(res,404,{err:'not_found'});
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Не найдено');}
-    const cache=ext==='.html'||root===MAP_DIR&&/base\.json$/.test(file)?'no-cache':(root===MAP_DIR?'public, max-age=2592000, immutable':(ext==='.json'?'public, max-age=3600':'public, max-age=300'));
-    res.writeHead(200,{'Content-Type':MIME[ext]||'application/octet-stream','Content-Length':st.size,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});
-    if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});});
+    // страница и base.json — каждый раз «не изменилось?» (тогда 304, без тела); с ?v= (скрипты сборки, кварталы карты) — навсегда
+    const cache=ext==='.html'||root===MAP_DIR&&/base\.json$/.test(file)?'no-cache':(u.searchParams.has('v')||root===MAP_DIR?'public, max-age=31536000, immutable':(ext==='.json'?'public, max-age=3600':'public, max-age=300'));
+    const core=st.size.toString(36)+'-'+Math.floor(st.mtimeMs).toString(36);
+    const zip=STATIC_ZIP.test(ext)&&st.size>1024&&/\bgzip\b/.test(req.headers['accept-encoding']||'');
+    const h={'Content-Type':MIME[ext]||'application/octet-stream','Cache-Control':cache,'ETag':'W/"'+core+'"','Last-Modified':st.mtime.toUTCString(),'Vary':'Accept-Encoding','X-Content-Type-Options':'nosniff'};
+    // ETag сравниваем по сути (размер и время файла): Caddy при своём сжатии дописывает к нему суффикс
+    const inm=req.headers['if-none-match'],ims=Date.parse(req.headers['if-modified-since']||'');
+    if(inm?inm.includes(core):ims>=Math.floor(st.mtimeMs/1000)*1000){res.writeHead(304,h);return res.end();}
+    const plain=()=>{h['Content-Length']=st.size;res.writeHead(200,h);if(req.method==='HEAD')return res.end();pipeFile(file,res);};
+    if(!zip)return plain();
+    // сжатое заранее: file.gz рядом, делается один раз в фоне — дальше сервер и Caddy не жмут файл на каждый запрос
+    const gzf=file+'.gz';fs.stat(gzf,(e2,gs)=>{if(e2||gs.mtimeMs<st.mtimeMs){gzLater(file,gzf);return plain();}
+      h['Content-Encoding']='gzip';h['Content-Length']=gs.size;h['ETag']='W/"'+core+'-gz"';res.writeHead(200,h);if(req.method==='HEAD')return res.end();pipeFile(gzf,res);});});}
+// файл в ответ: ошибка чтения или оборванная загрузка — закрыть и файл, и ответ (иначе дескриптор и память висят)
+function pipeFile(f,res){const s=fs.createReadStream(f);s.on('error',()=>res.destroy());res.on('close',()=>s.destroy());s.pipe(res);}
+const STATIC_ZIP=/^\.(json|js|html|css|svg|txt)$/;const GZ_BUSY=new Set(),GZ_FAIL=new Map();
+function gzLater(file,gzf){if(GZ_BUSY.has(file)||GZ_BUSY.size>=2||(GZ_FAIL.get(file)||0)>Date.now()-3600e3)return;GZ_BUSY.add(file);const tmp=gzf+'.'+process.pid+'.tmp';
+  const done=e=>{GZ_BUSY.delete(file);if(e){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}else fs.rename(tmp,gzf,e3=>{if(e3){GZ_FAIL.set(file,Date.now());fs.unlink(tmp,()=>{});}});};
+  const out=fs.createWriteStream(tmp);out.on('error',done);out.on('finish',()=>done());fs.createReadStream(file).on('error',done).pipe(require('zlib').createGzip({level:9})).on('error',done).pipe(out);}
 
 // ---------- WebSocket ----------
 const wss=new WebSocketServer({server,path:'/ws',maxPayload:16*1024,perMessageDeflate:false});
@@ -340,8 +436,10 @@ function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmoun
 wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
-    if(d.t==='hello'){const id=idstr(d.id);if(id.length<8)return ws.close(1008,'bad_id');me=addPlayer(id,ws);me.ip=ip;me.view.clear();setPresence(me,d.p);visit(id,d.src);notePeak();
-      wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid});return;}
+    if(d.t==='hello'){const priv=idstr(d.id);if(priv.length<8)return ws.close(1008,'bad_id');const id=pubOf(priv);
+      if(me&&me.id!==id)return ws.close(1008,'one_player');   // одно соединение — один игрок (иначе плодились «призраки», которых никто не убирал)
+      me=addPlayer(id,ws);me.priv=priv;me.ip=ip;me.view.clear();setPresence(me,d.p);visit(priv,d.src,ip);notePeak();
+      wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid,pid:id});return;}
     if(!me)return;
     if(d.t==='p'){setPresence(me,d);return;}           // координаты: {t:'p',x,y,hx,hy,b} — часто
     if(d.t==='m'){setPresence(me,d.m);return;}         // имя, одежда, фраза, аватар — только когда изменились
@@ -400,3 +498,6 @@ const impI=process.argv.indexOf('--import-php');
 if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
 else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${LLM.key?LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)':'выключен'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));
+// последняя страховка: ошибка, которую не поймали выше, — в журнал, а не падение всего сервера (с ним вылетают все игроки)
+process.on('unhandledRejection',e=>log('необработанная ошибка (сервер работает дальше):',e&&e.stack||e));
+process.on('uncaughtException',e=>log('необработанное исключение (сервер работает дальше):',e&&e.stack||e));

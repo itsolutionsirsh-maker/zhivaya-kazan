@@ -32,7 +32,7 @@ function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Mat
   if(f.id==='fidania'){p.hair='#B8B8B8';p.hairStyle=2;}return p;}
 // ---------- места ----------
 function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){if(!test(p))continue;const d=dist(p.x,p.y,x,y);if(d<bd){bd=d;best=p;}}return best;}
-function poiPlace(p,kind){return p?{x:p.x,y:p.y,inside:true,key:'poi'+p.i,poi:p,name:p.n||KIND_RU[p.t]||'',kind}:null;}
+function poiPlace(p,kind){return p?{x:p.x,y:p.y,inside:true,key:poiKey(p),poi:p,name:p.n||KIND_RU[p.t]||'',kind}:null;}
 function spotPlace(x,y,name,kind){const n=nearestNode(x,y,world.pedAdj,150);if(n<0)return null;const sp=sidewalkPos(n);return {x:sp[0],y:sp[1],inside:false,node:n,name,kind};}
 function folkAnchors(){const A={};
   const sq=(world.squares||[]).find(s=>/свобод/i.test(s.n));A.freedom=sq?[sq.x,sq.y]:[player.x,player.y];
@@ -56,7 +56,7 @@ function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   if(k==='street'){const s=nearestPoi(c[0],c[1],p=>p.t==='sight',350);const q=s?[s.x,s.y]:c;return spotPlace(q[0]+8,q[1]+6,sp.label||(sp.hints.some(h=>/бауман/.test(h))?'на Баумана':sp.hints.some(h=>/кремл/.test(h))?'у Кремля':'на улице'),'street');}
   let test=KIND_TEST[k]||(p=>p.t===k);if(k==='office'&&/школ|лицей|гимназ/i.test(sp.label))test=KIND_TEST.school;
   const taken=new Set(Object.values(P).filter(Boolean).map(q=>q.key));
-  const use=FOLK.use||(FOLK.use={});const named=p=>!!p.n&&!taken.has('poi'+p.i)&&(use['poi'+p.i]||0)<(role==='work'?1:2);   // на работе по одному, «своё место» — не больше двоих
+  const use=FOLK.use||(FOLK.use={});const named=p=>!!p.n&&!taken.has(poiKey(p))&&(use[poiKey(p)]||0)<(role==='work'?1:2);   // на работе по одному, «своё место» — не больше двоих
   // кандидаты рядом с подсказкой: совпадение по названию или улице, иначе просто ближайшие
   const cand=[];for(const p of world.pois){if(!test(p)||!named(p))continue;const d=dist(p.x,p.y,c[0],c[1]);if(d<900)cand.push([d,p]);}
   cand.sort((u,v)=>u[0]-v[0]);

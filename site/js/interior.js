@@ -37,7 +37,7 @@ function makeInterior(kind,name,key){
     default:{it.floor='tiles';F('counter',w/2,1.1,5,1.1,{spot:'counter'});NPC(w/2,0.5,{role:'staff',job:'администратор'});for(let i=0;i<4;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});NPC(3+rng()*(w-6),3+rng()*(h-6),{wander:true});}
   }
   return it;}
-function enterInterior(src){insideShot(src);const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}refreshCrowd(it);folkInterior(it);
+function enterInterior(src){insideShot(src);const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}refreshCrowd(it);folkInterior(it);homeItemsSync(it);
   interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
@@ -110,13 +110,14 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   ctx.fillStyle=fl[0];ctx.fillRect(it.door.x-0.85,it.h-0.25,1.7,0.5);ctx.fillStyle='#6B5A4C';ctx.fillRect(it.door.x-0.85,it.h+0.2,1.7,0.08);ctx.fillStyle='rgba(255,255,255,.6)';ctx.font='0.4px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillText('выход',it.door.x,it.h+0.65);
   // люди
   for(const n of it.npcs)drawPerson(n.x,n.y,n.hx,n.hy,n.p,n.phase,{scale:0.55,seated:n.seated});
-  drawPerson(player.ix,player.iy,player.ihx,player.ihy,{clothes:player.clothes,skin:player.skin,hair:player.hair,role:'player'},player.phase,{scale:0.55,ring:true});
+  drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';ctx.fillText(KIND_RU[it.kind]||KIND_RU.default,ox+ctx.measureText(it.name).width*1.45+12,oy+it.h*iz+35);
-  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
+  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   if(f.t==='rails'){ctx.fillStyle='#2B2A28';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#4A4440';for(let i=0;i<f.w;i+=0.7)ctx.fillRect(x+i,y+0.55,0.32,1.3);ctx.fillStyle='#B8B4AE';ctx.fillRect(x,y+0.75,f.w,0.08);ctx.fillRect(x,y+1.55,f.w,0.08);return;}
+  if(f.own){drawOwnFurniture(f);return;}
   if(f.t==='edge'){ctx.fillStyle='#E9C53A';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='rgba(0,0,0,.25)';for(let i=0;i<f.w;i+=0.5)ctx.fillRect(x+i,y,0.25,f.h);return;}
   if(f.t==='pillar'){ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(x+0.1,y+0.12,f.w,f.h);ctx.fillStyle='#E7E1D3';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();ctx.fillStyle='#2E7D5B';ctx.fillRect(x+0.15,y+0.15,f.w-0.3,0.12);return;}
   if(f.t==='scheme'){ctx.fillStyle='#F4F1EA';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#D7263D';ctx.fillRect(x+0.15,y+f.h/2-0.03,f.w-0.3,0.06);for(let i=0;i<11;i++){ctx.beginPath();ctx.arc(x+0.15+i*(f.w-0.3)/10,y+f.h/2,0.07,0,TAU);ctx.fill();}return;}

@@ -40,10 +40,12 @@ function fillDistricts(cur){const sel=$('#pDistrict');if(!sel)return;sel.innerHT
   sel.value=cur||'';if(sel.value!==(cur||''))sel.value='';}
 function homeAt(x,y){let hit=null;world.bgrid.query(x,y,x,y,b=>{if(Math.abs(b.cx-x)<2&&Math.abs(b.cy-y)<2){hit=b;return false;}});return hit;}
 async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id):null;if(id&&!d)return null;
+  if(player.vehicle||player.bus||cine)return {busy:true};   // за рулём, в автобусе, в сцене — переезд потом, иначе следующий кадр вернёт к машине
+  if(scene==='interior'&&typeof exitInterior==='function')exitInterior();   // из квартиры (шкаф «Сменить персонажа») — сначала на улицу
   // точка двора дальше 2,5 км от центра своего района — скорее ошибка в данных (попала в соседний район): такую не берём
   const spots=d?(window.cityHomeSpots||[]).filter(s=>s.district===id&&Array.isArray(s.ll)&&(q=>dist(q[0],q[1],d.x,d.y)<2500)(llToXY(s.ll))):[];const at=d?(spots.length?llToXY(pick(spots).ll):[d.x,d.y]):startPoint();
-  if(world.meta.chunks){setHint(d?`Строим дома: ${d.name}…`:'Строим дома вокруг…');await loadChunksAround([at],1800);}
-  let best=null,bd=d?2500:400;for(const b of world.buildings){if(!HOME_T.has(b.t||''))continue;const k=dist(b.cx,b.cy,at[0],at[1])+((b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3?0:250);if(k<bd){bd=k;best=b;}}
+  if(world.meta.chunks){setHint(d?`Строим дома: ${d.name}…`:'Строим дома вокруг…');await loadChunksAround([at],1200);}
+  let best=null,bd=d?900:400;for(const b of world.buildings){if(!HOME_T.has(b.t||''))continue;const k=dist(b.cx,b.cy,at[0],at[1])+((b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3?0:250);if(k<bd){bd=k;best=b;}}
   if(!best)return null;const n=nearestNode(best.cx,best.cy,world.pedAdj,250);if(n<0)return null;const q=sidewalkPos(n);
   player.x=q[0];player.y=q[1];cam.x=q[0];cam.y=q[1];player.waypoints=null;player.home=best;player.homeAt=null;
   populationJump(q[0],q[1]);spawnRentals(q[0],q[1]);if(player.hasCar)placeOwnCar();if(typeof folkReanchor==='function')folkReanchor();saveState();
@@ -99,7 +101,7 @@ function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,'poi'+poi.i);if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:'poi'+poi.i,x:player.x,y:player.y})};}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y})};}
   switch(poi.t){
     case 'atm':return {label:`Банкомат ${n}: карта и вклад`,run:()=>openBank('atm')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{clock.minutes+=30;player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
@@ -114,7 +116,7 @@ const SCRIPTED={police:['Проходите, не задерживайтесь. 
 function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
   $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
   if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
-  $('#brainLbl').textContent=sampleFn?'думает сам: мозги на Claude':'реплики по сценарию (без ИИ)';
+  $('#brainLbl').textContent=sampleFn?'думает сам: отвечает ИИ':'реплики по сценарию (без ИИ)';
   if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
 function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
@@ -134,7 +136,7 @@ function weatherText(){return weather.kind==='rain'?'дождь':weather.kind===
 function loadProfile(){try{return JSON.parse(localStorage.getItem('zk.profile')||'null');}catch(e){return null;}}
 function saveProfile(p){try{localStorage.setItem('zk.profile',JSON.stringify(p));}catch(e){}}
 function applyProfile(p){player.name=p.name||'Гость';player.desc=p.desc||'';player.role=p.role||'resident';player.avatar=p.avatar||null;player.thumb=p.thumb||null;player.clothes=p.clothes||'#2F9E6B';player.hasCar=p.hasCar!==false;player.carColor=p.carColor||'#C62828';player.district=p.district||'';player.avatarImg=null;if(player.avatar){const im=new Image();im.onload=()=>{player.avatarImg=im;};im.src=player.avatar;}$('#nameLbl').textContent=player.name;
-  if(ownCar){ownCar.color=player.carColor;if(!player.hasCar){ownCar=null;}}else if(player.hasCar&&world)placeOwnCar();}
+  if(ownCar){ownCar.color=wornCarColor()||player.carColor;if(!player.hasCar){ownCar=null;}}else if(player.hasCar&&world)placeOwnCar();}
 let pendingAvatar=null,pendingThumb=null;
 $('#avFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{pendingAvatar=cropSquare(im,128,0.86);pendingThumb=cropSquare(im,36,0.55);const pv=$('#avPreview');pv.style.backgroundImage=`url(${pendingAvatar})`;pv.textContent='';};im.src=rd.result;};rd.readAsDataURL(f);});
 function cropSquare(im,size,q){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');const s=Math.min(im.width,im.height);x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,size,size);return c.toDataURL('image/jpeg',q);}
@@ -143,20 +145,23 @@ function showProfile(){const p=loadProfile()||{};$('#pName').value=p.name||(type
 document.querySelectorAll('#clothes .sw').forEach(el=>el.addEventListener('click',()=>{document.querySelectorAll('#clothes .sw').forEach(q=>q.classList.remove('on'));el.classList.add('on');}));
 $('#startBtn').addEventListener('click',()=>{const nm0=$('#pName').value.trim();if(nm0&&window.ModCore&&ModCore.bad(nm0)){setHint('Такое имя не подойдёт: без мата и ссылок');$('#pName').focus();return;}const sw=document.querySelector('#clothes .sw.on');const prev=loadProfile();const first=!prev;const ds=$('#pDistrict');const p={name:(nm0||'Гость').slice(0,24),desc:modClean($('#pDesc').value.trim()).slice(0,160),role:$('#pRole').value,avatar:pendingAvatar,thumb:pendingThumb,clothes:sw?sw.dataset.c:'#2F9E6B',hasCar:$('#pCar').checked,carColor:$('#pCarColor').value,district:ds?ds.value:''};saveProfile(p);applyProfile(p);$('#profileModal').hidden=true;player.busy=false;
   // новый игрок из района или сменил район — переезжает во двор там (и обратно к Баумана, если выбрал центр)
-  if((first&&p.district)||(!first&&p.district!==(prev.district||'')))settleInDistrict(p.district).then(d=>addEvent(d&&d.name?`${player.name} вышел во двор: ${d.name}${d.parent?' · '+d.parent:''}`:`${player.name} вышел в город на улицу Баумана`));
+  if((first&&p.district)||(!first&&p.district!==(prev.district||'')))settleInDistrict(p.district).then(d=>{if(!d||d.busy){p.district=prev?prev.district||'':'';saveProfile(p);applyProfile(p);setHint(d&&d.busy?'Сменить район можно пешком на улице или дома':'Не нашли дом в этом районе — попробуйте ещё раз (нужна связь)');return;}
+    addEvent(d.name?`${player.name} вышел во двор: ${d.name}${d.parent?' · '+d.parent:''}`:`${player.name} вышел в город на улицу Баумана`);});
   else addEvent(`${player.name} вышел в город на улицу Баумана`);if(first||!flags.howtoSeen)showHowto();});
 $('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').click();});
+// самое сильное отдаление: чтобы вся карта помещалась на экран (для старой маленькой карты — как раньше, 0,22)
+function zMin(){const bb=world&&world.bbox;if(!bb||typeof W==='undefined')return 0.22;return Math.min(0.22,Math.max(0.01,0.9*Math.min(W/(bb[2]-bb[0]),H/(bb[3]-bb[1]))));}
 function showHowto(){$('#howtoModal').hidden=false;player.busy=true;}
 $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;player.busy=false;flags.howtoSeen=true;try{localStorage.setItem('zk.howto','1');}catch(e){}});
 
 // ---------- сохранение ----------
-function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,home:player.home?{x:player.home.cx,y:player.home.cy}:(player.homeAt?{x:player.homeAt[0],y:player.homeAt[1]}:null),own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object')player.job=s.job;if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,0.22,16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else player.homeAt=[s.home.x,s.home.y];}if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,home:player.home?{x:player.home.cx,y:player.home.cy}:(player.homeAt?{x:player.homeAt[0],y:player.homeAt[1]}:null),homeless:!player.home&&!player.homeAt,bills:typeof bills!=='undefined'?{rent:bills.rent,util:bills.util,call:bills.call}:undefined,delayAsked:!!player.delayAsked,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object'){player.job=s.job;if(/^poi\d+$/.test(player.job.key||'')&&isFinite(player.job.x)&&isFinite(player.job.y))player.job.key=poiKey(player.job);}/* старый ключ работы — по номеру, переводим на постоянный */if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);clock.minutes=s.minutes??clock.minutes;if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,zMin(),16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else{player.home=null;player.homeAt=[s.home.x,s.home.y];}}else if(s.homeless){player.home=null;player.homeAt=null;}if(s.bills&&typeof bills!=='undefined')Object.assign(bills,s.bills);player.delayAsked=!!s.delayAsked;if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(!$('#questModal').hidden)closeQuests();if(!$('#seasonModal').hidden)closeSeason();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
@@ -170,13 +175,14 @@ $('#howtoBtn').addEventListener('click',()=>{$('#menuModal').hidden=true;showHow
 $('#changeChar').addEventListener('click',()=>{$('#menuModal').hidden=true;showProfile();});
 // «Начать заново»: второе нажатие подтверждает. Стирает только своё: прогресс здесь и в аккаунте на сервере (имя и вход остаются)
 let resetArm=0;$('#resetBtn').addEventListener('click',async()=>{const b=$('#resetBtn');if(Date.now()-resetArm>4000){resetArm=Date.now();b.textContent='Точно? Всё сбросится — нажмите ещё раз';setTimeout(()=>{if(Date.now()-resetArm>=4000)b.textContent='Начать заново';},4100);return;}
-  window.zkNoSave=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function')await acctCall('reset',{token:acct.token});}catch(e){}
-  try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk'])localStorage.removeItem(k);}catch(e){}location.reload();});
+  window.zkNoSave=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function'){const r=await acctCall('reset',{token:acct.token});if(r&&r.updated&&typeof setRev==='function')setRev(r.updated);}}catch(e){}
+  // zk.prog — задания, значки, обучение; zk.invq — приглашения: тоже с начала (раньше оставались и гасили вечерние события новой игры)
+  try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk','zk.prog','zk.invq'])localStorage.removeItem(k);}catch(e){}location.reload();});
 $('#speedBtn').addEventListener('click',()=>{const i=(TIME_SCALES.indexOf(clock.scale)+1)%TIME_SCALES.length;clock.scale=TIME_SCALES[i];$('#speedBtn').textContent='×'+clock.scale;});
 $('#centerBtn').addEventListener('click',followPlayer);
 mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;$('#centerBtn').hidden=false;clampCam();});
-$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,0.22,16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,0.22,16);});
-canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),0.22,16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
+$('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,zMin(),16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,zMin(),16);});
+canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),zMin(),16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
 let pdown=null,dragging=false,pinch=null;const ptrs=new Map();
 function followPlayer(){cam.free=false;$('#centerBtn').hidden=true;}
 function clampCam(){const bb=world.bbox;cam.x=clamp(cam.x,bb[0],bb[2]);cam.y=clamp(cam.y,bb[1],bb[3]);}
@@ -184,7 +190,7 @@ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:cam.zt};pdown=null;dragging=false;return;}
   pdown={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now()};dragging=false;});
 canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
-  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,0.22,16);return;}
+  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,zMin(),16);return;}
   if(!pdown||scene!=='city')return;if(!dragging&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>6){dragging=true;cam.free=true;$('#centerBtn').hidden=false;canvas.style.cursor='grabbing';}
   if(dragging){cam.x-=(e.clientX-pdown.lx)/cam.z;cam.y-=(e.clientY-pdown.ly)/cam.z;pdown.lx=e.clientX;pdown.ly=e.clientY;clampCam();}});
 canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;pdown=null;dragging=false;canvas.style.cursor='';});
@@ -234,7 +240,8 @@ function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.rando
   if(weather.kind==='rain'&&!reduceMotion&&scene==='city'){while(weather.rain.length<160)weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);for(const r of weather.rain){r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
 
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
-function frame(now){const rdt=Math.min(0.05,(now-last)/1000);last=now;
+function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   // не чаще ~60 кадров: на экранах 120 Гц вдвое меньше работы и батареи
+  const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
     updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);engineTick(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
@@ -260,7 +267,7 @@ function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0
 // ---------- мультиплеер ----------
 function syncPeers(list){peers=list;const seen=new Set();
   for(const p of peers){seen.add(p.peer);let pr=peerRender.get(p.peer);if(!pr){pr={key:p.peer,x:p.presence.x,y:p.presence.y,tx:0,ty:0,name:'',img:null,imgSrc:null,hx:0,hy:1,b:0,c:'#4A90E2',veh:null};peerRender.set(p.peer,pr);}
-    pr.tx=p.presence.x;pr.ty=p.presence.y;if(Math.abs(pr.x-pr.tx)+Math.abs(pr.y-pr.ty)>40){pr.x=pr.tx;pr.y=pr.ty;}pr.name=modName(p.presence.n);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
+    pr.tx=p.presence.x;pr.ty=p.presence.y;if(Math.abs(pr.x-pr.tx)+Math.abs(pr.y-pr.ty)>40){pr.x=pr.tx;pr.y=pr.ty;}pr.name=modName(p.presence.n);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';{const w=p.presence.w&&typeof p.presence.w==='object'?p.presence.w:{};const wk=JSON.stringify(w);if(pr.wk!==wk){pr.wk=wk;pr.look=lookFromIds(w);}}pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
     onPeerSay(pr,p.presence.sy);
     const g=p.presence.g;if(g&&typeof g==='object'&&world.squares[g.s]&&RALLY_KIND[g.k]){const sq=world.squares[g.s];let r=rallyAt(sq);if(!r)r=startRally(sq,g.k,modClean(String(g.t||'').slice(0,60)),'peer');if(r&&r.by==='peer')r.seen=performance.now();}
     const a=typeof p.presence.a==='string'&&p.presence.a.startsWith('data:image/')?p.presence.a:null;if(a&&a!==pr.imgSrc){pr.imgSrc=a;const im=new Image();im.onload=()=>{pr.img=im;};im.src=a;}if(!a){pr.img=null;pr.imgSrc=null;}}
@@ -271,17 +278,20 @@ function initCaps(){netInit();}
 
 // ---------- старт ----------
 async function boot(){
+  // замер загрузки (от открытия страницы, мс) — уходит на сервер без имён, на mod.html видно, что тормозит: сеть, телефон или сервер
+  const BT={scripts:Math.round(performance.now())};const bt=k=>{BT[k]=Math.round(performance.now());};
   try{
     // карта всей Казани кусками (map/base.json + map/c_*.json); если её нет — старый цельный kazan.json
     let res=await fetch('map/base.json',{cache:'no-cache'});if(!res.ok)res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
-    $('#loadMsg').textContent='Строим улицы…';const data=await res.json();
-    await new Promise(r=>setTimeout(r,30));buildWorld(data);
+    $('#loadMsg').textContent='Строим улицы…';const data=await res.json();bt('base');
+    await new Promise(r=>setTimeout(r,30));buildWorld(data);bt('build');
     if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);if(s&&s.home&&isFinite(s.home.x)&&isFinite(s.home.y))pts.push([s.home.x,s.home.y]);}catch(e){}
-      await loadChunksAround(pts,2600);initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
+      await loadChunksAround(pts,1200);bt('chunks');initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
-    $('#loading').hidden=true;
+    $('#loading').hidden=true;bt('shown');
+    setTimeout(()=>{if(!Net.acct)return;try{fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({a:'boot',ms:BT,tg:!!(typeof TG!=='undefined'&&TG.on),conn:navigator.connection&&navigator.connection.effectiveType||''})}).catch(()=>{});}catch(e){}},4000);
     if(prof){addEvent(`${player.name} снова в городе`);if(!flags.howtoSeen)showHowto();}else showProfile();
     addEvent(world.meta.chunks?'Казань: '+Object.keys(world.meta.chunks).length+' кварталов по 2×2 км, '+world.crossings.length.toLocaleString('ru-RU')+' переходов. Дома вокруг подгружаются, пока вы идёте или едете':'Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');
     engineInit();initCaps();requestAnimationFrame(frame);

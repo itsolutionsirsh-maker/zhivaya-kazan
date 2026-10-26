@@ -65,6 +65,8 @@ body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 #feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
 #tripBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(244,197,66,.7);pointer-events:auto}#tripBox .btn{padding:3px 8px;font-size:11px}
 #rtList,#rtPlans{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}#rtList[hidden],#rtPlans[hidden]{display:none!important}
+.season-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:4px 0 2px}.season-bar i{display:block;height:100%;background:linear-gradient(90deg,#8FC6E8,#E7F3FA);border-radius:4px}.season-lvl{font-size:12.5px;padding:3px 2px;color:var(--text,#e8efe9);border-bottom:1px solid var(--line)}.season-lvl.got{color:var(--muted)}.season-lvl.next{font-weight:600}
+.wear-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--line);border-radius:10px}.wear-row>i{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.25)}.wear-row>div{flex:1;min-width:0;display:flex;flex-direction:column}.wear-row b{font-size:13px}.wear-row span{font-size:11.5px;color:var(--muted)}.wear-row .btn{flex:none}
 .rt-card{display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.rt-card b{font-size:14px}.rt-card span{font-size:12px;color:var(--muted)}.rt-card .btn{align-self:flex-start;margin-top:6px}.rt-card .btn:disabled{opacity:.45;cursor:default}
 #compBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(43,176,98,.6);pointer-events:auto}#compBox .btn{padding:3px 8px;font-size:11px}
 #chatPanel{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(360px,calc(100vw - 32px));height:min(380px,55vh);display:flex;flex-direction:column;z-index:15;overflow:hidden}
@@ -180,10 +182,19 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 
 <div id="loading"><div><h1>Живая Казань</h1><p id="loadMsg">Загружаем Казань из OpenStreetMap…</p><div class="pr"><i></i></div></div></div>
 
+<div class="modal" id="otherDevModal" hidden style="z-index:300">
+  <div class="box" style="max-width:420px">
+    <h2>Игра открыта на другом устройстве</h2>
+    <p>Там вы играли позже, и прогресс сохранён оттуда. Чтобы ничего не потерять, здесь игра на паузе.</p>
+    <div class="row"><button class="btn primary" id="otherDevGo">Играть здесь</button></div>
+  </div>
+</div>
+
 <div class="modal" id="profileModal" hidden>
   <div class="box">
     <h2>Кто вы в Казани?</h2>
     <p>Персонаж появится на улице Баумана или во дворе вашего района. Фото и описание видят другие игроки и жители города.</p>
+    <p id="pTgRow" hidden>Уже играете в Телеге? <button class="btn" id="pTgBtn">Войти через Телеграм</button> — откроется ваша игра.</p>
     <div class="avatarPick"><div class="pv" id="avPreview">?</div><label class="btn" for="avFile">Загрузить фото</label><input type="file" id="avFile" accept="image/*"></div>
     <div class="field"><label for="pName">Имя</label><input type="text" id="pName" maxlength="24" placeholder="Например, Иршат"></div>
     <div class="field"><label for="pDesc">О себе</label><textarea id="pDesc" maxlength="160" placeholder="Кто вы, чем занимаетесь, какой характер — жители будут это знать"></textarea></div>
@@ -253,9 +264,18 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   <div class="box">
     <h2 id="qTitle">Задания на сегодня</h2>
     <p class="hint" id="qSub">Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.</p>
+    <div id="qSeason" class="stack"></div>
     <div id="qList" class="stack"></div>
     <p class="hint" id="qAch"></p>
     <div class="row"><button class="btn" id="qClose">Закрыть</button></div>
+  </div>
+</div>
+<div class="modal" id="seasonModal" hidden>
+  <div class="box">
+    <h2 id="seasonTitle">Мои вещи</h2>
+    <p class="hint" id="seasonSub"></p>
+    <div id="seasonList" class="stack"></div>
+    <div class="row"><button class="btn" id="seasonClose">Закрыть</button></div>
   </div>
 </div>
 <div class="modal" id="routeModal" hidden>
@@ -328,6 +348,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
     </div>
     <div id="acctBox" hidden>
       <h3 class="sub">Аккаунт</h3>
+      <div class="row" id="acctTgRow" hidden><button class="btn primary" id="acctTgBtn">Войти через Телеграм</button></div>
       <div id="acctForm"><p>Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.</p>
         <div class="row"><input type="text" id="acctName" maxlength="24" placeholder="Имя" autocomplete="username" style="flex:1;min-width:0"><input type="password" id="acctPin" maxlength="8" inputmode="numeric" placeholder="PIN 4–8 цифр" autocomplete="current-password" style="width:120px"><button class="btn primary" id="acctGo">Войти</button></div></div>
       <div id="acctOut" hidden><p>Вы вошли как <b id="acctWho"></b>. Прогресс сохраняется на сервере каждые 30 секунд.</p><div class="row"><button class="btn" id="acctOutBtn">Выйти</button></div></div>
@@ -336,7 +357,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
     <div id="ignBox"><h3 class="sub">Скрытые игроки</h3><div id="ignList"></div></div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
-    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
   </div>
 </div>
 
@@ -372,5 +393,5 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/events.js"></script>
 <script src="js/people.js"></script>
 <script src="js/phone.js"></script>
-<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/render.js"></script>
+<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/render.js"></script>
 <script src="js/main.js"></script>

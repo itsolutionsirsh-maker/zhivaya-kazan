@@ -26,7 +26,10 @@ function endSit(s){if(!s||s.done)return;s.done=true;if(s.def.end)s.def.end(s);
   for(const w of s.actors)releaseActor(w);s.actors=[];closeSitCard(s);}
 
 // ---------- последствия ----------
-function sitMoney(d,why){d=Math.round(d);if(d<0)player.money=Math.max(0,player.money+d);else player.money+=d;if(typeof econNotify==='function')econNotify(d,why);if(why)addEvent(`${why}: ${d>0?'+':'−'}${fmtMoney(Math.abs(d))}`,d<0?'alert':'say');}
+function sitMoney(d,why){d=Math.round(d);let short=0;
+  // списание: не хватило на карте — со вклада, остаток — долг по суду (приставы спишут потом); раньше обнулялось, и деньги прятали на вклад
+  if(d<0){let need=-d;const c=Math.min(player.money,need);player.money-=c;need-=c;if(need>0&&typeof ECON!=='undefined'){const v=Math.min(ECON.dep||0,need);ECON.dep-=v;need-=v;if(need>0){ECON.owed=(ECON.owed||0)+need;short=need;}}}
+  else player.money+=d;if(typeof econNotify==='function')econNotify(d,why);if(why)addEvent(`${why}: ${d>0?'+':'−'}${fmtMoney(Math.abs(d))}`,d<0?'alert':'say');if(short)addEvent(`Не хватило ${fmtMoney(short)} — это долг по суду, приставы будут списывать с карты`,'alert');}
 function sitRep(d,why){player.rep=clamp(Math.round((player.rep||0)+d),-100,100);if(why)addEvent(`${d>0?'⭐':'👎'} Репутация ${d>0?'+':''}${d}: ${why}`,d>0?'say':'alert');}
 function sitMood(d){player.mood=clamp(player.mood+d,0,100);}
 function dossier(t){SIT.dossier.push({day:clock.day,t});if(SIT.dossier.length>30)SIT.dossier.shift();}

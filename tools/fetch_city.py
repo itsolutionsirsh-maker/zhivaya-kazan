@@ -10,7 +10,7 @@
   python3 tools/fetch_city.py --all      — всё сразу
   python3 tools/fetch_city.py --plan     — только заново взять границу города и пересчитать плитки
 """
-import json, math, os, sys, time
+import fcntl, json, math, os, sys, time
 
 # границы города (с запасом): юг, запад, север, восток
 CITY = tuple(float(v) for v in os.environ.get('CITY', '55.66,48.86,55.93,49.33').split(','))
@@ -132,6 +132,12 @@ def main():
                        "https://overpass.kumi.systems/api/interpreter"]
     query, fetch = g['query'], g['fetch']
     os.makedirs(OUTDIR, exist_ok=True)
+    # одна докачка за раз: её запускает и citymap.sh из консоли, и сам сервер (server.js, mapFetch)
+    lock = open('raw/city_fetch.lock', 'w')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print('карту уже качает другой процесс — выхожу', flush=True); return
     plan = load_plan()
     if plan is None or '--plan' in sys.argv:
         plan = make_plan(fetch) or plan

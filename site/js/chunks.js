@@ -1,13 +1,14 @@
 // ===== Подгрузка карты кусками 2×2 км: вокруг игрока (и вокруг камеры, если игрок смотрит в сторону) =====
 // Всё, что нужно везде (крупные улицы, маршруты, остановки, вода, больницы и т. п.), лежит в base.json и есть сразу.
 // Дома, дворы, тропинки, парки, магазины и кафе приходят кусками; далёкие куски выгружаются, чтобы телефону хватало памяти.
-const CHUNKS={loadR:3600,dropR:6500,busy:0,max:4,t:0,state:new Map(),fail:new Map()};
+const CHUNKS={wait:new Map(),loadR:3600,dropR:6500,busy:0,max:6,t:0,state:new Map(),fail:new Map()};
 function chunkSize(){return (world.meta.chunk||20000)/10;}
 function chunkKeysNear(x,y,R){const C=chunkSize(),idx=world.meta.chunks||{};const out=[];
   for(let cx=Math.floor((x-R)/C);cx<=Math.floor((x+R)/C);cx++)for(let cy=Math.floor((y-R)/C);cy<=Math.floor((y+R)/C);cy++){const k=cx+'_'+cy;if(!idx[k])continue;
     const d=Math.hypot(Math.max(0,Math.abs(x-(cx+0.5)*C)-C/2),Math.max(0,Math.abs(y-(cy+0.5)*C)-C/2));if(d<=R)out.push([d,k]);}
   out.sort((a,b)=>a[0]-b[0]);return out.map(o=>o[1]);}
-async function loadChunk(k){if(CHUNKS.state.has(k))return;CHUNKS.state.set(k,'loading');CHUNKS.busy++;
+function loadChunk(k){if(CHUNKS.state.has(k))return CHUNKS.wait.get(k)||Promise.resolve();const pr=loadChunkNow(k);CHUNKS.wait.set(k,pr);pr.finally(()=>CHUNKS.wait.delete(k));return pr;}
+async function loadChunkNow(k){CHUNKS.state.set(k,'loading');CHUNKS.busy++;
   try{const r=await fetch('map/c_'+k+'.json?v='+(world.meta.v||'1'));if(!r.ok)throw new Error(r.status);const d=await r.json();
     if(CHUNKS.state.get(k)!=='loading')return;const rec=addMapPart(d,k);CHUNKS.state.set(k,'ready');CHUNKS.fail.delete(k);onChunkAdded(rec);}
   catch(e){CHUNKS.state.delete(k);CHUNKS.fail.set(k,performance.now());}
@@ -17,18 +18,19 @@ function onChunkAdded(rec){if(typeof _sideOff!=='undefined')_sideOff.clear();if(
   if(player.homeAt&&typeof homeAt==='function'){const b=homeAt(player.homeAt[0],player.homeAt[1]);if(b){player.home=b;player.homeAt=null;if(typeof folkReanchor==='function')folkReanchor();}}}
 // куски вокруг точек старта — до показа игры, чтобы город вокруг был сразу
 async function loadChunksAround(points,R){const ks=new Set();for(const p of points)for(const k of chunkKeysNear(p[0],p[1],R))ks.add(k);
-  const list=[...ks];let i=0;const worker=async()=>{while(i<list.length){const k=list[i++];await loadChunk(k);}};await Promise.all([worker(),worker(),worker(),worker()]);}
+  const list=[...ks];let i=0;const worker=async()=>{while(i<list.length){const k=list[i++];await loadChunk(k);}};await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);}
 function chunkTick(dt){if(!world||!world.meta.chunks)return;CHUNKS.t-=dt;if(CHUNKS.t>0)return;CHUNKS.t=0.3;
-  // камера, отведённая от игрока, тоже подгружает при любом масштабе: на обзоре всего города видно дома там, куда смотришь,
-  // а не только там, где игрок уже был; пока карту быстро тянут (больше 400 м за такт) — не качаем то, мимо чего пролетели
+  // камера, отведённая от игрока, тоже подгружает (не только при сильном приближении): на обзоре видно дома там, куда смотришь,
+  // а не только там, где игрок уже был; пока карту быстро тянут (больше 400 м за такт) — не качаем то, мимо чего пролетели;
+  // на всём городе сразу (масштаб меньше 0,12, дом меньше точки) — не качаем вовсе
   const focus=[[player.x,player.y]],load=[[player.x,player.y]];
-  if(cam.free){focus.push([cam.x,cam.y]);const lc=CHUNKS.cam;if(lc&&Math.hypot(cam.x-lc[0],cam.y-lc[1])<400)load.push([cam.x,cam.y]);CHUNKS.cam=[cam.x,cam.y];}else CHUNKS.cam=null;
+  if(cam.free){focus.push([cam.x,cam.y]);const lc=CHUNKS.cam;if(lc&&cam.z>=0.12&&Math.hypot(cam.x-lc[0],cam.y-lc[1])<400)load.push([cam.x,cam.y]);CHUNKS.cam=[cam.x,cam.y];}else CHUNKS.cam=null;
   if(CHUNKS.busy<CHUNKS.max){const now=performance.now();
     for(const f of load){for(const k of chunkKeysNear(f[0],f[1],CHUNKS.loadR)){if(CHUNKS.busy>=CHUNKS.max)break;if(CHUNKS.state.has(k))continue;const ft=CHUNKS.fail.get(k);if(ft&&now-ft<15000)continue;loadChunk(k);}}}
   // выгрузка далёких
-  const C=chunkSize();for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
+  const C=chunkSize();let dropped=0;for(const [k,st] of CHUNKS.state){if(st!=='ready')continue;const [cx,cy]=k.split('_').map(Number);const mx=(cx+0.5)*C,my=(cy+0.5)*C;
     let near=false;for(const f of focus){if(Math.abs(f[0]-mx)<CHUNKS.dropR&&Math.abs(f[1]-my)<CHUNKS.dropR){near=true;break;}}
-    if(!near){CHUNKS.state.delete(k);removeMapPart(k);}}}
+    if(!near){CHUNKS.state.delete(k);removeMapPart(k);if(++dropped>=2)break;}}}   // не больше двух за такт: после дальней поездки выгрузка 16 кварталов разом давала подвисание на полсекунды
 // сразу после переезда (старт в своём районе) — всех, кого можно, поближе, не дожидаясь populationFollow
 function populationJump(px,py){
   for(const w of walkers){if(w.bus||w.inside||w.companion||w.keep||w.sitBy!=null||w.folk||w.rally||w.rallySlot||w.isInterior||w.temp)continue;
@@ -52,5 +54,5 @@ function populationFollow(dt){FOLLOW.t-=dt;if(FOLLOW.t>0||!world)return;FOLLOW.t
   moved=0;
   for(const c of cars){if(moved>=5)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.taxiFor||c.target!=null||c.state==='scene'||c.remove)continue;
     if(Math.abs(c.x-px)<FOLLOW.carR&&Math.abs(c.y-py)<FOLLOW.carR)continue;
-    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!world.carAdj[n].length)continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
+    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!hasAdj(world.carAdj,n))continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
       c.node=n;c.x=q[0];c.y=q[1];c.path=null;c.creep=null;c.speed=0;c.state='idle';c.ttl=rnd(0.2,2);moved++;break;}}}

@@ -32,22 +32,25 @@ function render(){
     if(a.k==='water'&&z>1.2){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.6;ctx.stroke();}}
   drawKremlinGround(vx0,vy0,vx1,vy1);
   // ---- дороги (батчами по ширине)
-  const groups=new Map();const vis=[];
-  for(const r of world.roads){if(r.bb[2]<vx0||r.bb[0]>vx1||r.bb[3]<vy0||r.bb[1]>vy1)continue;vis.push(r);const k=r.c*100+Math.round(r.w*2);let g=groups.get(k);if(!g){g={c:r.c,w:r.w,list:[]};groups.set(k,g);}g.list.push(r);}
+  // только улицы на экране — через сетку улиц (раньше каждый кадр перебирались все улицы, когда-либо загруженные: после объезда города — 40% времени кадра)
+  const gm=new Map();const vis=[];
+  roadsIn(vx0,vy0,vx1,vy1,r=>{vis.push(r);const k=r.c*100+Math.round(r.w*2);let g=gm.get(k);if(!g){g={c:r.c,w:r.w,list:[]};gm.set(k,g);}g.list.push(r);});
+  // крупные улицы — поверх мелких, в одном порядке на любом кадре (иначе перекрёстки мигали бы при сдвиге камеры)
+  const groups=[...gm.values()].sort((a,b)=>b.c-a.c||a.w-b.w);vis.sort((a,b)=>a.i-b.i);   // подписи улиц — на тех же отрезках, что раньше, и не прыгают при сдвиге
   const pathGroup=g=>{ctx.beginPath();for(const r of g.list){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}};
   ctx.lineCap='round';ctx.lineJoin='round';
-  for(const g of groups.values()){if(g.c<=8){pathGroup(g);ctx.strokeStyle='#B9B3A5';ctx.lineWidth=g.w+2*SIDEWALK+0.5;ctx.stroke();ctx.strokeStyle='#D4CFC3';ctx.lineWidth=g.w+2*SIDEWALK;ctx.stroke();}else if(g.c===9){pathGroup(g);ctx.strokeStyle='#D7D1C2';ctx.lineWidth=g.w+1;ctx.stroke();}}
-  if(z>1.3)for(const g of groups.values()){if(g.c<10)continue;pathGroup(g);ctx.strokeStyle='#CBC5B5';ctx.lineWidth=g.c===12?1.5:1.3;if(g.c===12)ctx.setLineDash([0.7,0.7]);ctx.stroke();ctx.setLineDash([]);}
-  for(const g of groups.values()){if(g.c>8)continue;pathGroup(g);ctx.strokeStyle='#8F8E89';ctx.lineWidth=g.w+0.9;ctx.stroke();}
-  for(const g of groups.values()){if(g.c>8)continue;pathGroup(g);if(g.c<=4&&z>1.4){ctx.strokeStyle='#E9E6DC';ctx.lineWidth=g.w;ctx.stroke();ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w-0.7;ctx.stroke();}else{ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w;ctx.stroke();}}
-  if(z>1.6){for(const g of groups.values()){if(g.c>8||g.w<6.2)continue;const two=g.list.filter(r=>!r.o);if(!two.length)continue;ctx.beginPath();for(const r of two){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}ctx.strokeStyle='#ECE9DF';ctx.lineWidth=0.22;if(g.c>=5)ctx.setLineDash([2.5,2.5]);ctx.stroke();ctx.setLineDash([]);}}
+  for(const g of groups){if(g.c<=8){pathGroup(g);ctx.strokeStyle='#B9B3A5';ctx.lineWidth=g.w+2*SIDEWALK+0.5;ctx.stroke();ctx.strokeStyle='#D4CFC3';ctx.lineWidth=g.w+2*SIDEWALK;ctx.stroke();}else if(g.c===9){pathGroup(g);ctx.strokeStyle='#D7D1C2';ctx.lineWidth=g.w+1;ctx.stroke();}}
+  if(z>1.3)for(const g of groups){if(g.c<10)continue;pathGroup(g);ctx.strokeStyle='#CBC5B5';ctx.lineWidth=g.c===12?1.5:1.3;if(g.c===12)ctx.setLineDash([0.7,0.7]);ctx.stroke();ctx.setLineDash([]);}
+  for(const g of groups){if(g.c>8)continue;pathGroup(g);ctx.strokeStyle='#8F8E89';ctx.lineWidth=g.w+0.9;ctx.stroke();}
+  for(const g of groups){if(g.c>8)continue;pathGroup(g);if(g.c<=4&&z>1.4){ctx.strokeStyle='#E9E6DC';ctx.lineWidth=g.w;ctx.stroke();ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w-0.7;ctx.stroke();}else{ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w;ctx.stroke();}}
+  if(z>1.6){for(const g of groups){if(g.c>8||g.w<6.2)continue;const two=g.list.filter(r=>!r.o);if(!two.length)continue;ctx.beginPath();for(const r of two){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}ctx.strokeStyle='#ECE9DF';ctx.lineWidth=0.22;if(g.c>=5)ctx.setLineDash([2.5,2.5]);ctx.stroke();ctx.setLineDash([]);}}
   // ---- зебры
   if(z>1.4){ctx.fillStyle='#F1EFE7';world.cgrid.query(vx0,vy0,vx1,vy1,c=>{if(c.x<vx0||c.x>vx1||c.y<vy0||c.y>vy1)return;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(Math.atan2(c.dy,c.dx));for(let u=-c.hw+0.5;u<c.hw-0.2;u+=1.0)ctx.fillRect(-1.4,u-0.25,2.8,0.5);ctx.restore();});}
   // ---- парковки: машины
   if(z>1.6)for(const a of world.areas){if(a.k!=='parking'||!a.cars||a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;for(const c of a.cars)drawCarSprite(c.x,c.y,Math.cos(c.ang),Math.sin(c.ang),4.3,1.8,c.color,'car',t,null);}
   // ---- тени зданий
   const bvis=[];world.bgrid.query(vx0,vy0,vx1,vy1,b=>{if(b.bb[2]<vx0||b.bb[0]>vx1||b.bb[3]<vy0||b.bb[1]>vy1)return;bvis.push(b);});
-  if(z>1.4){ctx.fillStyle='rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=0.38*b.hm,sy=0.3*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);ctx.closePath();}ctx.fill();}
+  if(z>1.4){ctx.fillStyle='rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=0.38*b.hm,sy=0.3*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);}ctx.fill();}
   // ---- деревья
   if(z>0.9){const tv=[];world.tgrid.query(vx0,vy0,vx1,vy1,tr=>{if(tr.x<vx0||tr.x>vx1||tr.y<vy0||tr.y>vy1)return;tv.push(tr);});
     if(z>1.4){ctx.fillStyle='rgba(40,50,25,.22)';ctx.beginPath();for(const tr of tv){ctx.moveTo(tr.x+tr.r*0.4+tr.r,tr.y+tr.r*0.35);ctx.arc(tr.x+tr.r*0.4,tr.y+tr.r*0.35,tr.r,0,TAU);}ctx.fill();}
@@ -59,8 +62,9 @@ function render(){
   winDark.length=0;winLit.length=0;
   for(const b of bvis)drawBuilding(b,z,night);
   if(z>1.1)drawLandmarks(bvis,z);
-  if(winDark.length){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winDark){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}
-  if(winLit.length&&night<=0.3){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}
+  // окна и тени — одним путём без closePath: fill() замыкает каждую фигуру сам, а closePath в длинном пути в Chrome стоит квадратично (на телефоне было ~10 кадров в секунду)
+  if(winDark.length){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winDark){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
+  if(winLit.length&&night<=0.3){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
   // ---- остановки
   if(z>1.2)for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(s.x-1.4,s.y-0.5,3,1.5);ctx.fillStyle=s.k==='tram'?'#C9B3D9':'#B9CCE3';rrect(ctx,s.x-1.5,s.y-0.7,3,1.4,0.2);ctx.fill();ctx.fillStyle=s.k==='tram'?'#8E3478':'#2F6DB5';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.45,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.2,0,TAU);ctx.fill();}
   // ---- прокат и своя машина
@@ -76,8 +80,8 @@ function render(){
   if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross'||!!w.mv||!!w.walking,scale:1.5});}
     for(const w of walkers){if(w.state==='hurt'&&w.x>vx0&&w.x<vx1&&w.y>vy0&&w.y<vy1)drawPerson(w.x,w.y,w.hx,w.hy,w.p,0,{lying:true,scale:1.5});}}
   // ---- игрок и другие игроки
-  for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,{clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},t,false);}
-  if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,{clothes:player.clothes,skin:player.skin,hair:player.hair,role:'player'},t,true);
+  for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,Object.assign({clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),t,false);}
+  if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,myLook(),t,true);
   // линия навигатора: оставшийся путь пешком или на машине
   {const wl=player.vehicle?(player.vehicle.auto&&player.vehicle.auto.wps):(!player.bus&&player.waypoints);if(wl&&wl.length){ctx.save();ctx.strokeStyle='rgba(43,176,98,.75)';ctx.lineWidth=Math.max(0.8,2.2/z);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([Math.max(1.2,4/z),Math.max(1,3/z)]);ctx.beginPath();ctx.moveTo(player.x,player.y);for(let i=(player.vehicle?player.vehicle.auto.i||0:0);i<wl.length;i++)ctx.lineTo(wl[i][0],wl[i][1]);ctx.stroke();ctx.restore();}}
   if(player.waypoints&&!player.vehicle){const w=player.waypoints[player.waypoints.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(w[0],w[1],1.6+Math.sin(t*6)*0.3,0,TAU);ctx.stroke();}
@@ -88,7 +92,7 @@ function render(){
     world.lgrid.query(vx0,vy0,vx1,vy1,l=>{if(l[0]<vx0||l[0]>vx1||l[1]<vy0||l[1]>vy1)return;ctx.drawImage(lampSprite,l[0]-13,l[1]-13,26,26);});
     const allv=cars.concat(buses);if(player.vehicle)allv.push(vehProxy(player.vehicle));for(const v of allv){if(v.crashed||v.x<vx0||v.x>vx1||v.y<vy0||v.y>vy1)continue;ctx.save();ctx.translate(v.x+v.hx*(v.len/2-0.5),v.y+v.hy*(v.len/2-0.5));ctx.rotate(Math.atan2(v.hy,v.hx));ctx.drawImage(beamSprite,0,-6,20,12);ctx.restore();}
     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-    if(winLit.length&&night>0.3){ctx.fillStyle=`rgba(255,214,130,${0.5+0.45*night})`;ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);ctx.closePath();}ctx.fill();}}
+    if(winLit.length&&night>0.3){ctx.fillStyle=`rgba(255,214,130,${0.5+0.45*night})`;ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}}
   // ---- подписи
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if(z>2.1){ctx.font='500 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const done=new Set();
@@ -104,8 +108,8 @@ function render(){
   for(const b of buses){if(b.x<vx0||b.x>vx1||b.y<vy0||b.y>vy1)continue;const [sx,sy0]=toS(b.x,b.y);const sy=sy0-2.2*z-10;ctx.fillStyle=b.color;rrect(ctx,sx-14,sy-8,28,16,4);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(b.route.ref,sx,sy+0.5);}
   {// в толпе подписываем только ближайших, иначе имена слипаются в кашу
     const arr=[...peerRender.values()];if(arr.length>12)arr.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
-    for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img);}}
-  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg);}
+    for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img,pr.look&&pr.look.frame);}}
+  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg,myLook().frame);}
   drawRallyLabels(toS,z);
   drawCrowd(toS,z);drawSpeedCams(toS,z);drawCityBubbles(toS,z);
   drawCompanionMark(toS,z);drawSituations(toS,z);
@@ -142,8 +146,9 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(sw,-0.66,0.16,0,TAU);ctx.arc(-sw,0.66,0.16,0,TAU);ctx.fill();
   ctx.fillStyle=p.clothes;rrect(ctx,-0.42,-0.56,0.84,1.12,0.4);ctx.fill();
   if(hi){ctx.fillStyle='rgba(255,255,255,.14)';rrect(ctx,-0.1,-0.5,0.46,1.0,0.3);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=0.05;rrect(ctx,-0.42,-0.56,0.84,1.12,0.4);ctx.stroke();
-    if(p.bag){ctx.fillStyle=p.bag;rrect(ctx,-0.3,0.45,0.42,0.3,0.06);ctx.fill();}}
+    if(p.bag){ctx.fillStyle=p.bag;if(p.backpack)rrect(ctx,-0.62,-0.3,0.3,0.6,0.08);else rrect(ctx,-0.3,0.45,0.42,0.3,0.06);ctx.fill();}}
   if(p.role==='courier'){ctx.fillStyle='#2B2B2B';rrect(ctx,-0.52,-0.3,0.32,0.6,0.06);ctx.fill();}
+  if(p.scarf){ctx.fillStyle=p.scarf;ctx.beginPath();ctx.ellipse(0.02,0,0.26,0.46,0,0,TAU);ctx.fill();if(hi){rrect(ctx,-0.46,0.14,0.36,0.14,0.05);ctx.fill();}}
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(0.05,0,0.34,0,TAU);ctx.fill();
   const hs=p.hairStyle||0;
   if(hs===4){ctx.fillStyle='#1E3480';ctx.beginPath();ctx.arc(0,0,0.36,0,TAU);ctx.fill();ctx.fillStyle='#E53935';ctx.fillRect(-0.05,-0.36,0.1,0.72);ctx.fillStyle='#0F1E55';ctx.beginPath();ctx.arc(0.22,0,0.2,0,TAU);ctx.fill();}
@@ -153,7 +158,17 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   else{ctx.fillStyle=p.hair;ctx.beginPath();ctx.arc(-0.13,0,0.27,0,TAU);ctx.fill();}
   if(hi&&hs!==4){ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(-0.12,-0.1,0.1,0,TAU);ctx.fill();}
   if(p.role==='guard'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0,0,0.32,0,TAU);ctx.fill();}
+  if(p.hat)drawHat(p.hat,hi);
+  if(p.glasses&&hi){ctx.strokeStyle=p.glasses;ctx.lineWidth=0.05;ctx.beginPath();ctx.arc(0.3,-0.12,0.07,0,TAU);ctx.moveTo(0.37,0.12);ctx.arc(0.3,0.12,0.07,0,TAU);ctx.moveTo(0.3,-0.05);ctx.lineTo(0.3,0.05);ctx.stroke();}
   ctx.restore();}
+// шапка сверху на голове (человек смотрит вдоль +x): вязаная, с помпоном, ушанка, тюбетейка, шляпа, кепка
+function drawHat(h,hi){const c=h.c;if(h.k==='felt'){ctx.fillStyle=shade(c,0.82);ctx.beginPath();ctx.arc(0,0,0.46,0,TAU);ctx.fill();ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.02,0,0.27,0,TAU);ctx.fill();return;}
+  if(h.k==='tub'){ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.06,0,0.23,0,TAU);ctx.fill();if(hi){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=0.03;ctx.beginPath();ctx.arc(-0.06,0,0.15,0,TAU);ctx.stroke();}return;}
+  if(h.k==='ush'){ctx.fillStyle=shade(c,0.8);ctx.beginPath();ctx.ellipse(0.04,-0.31,0.16,0.1,0,0,TAU);ctx.ellipse(0.04,0.31,0.16,0.1,0,0,TAU);ctx.fill();}
+  ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.03,0,0.32,0,TAU);ctx.fill();
+  if(h.k==='cap'){ctx.fillStyle=shade(c,0.75);ctx.beginPath();ctx.ellipse(0.3,0,0.14,0.22,0,0,TAU);ctx.fill();}
+  if(hi){ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.arc(-0.1,-0.1,0.1,0,TAU);ctx.fill();}
+  if(h.k==='pom'){ctx.fillStyle=shade(c,1.25);ctx.beginPath();ctx.arc(-0.14,0,0.11,0,TAU);ctx.fill();}}
 function drawCarSprite(x,y,hx,hy,L,Wd,color,kind,t,ex){ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));const hi=LOD>=2;
   ctx.fillStyle='rgba(0,0,0,.25)';rrect(ctx,-L/2+0.25,-Wd/2+0.3,L,Wd,0.5);ctx.fill();
   if(hi){ctx.fillStyle='#1A1A1A';for(const sx of [-L*0.3,L*0.3]){rrect(ctx,sx-0.36,-Wd/2-0.06,0.72,0.3,0.08);ctx.fill();rrect(ctx,sx-0.36,Wd/2-0.24,0.72,0.3,0.08);ctx.fill();}}
@@ -194,12 +209,19 @@ function drawPlayerWorld(x,y,hx,hy,veh,persona,t,me){
     if(me){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.25;ctx.beginPath();ctx.arc(x,y,veh.kind==='scooter'?1.3:3.1,0,TAU);ctx.stroke();}return;}
   if(player.state==='hurt'&&me){drawPerson(x,y,hx,hy,persona,0,{lying:true,scale:1.5});return;}
   drawPerson(x,y,hx,hy,persona,player.phase,{moving:true,ring:me,scale:1.8});}
-function labelPlayer(sx,sy,name,me,img){ctx.save();ctx.font='600 12px "IBM Plex Sans",system-ui';ctx.textAlign='left';ctx.textBaseline='middle';const tw=ctx.measureText(name).width;const aw=img?22:0;const w=tw+14+aw;const x0=sx-w/2,y0=sy-26;
+function labelPlayer(sx,sy,name,me,img,frame){ctx.save();ctx.font='600 12px "IBM Plex Sans",system-ui';ctx.textAlign='left';ctx.textBaseline='middle';const tw=ctx.measureText(name).width;const aw=img?22:0;const w=tw+14+aw;const x0=sx-w/2,y0=sy-26;
   ctx.fillStyle=me?'rgba(43,176,98,.95)':'rgba(20,30,26,.85)';rrect(ctx,x0,y0,w,22,8);ctx.fill();
+  if(frame)drawNameFrame(frame,x0,y0,w);
   if(img){ctx.save();ctx.beginPath();ctx.arc(x0+12,y0+11,9,0,TAU);ctx.clip();ctx.drawImage(img,x0+3,y0+2,18,18);ctx.restore();}
   ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,x0+7+aw,y0+11.5);ctx.restore();}
+// рамка имени из вещей: обводка; «значок» — точка у имени, «снежинка» — ❄ сбоку, «гирлянда» — огоньки по верху
+function drawNameFrame(f,x0,y0,w){ctx.save();if(f.k!=='pin'){ctx.strokeStyle=f.c;ctx.lineWidth=f.k==='thread'?1:2.2;rrect(ctx,x0-1.5,y0-1.5,w+3,25,9.5);ctx.stroke();}
+  if(f.k==='pin'){ctx.fillStyle=f.c;ctx.beginPath();ctx.arc(x0+w+5,y0+11,4,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();}
+  if(f.k==='flake'){ctx.fillStyle=f.c;ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText('❄',x0+w+8,y0+11.5);}
+  if(f.k==='garland'){const cols=['#F2C14E','#E24B6A','#2E9BD6','#6BCB77'];for(let i=0,n=Math.max(3,Math.floor(w/12));i<n;i++){ctx.fillStyle=cols[i%4];ctx.beginPath();ctx.arc(x0+6+i*(w-12)/(n-1),y0-1.5,2,0,TAU);ctx.fill();}}
+  ctx.restore();}
 let miniBg=null;
-function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
+function renderMini(){const tn=performance.now();if(!renderMini.t||tn-renderMini.t>500){renderMini.t=tn;renderMini.vis=mini.offsetParent!==null;}if(!renderMini.vis)return;/* видимость — раз в полсекунды: offsetParent каждый кадр пересчитывал раскладку страницы */const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
   if(!miniBg){miniBg=document.createElement('canvas');miniBg.width=mw;miniBg.height=mh;const m=miniBg.getContext('2d');m.fillStyle='#DAD5C7';m.fillRect(0,0,mw,mh);m.setTransform(s,0,0,s,ox-bb[0]*s,oy-bb[1]*s);for(const a of world.areas){if(a.k!=='water'&&a.k!=='park'&&a.k!=='forest')continue;m.fillStyle=AREA_FILL[a.k];m.beginPath();m.moveTo(a.p[0],a.p[1]);for(let i=2;i<a.p.length;i+=2)m.lineTo(a.p[i],a.p[i+1]);m.closePath();m.fill();}
     for(const w of world.walls||[]){if(w.k!=='kremlin')continue;m.strokeStyle='#C9B79A';m.lineWidth=14;m.beginPath();m.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)m.lineTo(w.p[i],w.p[i+1]);m.stroke();}
     m.lineCap='round';for(const r of world.roads){if(r.c>7)continue;m.strokeStyle=r.c<=4?'#fff':'#EFEBE2';m.lineWidth=r.c<=4?10:5;m.beginPath();const p0=world.nodes[r.p[0]];m.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];m.lineTo(p[0],p[1]);}m.stroke();}}
@@ -214,7 +236,8 @@ function renderMini(){if(mini.offsetParent===null)return;const mw=mini.width,mh=
 // ---------- мелкий масштаб: готовая картинка города + движущиеся точки ----------
 let overview=null;let OV_S=0.75;
 // обзорная картинка всей карты: не больше ~9 млн точек (iOS не держит холст больше ~16 млн, а память телефона не резиновая)
-function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+function buildOverview(){const bb=world.bbox;const px=matchMedia('(pointer:coarse)').matches||(navigator.deviceMemory||8)<=4?4e6:9e6;   // на телефоне — 4 млн точек: вдвое быстрее строится и меньше памяти, чёткость дают плитки
+  OV_S=Math.min(0.75,Math.sqrt(px/((bb[2]-bb[0])*(bb[3]-bb[1]))));const w=Math.ceil((bb[2]-bb[0])*OV_S),h=Math.ceil((bb[3]-bb[1])*OV_S);const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   g.fillStyle=GROUND;g.fillRect(0,0,w,h);g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of world.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
@@ -230,15 +253,48 @@ function buildOverview(){const bb=world.bbox;OV_S=Math.min(0.75,Math.sqrt(9e6/((
   for(const w of world.walls||[]){if(w.k!=='kremlin')continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
   overview=c;}
 // подгруженный кусок дорисовываем на обзорную картинку (выгруженные остаются на ней — как память о виденном)
-function overviewAddPart(rec){if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
+function overviewAddPart(rec){
+  if(rec.key&&typeof chunkSize==='function'){const C=chunkSize();const [cx,cy]=rec.key.split('_').map(Number);ovtDrop(cx*C-60,cy*C-60,(cx+1)*C+60,(cy+1)*C+60);}
+  if(!overview)return;const g=overview.getContext('2d');const bb=world.bbox;g.setTransform(OV_S,0,0,OV_S,-bb[0]*OV_S,-bb[1]*OV_S);
   const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
   for(const a of rec.areas){g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
   g.lineCap='round';g.lineJoin='round';g.strokeStyle='#D2CCBC';g.lineWidth=2.2;g.beginPath();for(const r of rec.roads){if(r.c<10)continue;const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();
   for(const r of rec.roads){if(r.c!==8)continue;g.strokeStyle='#9C9A94';g.lineWidth=ROAD_W[8]+3.5;g.beginPath();const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}g.stroke();g.strokeStyle='#F1EFEA';g.lineWidth=ROAD_W[8]+1.5;g.stroke();}
   for(const b of rec.buildings){g.fillStyle=b.roof;pl(b.p);g.fill();}
   g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of rec.buildings){if(b.area<300)continue;pl(b.p);g.stroke();}}
+// ---------- обзор плитками: чётко на любом отдалении ----------
+// Одна картинка на всю Казань — около 0,1 точки на метр (больше не влезает в память телефона), на среднем масштабе она мутная.
+// Поверх неё — плитки 512×512 в разрешении текущего масштаба из тех же данных: не больше ~8 мс рисования за кадр, готовые хранятся,
+// подгруженный квартал стирает плитки на своём месте — они перерисуются уже с домами. Пока плитки нет, видна общая картинка.
+const OVT={px:512,tiles:new Map(),max:32};
+function ovtScale(z){const r=z*DPR/OV_S;if(r<1.3)return 0;return Math.min(1.6,OV_S*Math.pow(2,Math.ceil(Math.log2(r))));}
+function ovtDraw(s,tx,ty){const T=OVT.px/s,x0=tx*T,y0=ty*T,x1=x0+T,y1=y0+T;const c=document.createElement('canvas');c.width=c.height=OVT.px;const g=c.getContext('2d');
+  g.fillStyle=GROUND;g.fillRect(0,0,OVT.px,OVT.px);g.setTransform(s,0,0,s,-x0*s,-y0*s);
+  const pl=p=>{g.beginPath();g.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)g.lineTo(p[i],p[i+1]);g.closePath();};
+  const hit=bb=>bb[2]>=x0&&bb[0]<=x1&&bb[3]>=y0&&bb[1]<=y1;
+  for(const a of world.areas){if(!hit(a.bb))continue;g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
+  if(world.kremlin&&world.kremlin.hull){g.fillStyle='#ECE5D6';g.beginPath();world.kremlin.hull.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.closePath();g.fill();}
+  g.lineCap='round';g.lineJoin='round';const byC=[[],[],[],[],[],[],[],[],[],[],[],[],[]];roadsIn(x0,y0,x1,y1,r=>byC[r.c].push(r));
+  const strokeC=(list,color,wd)=>{if(!list.length)return;g.strokeStyle=color;g.lineWidth=wd;g.beginPath();for(const r of list){const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();};
+  for(let k=10;k<=12;k++)strokeC(byC[k],'#D2CCBC',2.2);
+  strokeC(byC[9],'#DAD3C3',9);
+  for(let k=8;k>=0;k--)strokeC(byC[k],'#9C9A94',ROAD_W[k]+3.5);
+  for(let k=8;k>=0;k--)strokeC(byC[k],k<=4?'#FFFFFF':'#F1EFEA',ROAD_W[k]+1.5);
+  const bs=[];world.bgrid.query(x0,y0,x1,y1,b=>{bs.push(b);});
+  for(const b of bs){g.fillStyle=b.roof;pl(b.p);g.fill();}
+  g.strokeStyle='rgba(60,50,40,.35)';g.lineWidth=0.8;for(const b of bs){if(b.area<300)continue;pl(b.p);g.stroke();}
+  for(const w of world.walls||[]){if(w.k!=='kremlin'||!hit(w.bb))continue;g.strokeStyle='#FFFFFF';g.lineWidth=5;g.beginPath();g.moveTo(w.p[0],w.p[1]);for(let i=2;i<w.p.length;i+=2)g.lineTo(w.p[i],w.p[i+1]);g.stroke();}
+  return c;}
+function ovtRender(z,vx0,vy0,vx1,vy1){const s=ovtScale(z);if(!s)return;const T=OVT.px/s,o=0.6/z;
+  // хранить вдвое больше, чем видно (большой экран), и считать время только на рисование новых плиток — хотя бы одна за кадр
+  const tx0=Math.floor(vx0/T),tx1=Math.floor(vx1/T),ty0=Math.floor(vy0/T),ty1=Math.floor(vy1/T);OVT.max=Math.max(32,2*(tx1-tx0+1)*(ty1-ty0+1));let spent=0,drew=0;
+  for(let tx=tx0;tx<=tx1;tx++)for(let ty=ty0;ty<=ty1;ty++){const k=s+':'+tx+':'+ty;let c=OVT.tiles.get(k);
+    if(c){OVT.tiles.delete(k);OVT.tiles.set(k,c);}
+    else{if(drew&&spent>8)continue;const t1=performance.now();c=ovtDraw(s,tx,ty);spent+=performance.now()-t1;drew++;OVT.tiles.set(k,c);if(OVT.tiles.size>OVT.max)OVT.tiles.delete(OVT.tiles.keys().next().value);}
+    ctx.drawImage(c,tx*T,ty*T,T+o,T+o);}}
+function ovtDrop(x0,y0,x1,y1){for(const k of [...OVT.tiles.keys()]){const [s,tx,ty]=k.split(':').map(Number);const T=OVT.px/s;if(tx*T<=x1&&(tx+1)*T>=x0&&ty*T<=y1&&(ty+1)*T>=y0)OVT.tiles.delete(k);}}
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;
-  ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ovtRender(z,vx0,vy0,vx1,vy1);
   if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const dot=(x,y,r,c)=>{const [sx,sy]=toS(x,y);if(sx<-5||sx>W+5||sy<-5||sy>H+5)return;ctx.fillStyle=c;ctx.beginPath();ctx.arc(sx,sy,r,0,TAU);ctx.fill();};
@@ -252,5 +308,5 @@ function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOvervie
   if(typeof routeOverlay==='function')routeOverlay(toS);
   drawRallyLabels(toS,z);drawCompanionMark(toS,z);drawSituations(toS,z);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-26,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-17);}
-  {const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-10,player.name,true,player.avatarImg);}
+  {const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-10,player.name,true,player.avatarImg,myLook().frame);}
   renderMini();}

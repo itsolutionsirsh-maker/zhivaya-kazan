@@ -25,12 +25,13 @@ function econMorning(first){
   if(ECON.dep>0){const p=Math.round(ECON.dep*RATE.dep/100/365);ECON.dep+=p;}
   const L=ECON.loan;
   if(L){const pay=Math.min(L.left,L.daily);
-    if(player.money>=pay){player.money-=pay;ECON.last=player.money;L.left-=pay;L.over=0;
+    if(player.money+(ECON.dep||0)>=pay){const c=Math.min(player.money,pay);player.money-=c;ECON.dep-=pay-c;ECON.last=player.money;L.left-=pay;L.over=0;   // не хватает на карте — дописываем со вклада
       if(L.left<=0){ECON.loan=null;phoneNote('Банк','Кредит погашен полностью. Спасибо!','loan',true);if(typeof sitRep==='function')sitRep(1,'вовремя закрыли кредит');}
       else phoneNote('Банк',`Платёж по кредиту −${fmtMoney(pay)}. Осталось ${fmtMoney(L.left)}`,'loan');}
     else{L.over=(L.over||0)+1;const pen=Math.round(pay*0.2);L.left+=pen;phoneNote('Банк',`Не хватило на платёж по кредиту (${fmtMoney(pay)}). Просрочка ${L.over} дн., пени +${fmtMoney(pen)}`,'debt',true);
       if(L.over>=3&&typeof startSit==='function'&&!sitActive('collectors'))startSit('collectors');}}
-  if(ECON.owed>0&&player.money>0){const take=Math.min(ECON.owed,Math.round(player.money*0.5));player.money-=take;ECON.last=player.money;ECON.owed-=take;phoneNote('ФССП',`Списано ${fmtMoney(take)} в счёт долга по суду. Осталось ${fmtMoney(ECON.owed)}`,'debt',true);}
+  if(ECON.owed>0&&(player.money>0||ECON.dep>0)){let take=Math.min(ECON.owed,Math.round(player.money*0.5));if(take>0)player.money-=take;else{take=Math.min(ECON.owed,ECON.dep);ECON.dep-=take;}   // на карте пусто — приставы со вклада
+    ECON.last=player.money;ECON.owed-=take;phoneNote('ФССП',`Списано ${fmtMoney(take)} в счёт долга по суду. Осталось ${fmtMoney(ECON.owed)}`,'debt',true);}
   if(ECON.osagoTill&&ECON.osagoTill-clock.day===3)phoneNote('Страховая','Полис ОСАГО заканчивается через 3 дня. Продлить можно в отделении банка','ins');
   if(ECON.osagoTill&&ECON.osagoTill+1===clock.day)phoneNote('Страховая','Полис ОСАГО закончился. Ездить без него — штраф 800 ₽, а при ДТП платите сами','ins',true);}
 // звонок из банка при просрочке
