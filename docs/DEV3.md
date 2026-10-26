@@ -104,7 +104,7 @@ python3 tools/dev_build.py /tmp/zk-dev3 && python3 -I tools/split_map.py site/ka
 - `p.hat` — `{k:'cap'|'knit', c}`, уже рисует `drawHat`.
 - `p.clothes` — цвет куртки из данных.
 - `p.type` — типаж (`taxi`, `bombila`, `blogger`, `homeless`, `granny`, `busker`…) — если пригодится для мелочей.
-- Скоро (я делаю поведение): `w.filming = true`, пока блогер снимает игрока на телефон.
+- `w.filming = true`, пока блогер снимает игрока на телефон или ведёт спор (`folk-acts.js`).
 
 Что нужно:
 1. Нарисовать `p.item` в `drawPerson`. Вид сверху, человек смотрит вдоль `+x`, предмет — у руки или перед собой.

@@ -72,8 +72,8 @@ function callTaxi(dest){cancelTrip(true);let car=null,bd=1e9;for(const c of cars
 function boardTaxi(){const tc=taxiCall;if(!tc)return;const c=tc.car;const i=cars.indexOf(c);if(i>=0)cars.splice(i,1);taxiCall=null;
   player.vehicle={kind:'taxi',x:c.x,y:c.y,hx:c.hx,hy:c.hy,speed:0,spec:VEH.taxi,startMin:clock.minutes,auto:null,damaged:0,color:'#F4C542',crashedLook:false,odo:0,dest:tc.dest};
   player.waypoints=null;driveTo(tc.dest.x,tc.dest.y,true);addEvent(`Едем на такси: ${tc.dest.n}`);updateTripBox();}
-function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=Math.round(TAXI.base+km*TAXI.km);player.money=Math.max(0,player.money-fare);
-  addEvent(`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
+function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);player.money=Math.max(0,player.money-fare);   // бомбила из своих людей — цена, о которой договорились
+  addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
   let ex=v.x-v.hy*1.8,ey=v.y+v.hx*1.8;if(inBuilding(ex,ey)){ex=v.x+v.hy*1.8;ey=v.y-v.hx*1.8;}player.x=ex;player.y=ey;const dest=v.dest;player.vehicle=null;
   if(dest&&dist(player.x,player.y,dest.x,dest.y)>12)walkTo(dest.x,dest.y,true);updateTripBox();}
 function cancelTrip(silent){if(taxiCall){const c=taxiCall.car;c.taxiFor=false;c.target=null;c.onScene=null;c.state='idle';c.ttl=0.5;taxiCall=null;if(!silent)addEvent('Такси отменено');}
