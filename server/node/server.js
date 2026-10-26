@@ -382,16 +382,22 @@ async function apiLlm(body,ip){const cli=llmClient();if(!cli)return {err:'no_llm
 // поэтому чужой бот подставить нельзя. После сохранения служба перезапускается с новыми ключами.
 const SETUP_BOT=(ENV.SETUP_BOT||'zhivaya_kazan_bot').toLowerCase().replace(/^@/,'');
 const OLD_API=ENV.OLD_API_URL||'https://iks-ai-systems.ru/kazan/api.php';
-function modKeyOk(got){const key=String(ENV.MOD_TOKEN||'');got=String(got||'');return key.length>=16&&safeEq(got,key);}
+// вставленное из Телеги/заметок: пробелы, переносы, невидимые символы, кавычки, «длинные» тире и двоеточия, похожие кириллические буквы, приставка bot
+const LOOK={'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','Х':'X','а':'a','е':'e','о':'o','р':'p','с':'c','у':'y','х':'x'};
+function cleanKey(v){return String(v||'').normalize('NFKC').replace(/[\s\u00A0\u200B-\u200F\u2060\uFEFF]+/g,'').replace(/^["'`«»“”„]+|["'`«»“”„]+$/g,'').replace(/[\u2010-\u2015\u2212]/g,'-').replace(/[\uFF1A\uFE55]/g,':').replace(/[А-яЁё]/g,c=>LOOK[c]||c);}
+function modKeyOk(got){const key=String(ENV.MOD_TOKEN||'');got=cleanKey(got);return key.length>=16&&safeEq(got,key);}
 async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rate_limited'};if(TG_TOKEN&&!modKeyOk(body.mod))return {err:'already'};
-  const token=String(body.token||'').trim(),admin=String(body.admin||'').trim(),llm=String(body.llm||'').trim();
-  if(!/^\d{5,12}:[A-Za-z0-9_-]{30,60}$/.test(token))return {err:'token_format'};
+  let token=cleanKey(body.token).replace(/^(?:https?:\/\/api\.telegram\.org\/)?bot(?=\d)/i,''),admin=cleanKey(body.admin),llm=cleanKey(body.llm);
+  const again=!!TG_TOKEN;if(!token&&again)token=TG_TOKEN;   // уже настроено и токен не меняем — только ключ Claude или id
+  if(!token)return {err:'token_empty'};if(/^sk-ant/i.test(token))return {err:'token_is_llm'};if(/^[a-f0-9]{40,64}$/i.test(token))return {err:'token_is_mod'};if(!/^\d{5,12}:/.test(token)||token.length>120)return {err:'token_format'};   // точнее проверит сама Телега
   if(admin&&!/^\d{3,15}$/.test(admin))return {err:'admin_format'};if(llm.length>300)return {err:'llm_format'};
-  let me=null;try{me=await fetch(`https://api.telegram.org/bot${token}/getMe`,{signal:AbortSignal.timeout(10000)}).then(r=>r.json());}catch(e){return {err:'tg_unreachable'};}
+  const [tid,...rest]=token.split(':');
+  let me=null;try{me=await fetch(`https://api.telegram.org/bot${tid}:${encodeURIComponent(rest.join(':'))}/getMe`,{signal:AbortSignal.timeout(10000)}).then(r=>r.json());}catch(e){return {err:'tg_unreachable'};}
   if(!me||!me.ok)return {err:'token_wrong'};const uname=String(me.result&&me.result.username||'').toLowerCase();if(uname!==SETUP_BOT)return {err:'other_bot',bot:uname};
   let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}sec.TG_BOT_TOKEN=token;if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
   fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);
-  let imported=null;if(body.migrate!==false){try{imported=await importPhp(OLD_API,token);}catch(e){imported={err:e.message};}}
+  let imported=null;if(body.migrate!==false&&!again){   // перенос со старого сайта — только при первой настройке
+  try{imported=await importPhp(OLD_API,token);}catch(e){imported={err:e.message};}}
   log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':'')+'; перенос:',JSON.stringify(imported));
   setTimeout(()=>process.exit(0),1500);   // systemd запустит заново уже с ключами
   return {ok:1,bot:uname,imported,mod:ENV.MOD_TOKEN||''};}
@@ -399,15 +405,15 @@ const SETUP_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><me
 <style>body{margin:0;background:#10161A;color:#E8EEF0;font:16px/1.45 system-ui,sans-serif}main{max-width:560px;margin:0 auto;padding:20px}h1{font-size:22px}label{display:block;margin:16px 0 6px;font-weight:600}small{color:#8FA3AE;display:block;margin-top:4px}input{width:100%;box-sizing:border-box;background:#18222A;color:#E8EEF0;border:1px solid #2A3842;border-radius:10px;padding:12px;font:inherit}button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:10px;background:#2F9E6B;color:#fff;font:600 17px system-ui;cursor:pointer}#st{margin-top:16px;white-space:pre-wrap}.ok{color:#7ee2a8}.bad{color:#ff9aa5}</style></head><body><main>
 <h1>Настройка сервера «Живой Казани»</h1><p>Один раз: вставьте ключи и нажмите «Сохранить». Сервер проверит токен у Телеги, перенесёт игроков со старого сайта и перезапустится.</p>
 <div id="mw" hidden><label for="m">Ключ модератора</label><input id="m" autocomplete="off"><small>Сервер уже настроен. Чтобы сменить ключи (например, после нового токена у @BotFather), нужен ключ модератора — его показали при первой настройке.</small></div>
-<label for="t">Токен бота от @BotFather</label><input id="t" autocomplete="off" placeholder="1234567890:AAH…"><small>@BotFather → /mybots → @zhivaya_kazan_bot → API Token → нажать на строку, чтобы скопировать.</small>
+<label for="t">Токен бота от @BotFather</label><input id="t" autocomplete="off" placeholder="1234567890:AAH…"><small>@BotFather → /mybots → @zhivaya_kazan_bot → API Token → нажать на строку, чтобы скопировать. Если сервер уже настроен и токен не меняется — можно оставить пустым.</small>
 <label for="a">Ваш id в Телеге (число)</label><input id="a" inputmode="numeric" placeholder="123456789"><small>Напишите боту @userinfobot — он ответит числом. Сюда будут приходить сводка по утрам и тревоги.</small>
 <label for="l">Ключ Claude для жителей (по желанию)</label><input id="l" autocomplete="off" placeholder="sk-ant-…"><small>console.anthropic.com → API Keys. Можно оставить пустым — жители будут говорить заготовленными фразами.</small>
 <button id="go">Сохранить</button><div id="st"></div></main><script>
-const E={token_format:'Это не похоже на токен бота: он вида 1234567890:AAH…',token_wrong:'Телега не приняла этот токен — скопируйте его заново у @BotFather',other_bot:'Это токен другого бота',admin_format:'id — только цифры',tg_unreachable:'Сервер не достучался до Телеги, попробуйте ещё раз через минуту',already:'Уже настроено — нужен верный ключ модератора',rate_limited:'Слишком много попыток, подождите 10 минут'};
+const E={token_empty:'Вставьте токен бота от @BotFather',token_is_llm:'В поле токена бота вставлен ключ Claude (sk-ant-…). Его — в поле «Ключ Claude для жителей», а токен бота — от @BotFather (или оставьте пустым, если не меняли)',token_is_mod:'В поле токена бота вставлен ключ модератора. Его — в верхнее поле «Ключ модератора»',token_format:'Это не похоже на токен бота: в начале должны быть цифры и двоеточие, вида 1234567890:AAH…',token_wrong:'Телега не приняла этот токен — скопируйте его заново у @BotFather',other_bot:'Это токен другого бота',admin_format:'id — только цифры',tg_unreachable:'Сервер не достучался до Телеги, попробуйте ещё раз через минуту',already:'Уже настроено — нужен верный ключ модератора',rate_limited:'Слишком много попыток, подождите 10 минут'};
 if(location.hash==='#change'||window.__configured)mw.hidden=false;
 go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
  go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';
- const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n'+(im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
+ const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n'+(!j.imported?'Ключи обновлены.':im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
 </script></body></html>`;
 
 // ---------- HTTP ----------
