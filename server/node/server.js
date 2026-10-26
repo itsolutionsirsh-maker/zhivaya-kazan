@@ -425,7 +425,7 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));

@@ -63,31 +63,31 @@ function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}con
   return null;}
 function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainAction();if(f.spot==='scheme')return {label:'Схема линии метро',run:metroScheme};const price=it.kind==='bar'?500:350;
   switch(f.spot){
-    case 'table':if(it.kind==='home')return {label:player.pantry>0?'Поесть (есть продукты)':'Поесть — продуктов нет, нужно купить',run:()=>{if(player.pantry>0){player.pantry--;player.food=clamp(player.food+35,0,100);clock.minutes+=25;addEvent('Перекусили дома. Сытость +35');}else setHint('Холодильник пуст. Продукты — в магазине');}};
+    case 'table':if(it.kind==='home')return {label:player.pantry>0?'Поесть (есть продукты)':'Поесть — продуктов нет, нужно купить',run:()=>{if(player.pantry>0){player.pantry--;player.food=clamp(player.food+35,0,100);spendTime(25);addEvent('Перекусили дома. Сытость +35');}else setHint('Холодильник пуст. Продукты — в магазине');}};
       if(f.comp&&!f.ordered)return {label:`Сесть за столик (там ${f.comp.p.name}) и заказать`,run:()=>openOrder(f,it)};
       if(f.comp&&f.ordered)return {label:`Поговорить за столиком: ${f.comp.p.name}`,run:()=>openChat(f.comp)};
       if(f.taken){return {label:'Столик занят — подсесть и поболтать',run:()=>{const nb=it.npcs.find(q=>dist(q.x,q.y,f.x,f.y)<1.3);if(nb)openChat(nb);}};}
       if(MENU[it.kind])return {label:'Сесть и заказать — меню',run:()=>openOrder(f,it)};
-      return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);clock.minutes+=35;addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
+      return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);spendTime(35);addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
     case 'counter':if(it.kind==='bank')return {label:'Окно банка: вклад, кредит, страховка',run:()=>openBank('bank')};if(/cafe|bar/.test(it.kind))return {label:'Взять кофе с собой · 180 ₽',run:()=>spend(180,()=>{player.energy=clamp(player.energy+12,0,100);player.mood=clamp(player.mood+3,0,100);setHint('Кофе с собой. Энергия +12');})};
       if(it.kind==='bank')return {label:'Снять наличные',run:()=>setHint('Выдали наличные. Баланс тот же')};return {label:'Спросить у администратора',run:()=>setHint('«Чем могу помочь?» — пока ничем')};
     case 'cash':return {label:'Спросить кассира',run:()=>setHint('«Берите с полок, оплата сразу»')};
     case 'shelf':{const cost=it.kind==='pharmacy'?250:it.kind==='market'?300:220;const lbl=it.kind==='pharmacy'?'Купить витамины':it.kind==='market'?'Купить чак-чак и фрукты':'Взять продукты';
       return {label:`${lbl} · ${cost} ₽`,run:()=>spend(cost,()=>{if(it.kind==='pharmacy'){player.energy=clamp(player.energy+10,0,100);addEvent('Витамины. Энергия +10');}else{player.food=clamp(player.food+20,0,100);player.pantry=(player.pantry||0)+1;addEvent(`Купили продукты в «${n}». Сытость +20, запас дома +1`);}})};}
     case 'atm':return {label:'Банкомат: карта и вклад',run:()=>openBank('atm')};
-    case 'desk':return {label:'Поработать 2 часа · +1 200 ₽',run:()=>{if(player.energy<15){setHint('Слишком устали');return;}clock.minutes+=120;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа в «${n}»: +1 200 ₽`);}};
-    case 'seat':return {label:'Смотреть спектакль · 1 200 ₽',run:()=>spend(1200,()=>{clock.minutes+=150;player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в «${n}» — зал аплодировал стоя. Настроение +30`);})};
-    case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);clock.minutes+=8;setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};
-    case 'reception':if(it.kind==='hotel')return {label:'Снять номер на ночь · 3 500 ₽',run:()=>spend(3500,()=>sleep(8))};if(it.kind==='hospital')return {label:'Пройти осмотр · 800 ₽',run:()=>spend(800,()=>{player.energy=100;addEvent('Осмотр пройден, энергия восстановлена');})};return null;
-    case 'sofa':return {label:it.kind==='home'?'Посмотреть телевизор (1 ч)':'Посидеть на диване',run:()=>{const home=it.kind==='home';clock.minutes+=home?60:15;player.mood=clamp(player.mood+(home?8:3),0,100);setHint('Настроение +'+(home?8:3));}};
-    case 'study':return {label:it.kind==='library'?'Почитать час':'Послушать лекцию (1,5 ч)',run:()=>{clock.minutes+=it.kind==='library'?60:90;player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Настроение +4');}};
-    case 'books':return {label:'Полистать книги',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
-    case 'pew':return {label:'Посидеть в тишине',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
+    case 'desk':return {label:'Поработать 2 часа · +1 200 ₽',run:()=>{if(player.energy<15){setHint('Слишком устали');return;}if(!busyFor('desk',120))return;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа в «${n}»: +1 200 ₽`);}};
+    case 'seat':return {label:'Смотреть спектакль · 1 200 ₽',run:()=>spend(1200,()=>{spendTime(150);player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в «${n}» — зал аплодировал стоя. Настроение +30`);})};
+    case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);spendTime(8);setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};
+    case 'reception':if(it.kind==='hotel')return {label:'Снять номер на ночь · 3 500 ₽',run:()=>{if(!canSleep()){sleep(8);return;}spend(3500,()=>sleep(8));}};if(it.kind==='hospital')return {label:'Пройти осмотр · 800 ₽',run:()=>spend(800,()=>{player.energy=100;addEvent('Осмотр пройден, энергия восстановлена');})};return null;
+    case 'sofa':return {label:it.kind==='home'?'Посмотреть телевизор (1 ч)':'Посидеть на диване',run:()=>{const home=it.kind==='home';spendTime(home?60:15);player.mood=clamp(player.mood+(home?8:3),0,100);setHint('Настроение +'+(home?8:3));}};
+    case 'study':return {label:it.kind==='library'?'Почитать час':'Послушать лекцию (1,5 ч)',run:()=>{spendTime(it.kind==='library'?60:90);player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Настроение +4');}};
+    case 'books':return {label:'Полистать книги',run:()=>{spendTime(20);player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
+    case 'pew':return {label:'Посидеть в тишине',run:()=>{spendTime(20);player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
     case 'duty':return {label:'Спросить о происшествиях',run:()=>setHint(accidents.length?`Дежурный: «Сейчас на выезде — ${accidents[0].kind==='ped'?'сбили пешехода':'ДТП'}${accidents[0].road?', '+accidents[0].road:''}»`:'Дежурный: «В городе спокойно»')};
     case 'bed':return {label:'Лечь спать до утра',run:()=>trySleep(8)};
     case 'wardrobe':return {label:'Переодеться / сменить фото',run:()=>showProfile()};
-    case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);clock.minutes+=40;addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
-    case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}clock.minutes+=180;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
+    case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);spendTime(40);addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
+    case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}if(!busyFor('pc',180))return;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
     default:return null;}}
 
 // ---------- отрисовка интерьера ----------
@@ -171,7 +171,7 @@ function closeOrder(){$('#orderModal').hidden=true;player.busy=false;orderCtx=nu
 const TREAT_THX=['Ой, спасибо! В следующий раз я угощаю.','Рәхмәт! Вот это по-нашему.','Спасибо, очень приятно!','Ну ты даёшь, спасибо! За встречу!'];
 const SELF_LINES=['Мне то же самое, я сам(а) заплачу.','Отлично, давно тут не была... то есть не был. Возьму себе тоже.','Хороший выбор. Я себе тоже возьму.'];
 function placeOrder(m,treat){if(!orderCtx)return;const {f,it,cn}=orderCtx;const cost=m.p*(treat?2:1);if(player.money<cost){setHint(`Не хватает денег: нужно ${fmtMoney(cost)}`);return;}
-  player.money-=cost;if(m.alc)addDrink(m.alc,m.n);player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);clock.minutes+=m.min;
+  player.money-=cost;if(m.alc)addDrink(m.alc,m.n);player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);spendTime(m.min);
   player.ix=f.x-1.05;player.iy=f.y;player.ihx=1;player.ihy=0;player.iwp=null;
   if(cn){f.comp=cn;f.ordered=(f.ordered?f.ordered+', ':'')+m.n;cn.tableF=f;cn.x=f.x+1.05;cn.y=f.y;cn.seated=true;cn.hx=-1;cn.hy=0;
     const w=companion?companion.w:null;const pp=cn.p;pp.mood=treat?'отличное':(pp.mood==='тревожное'||pp.mood==='уставшее'?'хорошее':pp.mood);pp.rel=(pp.rel||0)+(treat?10:4);

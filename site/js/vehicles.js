@@ -88,7 +88,7 @@ function playerHitByCar(vehicle){if(player.state==='hurt'||cine)return;player.st
   player.energy=clamp(player.energy-35,0,100);player.mood=clamp(player.mood-30,0,100);}
 function playerToHospital(hosp){if(player.state!=='hurt')return;const h=hosp||pick(world.pois.filter(p=>p.t==='hospital'));player.state='ok';
   if(h){const n=nearestNode(h.x,h.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);player.x=sp[0];player.y=sp[1];}cam.x=player.x;cam.y=player.y;}
-  const bill=Math.min(player.money,1500);player.money-=bill;clock.minutes+=120;player.energy=Math.max(player.energy,45);
+  const bill=Math.min(player.money,1500);player.money-=bill;spendTime(120);player.energy=Math.max(player.energy,45);
   addEvent(`Вас подлечили${h&&h.n?' в «'+h.n+'»':' в больнице'}: −${bill} ₽, два часа`);
   if(companion){const w=companion.w;w.x=player.x+1.5;w.y=player.y+1;w.cwps=null;companion.route=null;w.say={t:companion.dest&&!companion.arrived?`Ты как? Я приехал. Ну что, всё-таки идём в «${companion.dest.n}»?`:'Ты как? Я приехал за тобой.',ttl:7};nearLine(w.p.name,w.say.t,false);}}
 function startCine(kind,text,dur){cine={kind,text,t:0,dur,zPrev:cam.zt};cam.zt=Math.max(cam.zt,7.5);}

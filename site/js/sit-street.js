@@ -29,7 +29,7 @@ defSit('pickpocket',{title:'Карманник',auto:true,weight:3,cool:600,
           choices:[{t:'Заявить в полицию',primary:true,run:()=>ppReport(s)},{t:'Ладно, забыли',run:()=>{sitMood(-6);endSit(s);}}],onTimeout:()=>endSit(s)});}}
     else if(s.phase==='wait'){s.waitT-=dt;if(s.waitT<=0){if(s.found){const back=Math.round(s.sum*0.8/50)*50;sitMoney(back,'📞 Полиция: карманника задержали по камерам, деньги вернули');sitRep(2,'помогли полиции');}else addEvent('📞 Полиция: «По вашему заявлению пока никого не нашли. Ищем»');endSit(s);}}
     if(s.endIn!=null){s.endIn-=dt;if(s.endIn<=0)endSit(s);}},
-  actionInside(s){if(s.phase==='report'&&inPolice())return {label:'Написать заявление о краже',run:()=>{clock.minutes+=30;unmark('ppol');s.phase='wait';s.waitT=rnd(60,150);s.found=Math.random()<0.45;addEvent('Дежурный принял заявление: «Будем искать. Камеры на Баумана хорошие»');}};return null;},
+  actionInside(s){if(s.phase==='report'&&inPolice())return {label:'Написать заявление о краже',run:()=>{spendTime(30);unmark('ppol');s.phase='wait';s.waitT=rnd(60,150);s.found=Math.random()<0.45;addEvent('Дежурный принял заявление: «Будем искать. Камеры на Баумана хорошие»');}};return null;},
   ctx(s,w){return s.phase==='caught'?'Ты карманник, тебя только что поймал за руку собеседник. Ты напуган и оправдываешься.':'Ты карманник и только что вытащил деньги у собеседника. Ты всё отрицаешь.';}});
 function ppChase(s){s.phase='chase';s.chase=true;s.ct=0;const q=awayPoint(s.w,140);moveActor(s.w,q[0],q[1],4.0);say(s.w,pick(['Чё надо?!','Отвали!']),2);setHint('Бегите за ним! Shift — бежать, догоните вплотную');}
 function ppReport(s){s.phase='report';s.chase=false;unmark('pp');for(const w of s.actors)releaseActor(w);s.actors=[];const ps=markPolice(s,'ppol');s.maxT=s.t+900;setHint(ps?`Отдел полиции — ${Math.round(dist(ps.x,ps.y,player.x,player.y))} м. Зайдите и напишите заявление`:'Отдел полиции не найден');}
@@ -98,7 +98,7 @@ defSit('wallet',{title:'Кошелёк',auto:true,weight:2,cool:600,
     if(s.endIn!=null){s.endIn-=dt;if(s.endIn<=0)endSit(s);}},
   action(s){if(s.phase==='lying'&&scene==='city'&&dist(s.item.x,s.item.y,player.x,player.y)<2.8)return {label:'Поднять кошелёк',run:()=>walletPick(s)};
     if(s.phase==='return'&&s.o&&dist(s.o.x,s.o.y,player.x,player.y)<3.2)return {label:`Отдать кошелёк: ${s.o.p.name}`,run:()=>walletGive(s)};return null;},
-  actionInside(s){if(s.phase==='police'&&inPolice())return {label:'Сдать найденный кошелёк',run:()=>{clock.minutes+=20;unmark('wpol');sitRep(6,'сдали находку в полицию');addEvent('Дежурный: «Спасибо. Владелец уже звонил — передадим»');s.phase='police-wait';s.waitT=rnd(60,120);}};return null;},
+  actionInside(s){if(s.phase==='police'&&inPolice())return {label:'Сдать найденный кошелёк',run:()=>{spendTime(20);unmark('wpol');sitRep(6,'сдали находку в полицию');addEvent('Дежурный: «Спасибо. Владелец уже звонил — передадим»');s.phase='police-wait';s.waitT=rnd(60,120);}};return null;},
   draw(s,toS,z){if(s.phase!=='lying'||z<1.5)return;const [sx,sy]=toS(s.item.x,s.item.y);const k=Math.max(4,z*0.35);ctx.fillStyle='#7A4A2A';rrect(ctx,sx-k,sy-k*0.6,k*2,k*1.2,k*0.3);ctx.fill();ctx.fillStyle='rgba(255,240,180,'+(0.5+0.5*Math.sin(performance.now()/180))+')';ctx.beginPath();ctx.arc(sx+k*0.7,sy-k*0.7,k*0.35,0,TAU);ctx.fill();}});
 function walletPick(s){s.phase='picked';unmark('wal');
   sitCard({s,icon:'👛',title:'Чужой кошелёк',text:`Внутри ${fmtMoney(s.sum)}, банковская карта и права на имя ${s.owner.n}.`,ttl:0,
@@ -157,4 +157,4 @@ function buskCard(s){const m=s.m;const drunk=(player.drunk||0)>=70;
       {t:'Заказать песню · 300 ₽',run:()=>{if(player.money<300){setHint('Не хватает денег');return;}sitMoney(-300);sitMood(12);say(m,'♪ По заявке — для вас! ♪',5);}},
       ...(drunk?[]:[{t:'Попросить гитару и сыграть',run:()=>{say(m,'Ну давай, покажи класс!');player.busy=true;s.busk=12;s.bt=0;s.maxT=s.t+200;}}])]});}
 function buskEnd(s){player.busy=false;const n=Math.max(0,s.actors.length-1)+Math.floor(crowdAround(player.x,player.y,14)/2);let earn=80+n*rnd(40,100)+((player.rep||0)>20?150:0)-((player.drunk||0)>=45?60:0);earn=Math.max(30,Math.round(earn/10)*10);
-  const cut=Math.round(earn*0.3/10)*10;say(s.m,'Неплохо! Гитара моя — тридцать процентов мне, ха!',5);sitMoney(earn-cut,'Уличный концерт');sitMood(10);player.energy=clamp(player.energy-6,0,100);clock.minutes+=40;sitRep(2);}
+  const cut=Math.round(earn*0.3/10)*10;say(s.m,'Неплохо! Гитара моя — тридцать процентов мне, ха!',5);sitMoney(earn-cut,'Уличный концерт');sitMood(10);player.energy=clamp(player.energy-6,0,100);spendTime(40);sitRep(2);}

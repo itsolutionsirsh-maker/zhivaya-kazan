@@ -15,7 +15,7 @@ defSit('scamcall',{title:'Звонок мошенников',auto:true,weight:2,
       sitCard({s,icon:'💸',tone:'alert',title:'Это были мошенники',text:`Банк и полиция никогда не просят коды из СМС и переводы «на безопасный счёт». Ушло ${fmtMoney(s.loss)}. Что делать?`,ttl:0,
         choices:[{t:'Позвонить в банк и заявить в полицию',primary:true,run:()=>{s.phase='report';markPolice(s,'scpol');setHint('Банк заблокировал карту. Заявление — в отделе полиции');}},{t:'Ничего уже не сделать',run:()=>{sitMood(-5);endSit(s);}}]});}}
     if(s.phase==='wait'){s.w-=dt;if(s.w<=0){if(s.back){const back=Math.round(s.loss*0.5/100)*100;sitMoney(back,'📞 Банк: часть перевода успели заморозить и вернули');}else addEvent('📞 Полиция: «Деньги ушли на карты подставных людей. Дело возбуждено, ищем»');endSit(s);}}},
-  actionInside(s){if(s.phase==='report'&&inPolice())return {label:'Заявление о мошенничестве',run:()=>{clock.minutes+=40;unmark('scpol');s.phase='wait';s.w=rnd(80,160);s.back=Math.random()<0.3;addEvent('Заявление приняли. «Чем быстрее заявили — тем больше шансов»');}};return null;}});
+  actionInside(s){if(s.phase==='report'&&inPolice())return {label:'Заявление о мошенничестве',run:()=>{spendTime(40);unmark('scpol');s.phase='wait';s.w=rnd(80,160);s.back=Math.random()<0.3;addEvent('Заявление приняли. «Чем быстрее заявили — тем больше шансов»');}};return null;}});
 
 defSit('promoter',{title:'Промоутер',auto:true,weight:1.5,cool:900,
   when(){const h=(clock.minutes/60)%24;return onFootCity()&&h>=10&&h<20;},
@@ -34,6 +34,6 @@ defSit('promoter',{title:'Промоутер',auto:true,weight:1.5,cool:900,
         choices:[{t:'Написать претензию',primary:true,run:()=>{s.phase='claim';s.cw=rnd(80,140);addEvent('Претензия отправлена. Ждём ответа');}},{t:'Смириться',run:()=>{sitMood(-10);endSit(s);}}]});}}},
   ctx(s,w){return 'Ты промоутер сомнительного «медицинского центра», зазываешь людей на «бесплатную проверку зрения», где им навязывают дорогие очки в кредит. Ты очень настойчив и улыбчив.';}});
 function promoLeave(s){const w=s.w;s.phase='leave';const q=awayPoint(w,40);moveActor(w,q[0],q[1],2.4);}
-function promoSalon(s){clock.minutes+=40;s.phase='salon';releaseActor(s.w);s.actors=[];addEvent('Сорок минут «проверки» в тесном кабинете…');
+function promoSalon(s){spendTime(40);s.phase='salon';releaseActor(s.w);s.actors=[];addEvent('Сорок минут «проверки» в тесном кабинете…');
   sitCard({s,icon:'👓',tone:'alert',title:'«Серьёзные проблемы со зрением»',text:'«Доктор» качает головой: срочно нужны очки за 38 000 ₽. Но сегодня по акции — «всего» 3 500 ₽ первый взнос, подпишите тут и тут.',ttl:0,
     choices:[{t:'Отказаться и уйти',primary:true,run:()=>{sitMood(-3);addEvent('Вы ушли. Потеряли только время');endSit(s);}},{t:'Подписать договор',run:()=>{s.paid=Math.min(3500,player.money);sitMoney(-s.paid,'Первый взнос за очки');sitMood(-12);s.phase='loan';s.lw=rnd(60,120);}}]});}

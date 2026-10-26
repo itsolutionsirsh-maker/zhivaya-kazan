@@ -74,9 +74,9 @@ function nightInStation(){releaseCops();player.busy=false;
   if(companion){const w=companion.w;const t='Ну ты дал… Ладно, я домой. Созвонимся.';nearLine(w.p.name,t,false);stopCompanion(true);}
   if(typeof cancelTrip==='function')cancelTrip(true);player.waitingStop=null;
   const fine=1000;player.money=Math.max(0,player.money-fine);player.drunk=0;drunkSt.warned=false;
-  const day0=Math.floor(clock.minutes/1440);clock.minutes=(day0+1)*1440+7*60;player.energy=55;player.food=clamp(player.food-20,0,100);player.mood=clamp(player.mood-20,0,100);
+  spendTime(480);player.energy=55;player.food=clamp(player.food-20,0,100);player.mood=clamp(player.mood-20,0,100);
   const st=world.pois.filter(p=>p.t==='police');let ps=null,bd=1e9;for(const p of st){const d=dist(p.x,p.y,player.x,player.y);if(d<bd){bd=d;ps=p;}}
   if(ps){const q=toSidewalk(ps.x,ps.y);player.x=q[0];player.y=q[1];cam.x=player.x;cam.y=player.y;enterInterior({kind:'police',name:ps.n||'Отдел полиции',key:poiKey(ps),x:player.x,y:player.y});
     const duty=interior&&interior.npcs.find(n=>n.role==='police');if(duty){const t='Проснулся? Протокол подпиши — и свободен. И больше так не делай.';duty.say={t,ttl:7};nearLine(duty.p.name+' (дежурный)',t,false);}}
-  addEvent(`Утро в отделе полиции. Протокол по ст. 20.21 КоАП (появление в пьяном виде) — штраф ${fmtMoney(fine)}. Настроение −20`,'alert');
+  addEvent(`Ночь в отделе полиции позади. Протокол по ст. 20.21 КоАП (появление в пьяном виде) — штраф ${fmtMoney(fine)}. Настроение −20`,'alert');
   setHint('Вас отпустили. Выход — внизу');}

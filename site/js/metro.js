@@ -57,7 +57,7 @@ if(typeof defSit==='function')defSit('metroScheme',{title:'Схема',quiet:tru
   sitCard({s,icon:'🗺',title:'Первая линия метро',text:txt,ttl:0,choices:[{t:'Понятно',primary:true,run:()=>endSit(s)}]});return true;}});
 function metroCall(to){const w=1+Math.random()*(metroInterval()-1);METRO.ride={to,phase:'wait',waitMin:w,t:0,real:Math.min(6,1.5+w*0.8),train:0};}
 function metroBoard(){const R=METRO.ride;if(!R||R.phase!=='here')return;R.phase='go';R.t=0;R.min=rideMinutes(metroCur(),metroStation(R.to));player.busy=true;}
-function metroArrive(){const R=METRO.ride;const dst=metroStation(R.to);METRO.ride=null;player.busy=false;clock.minutes+=R.min;
+function metroArrive(){const R=METRO.ride;const dst=metroStation(R.to);METRO.ride=null;player.busy=false;spendTime(R.min);
   const e=dst.ents[Math.floor(Math.random()*dst.ents.length)];
   if(interior&&interior.kind==='metro')interior.ret={x:e.x,y:e.y,hx:0,hy:1};
   exitInterior();player.x=e.x;player.y=e.y;cam.x=e.x;cam.y=e.y;player.waypoints=null;
@@ -65,7 +65,7 @@ function metroArrive(){const R=METRO.ride;const dst=metroStation(R.to);METRO.rid
   addEvent(`🚇 Вы вышли из метро на станции «${stName(dst)}»`,'say');METRO.at=null;}
 function updateMetro(rdt){const R=METRO.ride;if(!R)return;R.t+=rdt;
   if(!interior||interior.kind!=='metro'){METRO.ride=null;player.busy=false;return;}
-  if(R.phase==='wait'){R.waitMin=Math.max(0,R.waitMin-rdt*clock.scale/60);if(R.t>=R.real){clock.minutes+=R.waitMin;R.waitMin=0;R.phase='here';R.t=0;R.train=0;addEvent(`Поезд до «${stName(metroStation(R.to))}» прибыл. Двери открываются`);}}
+  if(R.phase==='wait'){R.waitMin=Math.max(0,R.waitMin-rdt*clock.scale/60);if(R.t>=R.real){spendTime(R.waitMin);R.waitMin=0;R.phase='here';R.t=0;R.train=0;addEvent(`Поезд до «${stName(metroStation(R.to))}» прибыл. Двери открываются`);}}
   else if(R.phase==='here'){R.train=Math.min(1,R.train+rdt/1.6);if(R.t>18){R.phase='leave';R.t=0;addEvent('Двери закрылись — поезд ушёл. Следующий скоро');}}
   else if(R.phase==='leave'){R.train=1+Math.min(1,R.t/1.6);if(R.t>1.6)metroCall(R.to);}
   else if(R.phase==='go'){R.train=1;if(R.t>3.2)metroArrive();}}

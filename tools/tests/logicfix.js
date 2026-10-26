@@ -15,12 +15,15 @@ const shown = pg => pg.waitForFunction('document.querySelector("#loading").hidde
     await pg.goto(`http://127.0.0.1:${PORT}/index.html`); await shown(pg); await sleep(800);
     await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(1000);
     console.log('1) штраф при пустой карте:', await pg.evaluate(`(()=>{player.money=100;ECON.dep=1000;ECON.owed=0;sitMoney(-500,'Штраф');const a={money:player.money,dep:ECON.dep,owed:ECON.owed};sitMoney(-900,'Штраф');return {после_500:a,после_900:{money:player.money,dep:ECON.dep,owed:ECON.owed}};})()`));
-    // аренда: день оплаты (день % 7 === 0), 10:30
-    await pg.evaluate('player.money=20000;clock.day=7;clock.minutes=6*24*60+10*60+30;'); await sleep(1500);
+    // аренда: ближайший день оплаты (день % 7 === 0), 10:30; часы общие — переводим их только в этой вкладке
+    const pay = await pg.evaluate('clock.day+((7-clock.day%7)%7||7)');
+    await pg.evaluate(`player.money=20000;zkSetTime((${pay}-1)*1440+10*60+30);`); await sleep(1500);
     const m1 = await pg.evaluate('player.money'); await pg.evaluate('saveState()');
     await pg.reload(); await shown(pg); await sleep(2000);
-    await pg.evaluate('clock.day=7;clock.minutes=6*24*60+10*60+40;'); await sleep(1500);
-    console.log('2) аренда: после списания', m1, '| после перезагрузки в тот же день', await pg.evaluate('player.money'), '(ждём то же самое)');
+    await pg.evaluate(`zkSetTime((${pay}-1)*1440+10*60+40);`); await sleep(1500);
+    const m2 = await pg.evaluate('player.money');
+    await pg.evaluate(`zkSetTime((${pay}+20)*1440+11*60);`); await sleep(1500);   // три недели без игры — списать один раз
+    console.log('2) аренда: было 20000, после списания', m1, '| после перезагрузки в тот же день', m2, '(ждём то же самое) | через три недели', await pg.evaluate('player.money'), '(ждём минус одна аренда и одна коммуналка)');
     // переезд из квартиры
     await pg.evaluate('(()=>{const h=player.home;player.x=h.cx;player.y=h.bb[3]+3;})()'); await sleep(300);
     await pg.evaluate("enterInterior({kind:'home',name:'Ваша квартира',key:'home',x:player.x,y:player.y})"); await sleep(500);
