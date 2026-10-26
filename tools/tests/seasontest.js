@@ -49,8 +49,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     console.log('   31 декабря 23:05:', JSON.stringify(await ev(5, 23, '2026-12-31')));
     console.log('   30 декабря 23:05:', JSON.stringify(await ev(5, 23, '2026-12-30')));
     // вечер по точке (at) — далеко от игрока, кварталы там не загружены
-    await pg.evaluate(`(()=>{clock.day=3;clock.minutes=(3-1)*1440+20*60;})()`);
-    await pg.evaluate(`cityDaily.push({dow:gameDow(),hour:21,season:'2026-12',xp:60,kind:'meet',title:'Тест по точке',at:[55.81909,48.89666],text:'т',remind:'т',reward:{money:10}})`);
+    // часы общие и каждый кадр встают по настоящему времени — день недели считаем в том же вызове, где ставим день 3
+    await pg.evaluate(`(()=>{clock.day=3;clock.minutes=(3-1)*1440+20*60;cityDaily.push({dow:gameDow(),hour:21,season:'2026-12',xp:60,kind:'meet',title:'Тест по точке',at:[55.81909,48.89666],text:'т',remind:'т',reward:{money:10}});})()`);
     const at = await pg.evaluate(`(()=>{window.zkTestDay='2026-12-07';clock.day=3;clock.minutes=(3-1)*1440+21*60+5;PROG.ev={};EVT.t=0;eventsTick(1);const k=Object.keys(PROG.ev).find(k=>PROG.ev[k].place&&PROG.ev[k].place[2]==='Тест по точке');const p=k&&PROG.ev[k].place;const q=llToXY([55.81909,48.89666]);return p?{x:Math.round(p[0]),y:Math.round(p[1]),ждём:[Math.round(q[0]),Math.round(q[1])]}:'не поставлен';})()`);
     console.log('9) вечер по точке:', JSON.stringify(at));
     // прийти на вечер — награда и опыт

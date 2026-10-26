@@ -1,9 +1,9 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
-const KIND_RU={cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
+const KIND_RU={cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
 function makeInterior(kind,name,key){
   const rng=seeded(hashStr(key));const R=(a,b)=>a+rng()*(b-a);
-  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],default:[12,9]};
+  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],default:[12,9]};
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
@@ -29,6 +29,8 @@ function makeInterior(kind,name,key){
       const cols=Math.floor((w-2)/2.6),rows=Math.floor((h-4)/1.8);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=1.5+c*2.6+1.1,y=3.4+r*1.8;F('desk',x,y,1.8,0.7,{spot:'study'});F('chair',x-0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});F('chair',x+0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});if(rng()<0.45){const n=NPC(x-0.45,y+0.75,{seated:true,job:'студент'});n.hy=-1;n.hx=0;}}break;}
     case 'worship':{it.floor='rug';for(let r=0;r<5;r++)F('pew',w/2,3.2+r*1.8,w-4,0.6,{spot:'pew'});F('altar',w/2,1.1,3,1.2,{});const a=NPC(3.5,6.2,{seated:true});a.hy=-1;const b=NPC(w-3.5,8,{seated:true});b.hy=-1;break;}
     case 'police':{it.floor='tiles';F('desk',w/2,1.8,3,1,{spot:'duty'});NPC(w/2,1.05,{role:'police',job:'дежурный'});for(let i=0;i<4;i++)F('chair',1.6+i*1,h-2,0.5,0.5,{ang:-Math.PI/2});F('board',1.8,0.25,3,0.4);const q=NPC(2.6,h-2,{seated:true});q.hy=-1;break;}
+    case 'prosecutor':{it.floor='carpet';F('window',w/2,0.15,4,0.3);F('desk',w/2,1.95,3.6,1.1,{});F('box',w/2+1.15,1.8,0.6,0.42,{});F('board',1.6,0.25,2.2,0.4);plant(0.9,h-0.9);plant(w-0.9,0.9);   // прокурор за столом — prosSeat (prosecutor.js)
+      F('desk',2.1,4.3,1.6,0.8,{});const a=NPC(2.1,5.2,{role:'staff',seated:true,job:'помощник прокурора'});a.hy=-1;for(let i=0;i<4;i++)F('chair',w/2-1.5+i*1.1,h-2.1,0.5,0.5,{ang:-Math.PI/2});const q=NPC(w/2-1.5,h-2.1,{seated:true});q.hy=-1;break;}
     case 'home':{it.floor='wood';F('bed',2.3,1.9,2.4,1.7,{spot:'bed'});F('wardrobe',5.2,0.7,1.8,0.7,{spot:'wardrobe'});F('kitchen',w-2.6,0.8,4.4,0.9,{spot:'kitchen'});F('fridge',w-0.7,2.3,0.8,0.9,{});F('table',w-3,3.8,1.2,1.2,{spot:'table',round:true});F('chair',w-3,2.8,0.5,0.5,{ang:Math.PI/2});F('chair',w-3,4.8,0.5,0.5,{ang:-Math.PI/2});
       F('rug',3.2,h-2.6,3.6,2.2,{});F('sofa',3.2,h-1.9,2.8,1.1,{spot:'sofa'});F('tv',3.2,h-3.7,1.8,0.3,{});F('desk',w-2.4,h-1.6,1.8,0.8,{spot:'pc'});F('chair',w-2.4,h-2.5,0.5,0.5,{ang:Math.PI/2});plant(0.8,h-0.8);F('window',2.5,0.15,2.5,0.3);break;}
     case 'metro':{it.floor='granite';F('rails',w/2,1.2,w,2.4,{});F('edge',w/2,2.62,w-0.6,0.25,{spot:'train'});
@@ -63,31 +65,31 @@ function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}con
   return null;}
 function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainAction();if(f.spot==='scheme')return {label:'Схема линии метро',run:metroScheme};const price=it.kind==='bar'?500:350;
   switch(f.spot){
-    case 'table':if(it.kind==='home')return {label:player.pantry>0?'Поесть (есть продукты)':'Поесть — продуктов нет, нужно купить',run:()=>{if(player.pantry>0){player.pantry--;player.food=clamp(player.food+35,0,100);clock.minutes+=25;addEvent('Перекусили дома. Сытость +35');}else setHint('Холодильник пуст. Продукты — в магазине');}};
+    case 'table':if(it.kind==='home')return {label:player.pantry>0?'Поесть (есть продукты)':'Поесть — продуктов нет, нужно купить',run:()=>{if(player.pantry>0){player.pantry--;player.food=clamp(player.food+35,0,100);spendTime(25);addEvent('Перекусили дома. Сытость +35');}else setHint('Холодильник пуст. Продукты — в магазине');}};
       if(f.comp&&!f.ordered)return {label:`Сесть за столик (там ${f.comp.p.name}) и заказать`,run:()=>openOrder(f,it)};
       if(f.comp&&f.ordered)return {label:`Поговорить за столиком: ${f.comp.p.name}`,run:()=>openChat(f.comp)};
       if(f.taken){return {label:'Столик занят — подсесть и поболтать',run:()=>{const nb=it.npcs.find(q=>dist(q.x,q.y,f.x,f.y)<1.3);if(nb)openChat(nb);}};}
       if(MENU[it.kind])return {label:'Сесть и заказать — меню',run:()=>openOrder(f,it)};
-      return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);clock.minutes+=35;addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
+      return {label:`Сесть и заказать · ${price} ₽`,run:()=>spend(price,()=>{player.food=clamp(player.food+45,0,100);player.mood=clamp(player.mood+8,0,100);spendTime(35);addEvent(`Вы поели в «${n}». Сытость +45, настроение +8`);})};
     case 'counter':if(it.kind==='bank')return {label:'Окно банка: вклад, кредит, страховка',run:()=>openBank('bank')};if(/cafe|bar/.test(it.kind))return {label:'Взять кофе с собой · 180 ₽',run:()=>spend(180,()=>{player.energy=clamp(player.energy+12,0,100);player.mood=clamp(player.mood+3,0,100);setHint('Кофе с собой. Энергия +12');})};
       if(it.kind==='bank')return {label:'Снять наличные',run:()=>setHint('Выдали наличные. Баланс тот же')};return {label:'Спросить у администратора',run:()=>setHint('«Чем могу помочь?» — пока ничем')};
     case 'cash':return {label:'Спросить кассира',run:()=>setHint('«Берите с полок, оплата сразу»')};
     case 'shelf':{const cost=it.kind==='pharmacy'?250:it.kind==='market'?300:220;const lbl=it.kind==='pharmacy'?'Купить витамины':it.kind==='market'?'Купить чак-чак и фрукты':'Взять продукты';
       return {label:`${lbl} · ${cost} ₽`,run:()=>spend(cost,()=>{if(it.kind==='pharmacy'){player.energy=clamp(player.energy+10,0,100);addEvent('Витамины. Энергия +10');}else{player.food=clamp(player.food+20,0,100);player.pantry=(player.pantry||0)+1;addEvent(`Купили продукты в «${n}». Сытость +20, запас дома +1`);}})};}
     case 'atm':return {label:'Банкомат: карта и вклад',run:()=>openBank('atm')};
-    case 'desk':return {label:'Поработать 2 часа · +1 200 ₽',run:()=>{if(player.energy<15){setHint('Слишком устали');return;}clock.minutes+=120;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа в «${n}»: +1 200 ₽`);}};
-    case 'seat':return {label:'Смотреть спектакль · 1 200 ₽',run:()=>spend(1200,()=>{clock.minutes+=150;player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в «${n}» — зал аплодировал стоя. Настроение +30`);})};
-    case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);clock.minutes+=8;setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};
-    case 'reception':if(it.kind==='hotel')return {label:'Снять номер на ночь · 3 500 ₽',run:()=>spend(3500,()=>sleep(8))};if(it.kind==='hospital')return {label:'Пройти осмотр · 800 ₽',run:()=>spend(800,()=>{player.energy=100;addEvent('Осмотр пройден, энергия восстановлена');})};return null;
-    case 'sofa':return {label:it.kind==='home'?'Посмотреть телевизор (1 ч)':'Посидеть на диване',run:()=>{const home=it.kind==='home';clock.minutes+=home?60:15;player.mood=clamp(player.mood+(home?8:3),0,100);setHint('Настроение +'+(home?8:3));}};
-    case 'study':return {label:it.kind==='library'?'Почитать час':'Послушать лекцию (1,5 ч)',run:()=>{clock.minutes+=it.kind==='library'?60:90;player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Настроение +4');}};
-    case 'books':return {label:'Полистать книги',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
-    case 'pew':return {label:'Посидеть в тишине',run:()=>{clock.minutes+=20;player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
+    case 'desk':return {label:'Поработать 2 часа · +1 200 ₽',run:()=>{if(player.energy<15){setHint('Слишком устали');return;}if(!busyFor('desk',120))return;player.money+=1200;player.energy=clamp(player.energy-22,0,100);player.food=clamp(player.food-12,0,100);addEvent(`Отработали 2 часа в «${n}»: +1 200 ₽`);}};
+    case 'seat':return {label:'Смотреть спектакль · 1 200 ₽',run:()=>spend(1200,()=>{spendTime(150);player.mood=clamp(player.mood+30,0,100);addEvent(`Спектакль в «${n}» — зал аплодировал стоя. Настроение +30`);})};
+    case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);spendTime(8);setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};
+    case 'reception':if(it.kind==='hotel')return {label:'Снять номер на ночь · 3 500 ₽',run:()=>{if(!canSleep()){sleep(8);return;}spend(3500,()=>sleep(8));}};if(it.kind==='hospital')return {label:'Пройти осмотр · 800 ₽',run:()=>spend(800,()=>{player.energy=100;addEvent('Осмотр пройден, энергия восстановлена');})};return null;
+    case 'sofa':return {label:it.kind==='home'?'Посмотреть телевизор (1 ч)':'Посидеть на диване',run:()=>{const home=it.kind==='home';spendTime(home?60:15);player.mood=clamp(player.mood+(home?8:3),0,100);setHint('Настроение +'+(home?8:3));}};
+    case 'study':return {label:it.kind==='library'?'Почитать час':'Послушать лекцию (1,5 ч)',run:()=>{spendTime(it.kind==='library'?60:90);player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Настроение +4');}};
+    case 'books':return {label:'Полистать книги',run:()=>{spendTime(20);player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
+    case 'pew':return {label:'Посидеть в тишине',run:()=>{spendTime(20);player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
     case 'duty':return {label:'Спросить о происшествиях',run:()=>setHint(accidents.length?`Дежурный: «Сейчас на выезде — ${accidents[0].kind==='ped'?'сбили пешехода':'ДТП'}${accidents[0].road?', '+accidents[0].road:''}»`:'Дежурный: «В городе спокойно»')};
     case 'bed':return {label:'Лечь спать до утра',run:()=>trySleep(8)};
     case 'wardrobe':return {label:'Переодеться / сменить фото',run:()=>showProfile()};
-    case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);clock.minutes+=40;addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
-    case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}clock.minutes+=180;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
+    case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);spendTime(40);addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
+    case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}if(!busyFor('pc',180))return;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
     default:return null;}}
 
 // ---------- отрисовка интерьера ----------
@@ -113,7 +115,7 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
-  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';ctx.fillText(KIND_RU[it.kind]||KIND_RU.default,ox+ctx.measureText(it.name).width*1.45+12,oy+it.h*iz+35);
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);{const nw=ctx.measureText(it.name).width,kr=KIND_RU[it.kind]||KIND_RU.default;ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';if(kr.toLowerCase()!==String(it.name).toLowerCase())ctx.fillText(kr,ox+nw+12,oy+it.h*iz+35);}
   const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   if(f.t==='rails'){ctx.fillStyle='#2B2A28';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#4A4440';for(let i=0;i<f.w;i+=0.7)ctx.fillRect(x+i,y+0.55,0.32,1.3);ctx.fillStyle='#B8B4AE';ctx.fillRect(x,y+0.75,f.w,0.08);ctx.fillRect(x,y+1.55,f.w,0.08);return;}
@@ -133,6 +135,7 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
     case 'shelf':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#D8D2C4';ctx.fillRect(x,y,f.w,f.h);const cols=[['#D64545','#3E8ED0','#F4B400'],['#2F9E6B','#E07B39','#8E44AD'],['#C2185B','#00897B','#5D4037']][f.goods||0];
       if(f.horiz){for(let i=0;i<f.w;i+=0.35)ctx.fillStyle=cols[Math.floor(i/0.35)%3],ctx.fillRect(x+0.05+i,y+0.1,0.25,f.h-0.2);}else{for(let i=0;i<f.h-0.2;i+=0.35){ctx.fillStyle=cols[Math.floor(i/0.35)%3];ctx.fillRect(x+0.1,y+0.1+i,f.w-0.2,0.25);}}break;
     case 'desk':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle=it.kind==='home'?'#E0D2BC':'#C9B99A';rrect(ctx,x,y,f.w,f.h,0.06);ctx.fill();ctx.fillStyle='#1F2A33';ctx.fillRect(f.x-0.35,y+0.08,0.7,0.14);ctx.fillStyle='#D8D8D8';ctx.fillRect(f.x-0.3,y+0.42,0.6,0.16);break;
+    case 'box':ctx.fillStyle='#C2185B';rrect(ctx,x,y,f.w,f.h,0.05);ctx.fill();ctx.fillStyle='#F2C14E';ctx.fillRect(f.x-0.04,y,0.08,f.h);ctx.fillRect(x,f.y-0.04,f.w,0.08);ctx.beginPath();ctx.arc(f.x-0.08,f.y,0.08,0,TAU);ctx.arc(f.x+0.08,f.y,0.08,0,TAU);ctx.fill();break;   // коробка чак-чака с бантом
     case 'printer':ctx.fillStyle='#CFCFCF';rrect(ctx,x,y,f.w,f.h,0.06);ctx.fill();break;
     case 'stage':ctx.fillStyle='#6B1E1E';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#8E2A2A';for(let i=0;i<f.w;i+=0.6)ctx.fillRect(x+i,y,0.3,0.6);ctx.fillStyle='#3B2416';ctx.fillRect(x,y+0.6,f.w,f.h-0.6);ctx.fillStyle='rgba(255,230,160,.35)';ctx.beginPath();ctx.ellipse(f.x,y+1.9,2.2,0.7,0,0,TAU);ctx.fill();break;
     case 'seat':ctx.fillStyle='#8E2A2A';rrect(ctx,x+0.05,y+0.05,f.w-0.1,f.h-0.1,0.1);ctx.fill();ctx.fillStyle='#6B1E1E';ctx.fillRect(x+0.05,y+0.05,f.w-0.1,0.15);break;
@@ -171,7 +174,7 @@ function closeOrder(){$('#orderModal').hidden=true;player.busy=false;orderCtx=nu
 const TREAT_THX=['Ой, спасибо! В следующий раз я угощаю.','Рәхмәт! Вот это по-нашему.','Спасибо, очень приятно!','Ну ты даёшь, спасибо! За встречу!'];
 const SELF_LINES=['Мне то же самое, я сам(а) заплачу.','Отлично, давно тут не была... то есть не был. Возьму себе тоже.','Хороший выбор. Я себе тоже возьму.'];
 function placeOrder(m,treat){if(!orderCtx)return;const {f,it,cn}=orderCtx;const cost=m.p*(treat?2:1);if(player.money<cost){setHint(`Не хватает денег: нужно ${fmtMoney(cost)}`);return;}
-  player.money-=cost;if(m.alc)addDrink(m.alc,m.n);player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);clock.minutes+=m.min;
+  player.money-=cost;if(m.alc)addDrink(m.alc,m.n);player.food=clamp(player.food+m.food,0,100);player.mood=clamp(player.mood+m.mood+(cn?5:0),0,100);player.energy=clamp(player.energy+m.en,0,100);spendTime(m.min);
   player.ix=f.x-1.05;player.iy=f.y;player.ihx=1;player.ihy=0;player.iwp=null;
   if(cn){f.comp=cn;f.ordered=(f.ordered?f.ordered+', ':'')+m.n;cn.tableF=f;cn.x=f.x+1.05;cn.y=f.y;cn.seated=true;cn.hx=-1;cn.hy=0;
     const w=companion?companion.w:null;const pp=cn.p;pp.mood=treat?'отличное':(pp.mood==='тревожное'||pp.mood==='уставшее'?'хорошее':pp.mood);pp.rel=(pp.rel||0)+(treat?10:4);

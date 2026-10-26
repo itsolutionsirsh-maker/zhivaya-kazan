@@ -31,6 +31,7 @@ function poiHours(p){const t=p.t,n=String(p.n||''),i=p.i||0;
     case 'library':return {a:10,b:20};
     case 'university':case 'school':return {a:8,b:18,wd:true};
     case 'worship':return {a:7,b:21};
+    case 'prosecutor':return {a:9,b:19,wd:true};
     default:return null;}}            // гостиница, больница, полиция, дом — всегда
 function openAt(p,day,h){const H=poiHours(p);if(!H)return true;const wd=cityWeekday(day);
   let a=H.a,b=H.b;

@@ -77,7 +77,7 @@ function rallyAction(){if(!world.squares||player.vehicle||player.bus)return null
   if(r){if(dist(player.x,player.y,sq.x,sq.y)<Math.max(10,sq.r*0.6))return {label:r.kind==='concert'?`Слушать концерт «${r.title}»`:`Выступить перед людьми: «${r.title}»`,run:()=>r.kind==='concert'?enjoyConcert(r):openSpeech(r)};
     return null;}
   return {label:`Собрать людей здесь · ${sq.n}`,run:()=>openRallyModal(sq)};}
-function enjoyConcert(r){player.mood=clamp(player.mood+10,0,100);clock.minutes+=30;addEvent(`Вы послушали «${r.title}». Настроение +10`);}
+function enjoyConcert(r){player.mood=clamp(player.mood+10,0,100);spendTime(30);addEvent(`Вы послушали «${r.title}». Настроение +10`);}
 let rallySq=null;
 function openRallyModal(sq){rallySq=sq;$('#rallyWhere').textContent=sq.n;$('#rallyTitle').value='';document.querySelectorAll('#rallyKind button').forEach(b=>b.classList.toggle('on',b.dataset.k==='rally'));$('#rallyModal').hidden=false;player.busy=true;setTimeout(()=>$('#rallyTitle').focus(),50);}
 function closeRallyModal(){$('#rallyModal').hidden=true;player.busy=false;}

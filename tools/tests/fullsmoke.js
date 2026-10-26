@@ -19,8 +19,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(1500);
     await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(500); await pg.click('#howtoClose'); await sleep(3000);
     console.log('stats', await ev('({walkers:walkers.length,cars:cars.length,buses:buses.length,rentals:rentals.length,own:!!ownCar,cross:world.crossings.length,home:!!player.home})'));
-    await ev('clock.minutes = 23*60'); await sleep(1000); await pg.screenshot({path: `${OUT}/f04_night.png`});
-    await ev('clock.minutes = 12*60+30'); await ev('cam.zt = 7.5'); await sleep(1200); await ev('cam.zt = 4.5');
+    await ev('zkSetTime((clock.day-1)*1440+23*60)'); await sleep(1000); await pg.screenshot({path: `${OUT}/f04_night.png`});
+    await ev('zkSetTime(clock.day*1440+12*60+30)'); await ev('cam.zt = 7.5'); await sleep(1200); await ev('cam.zt = 4.5');
     // самокат
     await ev('(()=>{const r=rentals.find(r=>r.kind==="scooter");if(r){player.x=r.x+1;player.y=r.y;}})()'); await sleep(600);
     console.log('action near scooter:', await ev('currentAction?currentAction.label:null'));

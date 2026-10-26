@@ -1,17 +1,18 @@
 // ===== Деньги, второй круг: банк (вклад, кредит, страховки), своя машина после ДТП, сводка в телефон =====
 // Деньги игрока — player.money (это карта). Здесь: вклад под проценты, кредит с ежедневным платежом и просрочкой,
 // ОСАГО/КАСКО, состояние своей машины (ремонт в автосервисе на АЗС), учёт доходов/расходов за день.
-const ECON={owed:0,dep:0,loan:null,osagoTill:0,kaskoTill:0,carCond:100,claim:false,dIn:0,dOut:0,day:0,t:0,last:null};
+const ECON={owed:0,dep:0,loan:null,osagoTill:0,kaskoTill:0,carCond:100,claim:false,dIn:0,dOut:0,day:0,era:2,t:0,last:null};
 const RATE={dep:16,loan:28,loanDays:30,osago:8500,kasko:32000,repair:180,franchise:15000,noOsago:800,tow:3000,pedHarm:30000};
-function econDump(){const o={};for(const k of ['owed','dep','loan','osagoTill','kaskoTill','carCond','claim','dIn','dOut','day'])o[k]=ECON[k];return o;}
-function econApply(o){if(o&&typeof o==='object')for(const k in o)if(k in ECON)ECON[k]=o[k];ECON.last=null;}
+function econDump(){const o={};for(const k of ['owed','dep','loan','osagoTill','kaskoTill','carCond','claim','dIn','dOut','day','era'])o[k]=ECON[k];return o;}
+function econApply(o){if(o&&typeof o==='object')for(const k in o)if(k in ECON)ECON[k]=o[k];ECON.last=null;
+  if(o&&o.era!==2){const dd=ECON.day>0?clock.day-ECON.day:0;if(ECON.osagoTill)ECON.osagoTill+=dd;if(ECON.kaskoTill)ECON.kaskoTill+=dd;if(ECON.day>0)ECON.day=clock.day-1;ECON.era=2;}}   // переход на общие часы: номера дней сменились, страховки сохраняют оставшиеся дни
 // сообщение в телефон (лента «Сегодня» второго программиста), если он подключён; иначе — в ленту событий
 function phoneNote(from,text,kind,alsoFeed){let ok=false;if(window.cityPhone&&typeof window.cityPhone.push==='function'){try{window.cityPhone.push({from,text,kind});ok=true;}catch(e){}}
   if(alsoFeed||!ok)addEvent(`${from}: ${text}`,kind==='fine'||kind==='debt'?'alert':'say');}
 // деньги, которые уже прошли через sitMoney: только отправить уведомление в телефон
 function econNotify(d,why){if(!why)return;const w=String(why);
   if(d>0&&/Смена|смена/.test(w))phoneNote('Банк',`Зарплата +${fmtMoney(d)} · ${w.replace(/^💼\s*/,'')}`,'pay');
-  else if(d<0&&/Штраф|штраф|КоАП/.test(w))phoneNote('Госуслуги',`${w}: ${fmtMoney(-d)}`,'fine');
+  else if(d<0&&/Штраф|штраф|КоАП/.test(w)){phoneNote('Госуслуги',`${w}: ${fmtMoney(-d)}`,'fine');if(typeof prosNoteFine==='function')prosNoteFine(-d,w);}
   else if(d<0&&/Аренда|Коммунал|ЖКУ/.test(w))phoneNote(/Аренда/.test(w)?'Хозяйка квартиры':'ЖКХ',`${w}: оплачено ${fmtMoney(-d)}`,'bill');}
 function insured(k){return (k==='kasko'?ECON.kaskoTill:ECON.osagoTill)>=clock.day;}
 // ---------- учёт и утро ----------
@@ -88,7 +89,7 @@ function econCrash(v,fault,ped){
 function repairAction(onFoot){const c=repairCost();const free=repairFree();
   return {label:onFoot?`Машина не заводится · эвакуатор и ремонт · ${free?fmtMoney(RATE.tow):fmtMoney(RATE.tow+c)}`:`Автосервис: ремонт ${Math.round(ECON.carCond)}% → 100% · ${free?'за счёт страховой':fmtMoney(c)}`,
     run:()=>{const sum=(free?0:c)+(onFoot?RATE.tow:0);if(player.money<sum){setHint(`Нужно ${fmtMoney(sum)}. Можно взять кредит в банке`);return;}
-      player.money-=sum;ECON.carCond=100;ECON.claim=false;clock.minutes+=onFoot?180:90;
+      player.money-=sum;ECON.carCond=100;ECON.claim=false;spendTime(onFoot?180:90);
       addEvent(onFoot?`🚗 Эвакуатор увёз машину в сервис, вечером её пригнали обратно. ${free?'Ремонт оплатила страховая':'Ремонт '+fmtMoney(c)}`:`🔧 Машину отремонтировали${free?' за счёт страховой':': '+fmtMoney(c)}. Как новая`,'say');
       if(sum)phoneNote('Автосервис',`Ремонт машины: ${fmtMoney(sum)}`,'bill');}};}
 function carSpeedMul(){return ECON.carCond<50?0.7+ECON.carCond/170:1;}

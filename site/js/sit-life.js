@@ -7,10 +7,10 @@ function staffNpc(){return interior?interior.npcs.find(n=>n.role==='staff')||int
 
 // ---------- вакансии ----------
 const WORK={
-  barista:{t:'Бариста',kinds:['cafe'],start:9,len:4,pay:2400,spot:f=>f.spot==='counter',verb:'Обслужить',orders:['Капучино, пожалуйста!','Мне латте с собой','Чай с чак-чаком, будьте добры','Американо без сахара','Эчпочмак и чай!']},
-  bartender:{t:'Бармен',kinds:['bar'],start:18,len:4,pay:3000,spot:f=>f.spot==='counter',verb:'Налить',orders:['Светлое, пожалуйста!','Лимонад со льдом','Повторите нам!','Облепиховую, две']},
-  seller:{t:'Продавец',kinds:['shop','market','pharmacy'],start:10,len:4,pay:2200,spot:f=>f.spot==='shelf'||f.spot==='cash',verb:'Работа',orders:['Выложить товар на полку','Пробить покупку на кассе','Помочь покупателю найти товар']},
-  office:{t:'Офис-менеджер',kinds:['office','bank'],start:9,len:4,pay:3200,spot:f=>f.t==='desk'||f.spot==='counter',verb:'Работа',orders:['Ответить на письмо клиента','Свести табличку для начальника','Созвон с подрядчиком','Подготовить договор']},
+  barista:{t:'Бариста',kinds:['cafe'],start:9,len:2,pay:2400,spot:f=>f.spot==='counter',verb:'Обслужить',orders:['Капучино, пожалуйста!','Мне латте с собой','Чай с чак-чаком, будьте добры','Американо без сахара','Эчпочмак и чай!']},
+  bartender:{t:'Бармен',kinds:['bar'],start:18,len:2,pay:3000,spot:f=>f.spot==='counter',verb:'Налить',orders:['Светлое, пожалуйста!','Лимонад со льдом','Повторите нам!','Облепиховую, две']},
+  seller:{t:'Продавец',kinds:['shop','market','pharmacy'],start:10,len:2,pay:2200,spot:f=>f.spot==='shelf'||f.spot==='cash',verb:'Работа',orders:['Выложить товар на полку','Пробить покупку на кассе','Помочь покупателю найти товар']},
+  office:{t:'Офис-менеджер',kinds:['office','bank'],start:9,len:2,pay:3200,spot:f=>f.t==='desk'||f.spot==='counter',verb:'Работа',orders:['Ответить на письмо клиента','Свести табличку для начальника','Созвон с подрядчиком','Подготовить договор']},
   courier:{t:'Курьер доставки',courier:true,pay:0}};
 function vacancies(){const out=[];const seen=new Set();const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,player.x,player.y)<1100).sort(()=>Math.random()-0.5);
   for(const [id,J] of Object.entries(WORK)){if(J.courier)continue;const p=near.find(p=>J.kinds.includes(p.t)&&!seen.has(p.n));if(!p)continue;seen.add(p.n);out.push({id,J,p});}
@@ -43,12 +43,14 @@ defSit('job',{title:'Работа',quiet:true,
   start(s){return !!player.job;},
   update(s,dt){const j=player.job;if(!j){endSit(s);return;}
     if(j.courier){courierTick(s,j,dt);return;}
+    if(WORK[j.id]&&j.len!==WORK[j.id].len)j.len=WORK[j.id].len;   // старые сохранения: смена была 4 часа
     const gm=gMin(),day=clock.day,st=j.start*60,en=st+j.len*60;
-    if(j.day!==day){if(!j.done&&j.day!=null&&day>j.day)shiftEnd(j,true);j.day=day;j.present=0;j.late=false;j.entered=false;j.done=false;j.remind=false;j.taskT=rnd(10,20);j.task=null;j.tasksDone=0;j.missed=0;}
+    if(j.day!==day){if(!j.done&&j.day!=null&&day>j.day)shiftEnd(j,true);j.day=day;j.present=0;j.late=false;j.entered=false;j.done=false;j.remind=false;j.taskT=rnd(10,20);j.task=null;j.tasksDone=0;j.missed=0;j.seenAt=null;j.inGame=0;}
+    if(!j.done&&gm>=st&&gm<en){if(j.seenAt==null)j.seenAt=gm;j.inGame=(j.inGame||0)+dt*clock.scale/60;}   // часы общие: смена идёт и без игрока, выговор — только если он был в игре
     if(!j.remind&&gm>=st-60&&gm<st){j.remind=true;addEvent(`⏰ Через час смена: ${j.t} в «${j.name}»`,'alert');mark(null,'job',j.x,j.y,'💼',j.name,{arrow:true,color:'#2BB062'});}
     const atWork=scene==='interior'&&interior&&interior.key===j.key;
     if(!j.done&&gm>=st&&gm<en&&atWork){
-      if(!j.entered){j.entered=true;unmark('job');if(gm>st+15){j.late=true;strike(j,'опоздание');}else{const b=staffNpc();if(b)say(b,'О, вовремя! Становись на место.');addEvent(`💼 Смена началась: до ${fmtHM(j.start+j.len)}`);}}
+      if(!j.entered){j.entered=true;unmark('job');if(gm>st+15&&j.seenAt!=null&&j.seenAt>st+10){const b=staffNpc();if(b)say(b,'Пришёл? Становись — заплатим за отработанное.');addEvent(`💼 Вы зашли посреди смены: оплата за отработанное, до ${fmtHM(j.start+j.len)}`);}else if(gm>st+15){j.late=true;strike(j,'опоздание');}else{const b=staffNpc();if(b)say(b,'О, вовремя! Становись на место.');addEvent(`💼 Смена началась: до ${fmtHM(j.start+j.len)}`);}}
       j.present+=dt*clock.scale/60;
       if(!j.task){j.taskT-=dt;if(j.taskT<=0){const J=WORK[j.id];const fs=interior.furn.filter(J.spot);if(fs.length){j.task={f:pick(fs),text:pick(J.orders),t:45};const cl=interior.npcs.find(n=>n.role!=='staff'&&!n.companionOf);if(cl&&/barista|bartender/.test(j.id))say(cl,j.task.text,4);else setHint(`Задание: ${j.task.text}`);}}}
       else{j.task.t-=dt;if(j.task.t<=0){j.task=null;j.taskT=rnd(15,30);j.missed++;addEvent('Не успели — гость ушёл недовольный');if(j.missed===3)strike(j,'недовольные гости');}}}
@@ -59,7 +61,8 @@ defSit('job',{title:'Работа',quiet:true,
 function shiftEnd(j,missedDay){j.done=true;unmark('job');const need=j.len*60;const frac=Math.min(1,j.present/need);
   if(frac>=0.7){const bonus=(j.tasksDone||0)*50;sitMoney(j.pay+bonus,`💼 Смена в «${j.name}» закрыта${bonus?' (премия за работу '+bonus+' ₽)':''}`);sitMood(4);sitRep(1);}
   else if(frac>=0.25){sitMoney(Math.round(j.pay*frac/10)*10,`💼 Неполная смена в «${j.name}»`);}
-  else{addEvent(`💼 Вы не вышли на смену в «${j.name}»`,'alert');strike(j,'прогул');}}
+  else if((j.inGame||0)>=need*0.5){addEvent(`💼 Вы не вышли на смену в «${j.name}»`,'alert');strike(j,'прогул');}
+  else if(!missedDay)addEvent(`💼 Смена в «${j.name}» прошла без вас — вас почти не было в игре, выговора нет`);}
 
 // ---------- курьер ----------
 function courierTick(s,j,dt){if(!j.online)return;const o=j.order;
@@ -79,10 +82,14 @@ function courierTick(s,j,dt){if(!j.online)return;const o=j.order;
 // ---------- аренда и коммуналка ----------
 const RENT=7000,UTIL=1800;
 const bills={lastDay:clock.day,remind:{}};
-defWatch(()=>{if(!player.home)return;const d=clock.day,h=gHour();
+// последний день недели dow с часом h, который уже наступил (часы общие, дни те же у всех)
+function lastDue(dow,h){let d=clock.day-((clock.day%7-dow+7)%7);if((d-1)*1440+h*60>clock.minutes)d-=7;return d;}
+defWatch(()=>{if(bills.era!==2){bills.era=2;bills.rent=lastDue(0,10);bills.util=lastDue(3,12);}   // переход на общие часы: старые дни были свои у каждого — считаем, что за эту неделю заплачено
+  if(!player.home)return;const d=clock.day,h=gHour();
   if(d%7===6&&h>=20&&bills.remind[d]!=='r'){bills.remind[d]='r';addEvent(`📅 Завтра платить за квартиру: ${fmtMoney(RENT)}`);}
-  if(d%7===0&&h>=10&&bills.rent!==d){bills.rent=d;payBill(RENT,'Аренда квартиры за неделю');}
-  if(d%7===3&&h>=12&&bills.util!==d){bills.util=d;payBill(UTIL,'Коммуналка (ЖКУ)');}
+  const r=lastDue(0,10),u=lastDue(3,12);   // пропустили несколько недель — списываем один раз
+  if(!(bills.rent>=r)){bills.rent=r;payBill(RENT,'Аренда квартиры за неделю');}
+  if(!(bills.util>=u)){bills.util=u;payBill(UTIL,'Коммуналка (ЖКУ)');}
   if((player.debt||0)>0&&h>=11&&bills.call!==d&&d%7!==0){bills.call=d;startSit('landlord');}});
 function payBill(sum,what){if(player.money>=sum)sitMoney(-sum,what);else{const part=player.money;player.money=0;player.debt=(player.debt||0)+sum-part;addEvent(`${what}: не хватило ${fmtMoney(sum-part)} — долг ${fmtMoney(player.debt)}`,'alert');sitMood(-10);}}
 defSit('landlord',{title:'Хозяйка квартиры',quiet:true,
@@ -93,7 +100,7 @@ defSit('landlord',{title:'Хозяйка квартиры',quiet:true,
         {t:'Сбросить',run:()=>{sitMood(-4);if(evict&&Math.random()<0.5)evictHome();endSit(s);}}],onTimeout:()=>endSit(s)});return true;}});
 function evictHome(){addEvent('🏠 Хозяйка сменила замки: вас выселили. Новое жильё — в 💼 «Работа и жильё», переночевать можно в гостинице','alert');player.home=null;player.debt=0;player.delayAsked=false;sitMood(-20);}
 function rentNewHome(){const homes=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,player.x,player.y)<500);if(!homes.length){setHint('Рядом нет квартир в аренду');return;}
-  if(player.money<RENT){setHint(`Нужно ${fmtMoney(RENT)} за первую неделю`);return;}player.money-=RENT;player.home=pick(homes);bills.rent=clock.day;mark(null,'home',player.home.cx,player.home.cy,'🏠','Новая квартира',{arrow:true,color:'#2BB062'});addEvent(`🏠 Вы сняли квартиру за ${fmtMoney(RENT)} в неделю`,'say');}
+  if(player.money<RENT){setHint(`Нужно ${fmtMoney(RENT)} за первую неделю`);return;}player.money-=RENT;player.home=pick(homes);bills.rent=Math.max(lastDue(0,10),clock.day);mark(null,'home',player.home.cx,player.home.cy,'🏠','Новая квартира',{arrow:true,color:'#2BB062'});addEvent(`🏠 Вы сняли квартиру за ${fmtMoney(RENT)} в неделю`,'say');}
 
 // ---------- простуда, зонт, аптека ----------
 let wetT=0;
@@ -110,21 +117,21 @@ defSit('lifeShops',{title:'Покупки для жизни',quiet:true,always:t
     return null;}});
 
 // ---------- сон дома: соседи шумят ----------
-function trySleep(h){const night=gHour()>=21||gHour()<6;const home=interior&&interior.kind==='home';if(home&&night&&Math.random()<0.3&&(SIT.cool.neighbors||0)<sitNow()){startSit('neighbors',{h});return;}sleep(h);if(player.cold&&Math.random()<0.6){player.cold=false;addEvent('Выспались — простуда прошла','say');}}
+function trySleep(h){if(!canSleep()){sleep(h);return;}const night=gHour()>=21||gHour()<6;const home=interior&&interior.kind==='home';if(home&&night&&Math.random()<0.3&&(SIT.cool.neighbors||0)<sitNow()){startSit('neighbors',{h});return;}sleep(h);if(player.cold&&Math.random()<0.6){player.cold=false;addEvent('Выспались — простуда прошла','say');}}
 defSit('neighbors',{title:'Шумные соседи',quiet:true,cool:900,
   start(s){sitCard({s,icon:'🔊',tone:'alert',title:'Соседи сверху шумят',text:`${fmtTime()}. Сверху грохочет музыка и кто-то топает. Уснуть невозможно.`,ttl:0,
     choices:[{t:'Постучать по батарее',primary:true,run:()=>{if(Math.random()<0.5){addEvent('Музыку сделали тише');nbSleep(s,1);}else{addEvent('Не помогло — до трёх ночи «тынц-тынц»');nbSleep(s,0.7,-8);}}},
       {t:'Подняться и поговорить',run:()=>{if(Math.random()<0.7){addEvent('Сосед: «Ой, простите, у меня день рождения. Сделаю тише!»');sitRep(1);nbSleep(s,1);}else{addEvent('Сосед хлопнул дверью перед носом','alert');nbSleep(s,0.7,-10);}}},
       {t:'Вызвать полицию',run:()=>{addEvent('Участковый приехал через сорок минут — стало тихо (ст. «Закона о тишине» РТ)');nbSleep(s,0.85,-3);}},
       {t:'Терпеть',run:()=>{nbSleep(s,0.65,-10);}}]});return true;}});
-function nbSleep(s,q,m){sleep(s.h);player.energy=Math.round(100*q);if(m)sitMood(m);if(player.cold&&q>=0.85&&Math.random()<0.5){player.cold=false;addEvent('Простуда прошла','say');}endSit(s);}
+function nbSleep(s,q,m){if(!sleep(s.h)){endSit(s);return;}player.energy=Math.round(100*q);if(m)sitMood(m);if(player.cold&&q>=0.85&&Math.random()<0.5){player.cold=false;addEvent('Простуда прошла','say');}endSit(s);}
 
 // ---------- прорвало трубу ----------
 defEnter(it=>{if(it.kind!=='home'||sitActive('pipe')||(SIT.cool.pipe||0)>sitNow()||Math.random()>0.12)return;setTimeout(()=>{if(interior===it)startSit('pipe');},1500);});
 defSit('pipe',{title:'Прорвало трубу',quiet:true,cool:1500,
   start(s){s.it=interior;sitCard({s,icon:'💧',tone:'alert',urgent:true,title:'Прорвало трубу!',text:'Из-под раковины хлещет вода, на полу растёт лужа. Ещё немного — и зальёт соседей снизу.',ttl:20,
-    choices:[{t:'Перекрыть воду и вызвать сантехника · 1 800 ₽',primary:true,run:()=>{sitMoney(-1800,'Сантехник поменял трубу');clock.minutes+=60;s.fixedAt=s.t+8;}},
-      {t:'Чинить самому',run:()=>{clock.minutes+=40;if(Math.random()<0.55){addEvent('Изолента, хомут и мат — течь остановлена! Настроение +6','say');sitMood(6);s.fixedAt=s.t+3;}else pipeFlood(s);}},
+    choices:[{t:'Перекрыть воду и вызвать сантехника · 1 800 ₽',primary:true,run:()=>{sitMoney(-1800,'Сантехник поменял трубу');spendTime(60);s.fixedAt=s.t+8;}},
+      {t:'Чинить самому',run:()=>{spendTime(40);if(Math.random()<0.55){addEvent('Изолента, хомут и мат — течь остановлена! Настроение +6','say');sitMood(6);s.fixedAt=s.t+3;}else pipeFlood(s);}},
       {t:'Звонить в управляющую компанию',run:()=>{addEvent('УК: «Мастер придёт завтра. Воду в квартире пока перекроем»');player.noWater=clock.day;sitMood(-5);s.fixedAt=s.t+3;}}],
     onTimeout:()=>pipeFlood(s)});return true;},
   update(s,dt){if(s.fixedAt!=null&&s.t>=s.fixedAt)endSit(s);},

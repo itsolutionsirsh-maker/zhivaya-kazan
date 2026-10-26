@@ -226,7 +226,7 @@ function policeAtScene(ac,car){
   const o=new Walker('police',n);o.temp=true;o.x=sp[0]+1.2;o.y=sp[1]+0.6;o.p.job='инспектор ДПС, оформляет ДТП';o.state='idle';o.ttl=110;walkers.push(o);ac.officer=o;
   const dx=vx-o.x,dy=vy-o.y,L=Math.hypot(dx,dy)||1;o.hx=dx/L;o.hy=dy/L;
   if(ac.victim==='player'){
-    if(ac.jaywalk){const t=pick(DPS_JAY);o.say={t,ttl:8};nearLine(o.p.name+' (ДПС)',t,false);o.p.memory.push({role:'assistant',content:t});player.money=Math.max(0,player.money-500);addEvent('ГИБДД: переход в неположенном месте — штраф 500 ₽ (ст. 12.29 КоАП)','alert');}
+    if(ac.jaywalk){const t=pick(DPS_JAY);o.say={t,ttl:8};nearLine(o.p.name+' (ДПС)',t,false);o.p.memory.push({role:'assistant',content:t});player.money=Math.max(0,player.money-500);addEvent('ГИБДД: переход в неположенном месте — штраф 500 ₽ (ст. 12.29 КоАП)','alert');if(typeof prosNoteFine==='function')prosNoteFine(500,'Штраф за переход в неположенном месте');}
     else{const t='Вы на переходе были, водитель не пропустил. Он и виноват — страховая заплатит.';o.say={t,ttl:8};nearLine(o.p.name+' (ДПС)',t,false);o.p.memory.push({role:'assistant',content:t});player.money+=5000;addEvent('ГИБДД: виноват водитель. Выплата по ОСАГО: +5 000 ₽','alert');}}
   else if(ac.kind==='ped'&&ac.victim&&ac.jaywalk!==undefined){o.say={t:ac.jaywalk?'Опять не по переходу бежал…':'Водитель, документы! Пешехода на зебре сбили.',ttl:6};}}
 // скорая на месте: чаще всего обрабатывают и отпускают, при серьёзных травмах — в больницу
