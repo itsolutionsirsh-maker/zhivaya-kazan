@@ -85,8 +85,11 @@ function retireCar(c){const i=cars.indexOf(c);if(i<0)return;cars.splice(i,1);c.p
 function sendHome(w){w.goHome=true;let best=null,bd=1e9;for(let k=0;k<14;k++){const p=pick(world.pois);const d=dist(p.x,p.y,w.x,w.y);if(d<bd&&d<160){bd=d;best=p;}}
   const goal=best?nearestNode(best.x,best.y,world.pedAdj,120):-1;if(goal<0||w.node==null){w.state='idle';w.ttl=0.5;return;}
   w.goalPoi=best;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,goal,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=0.5;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';});}
-// выходит из подъезда или заведения недалеко от игрока
-function wakeWalker(){const w=RHYTHM.dormW.pop();if(!w)return false;const px=player.x,py=player.y;let spot=null;
+// где сейчас «жизнь»: у игрока, а если карту отвели и смотрят в другое место — и там (через раз)
+function lifeCenter(){return typeof camFar==='function'&&camFar()&&Math.random()<0.5?[cam.x,cam.y]:[player.x,player.y];}
+function lifeDist(x,y){const d=dist(x,y,player.x,player.y);return typeof camFar==='function'&&camFar()?Math.min(d,dist(x,y,cam.x,cam.y)):d;}
+// выходит из подъезда или заведения недалеко от игрока (или от того места, куда смотрят)
+function wakeWalker(){const w=RHYTHM.dormW.pop();if(!w)return false;const [px,py]=lifeCenter();let spot=null;
   // часть людей выходит из метро
   if(typeof metroSpots==='function'&&typeof metroOpen==='function'&&metroOpen()&&Math.random()<0.25){const ms=metroSpots().filter(e=>{const d=dist(e.x,e.y,px,py);return d>30&&d<320;});if(ms.length){const e=pick(ms);spot={x:e.x,y:e.y,t:'metro'};}}
   for(let k=0;k<16&&!spot;k++){const p=pick(world.pois);const d=dist(p.x,p.y,px,py);if(d>40&&d<320&&poiOpen(p))spot=p;}
@@ -94,7 +97,7 @@ function wakeWalker(){const w=RHYTHM.dormW.pop();if(!w)return false;const px=pla
   w.node=n;if(spot){w.x=spot.x+rnd(-1.5,1.5);w.y=spot.y+rnd(-1.5,1.5);}else{const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];}
   w.p=makePersona('resident');w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.goHome=false;w.state='idle';w.ttl=rnd(0,2);w.bus=null;w.rally=null;w.rallySlot=null;
   walkers.push(w);return true;}
-function wakeCar(){const c=RHYTHM.dormC.pop();if(!c)return false;const px=player.x,py=player.y;let n=-1;
+function wakeCar(){const c=RHYTHM.dormC.pop();if(!c)return false;const [px,py]=lifeCenter();let n=-1;
   for(let k=0;k<10;k++){const m=nodeNear(world.carNodes,[px,py],650);const p=world.nodes[m];if(dist(p[0],p[1],px,py)>300){n=m;break;}}
   if(n<0)n=nodeNear(world.carNodes,[px,py],650);const p=world.nodes[n];
   c.node=n;c.x=p[0];c.y=p[1];c.path=null;c.speed=0;c.state='idle';c.ttl=rnd(0,1.5);c.creep=null;c.stuck=0;c.waitT=0;c.crashed=false;c.remove=false;
@@ -110,14 +113,14 @@ function updateRhythm(rdt){if(!world||typeof walkers==='undefined')return;
     // дошли до подъезда — исчезают
     for(const w of homing){if(w.state==='idle'&&freeWalker(w))retireWalker(w);else if(!freeWalker(w)&&w.state!=='routing'&&w.state!=='walk')w.goHome=false;}
     if(diff>0){let n=0;const cand=active.filter(w=>!w.goHome&&freeWalker(w));
-      cand.sort((a,b)=>dist(b.x,b.y,px,py)-dist(a.x,a.y,px,py));
-      for(const w of cand){if(n>=Math.min(diff,lim))break;if(first||dist(w.x,w.y,px,py)>170)retireWalker(w);else sendHome(w);n++;}}
+      cand.sort((a,b)=>lifeDist(b.x,b.y)-lifeDist(a.x,a.y));
+      for(const w of cand){if(n>=Math.min(diff,lim))break;if(first||lifeDist(w.x,w.y)>170)retireWalker(w);else sendHome(w);n++;}}
     else if(diff<0){let n=0;const need=Math.min(-diff,lim);
       for(const w of homing){if(n>=need)break;w.goHome=false;if(w.state==='walk'||w.state==='routing'){w.goalPoi=null;}n++;}
       while(n<need&&wakeWalker())n++;}}
   // машины (такси, полиция и скорая не уходят — ночью их доля сама растёт)
   {const own=cars.filter(c=>c.kind==='car'&&!c.temp);const pool=own.length+RHYTHM.dormC.length;const target=Math.round(pool*cf);let diff=own.length-target;
     const lim=first?1e9:Math.max(2,Math.ceil(Math.abs(diff)/10));
-    if(diff>0){let n=0;const cand=own.filter(freeCar).sort((a,b)=>dist(b.x,b.y,px,py)-dist(a.x,a.y,px,py));
-      for(const c of cand){if(n>=Math.min(diff,lim))break;if(!first&&dist(c.x,c.y,px,py)<260)break;retireCar(c);n++;}}
+    if(diff>0){let n=0;const cand=own.filter(freeCar).sort((a,b)=>lifeDist(b.x,b.y)-lifeDist(a.x,a.y));
+      for(const c of cand){if(n>=Math.min(diff,lim))break;if(!first&&lifeDist(c.x,c.y)<260)break;retireCar(c);n++;}}
     else if(diff<0){let n=0;const need=Math.min(-diff,lim);while(n<need&&wakeCar())n++;}}}
