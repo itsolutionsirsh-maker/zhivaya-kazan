@@ -12,7 +12,7 @@ function phoneNote(from,text,kind,alsoFeed){let ok=false;if(window.cityPhone&&ty
 // деньги, которые уже прошли через sitMoney: только отправить уведомление в телефон
 function econNotify(d,why){if(!why)return;const w=String(why);
   if(d>0&&/Смена|смена/.test(w))phoneNote('Банк',`Зарплата +${fmtMoney(d)} · ${w.replace(/^💼\s*/,'')}`,'pay');
-  else if(d<0&&/Штраф|штраф|КоАП/.test(w))phoneNote('Госуслуги',`${w}: ${fmtMoney(-d)}`,'fine');
+  else if(d<0&&/Штраф|штраф|КоАП/.test(w)){phoneNote('Госуслуги',`${w}: ${fmtMoney(-d)}`,'fine');if(typeof prosNoteFine==='function')prosNoteFine(-d,w);}
   else if(d<0&&/Аренда|Коммунал|ЖКУ/.test(w))phoneNote(/Аренда/.test(w)?'Хозяйка квартиры':'ЖКХ',`${w}: оплачено ${fmtMoney(-d)}`,'bill');}
 function insured(k){return (k==='kasko'?ECON.kaskoTill:ECON.osagoTill)>=clock.day;}
 // ---------- учёт и утро ----------
