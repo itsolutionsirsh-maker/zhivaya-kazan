@@ -54,5 +54,5 @@ function populationFollow(dt){FOLLOW.t-=dt;if(FOLLOW.t>0||!world)return;FOLLOW.t
   moved=0;
   for(const c of cars){if(moved>=5)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.taxiFor||c.target!=null||c.state==='scene'||c.remove)continue;
     if(Math.abs(c.x-px)<FOLLOW.carR&&Math.abs(c.y-py)<FOLLOW.carR)continue;
-    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!world.carAdj[n].length)continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
+    for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!hasAdj(world.carAdj,n))continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
       c.node=n;c.x=q[0];c.y=q[1];c.path=null;c.creep=null;c.speed=0;c.state='idle';c.ttl=rnd(0.2,2);moved++;break;}}}

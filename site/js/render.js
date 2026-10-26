@@ -32,15 +32,18 @@ function render(){
     if(a.k==='water'&&z>1.2){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.6;ctx.stroke();}}
   drawKremlinGround(vx0,vy0,vx1,vy1);
   // ---- дороги (батчами по ширине)
-  const groups=new Map();const vis=[];
-  for(const r of world.roads){if(r.bb[2]<vx0||r.bb[0]>vx1||r.bb[3]<vy0||r.bb[1]>vy1)continue;vis.push(r);const k=r.c*100+Math.round(r.w*2);let g=groups.get(k);if(!g){g={c:r.c,w:r.w,list:[]};groups.set(k,g);}g.list.push(r);}
+  // только улицы на экране — через сетку улиц (раньше каждый кадр перебирались все улицы, когда-либо загруженные: после объезда города — 40% времени кадра)
+  const gm=new Map();const vis=[];
+  roadsIn(vx0,vy0,vx1,vy1,r=>{vis.push(r);const k=r.c*100+Math.round(r.w*2);let g=gm.get(k);if(!g){g={c:r.c,w:r.w,list:[]};gm.set(k,g);}g.list.push(r);});
+  // крупные улицы — поверх мелких, в одном порядке на любом кадре (иначе перекрёстки мигали бы при сдвиге камеры)
+  const groups=[...gm.values()].sort((a,b)=>b.c-a.c||a.w-b.w);vis.sort((a,b)=>a.i-b.i);   // подписи улиц — на тех же отрезках, что раньше, и не прыгают при сдвиге
   const pathGroup=g=>{ctx.beginPath();for(const r of g.list){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}};
   ctx.lineCap='round';ctx.lineJoin='round';
-  for(const g of groups.values()){if(g.c<=8){pathGroup(g);ctx.strokeStyle='#B9B3A5';ctx.lineWidth=g.w+2*SIDEWALK+0.5;ctx.stroke();ctx.strokeStyle='#D4CFC3';ctx.lineWidth=g.w+2*SIDEWALK;ctx.stroke();}else if(g.c===9){pathGroup(g);ctx.strokeStyle='#D7D1C2';ctx.lineWidth=g.w+1;ctx.stroke();}}
-  if(z>1.3)for(const g of groups.values()){if(g.c<10)continue;pathGroup(g);ctx.strokeStyle='#CBC5B5';ctx.lineWidth=g.c===12?1.5:1.3;if(g.c===12)ctx.setLineDash([0.7,0.7]);ctx.stroke();ctx.setLineDash([]);}
-  for(const g of groups.values()){if(g.c>8)continue;pathGroup(g);ctx.strokeStyle='#8F8E89';ctx.lineWidth=g.w+0.9;ctx.stroke();}
-  for(const g of groups.values()){if(g.c>8)continue;pathGroup(g);if(g.c<=4&&z>1.4){ctx.strokeStyle='#E9E6DC';ctx.lineWidth=g.w;ctx.stroke();ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w-0.7;ctx.stroke();}else{ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w;ctx.stroke();}}
-  if(z>1.6){for(const g of groups.values()){if(g.c>8||g.w<6.2)continue;const two=g.list.filter(r=>!r.o);if(!two.length)continue;ctx.beginPath();for(const r of two){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}ctx.strokeStyle='#ECE9DF';ctx.lineWidth=0.22;if(g.c>=5)ctx.setLineDash([2.5,2.5]);ctx.stroke();ctx.setLineDash([]);}}
+  for(const g of groups){if(g.c<=8){pathGroup(g);ctx.strokeStyle='#B9B3A5';ctx.lineWidth=g.w+2*SIDEWALK+0.5;ctx.stroke();ctx.strokeStyle='#D4CFC3';ctx.lineWidth=g.w+2*SIDEWALK;ctx.stroke();}else if(g.c===9){pathGroup(g);ctx.strokeStyle='#D7D1C2';ctx.lineWidth=g.w+1;ctx.stroke();}}
+  if(z>1.3)for(const g of groups){if(g.c<10)continue;pathGroup(g);ctx.strokeStyle='#CBC5B5';ctx.lineWidth=g.c===12?1.5:1.3;if(g.c===12)ctx.setLineDash([0.7,0.7]);ctx.stroke();ctx.setLineDash([]);}
+  for(const g of groups){if(g.c>8)continue;pathGroup(g);ctx.strokeStyle='#8F8E89';ctx.lineWidth=g.w+0.9;ctx.stroke();}
+  for(const g of groups){if(g.c>8)continue;pathGroup(g);if(g.c<=4&&z>1.4){ctx.strokeStyle='#E9E6DC';ctx.lineWidth=g.w;ctx.stroke();ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w-0.7;ctx.stroke();}else{ctx.strokeStyle=ASPHALT[g.c];ctx.lineWidth=g.w;ctx.stroke();}}
+  if(z>1.6){for(const g of groups){if(g.c>8||g.w<6.2)continue;const two=g.list.filter(r=>!r.o);if(!two.length)continue;ctx.beginPath();for(const r of two){const p0=world.nodes[r.p[0]];ctx.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const p=world.nodes[r.p[i]];ctx.lineTo(p[0],p[1]);}}ctx.strokeStyle='#ECE9DF';ctx.lineWidth=0.22;if(g.c>=5)ctx.setLineDash([2.5,2.5]);ctx.stroke();ctx.setLineDash([]);}}
   // ---- зебры
   if(z>1.4){ctx.fillStyle='#F1EFE7';world.cgrid.query(vx0,vy0,vx1,vy1,c=>{if(c.x<vx0||c.x>vx1||c.y<vy0||c.y>vy1)return;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(Math.atan2(c.dy,c.dx));for(let u=-c.hw+0.5;u<c.hw-0.2;u+=1.0)ctx.fillRect(-1.4,u-0.25,2.8,0.5);ctx.restore();});}
   // ---- парковки: машины
@@ -253,7 +256,7 @@ function ovtDraw(s,tx,ty){const T=OVT.px/s,x0=tx*T,y0=ty*T,x1=x0+T,y1=y0+T;const
   const hit=bb=>bb[2]>=x0&&bb[0]<=x1&&bb[3]>=y0&&bb[1]<=y1;
   for(const a of world.areas){if(!hit(a.bb))continue;g.fillStyle=AREA_FILL[a.k]||'#ddd';pl(a.p);g.fill();}
   if(world.kremlin&&world.kremlin.hull){g.fillStyle='#ECE5D6';g.beginPath();world.kremlin.hull.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.closePath();g.fill();}
-  g.lineCap='round';g.lineJoin='round';const byC=[[],[],[],[],[],[],[],[],[],[],[],[],[]];for(const r of world.roads)if(hit(r.bb))byC[r.c].push(r);
+  g.lineCap='round';g.lineJoin='round';const byC=[[],[],[],[],[],[],[],[],[],[],[],[],[]];roadsIn(x0,y0,x1,y1,r=>byC[r.c].push(r));
   const strokeC=(list,color,wd)=>{if(!list.length)return;g.strokeStyle=color;g.lineWidth=wd;g.beginPath();for(const r of list){const p0=world.nodes[r.p[0]];g.moveTo(p0[0],p0[1]);for(let i=1;i<r.p.length;i++){const q=world.nodes[r.p[i]];g.lineTo(q[0],q[1]);}}g.stroke();};
   for(let k=10;k<=12;k++)strokeC(byC[k],'#D2CCBC',2.2);
   strokeC(byC[9],'#DAD3C3',9);

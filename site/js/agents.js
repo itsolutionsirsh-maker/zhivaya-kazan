@@ -48,14 +48,14 @@ class Walker{
     while(step>0){const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);
       if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
-    const edge=world.pedAdj[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;this.road=r;const want=r&&r.c<=8?r.hw+1.3:0;const off=want?Math.min(safeSideOff(a,b,want+0.6),want+this.off):this.off;
+    const r=edgeRoad(world.pedAdj,a,b);this.road=r;const want=r&&r.c<=8?r.hw+1.3:0;const off=want?Math.min(safeSideOff(a,b,want+0.6),want+this.off):this.off;
     this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;
     if(r&&r.c>8&&Math.abs(this.x-player.x)<450&&Math.abs(this.y-player.y)<450){const q=pushOffRoad(this.x,this.y,dx,dy);if(q){this.x=q[0];this.y=q[1];}}}
   arrive(){this.path=null;if(this.rallySlot){this.x=this.rallySlot[0];this.y=this.rallySlot[1];this.state='rally';rallyFace(this);return;}if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
     if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);if(inBuilding(this.x,this.y)){const q=toSidewalk(this.x,this.y);if(!inBuilding(q[0],q[1])){this.x=q[0]+rnd(-0.8,0.8);this.y=q[1]+rnd(-0.8,0.8);}}}
     this.state='idle';this.ttl=rnd(6,45);}
   // перебежать дорогу не по переходу
-  startCross(){if(this.state!=='walk'||!this.path)return false;const a=this.path[this.seg],b=this.path[this.seg+1];const e=world.pedAdj[a].find(q=>q[0]===b);if(!e)return false;const r=world.roads[e[2]];if(r.c>7||r.c<2||r.w<6)return false;
+  startCross(){if(this.state!=='walk'||!this.path)return false;const a=this.path[this.seg],b=this.path[this.seg+1];const r=edgeRoad(world.pedAdj,a,b);if(!r)return false;if(r.c>7||r.c<2||r.w<6)return false;
     const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;const off=r.hw+1.3+this.off;
     this.tx=this.x+dy*2*off;this.ty=this.y-dx*2*off;if(inBuilding(this.tx,this.ty))return false;
     this.path=null;this.goalPoi=null;this.goalStop=null;this.state='cross';this.crossSpd=rnd(1.3,2.1);this.road=r;return true;}
@@ -85,7 +85,7 @@ class Car{
     if(this.state==='idle'){this.ttl-=dt;if(this.ttl<=0)this.newGoal(this.target);return;}
     if(this.state!=='drive')return;
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
-    const edge=(this.siren()?world.emAdj:world.carAdj)[a].find(e=>e[0]===b);const r=edge?world.roads[edge[2]]:null;
+    const r=edgeRoad(this.siren()?world.emAdj:world.carAdj,a,b);
     let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(weather.kind==='rain')vlim*=0.85;
     const rem=L-this.t;if(rem<14&&this.seg+2<this.path.length){const pc=world.nodes[this.path[this.seg+2]];const L2=dist(pb[0],pb[1],pc[0],pc[1])||1;const d2x=(pc[0]-pb[0])/L2,d2y=(pc[1]-pb[1])/L2;const cos=dx*d2x+dy*d2y;if(cos<0.85)vlim=Math.min(vlim,(this.siren()?6.5:4)+cos*3);}
     // спецмашина у места ДТП: встаёт рядом, даже если впереди зеваки или сам пострадавший
@@ -99,12 +99,12 @@ class Car{
     let step=this.speed*dt;
     while(step>0){const a2=this.path[this.seg],b2=this.path[this.seg+1];const p1=world.nodes[a2],p2=world.nodes[b2];const L3=dist(p1[0],p1[1],p2[0],p2[1]);
       if(this.t+step>=L3){step-=L3-this.t;this.seg++;this.t=0;this.node=b2;if(this.seg>=this.path.length-1){this.path=null;this.onArrive();return;}}else{this.t+=step;step=0;}}
-    const a3=this.path[this.seg],b3=this.path[this.seg+1];const q1=world.nodes[a3],q2=world.nodes[b3];const L4=dist(q1[0],q1[1],q2[0],q2[1])||1;const ex=(q2[0]-q1[0])/L4,ey=(q2[1]-q1[1])/L4;const e2=world.carAdj[a3].find(e=>e[0]===b3);const rr2=e2?world.roads[e2[2]]:null;const off=rr2?Math.max(1.2,rr2.hw*0.5):1.5;
+    const a3=this.path[this.seg],b3=this.path[this.seg+1];const q1=world.nodes[a3],q2=world.nodes[b3];const L4=dist(q1[0],q1[1],q2[0],q2[1])||1;const ex=(q2[0]-q1[0])/L4,ey=(q2[1]-q1[1])/L4;const rr2=edgeRoad(world.carAdj,a3,b3);const off=rr2?Math.max(1.2,rr2.hw*0.5):1.5;
     this.x=q1[0]+ex*this.t-ey*off;this.y=q1[1]+ey*this.t+ex*off;this.hx=lerp(this.hx,ex,0.4);this.hy=lerp(this.hy,ey,0.4);const hl=Math.hypot(this.hx,this.hy)||1;this.hx/=hl;this.hy/=hl;
     checkPedHits(this);}
   // от последнего перекрёстка спецмашина медленно подъезжает по той же улице к самому месту ДТП
   planCreep(){const sc=this.sceneXY;if(!sc)return;const N=this.node;const a=world.nodes[N];let best=null;
-    for(const e of world.emAdj[N]){const M=e[0];const b=world.nodes[M];const L=dist(a[0],a[1],b[0],b[1]);if(L<2)continue;const ux=(b[0]-a[0])/L,uy=(b[1]-a[1])/L;const t=(sc[0]-a[0])*ux+(sc[1]-a[1])*uy;const sd=Math.abs(-(sc[0]-a[0])*uy+(sc[1]-a[1])*ux);
+    for(const e of adjList(world.emAdj,N)){const M=e[0];const b=world.nodes[M];const L=dist(a[0],a[1],b[0],b[1]);if(L<2)continue;const ux=(b[0]-a[0])/L,uy=(b[1]-a[1])/L;const t=(sc[0]-a[0])*ux+(sc[1]-a[1])*uy;const sd=Math.abs(-(sc[0]-a[0])*uy+(sc[1]-a[1])*ux);
       if(t>4&&t<L+4&&sd<12&&(!best||sd<best.sd))best={M,L,ri:e[2],sd,to:clamp(t-6,0,L-1)};}
     if(best&&best.to>2)this.creep={a:N,b:best.M,L:best.L,ri:best.ri,t:0,to:best.to};}
   creepStep(dt){const c=this.creep;if(c.t>=c.to){this.speed=0;return;}this.speed=Math.min(5,(c.to-c.t)*1.5+0.5);c.t=Math.min(c.to,c.t+this.speed*dt);
@@ -174,7 +174,7 @@ function updateRoadPeds(){roadPeds=[];activeCrossings=[];
 // ---------- происшествия ----------
 let accidentTimer=rnd(40,80);
 // спецмашина выезжает из-за угла в 130–230 м по короткому маршруту — чтобы её было видно и ждать недолго
-function emergencyStart(ac,tgt){const ring=[];world.ngrid.query(ac.x-230,ac.y-230,ac.x+230,ac.y+230,i=>{if(!world.carAdj[i].length)return;const d=dist(world.nodes[i][0],world.nodes[i][1],ac.x,ac.y);if(d>130&&d<230)ring.push(i);});
+function emergencyStart(ac,tgt){const ring=[];world.ngrid.query(ac.x-230,ac.y-230,ac.x+230,ac.y+230,i=>{if(!hasAdj(world.carAdj,i))return;const d=dist(world.nodes[i][0],world.nodes[i][1],ac.x,ac.y);if(d>130&&d<230)ring.push(i);});
   let sn=-1,bestL=1e9;for(let k=0;k<6&&ring.length;k++){const c=ring.splice(Math.floor(Math.random()*ring.length),1)[0];const p=astar(world.emAdj,c,tgt,carCost);if(!p)continue;let L=0;for(let i=0;i<p.length-1;i++){const a=world.nodes[p[i]],b=world.nodes[p[i+1]];L+=dist(a[0],a[1],b[0],b[1]);}if(L>=120&&L<bestL){bestL=L;sn=c;}}
   return sn;}
 function dispatchPolice(ac){let best=null,bd=1e9;for(const p of policeCars){if(p.state==='scene'||p.target!=null)continue;const d=dist(p.x,p.y,ac.x,ac.y);if(d<bd){bd=d;best=p;}}

@@ -5,7 +5,7 @@ const VEH={
   car:{vmax:16,acc:4.5,brake:9,turn:2.3,len:4.5,wid:1.9,start:200,perMin:10,label:'каршеринг',word:'каршеринге'},
   taxi:{vmax:14,acc:4,brake:9,turn:2.3,len:4.5,wid:1.9,start:0,perMin:0,label:'такси',word:'такси'},
   own:{vmax:18,acc:5,brake:9.5,turn:2.3,len:4.6,wid:1.9,start:0,perMin:0,label:'своя машина',word:'своей машине'}};
-function curbSpot(node){const adj=world.carAdj[node];if(!adj.length)return null;const e=pick(adj);const r=world.roads[e[2]];if(r.c<5||r.c>8)return null;
+function curbSpot(node){const adj=adjList(world.carAdj,node);if(!adj.length)return null;const e=pick(adj);const r=world.roads[e[2]];if(r.c<5||r.c>8)return null;
   const pa=world.nodes[node],pb=world.nodes[e[0]];const L=dist(pa[0],pa[1],pb[0],pb[1]);if(L<10)return null;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;const t=rnd(4,L-4);const off=r.hw+1.0;
   const x=pa[0]+dx*t-dy*off,y=pa[1]+dy*t+dx*off;if(inBuilding(x,y))return null;return {x,y,hx:dx,hy:dy};}
 function addScooterAt(x,y){const o={kind:'scooter',x:x+rnd(-1.5,1.5),y:y+rnd(-1.5,1.5),hx:1,hy:0,color:'#7B61FF'};const an=rnd(0,TAU);o.hx=Math.cos(an);o.hy=Math.sin(an);if(inBuilding(o.x,o.y))return null;rentals.push(o);return o;}
