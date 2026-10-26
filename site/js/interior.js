@@ -51,8 +51,8 @@ function moveInside(dx,dy){const r=0.3;let ok=false;if(!blockedInside(player.ix+
   if(player.iy>interior.h+0.4){exitInterior();return false;}return ok;}
 function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
   const m=Math.hypot(mx,my);
-  if(m>0.05){player.iwp=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=2.6*dt*Math.min(1,m)*dk;moveInside(mx*sp,my*sp);player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
-  else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(2.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
+  if(m>0.05){player.iwp=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=3.6*dt*Math.min(1,m)*dk;moveInside(mx*sp,my*sp);player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
+  else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(3.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
 function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;

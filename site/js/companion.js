@@ -31,8 +31,8 @@ $('#compFollow').addEventListener('click',()=>{player.escort=!player.escort;play
 function escortStep(dt){const c=companion;if(!c||c.mode!=='go'||c.arrived||c.w.inside){player.escort=false;updateCompBox();return false;}const w=c.w;
   const T=[w.x-w.hx*1.6,w.y-w.hy*1.6];const d=dist(player.x,player.y,T[0],T[1]);
   if(d<1.2){const dx=w.x-player.x,dy=w.y-player.y,L=Math.hypot(dx,dy)||1;player.hx=dx/L;player.hy=dy/L;player.waypoints=null;return true;}
-  if(d<22&&clearLine(player.x,player.y,T[0],T[1])){player.waypoints=null;const sp=(d>4?3.4:2.7)*dt;const ux=(T[0]-player.x)/d,uy=(T[1]-player.y)/d;const st=Math.min(sp,d);const nx=player.x+ux*st,ny=player.y+uy*st;player.hx=ux;player.hy=uy;
-    if(unsafeStep(player.x,player.y,nx+ux*1.2,ny+uy*1.2))return true;if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;player.phase+=dt*8;}return true;}
+  if(d<22&&clearLine(player.x,player.y,T[0],T[1])){player.waypoints=null;const sp=(d>4?WALK_SPEED*1.1:WALK_SPEED*0.9)*dt;const ux=(T[0]-player.x)/d,uy=(T[1]-player.y)/d;const st=Math.min(sp,d);const nx=player.x+ux*st,ny=player.y+uy*st;player.hx=ux;player.hy=uy;
+    if(unsafeStep(player.x,player.y,nx+ux*1.2,ny+uy*1.2))return true;if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;player.phase+=dt*12;}return true;}
   player.escortT=(player.escortT||0)-dt;if(!player.waypoints||player.escortT<=0){player.escortT=2;walkTo(w.x,w.y,true);}return false;}
 
 function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=dt;
@@ -49,12 +49,12 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     const R=c.route;let best=c.ri,bd=dist(w.x,w.y,R[c.ri][0],R[c.ri][1]);for(let i=c.ri+1;i<Math.min(R.length,c.ri+6);i++){const d=dist(w.x,w.y,R[i][0],R[i][1]);if(d<bd){bd=d;best=i;}}c.ri=best;
     if(bd<1.5&&c.ri<R.length-1)c.ri++;
     if(pd>11){look();updateCompBox();return;}   // ждёт, пока игрок догонит
-    stepTo(w,R[c.ri],Math.min(3.4,pd>5?3.4:2.8),dt,true);
+    stepTo(w,R[c.ri],pd>5?WALK_SPEED*1.1:WALK_SPEED*0.9,dt,true);   // ведёт в темпе игрока
     if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;addEvent(`Вы с ${w.p.name} пришли: «${c.dest.n}». Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в «${c.dest.n}». E у входа — зайти вместе`);}
     updateCompBox();return;}
   else{T=[player.x-player.hx*1.6,player.y-player.hy*1.6];if(pd<2.6)T=null;}
   if(!T||dist(w.x,w.y,T[0],T[1])<stop){look();updateCompBox();return;}
-  const spd=Math.min(3.4,Math.max(2.4,pd>6?3.4:2.8));
+  const spd=pd>6?WALK_SPEED*1.15:WALK_SPEED*0.9;   // идёт следом и догоняет
   if(dist(w.x,w.y,T[0],T[1])<30&&clearLine(w.x,w.y,T[0],T[1])){w.cwps=null;stepTo(w,T,spd,dt);}
   else{w.repath-=dt;if(!w.cwps||w.repath<=0||w.wi>=w.cwps.length){w.repath=6;const s=nearestNode(w.x,w.y,world.pedAdj,120),g=nearestNode(T[0],T[1],world.pedAdj,120);const path=astar(world.pedAdj,s,g,pedCost);w.cwps=path?pathToWaypoints(path,world.pedAdj,'ped'):null;if(w.cwps){w.cwps.push(T);let bi=0,bd=1e9;for(let i=0;i<Math.min(6,w.cwps.length);i++){const d=dist(w.x,w.y,w.cwps[i][0],w.cwps[i][1]);if(d<bd){bd=d;bi=i;}}w.wi=bd<8?bi+1:bi;}else w.wi=0;}
     if(w.cwps&&w.wi<w.cwps.length){const q=w.cwps[w.wi];if(dist(w.x,w.y,q[0],q[1])<0.8)w.wi++;else stepTo(w,q,spd,dt,true);}else stepTo(w,T,spd,dt);}

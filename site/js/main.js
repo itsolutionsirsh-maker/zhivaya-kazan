@@ -66,6 +66,8 @@ function leaveBus(stop){const b=player.bus;player.bus=null;player.fare=null;play
 let currentAction=null;
 // у действия E есть цель: at — объект с x,y (живой: человек, машина, место), tk — что это, bld — здание (для входа).
 // Рисование может подсветить цель; в интерьере at — в координатах помещения.
+// скорость игрока пешком, м/с (было 3 и 5,5 — по городу ходить скучно): от неё же — попутчик, погоня, собака
+const WALK_SPEED=6.0,RUN_SPEED=10.0;
 function actTarget(a,at,tk,bld){if(a&&at){a.at=at;a.tk=tk;if(bld)a.bld=bld;}return a;}
 function findAction(){
   if(scene==='interior')return findActionInterior();
@@ -254,11 +256,11 @@ function updatePlayer(dt){
   const m=Math.hypot(mx,my);const run=keys.shift||keys.ShiftLeft;
   if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
   if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
-  if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=(run?5.5:3.0)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?11:8);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
-  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{let [sx,sy,dk]=drunkSway((w[0]-player.x)/d,(w[1]-player.y)/d);const sp=3.0*dt*dk;let dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);if(!inBuilding(player.x+sx*step,player.y+sy*step)){dx=sx;dy=sy;}const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
+  if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=(run?RUN_SPEED:WALK_SPEED)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?15:12);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
+  else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{let [sx,sy,dk]=drunkSway((w[0]-player.x)/d,(w[1]-player.y)/d);const sp=WALK_SPEED*dt*dk;let dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);if(!inBuilding(player.x+sx*step,player.y+sy*step)){dx=sx;dy=sy;}const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
     if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;
-    if(blockedStep(player.x,player.y,nx,ny)){const px=player.x,py=player.y;tryMove(dx*step,dy*step);player.phase+=dt*8;if(dist(px,py,player.x,player.y)<step*0.3){player.stuckT=(player.stuckT||0)+dt;if(player.stuckT>1.2){player.stuckT=0;const last=player.waypoints[player.waypoints.length-1];player.waypoints=null;player.replans=(player.replans||0)+1;if(player.replans<=2)walkTo(last[0],last[1],true);else{player.replans=0;setHint('Сюда не пройти — мешает здание');}}}return;}
-    player.stuckT=0;player.x=nx;player.y=ny;player.phase+=dt*8;}}}
+    if(blockedStep(player.x,player.y,nx,ny)){const px=player.x,py=player.y;tryMove(dx*step,dy*step);player.phase+=dt*12;if(dist(px,py,player.x,player.y)<step*0.3){player.stuckT=(player.stuckT||0)+dt;if(player.stuckT>1.2){player.stuckT=0;const last=player.waypoints[player.waypoints.length-1];player.waypoints=null;player.replans=(player.replans||0)+1;if(player.replans<=2)walkTo(last[0],last[1],true);else{player.replans=0;setHint('Сюда не пройти — мешает здание');}}}return;}
+    player.stuckT=0;player.x=nx;player.y=ny;player.phase+=dt*12;}}}
 // шаг упирается в стену дома или кремля (если уже внутри контура — например, вышли из помещения — выпускаем)
 function blockedStep(x0,y0,x1,y1){if(wallBlocks(x0,y0,x1,y1))return true;return !!inBuilding(x1,y1)&&!inBuilding(x0,y0);}
 function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!blockedStep(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}

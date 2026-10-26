@@ -18,7 +18,7 @@ defSit('pickpocket',{title:'Карманник',auto:true,weight:3,cool:600,
         onTimeout:()=>{sitMood(-8);addEvent('Карманник растворился в толпе');endSit(s);}});}}
     if(s.phase==='quiet'||s.phase==='chase'){const m=SIT.marks.get('pp');if(m){m.x=w.x;m.y=w.y;}}
     if(s.phase==='quiet'){stepActor(w,dt);}
-    else if(s.phase==='chase'){s.ct+=dt;if(stepActor(w,dt)){const q=awayPoint(w,120);moveActor(w,q[0],q[1],4.0);}
+    else if(s.phase==='chase'){s.ct+=dt;if(stepActor(w,dt)){const q=awayPoint(w,120);moveActor(w,q[0],q[1],WALK_SPEED*1.33);}
       const d=dist(w.x,w.y,player.x,player.y);
       if(d<2.4&&!player.vehicle){s.phase='caught';s.chase=false;w.mv=null;faceTo(w,player.x,player.y);say(w,pick(['Всё-всё! На, забирай, только не бей!','Ладно, ладно! Держи свои деньги!','Ай! Отпусти, на, на!']));
         sitMoney(s.sum,'Вы догнали карманника и вернули деньги');sitRep(6,'поймали карманника');sitMood(12);unmark('pp');
@@ -31,7 +31,7 @@ defSit('pickpocket',{title:'Карманник',auto:true,weight:3,cool:600,
     if(s.endIn!=null){s.endIn-=dt;if(s.endIn<=0)endSit(s);}},
   actionInside(s){if(s.phase==='report'&&inPolice())return {label:'Написать заявление о краже',run:()=>{spendTime(30);unmark('ppol');s.phase='wait';s.waitT=rnd(60,150);s.found=Math.random()<0.45;addEvent('Дежурный принял заявление: «Будем искать. Камеры на Баумана хорошие»');}};return null;},
   ctx(s,w){return s.phase==='caught'?'Ты карманник, тебя только что поймал за руку собеседник. Ты напуган и оправдываешься.':'Ты карманник и только что вытащил деньги у собеседника. Ты всё отрицаешь.';}});
-function ppChase(s){s.phase='chase';s.chase=true;s.ct=0;const q=awayPoint(s.w,140);moveActor(s.w,q[0],q[1],4.0);say(s.w,pick(['Чё надо?!','Отвали!']),2);setHint('Бегите за ним! Shift — бежать, догоните вплотную');}
+function ppChase(s){s.phase='chase';s.chase=true;s.ct=0;const q=awayPoint(s.w,140);moveActor(s.w,q[0],q[1],WALK_SPEED*1.33);say(s.w,pick(['Чё надо?!','Отвали!']),2);setHint('Бегите за ним! Shift — бежать, догоните вплотную');}
 function ppReport(s){s.phase='report';s.chase=false;unmark('pp');for(const w of s.actors)releaseActor(w);s.actors=[];const ps=markPolice(s,'ppol');s.maxT=s.t+900;setHint(ps?`Отдел полиции — ${Math.round(dist(ps.x,ps.y,player.x,player.y))} м. Зайдите и напишите заявление`:'Отдел полиции не найден');}
 
 // ---------- ссора: толкнул на бегу / задели вас ----------
@@ -119,7 +119,7 @@ defSit('dog',{title:'Пропала собака',auto:true,weight:1.5,cool:900,
     sitCard({s,icon:'🐕',title:`Пропала собака: ${s.dog.name}`,text:`Объявление на столбе: «Пропал ${b.n} ${s.dog.name}. Последний раз видели ${placeName(q[0],q[1])}. Вознаграждение ${fmtMoney(s.reward)}. Звонить: ${o.p.name}».`,ttl:16,
       choices:[{t:'Поискать',primary:true,run:()=>{mark(s,'dogarea',s.dog.home[0],s.dog.home[1],'🔍','Видели здесь',{arrow:true});setHint(`Ищите ${s.dog.name} рядом с меткой 🔍 и нажмите E`);}},{t:'Не до этого',run:()=>{}}]});return true;},
   update(s,dt){const d=s.dog;d.ph+=dt*8;let tx,ty,spd;
-    if(s.follow){const tgt=s.give?[s.o.x+1,s.o.y]:[player.x,player.y];const dd=dist(d.x,d.y,tgt[0],tgt[1]);if(dd>1.6){tx=tgt[0];ty=tgt[1];spd=Math.min(5.2,1.5+dd*0.8);}else{tx=d.x;ty=d.y;spd=0;}if(dd>60){d.x=tgt[0]+1;d.y=tgt[1];}}
+    if(s.follow){const tgt=s.give?[s.o.x+1,s.o.y]:[player.x,player.y];const dd=dist(d.x,d.y,tgt[0],tgt[1]);if(dd>1.6){tx=tgt[0];ty=tgt[1];spd=Math.min(WALK_SPEED*1.2,1.5+dd*0.8);}else{tx=d.x;ty=d.y;spd=0;}if(dd>60){d.x=tgt[0]+1;d.y=tgt[1];}}
     else{d.T-=dt;if(d.T<=0){d.T=rnd(2,5);const an=Math.random()*TAU,R=rnd(2,9);const nx=d.home[0]+Math.cos(an)*R,ny=d.home[1]+Math.sin(an)*R;if(!inBuilding(nx,ny)){d.tx=nx;d.ty=ny;}}tx=d.tx;ty=d.ty;spd=1.3;}
     const dd=dist(d.x,d.y,tx,ty);if(spd>0&&dd>0.2){const ux=(tx-d.x)/dd,uy=(ty-d.y)/dd;const st=Math.min(dd,spd*dt);const nx=d.x+ux*st,ny=d.y+uy*st;if(!inBuilding(nx,ny)){d.x=nx;d.y=ny;}d.hx=ux;d.hy=uy;d.moving=true;}else d.moving=false;
     if(s.follow&&!s.give){const m=SIT.marks.get('dogown');if(m){m.x=s.o.x;m.y=s.o.y;}}
