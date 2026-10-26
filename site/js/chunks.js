@@ -45,14 +45,40 @@ const FOLLOW={t:0,walkR:1100,carR:1500};
 function populationFollow(dt){FOLLOW.t-=dt;if(FOLLOW.t>0||!world)return;FOLLOW.t=1.5;if(player.inside)return;
   const px=player.x,py=player.y;const vw=(typeof W!=='undefined'?W:1200)/Math.max(0.3,cam.z)/2+40,vh=(typeof H!=='undefined'?H:800)/Math.max(0.3,cam.z)/2+40;
   const offscreen=(x,y)=>Math.abs(x-cam.x)>vw||Math.abs(y-cam.y)>vh;
-  let moved=0;
+  let moved=0;const cf=camFar();
   for(const w of walkers){if(moved>=8)break;if(w.bus||w.inside||w.companion||w.keep||w.sitBy!=null||w.folk||w.rallySlot||w.isInterior||w.temp)continue;
     if(w.role!=='resident'&&w.role!=='courier'&&w.role!=='police')continue;if(!/^(idle|walk|routing|wait)$/.test(w.state))continue;
-    if(Math.abs(w.x-px)<FOLLOW.walkR&&Math.abs(w.y-py)<FOLLOW.walkR)continue;
+    if(Math.abs(w.x-px)<FOLLOW.walkR&&Math.abs(w.y-py)<FOLLOW.walkR)continue;if(cf&&Math.abs(w.x-cam.x)<FOLLOW.walkR&&Math.abs(w.y-cam.y)<FOLLOW.walkR)continue;
     for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(260,650);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.pedAdj,120);if(n<0)continue;const q=sidewalkPos(n);if(!offscreen(q[0],q[1]))continue;
       w.node=n;w.x=q[0];w.y=q[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0.5,6);if(w.anchor)w.anchor=[px+rnd(-150,150),py+rnd(-150,150)];moved++;break;}}
   moved=0;
   for(const c of cars){if(moved>=5)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.taxiFor||c.target!=null||c.state==='scene'||c.remove)continue;
-    if(Math.abs(c.x-px)<FOLLOW.carR&&Math.abs(c.y-py)<FOLLOW.carR)continue;
+    if(Math.abs(c.x-px)<FOLLOW.carR&&Math.abs(c.y-py)<FOLLOW.carR)continue;if(cf&&Math.abs(c.x-cam.x)<FOLLOW.carR&&Math.abs(c.y-cam.y)<FOLLOW.carR)continue;
     for(let k=0;k<6;k++){const an=Math.random()*TAU,R=rnd(350,900);const n=nearestNode(px+Math.cos(an)*R,py+Math.sin(an)*R,world.carAdj,150);if(n<0||!hasAdj(world.carAdj,n))continue;const q=world.nodes[n];if(!offscreen(q[0],q[1]))continue;
       c.node=n;c.x=q[0];c.y=q[1];c.path=null;c.creep=null;c.speed=0;c.state='idle';c.ttl=rnd(0.2,2);moved++;break;}}}
+// ---------- жизнь там, куда смотрят: карта отведена от игрока и приближена — часть жителей и машин и там ----------
+// Камера прыгнула на новое место — ставим прямо в кадр (так же появляются дома подгруженного квартала); дальше доливаем понемногу
+// из-за края экрана, чтобы заходили сами. Пока камера там, ни populationFollow, ни updatePopulation их к игроку не уводят.
+const CAMPOP={t:0,at:null,walk:45,car:14};
+function camFar(){return !!(cam.free&&!player.inside&&world&&Math.hypot(cam.x-player.x,cam.y-player.y)>700);}
+function populationCam(dt){CAMPOP.t-=dt;if(CAMPOP.t>0||!world)return;CAMPOP.t=1;
+  if(!camFar()||cam.z<0.75){CAMPOP.at=null;return;}
+  const jump=!CAMPOP.at||Math.hypot(cam.x-CAMPOP.at[0],cam.y-CAMPOP.at[1])>250;
+  const hw=(typeof W!=='undefined'?W:1200)/cam.z/2,hh=(typeof H!=='undefined'?H:800)/cam.z/2,M=150;
+  const inV=(o,m)=>Math.abs(o.x-cam.x)<hw+(m||0)&&Math.abs(o.y-cam.y)<hh+(m||0);
+  const pedIn=[],pedRing=[],carIn=[],carRing=[];
+  world.ngrid.query(cam.x-hw-M,cam.y-hh-M,cam.x+hw+M,cam.y+hh+M,i=>{const p=world.nodes[i],o={x:p[0],y:p[1]};const v=inV(o);
+    if(hasAdj(world.pedAdj,i))(v?pedIn:pedRing).push(i);if(hasAdj(world.carAdj,i))(v?carIn:carRing).push(i);});
+  if(pedIn.length<20)return;   // квартал ещё грузится — подождём
+  const area=4*hw*hh/1e6;   // км² в кадре; у игрока людей примерно столько же на км²
+  const tW=Math.min(CAMPOP.walk,Math.max(8,Math.round(area*600)),Math.round(pedIn.length/2)),tC=Math.min(CAMPOP.car,Math.max(3,Math.round(area*80)),Math.round(carIn.length/3));
+  let need=tW-walkers.filter(w=>inV(w,30)).length;if(!jump)need=Math.min(need,4);
+  const toW=jump||!pedRing.length?pedIn:pedRing;
+  const movable=w=>!(w.bus||w.inside||w.companion||w.keep||w.sitBy!=null||w.folk||w.rally||w.rallySlot||w.isInterior||w.temp)&&(w.role==='resident'||w.role==='courier')&&/^(idle|walk|routing|wait)$/.test(w.state);
+  // сначала дальние от игрока, потом — кроме тех, кто совсем рядом с ним
+  for(const near of [300,120])for(const w of walkers){if(need<=0)break;if(!movable(w)||inV(w,M)||Math.hypot(w.x-player.x,w.y-player.y)<near)continue;
+    const n=pick(toW);const q=sidewalkPos(n);w.node=n;w.x=q[0];w.y=q[1];w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.state='idle';w.ttl=rnd(0,3);if(w.anchor)w.anchor=[cam.x+rnd(-150,150),cam.y+rnd(-150,150)];need--;}
+  let needC=tC-cars.filter(c=>inV(c,30)).length;if(!jump)needC=Math.min(needC,2);const toC=jump||!carRing.length?carIn:carRing;
+  if(toC.length)for(const near of [400,200])for(const c of cars){if(needC<=0)break;if(c.kind!=='car'&&c.kind!=='taxi')continue;if(c.crashed||c.taxiFor||c.target!=null||c.state==='scene'||c.remove||inV(c,M)||Math.hypot(c.x-player.x,c.y-player.y)<near)continue;
+    const n=pick(toC);const q=world.nodes[n];c.node=n;c.x=q[0];c.y=q[1];c.path=null;c.creep=null;c.speed=0;c.state='idle';c.ttl=rnd(0.2,2);needC--;}
+  CAMPOP.at=[cam.x,cam.y];}

@@ -204,8 +204,24 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
   player.talkTarget=null;walkTo(wx,wy);});
-function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
-  const path=astar(world.pedAdj,s,g,pedCost);const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=wps;}
+function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}
+  // близко и по прямой ничего не мешает (через парк, двор, площадь) — напрямик, без крюка по дорожкам
+  const smart=!(player.replans>0);   // застряли и ищем путь заново — только по дорожкам
+  if(smart&&Math.hypot(wx-player.x,wy-player.y)<450&&clearLine(player.x,player.y,wx,wy)){player.waitingStop=null;player.waypoints=[[wx,wy]];return;}
+  const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
+  const path=astar(world.pedAdj,s,g,pedCost);const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=smart?cutCorners(wps,player.x,player.y):wps;}
+// по прямой можно пройти: нет домов, стен, воды и проезжей части больших улиц (маленькую улицу перейти можно — подождём машины)
+let _water=null;
+function inWater(x,y){if(!_water||_water.src!==world.areas){_water=world.areas.filter(a=>a.k==='water');_water.src=world.areas;}for(const a of _water){if(x<a.bb[0]||x>a.bb[2]||y<a.bb[1]||y>a.bb[3])continue;if(pointInPoly(a.p,x,y))return true;}return false;}
+function clearLine(x0,y0,x1,y1){if(typeof wallBlocks==='function'&&wallBlocks(x0,y0,x1,y1))return false;const L=Math.hypot(x1-x0,y1-y0),n=Math.max(1,Math.ceil(L/1.5));
+  for(let i=1;i<=n;i++){const t=i/n,x=x0+(x1-x0)*t,y=y0+(y1-y0)*t;if(inBuilding(x,y)||inWater(x,y))return false;const ns=nearestRoadSeg(x,y,12);if(ns&&ns.seg.r.c<=4&&ns.d<ns.seg.r.hw)return false;}return true;}
+// срезать крюк в начале и в конце пути: от игрока — к самой дальней точке пути, до которой можно дойти по прямой (до 400 м), так же у цели
+function cutCorners(wps,px,py){if(wps.length<3)return wps;const far=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  const run=[0];for(let i=1;i<wps.length;i++)run.push(run[i-1]+far(wps[i-1],wps[i]));const lenTo=i=>run[i]+far([px,py],wps[0]);
+  for(let i=wps.length-2;i>=1;i--){const d=far([px,py],wps[i]);if(d>400||lenTo(i)<d*1.3)continue;if(clearLine(px,py,wps[i][0],wps[i][1])){wps=wps.slice(i);break;}}
+  if(wps.length<3)return wps;const run2=[0];for(let i=1;i<wps.length;i++)run2.push(run2[i-1]+far(wps[i-1],wps[i]));const end=wps[wps.length-1],tot=run2[run2.length-1];
+  for(let j=0;j<wps.length-2;j++){const d=far(wps[j],end);if(d>400||tot-run2[j]<d*1.3)continue;if(clearLine(wps[j][0],wps[j][1],end[0],end[1])){wps=wps.slice(0,j+1).concat([end]);break;}}
+  return wps;}
 const joy=$('#joy'),joyKnob=joy.querySelector('i');let joyVec=[0,0],joyId=null,joyOrigin=null;
 joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joyOrigin=[e.clientX,e.clientY];joy.setPointerCapture(e.pointerId);});
 joy.addEventListener('pointermove',e=>{if(e.pointerId!==joyId)return;let dx=e.clientX-joyOrigin[0],dy=e.clientY-joyOrigin[1];const m=Math.hypot(dx,dy);if(m>44){dx*=44/m;dy*=44/m;}joyVec=[dx/44,dy/44];joyKnob.style.transform=`translate(${dx}px,${dy}px)`;});
@@ -243,7 +259,7 @@ let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   // не чаще ~60 кадров: на экранах 120 Гц вдвое меньше работы и батареи
   const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
-    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);engineTick(rdt);
+    updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);populationCam(rdt);engineTick(rdt);
     const vehicles=cars.concat(buses);if(player.vehicle&&!player.inside)vehicles.push(vehProxy(player.vehicle));
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
