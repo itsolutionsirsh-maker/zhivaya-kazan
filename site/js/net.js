@@ -13,7 +13,7 @@ let outSeq=0;const outbox=[];        // последние исходящие (�
 const lastSeen=new Map();             // peer → последний прочитанный номер сообщения
 let httpOut=[],httpSince=0,httpFirst=true;
 
-function buildPresence(){const p={x:Math.round(player.x*10)/10,y:Math.round(player.y*10)/10,n:player.name.slice(0,24),r:player.role,hx:Math.round(player.hx*100)/100,hy:Math.round(player.hy*100)/100,b:(player.bus||player.inside)?1:0,c:player.clothes,v:player.vehicle?player.vehicle.kind:null,vc:player.vehicle?player.vehicle.color:null};
+function buildPresence(){const p={x:Math.round(player.x*10)/10,y:Math.round(player.y*10)/10,n:player.name.slice(0,24),r:player.role,hx:Math.round(player.hx*100)/100,hy:Math.round(player.hy*100)/100,b:(player.bus||player.inside)?1:0,c:myClothes(),w:wornIds(),v:player.vehicle?player.vehicle.kind:null,vc:player.vehicle?player.vehicle.color:null};
   p.sy=saySent;p.g=player.rally?{s:player.rally.sq.i,k:player.rally.kind,t:player.rally.title}:null;
   if(Net.mode==='room')p.m=outbox.slice(-4);
   if(player.thumb&&player.thumb.length<2600)p.a=player.thumb;
@@ -60,7 +60,7 @@ let wsLastP=null;
 function wsPush(){const t=performance.now();if(!wsSock||wsSock.readyState!==1||t-wsLastPush<140)return;const p=buildPresence();
   const q=wsLastP;if(q&&t-wsLastPush<3000&&Math.abs(q.x-p.x)<0.05&&Math.abs(q.y-p.y)<0.05&&Math.abs(q.hx-p.hx)<0.02&&Math.abs(q.hy-p.hy)<0.02&&q.b===p.b)return;wsLastPush=t;wsLastP={x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b};
   wsSock.send(JSON.stringify({t:'p',x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b}));
-  const m={n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a};const ms=JSON.stringify(m);if(ms!==wsLastMeta){wsLastMeta=ms;wsSock.send(JSON.stringify({t:'m',m}));}}
+  const m={n:p.n,r:p.r,c:p.c,w:p.w,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a};const ms=JSON.stringify(m);if(ms!==wsLastMeta){wsLastMeta=ms;wsSock.send(JSON.stringify({t:'m',m}));}}
 function wsApply(d){
   if(d.m)for(const [sid,id,meta] of d.m){let e=wsPeers.get(sid);if(!e){e={peer:id,presence:{x:0,y:0,hx:0,hy:1,b:0}};wsPeers.set(sid,e);}e.peer=id;Object.assign(e.presence,meta);}
   if(d.p)for(const [sid,x,y,hx,hy,b] of d.p){const e=wsPeers.get(sid);if(!e)continue;e.presence.x=x/10;e.presence.y=y/10;e.presence.hx=hx/100;e.presence.hy=hy/100;e.presence.b=b;}

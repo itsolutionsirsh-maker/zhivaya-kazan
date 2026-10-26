@@ -32,7 +32,22 @@ window.cityQuests=[
   {id:'talk-lenar', lvl:3, title:'Чехол Ленара', text:'Поговори с Ленаром.', check:'talk', target:{folk:'lenar'}, n:1, reward:{money:80, mood:6}},
   {id:'talk-zulfiya', lvl:3, title:'Чай Зульфии', text:'Поговори с Зульфией.', check:'talk', target:{folk:'zulfiya'}, n:1, reward:{money:80, mood:5}},
   {id:'taxi-two', lvl:3, title:'Две посадки', text:'Два раза доедь на такси.', check:'taxi', n:2, reward:{money:100}},
-  {id:'work-late', lvl:3, title:'Смена до конца', text:'Отработай смену до конца.', check:'work', n:1, reward:{money:130, mood:6}}
+  {id:'work-late', lvl:3, title:'Смена до конца', text:'Отработай смену до конца.', check:'work', n:1, reward:{money:130, mood:6}},
+  {id:'winter-tea-bauman', lvl:1, season:'2026-12', xp:40, title:'Горячий чай на Баумана', text:'Выпей горячий чай в кафе на Баумана.', check:'eat', target:{hints:['бауман']}, n:1, reward:{money:70, mood:5}},
+  {id:'winter-tea-freedom', lvl:1, season:'2026-12', xp:40, title:'Чай у площади Свободы', text:'Поешь горячего в кафе у площади Свободы.', check:'eat', target:{hints:['свобод']}, n:1, reward:{money:70, mood:4}},
+  {id:'winter-fair-bauman', lvl:1, season:'2026-12', xp:40, title:'Ярмарка на Баумана', text:'Зайди на ярмарку на Баумана.', check:'visit', target:{hints:['бауман']}, n:1, reward:{money:60, mood:4}},
+  {id:'winter-ointment', lvl:1, season:'2026-12', xp:40, title:'Мазь от мороза', text:'Зайди в аптеку за мазью от мороза.', check:'visit', target:{hints:['аптек']}, n:1, reward:{money:50}},
+  {id:'winter-metro-tukay', lvl:1, season:'2026-12', xp:40, title:'К ярмарке под землёй', text:'Доедь на метро до «Площади Тукая».', check:'metro', target:{to:'tukay'}, n:1, reward:{money:70}},
+  {id:'winter-metro-kreml', lvl:1, season:'2026-12', xp:40, title:'К Кремлю в шарфе', text:'Доедь на метро до «Кремлёвской».', check:'metro', target:{to:'kreml'}, n:1, reward:{money:70}},
+  {id:'winter-metro-sukon', lvl:2, season:'2026-12', xp:40, title:'Суконная в снегопад', text:'Доедь на метро до «Суконной слободы».', check:'metro', target:{to:'sukon'}, n:1, reward:{money:80}},
+  {id:'winter-kremlin', lvl:1, season:'2026-12', xp:40, title:'Стены Кремля зимой', text:'Побывай у Кремля.', check:'visit', target:{hints:['кремл']}, n:1, reward:{money:60, mood:3}},
+  {id:'winter-park', lvl:2, season:'2026-12', xp:40, title:'Холмы парка Горького', text:'Дойди до парка Горького.', check:'visit', target:{hints:['горьк']}, n:1, reward:{money:70, mood:4}},
+  {id:'winter-walk', lvl:2, season:'2026-12', xp:40, title:'Полтора километра по снегу', text:'Пройди пешком полтора километра.', check:'walk', n:1500, reward:{money:60, mood:4}},
+  {id:'winter-bus', lvl:1, season:'2026-12', xp:40, title:'Автобус, пока скользко', text:'Проедь на автобусе, троллейбусе или трамвае.', check:'bus', n:1, reward:{money:50}},
+  {id:'winter-atm', lvl:1, season:'2026-12', xp:40, title:'Наличные на варежки', text:'Зайди к банкомату.', check:'atm', n:1, reward:{money:40}},
+  {id:'winter-evening', lvl:3, season:'2026-12', xp:40, title:'Зимний вечер', text:'Приди на вечернее событие.', check:'event', n:1, reward:{money:100, mood:8}},
+  {id:'winter-taxi', lvl:2, season:'2026-12', xp:40, title:'Такси по гололёду', text:'Доедь на такси.', check:'taxi', n:1, reward:{money:70}},
+  {id:'winter-two-teas', lvl:2, season:'2026-12', xp:40, title:'Два горячих чая', text:'Два раза поешь горячего в кафе.', check:'eat', n:2, reward:{money:90, mood:5}}
 ];
 
 window.cityAchievements=[

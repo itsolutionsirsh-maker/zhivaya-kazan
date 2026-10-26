@@ -15,7 +15,7 @@ function spawnRentals(cx,cy){
   for(const p of world.pois){if(dist(p.x,p.y,cx,cy)>600||!/university|museum|theatre|hotel/.test(p.t)||Math.random()<0.5)continue;addScooterAt(p.x,p.y);addScooterAt(p.x,p.y);}
   for(let i=0;i<14;i++)addCarshareNear(cx,cy,650);
   if(player.hasCar&&!ownCar){placeOwnCar();}}
-function placeOwnCar(){if(!player.home)return;const n=nearestNode(player.home.cx,player.home.cy,world.carAdj,200);let s=n>=0?curbSpot(n):null;if(!s){const p=world.nodes[n>=0?n:pick(world.carNodes)];s={x:p[0],y:p[1],hx:1,hy:0};}ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:player.carColor||'#C62828',parked:true};}
+function placeOwnCar(){if(!player.home)return;const n=nearestNode(player.home.cx,player.home.cy,world.carAdj,200);let s=n>=0?curbSpot(n):null;if(!s){const p=world.nodes[n>=0?n:pick(world.carNodes)];s={x:p[0],y:p[1],hx:1,hy:0};}ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:wornCarColor()||player.carColor||'#C62828',parked:true};}
 let rentalTimer=0;
 function updateRentals(dt){rentalTimer-=dt;if(rentalTimer>0)return;rentalTimer=2;const px=player.x,py=player.y;
   for(let i=rentals.length-1;i>=0;i--){const r=rentals[i];if(dist(r.x,r.y,px,py)>1100)rentals.splice(i,1);}

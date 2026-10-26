@@ -6,7 +6,7 @@ const PROG_KEY='zk.prog';
 const PROG=(()=>{let s=null;try{s=JSON.parse(localStorage.getItem(PROG_KEY)||'null');}catch(e){}
   s=s&&typeof s==='object'?s:{};s.c=s.c||{};s.metroSt=s.metroSt||[];s.folk=s.folk||[];s.ach=s.ach||{};s.days=s.days||{last:'',streak:0,total:0};s.q=s.q||{day:'',ids:[],p:{},done:[]};s.ev=s.ev||{};s.seenD=s.seenD||[];return s;})();
 function progSave(){try{localStorage.setItem(PROG_KEY,JSON.stringify(PROG));}catch(e){}}
-function mskDate(){return new Date(Date.now()+3*3600e3).toISOString().slice(0,10);}   // сутки — по Москве
+function mskDate(){return typeof window.zkTestDay==='string'?window.zkTestDay:new Date(Date.now()+3*3600e3).toISOString().slice(0,10);}   // сутки — по Москве (zkTestDay — подставить дату для проверки из консоли)
 
 // ---------- учёт ----------
 function cityTrack(kind,info){info=info||{};const add=info.n||1;PROG.c[kind]=(PROG.c[kind]||0)+add;
@@ -33,31 +33,34 @@ function tutOn(kind,info,add){const t=tutStep();if(!t||t.check!==kind||!targetOk
 function questLevel(){const d=PROG.days.total||1;return d<=2?1:d<=5?2:3;}
 function questsRoll(){const day=mskDate();if(PROG.q.day===day)return;const list=(window.cityQuests||[]).filter(q=>q&&q.id);if(!list.length)return;
   const lvl=questLevel();let seed=0;for(const ch of day+(typeof myCid!=='undefined'?myCid:''))seed=(seed*31+ch.charCodeAt(0))>>>0;const rng=seeded(seed||1);
-  const usable=list.filter(q=>q.check!=='metro'||!q.target||!q.target.to||(typeof metroStation==='function'&&(metroInit(),metroStation(q.target.to))));
+  const usable=list.filter(q=>(!q.season||seasonOn(q.season))&&(q.check!=='metro'||!q.target||!q.target.to||(typeof metroStation==='function'&&(metroInit(),metroStation(q.target.to)))));
   const pool=usable.filter(q=>(q.lvl||1)<=lvl);const top=pool.filter(q=>(q.lvl||1)===lvl);const pick3=[];
-  const take=arr=>{const a=arr.slice();while(a.length&&pick3.length<3){const i=Math.floor(rng()*a.length);const q=a.splice(i,1)[0];if(!pick3.some(x=>x.check===q.check))pick3.push(q);}};
+  const take=(arr,max)=>{const a=arr.slice();max=max||3;while(a.length&&pick3.length<max){const i=Math.floor(rng()*a.length);const q=a.splice(i,1)[0];if(!pick3.some(x=>x.check===q.check))pick3.push(q);}};
+  take(pool.filter(q=>q.season),2);   // в сезон два задания из трёх — сезонные (за них опыт сезона), третье — обычное
   take(top);take(pool);take(usable);
   PROG.q={day,ids:pick3.map(q=>q.id),p:{},done:[]};progSave();}
 function questsToday(){questsRoll();const byId=new Map((window.cityQuests||[]).map(q=>[q.id,q]));return PROG.q.ids.map(id=>byId.get(id)).filter(Boolean);}
 function questsOn(kind,info,add){questsRoll();for(const q of questsToday()){if(q.check!==kind||PROG.q.done.includes(q.id))continue;if(!targetOk(q,info))continue;
     PROG.q.p[q.id]=(PROG.q.p[q.id]||0)+add;if(PROG.q.p[q.id]>=(q.n||1))questDone(q);}}
 function questDone(q){PROG.q.done.push(q.id);const r=q.reward||{};if(r.money)player.money+=r.money;if(r.mood)player.mood=clamp(player.mood+r.mood,0,100);
-  const what=(r.money?`+${fmtMoney(r.money)}`:'')+(r.mood?` · настроение +${r.mood}`:'');addEvent(`🎯 Задание выполнено: «${q.title}» ${what}`,'say');
+  const xp=seasonXP(q.xp||SEASON_XP.quest,null,true);
+  const what=(r.money?`+${fmtMoney(r.money)}`:'')+(r.mood?` · настроение +${r.mood}`:'')+(xp?` · ❄️ +${xp} опыта`:'');addEvent(`🎯 Задание выполнено: «${q.title}» ${what}`,'say');
   if(window.cityPhone)window.cityPhone.push({from:'Задания',text:`«${q.title}» — готово. ${what}`,kind:'quest'});
-  if(PROG.q.done.length===PROG.q.ids.length)setTimeout(()=>addEvent('🎯 Все задания на сегодня сделаны. Завтра будут новые','say'),1200);
+  if(PROG.q.done.length===PROG.q.ids.length)setTimeout(()=>{addEvent('🎯 Все задания на сегодня сделаны. Завтра будут новые','say');seasonXP(SEASON_XP.allDay,'все задания дня');},1200);
   updateQuestBtn();}
 
 // ---------- значки ----------
 function achValue(a){if(a.id==='metro-all')return PROG.metroSt.length;if(a.check==='talk'&&/восем|все/i.test(a.title+a.text))return PROG.folk.length;
   if(a.check==='money')return Math.floor(player.money||0);if(a.check==='days')return PROG.days.streak||0;return PROG.c[a.check]||0;}
 function achNeed(a){if(a.id==='metro-all')return typeof METRO_LINE!=='undefined'?METRO_LINE.filter(s=>s.ll).length:a.n||1;return a.n||1;}
-function achCheck(){for(const a of window.cityAchievements||[]){if(PROG.ach[a.id])continue;if(achValue(a)>=achNeed(a)){PROG.ach[a.id]=Date.now();
+function achCheck(){for(const a of window.cityAchievements||[]){if(PROG.ach[a.id])continue;if(achValue(a)>=achNeed(a)){PROG.ach[a.id]=Date.now();seasonXP(SEASON_XP.badge,'новый значок');
   addEvent(`${a.icon||'🏅'} Новый значок: «${a.title}»`,'say');if(window.cityPhone)window.cityPhone.push({from:'Значки',text:`${a.icon||'🏅'} «${a.title}» — ${a.text||''}`,kind:'badge'});}}}
 window.cityAchievementsState=function(){const out={};for(const a of window.cityAchievements||[])out[a.id]={done:!!PROG.ach[a.id],n:Math.min(achValue(a),achNeed(a))};return out;};
 
 // ---------- дни подряд ----------
 function daysTick(){const d=mskDate();const D=PROG.days;if(D.last===d)return;const y=new Date(Date.parse(d)-86400e3).toISOString().slice(0,10);
-  D.streak=D.last===y?(D.streak||0)+1:1;D.last=d;D.total=(D.total||0)+1;progSave();achCheck();}
+  D.streak=D.last===y?(D.streak||0)+1:1;D.last=d;D.total=(D.total||0)+1;progSave();achCheck();
+  setTimeout(()=>seasonXP(SEASON_XP.day+SEASON_XP.streak*Math.min(7,D.streak-1),D.streak>1?`${D.streak}-й день подряд`:'день в городе'),5000);}
 
 // ---------- вечерние события (cityDaily): напоминание за час, сбор в месте по подсказкам, награда за приход ----------
 function gameDow(){return new Date(Date.UTC(2026,5,20)+((clock.day||1)-1)*86400e3).getUTCDay();}   // тот же календарь, что в телефоне
@@ -68,17 +71,29 @@ function placeByHints(hints){if(!world)return null;const hs=(hints||[]).map(h=>S
   let best=null;for(const r of world.roads){if(!r.n||!hs.some(h=>r.n.toLowerCase().includes(h)))continue;const q=world.nodes[r.p[r.p.length>>1]];const d=dist(q[0],q[1],player.x,player.y);if(!best||d<best.d)best={x:q[0],y:q[1],n:r.n,d};}
   return best;}
 const EVT={t:0,cur:null};
+function evPlace(d){if(Array.isArray(d.at)){const q=llToXY(d.at);return {x:q[0],y:q[1],n:d.place||d.title};}return placeByHints(d.hints);}
 function eventsTick(dt){EVT.t-=dt;if(EVT.t>0||!world||typeof clock==='undefined')return;EVT.t=2;const list=window.cityDaily||[];if(!list.length)return;
-  const dow=gameDow(),h=(clock.minutes/60)%24,key=d=>`${clock.day}:${d.dow}:${d.hour}`;
-  for(const d of list){if(d.dow!==dow)continue;const k=key(d);const st=PROG.ev[k]||(PROG.ev[k]={});
-    if(!st.remind&&h>=d.hour-1&&h<d.hour){st.remind=1;addEvent(`🌙 ${d.remind||('Через час — '+d.title)}`,'say');if(window.cityPhone)window.cityPhone.push({from:'Вечер',text:d.remind||d.title,kind:'event'});progSave();}
-    if(h>=d.hour&&h<d.hour+2){if(!st.place){const pl=placeByHints(d.hints);if(!pl){st.place='none';continue;}st.place=[pl.x,pl.y,pl.n];progSave();
-        mark(null,'event:'+k,pl.x,pl.y,'🌙',d.title,{arrow:true,color:'#7B61FF'});addEvent(`🌙 Начинается: ${d.title} — ${pl.n}`,'say');
-        if(pl.sq&&typeof startRally==='function'){const kind=d.kind==='concert'?'concert':'meet';try{startRally(pl.sq,kind,d.title,'city');}catch(e){}}}
-      if(Array.isArray(st.place)&&!st.got&&!player.inside&&dist(player.x,player.y,st.place[0],st.place[1])<60){st.got=1;const r=d.reward||{};if(r.money)player.money+=r.money;if(r.mood)player.mood=clamp(player.mood+r.mood,0,100);
-        addEvent(`🌙 Вы на месте: ${d.title}. ${d.text||''} ${r.money?'+'+fmtMoney(r.money):''}`,'say');unmark('event:'+k);cityTrack('event',{name:d.title});}}
-    if(h>=d.hour+2&&Array.isArray(st.place)&&!st.closed){st.closed=1;unmark('event:'+k);progSave();}}
-  const keep=Object.keys(PROG.ev).filter(k=>+k.split(':')[0]>=(clock.day||1)-2);if(keep.length<Object.keys(PROG.ev).length){const n={};for(const k of keep)n[k]=PROG.ev[k];PROG.ev=n;}}
+  const dow=gameDow(),h=(clock.minutes/60)%24,today=mskDate(),key=d=>(d.date?`d:${d.date}:${d.hour}`:`${clock.day}:${d.dow}:${d.hour}`)+':'+d.title;
+  // сезонные вечера — только в сезон; обычный вечер в тот же день и час в том же месте (общие подсказки) уступает сезонному;
+  // разовый вечер (date) — в этот день по Москве, в свой час игрового времени, один раз.
+  // Первый обычный вечер дня (общий, в центре), сезонные и разовые видны всем; районные — только тем, кто в 4 км от места.
+  const seas=list.filter(d=>d.season&&seasonOn(d.season)&&d.dow===dow);let first=true;const live=new Set();
+  for(const d of list){if(d.season&&!seasonOn(d.season))continue;if(d.date?d.date!==today:d.dow!==dow)continue;
+    const plain=!d.season&&!d.date,main=!plain||first;if(plain)first=false;
+    if(plain&&seas.some(s=>s.hour===d.hour&&(s.hints||[]).some(x=>(d.hints||[]).includes(x))))continue;
+    const k=key(d);let t=h-d.hour;if(t<-12)t+=24;if(t<-1||t>=2)continue;live.add(k);const st=PROG.ev[k]||(PROG.ev[k]={});
+    if(st.show===undefined){const pl=evPlace(d);st.place=pl?[pl.x,pl.y,pl.n]:'none';st.show=!!pl&&(main||dist(player.x,player.y,pl.x,pl.y)<4000);progSave();}
+    if(!st.show)continue;
+    if(!st.remind&&t<0){st.remind=1;addEvent(`🌙 ${d.remind||('Через час — '+d.title)}`,'say');if(window.cityPhone)window.cityPhone.push({from:'Вечер',text:d.remind||d.title,kind:'event'});progSave();}
+    if(t<0)continue;
+    if(!st.on){st.on=1;progSave();const p=st.place;mark(null,'event:'+k,p[0],p[1],'🌙',d.title,{arrow:true,color:'#7B61FF'});addEvent(`🌙 Начинается: ${d.title} — ${p[2]}`,'say');
+      const pl=Array.isArray(d.at)?null:evPlace(d);if(pl&&pl.sq&&typeof startRally==='function'){const kind=d.kind==='concert'?'concert':'meet';try{startRally(pl.sq,kind,d.title,'city');}catch(e){}}}
+    if(!st.got&&!player.inside&&dist(player.x,player.y,st.place[0],st.place[1])<60){st.got=1;const r=d.reward||{};if(r.money)player.money+=r.money;if(r.mood)player.mood=clamp(player.mood+r.mood,0,100);
+      const xp=seasonXP(d.xp||SEASON_XP.evening,null,true);
+      addEvent(`🌙 Вы на месте: ${d.title}. ${d.text||''} ${r.money?'+'+fmtMoney(r.money):''}${xp?' · ❄️ +'+xp+' опыта':''}`,'say');unmark('event:'+k);cityTrack('event',{name:d.title});progSave();}}
+  // кончился (или сменились сутки) — убрать метку
+  for(const k in PROG.ev){const st=PROG.ev[k];if(st.on&&!st.closed&&!live.has(k)){st.closed=1;unmark('event:'+k);progSave();}}
+  const keep=Object.keys(PROG.ev).filter(k=>k.startsWith('d:')?k.slice(2,12)>=today:+k.split(':')[0]>=(clock.day||1)-2);if(keep.length<Object.keys(PROG.ev).length){const n={};for(const k of keep)n[k]=PROG.ev[k];PROG.ev=n;}}
 
 // ---------- районы: «Вы в районе …» и один факт (districts.js: жилые места с center, административные с kind:'admin') ----------
 const DIST={t:0,cur:null,adm:null};
@@ -93,7 +108,7 @@ function districtsTick(dt){DIST.t-=dt;if(DIST.t>0||!world||player.inside||player
   const parent=found&&found.parent?list.find(x=>x.id===found.parent):null;const admin=parent||adm;
   const cur=found||admin;if(!cur||cur.id===DIST.cur)return;DIST.cur=cur.id;
   const where=found?found.name+(admin&&admin!==found?' · '+admin.name:''):admin.name;
-  if(!PROG.seenD.includes(cur.id)){PROG.seenD.push(cur.id);progSave();const f=(cur.facts||[])[Math.floor(Math.random()*(cur.facts||[]).length)];
+  if(!PROG.seenD.includes(cur.id)){PROG.seenD.push(cur.id);progSave();seasonXP(SEASON_XP.district,'новый район');const f=(cur.facts||[])[Math.floor(Math.random()*(cur.facts||[]).length)];
     addEvent(`📍 ${where}${f?'. '+f:''}`,'say');}
   else{const l=(cur.lines||[])[Math.floor(Math.random()*(cur.lines||[]).length)];setHint(`📍 ${where}${l?' — '+l:''}`);}}
 
@@ -138,14 +153,14 @@ function engineTick(dt){walkTick(dt);eventsTick(dt);districtsTick(dt);}
 
 // ---------- окно «Задания» ----------
 function updateQuestBtn(){const b=$('#questBtn');if(!b)return;if(tutActive()){b.textContent='👣'+(PROG.tut.i+1);b.title='Первые шаги';return;}const n=PROG.q.ids.length-PROG.q.done.length;b.textContent=n>0?'🎯'+n:'🎯';b.title=n>0?`Задания на сегодня: осталось ${n}`:'Задания на сегодня сделаны';}
-function openQuests(){questsRoll();const box=$('#qList');box.innerHTML='';
+function openQuests(){questsRoll();const box=$('#qList');box.innerHTML='';const sb=$('#qSeason');if(sb){sb.innerHTML='';if(!tutActive())seasonCard(sb);}
   $('#qTitle').textContent=tutActive()?'Первые шаги':'Задания на сегодня';$('#qSub').textContent=tutActive()?'Восемь коротких шагов, чтобы освоиться в городе. За каждый — немного денег.':'Три задания в сутки (по Москве). Чем дольше играете, тем интереснее.';
   if(tutActive()){const L=tutList();L.forEach((t,i)=>{const el=document.createElement('div');el.className='rt-card';const h=document.createElement('b');h.textContent=(i<PROG.tut.i?'✅ ':i===PROG.tut.i?'👣 ':'· ')+t.title;const x=document.createElement('span');x.textContent=i===PROG.tut.i?(t.text||''):'';el.append(h,x);if(i>PROG.tut.i)el.style.opacity='.5';box.append(el);});
     const sk=document.createElement('button');sk.className='btn';sk.textContent='Пропустить обучение';sk.addEventListener('click',()=>{PROG.tut.end=true;progSave();updateQuestBtn();openQuests();});box.append(sk);
     $('#qAch').textContent='Пройдите первые шаги — потом каждый день будут три задания.';$('#questModal').hidden=false;player.busy=true;return;}
   for(const q of questsToday()){const done=PROG.q.done.includes(q.id);const n=Math.min(PROG.q.p[q.id]||0,q.n||1);const el=document.createElement('div');el.className='rt-card';
     const h=document.createElement('b');h.textContent=(done?'✅ ':'🎯 ')+q.title;const t=document.createElement('span');t.textContent=q.text||'';
-    const p=document.createElement('span');const r=q.reward||{};p.textContent=(done?'Готово':`${q.check==='walk'?Math.round(n)+' из '+q.n+' м':n+' из '+(q.n||1)}`)+' · награда '+(r.money?fmtMoney(r.money):'')+(r.mood?' и настроение':'');
+    const p=document.createElement('span');const r=q.reward||{};p.textContent=(done?'Готово':`${q.check==='walk'?Math.round(n)+' из '+q.n+' м':n+' из '+(q.n||1)}`)+' · награда '+(r.money?fmtMoney(r.money):'')+(r.mood?' и настроение':'')+(seasonOn()?` · ❄️ ${q.xp||SEASON_XP.quest} опыта`:'');
     el.append(h,t,p);box.append(el);}
   if(!box.children.length){const p=document.createElement('p');p.className='hint';p.textContent='Заданий пока нет.';box.append(p);}
   const got=Object.keys(PROG.ach).length,all=(window.cityAchievements||[]).length;$('#qAch').textContent=all?`Значков: ${got} из ${all} — список в «Сегодня» → «Значки». Дней подряд: ${PROG.days.streak||1}.`:'';

@@ -242,12 +242,13 @@ function nearest(p,R,K,out){out.length=0;const c0=Math.floor((p.x-R)/CELL),c1=Ma
 // толпа: сколько людей в каждой клетке 10 м в радиусе R (клиент сам вычтет тех, кого видит)
 function crowdCells(p,R){const res=[];const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);
   for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(!c)continue;for(const [fk,n] of c.fine){res.push([Math.floor(fk/20000)-5000,fk%20000-5000,n]);if(res.length>=800)return res;}}return res;}
-const META_KEYS=['n','r','c','v','vc','sy','g','a'];
+const META_KEYS=['n','r','c','v','vc','sy','g','a','w'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
   if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
   if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
     if(m.sy&&typeof m.sy==='object'){if(modBlocked(p))m.sy=null;else if(typeof m.sy.t==='string')m.sy={t:Mod.clean(clean(m.sy.t,140)),i:+m.sy.i||0};}
+    if('w' in m){const w=m.w,o={};if(w&&typeof w==='object')for(const k of ['h','s','g','b','f'])if(typeof w[k]==='string'&&/^[a-z0-9-]{1,24}$/.test(w[k]))o[k]=w[k];m.w=o;}   // надетые вещи — только номера вещей витрины
     if(m.g&&typeof m.g==='object'&&typeof m.g.t==='string')m.g=Object.assign({},m.g,{t:Mod.clean(clean(m.g.t,60))});if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}

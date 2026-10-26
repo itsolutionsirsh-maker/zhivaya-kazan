@@ -80,8 +80,8 @@ function render(){
   if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross'||!!w.mv||!!w.walking,scale:1.5});}
     for(const w of walkers){if(w.state==='hurt'&&w.x>vx0&&w.x<vx1&&w.y>vy0&&w.y<vy1)drawPerson(w.x,w.y,w.hx,w.hy,w.p,0,{lying:true,scale:1.5});}}
   // ---- игрок и другие игроки
-  for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,{clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},t,false);}
-  if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,{clothes:player.clothes,skin:player.skin,hair:player.hair,role:'player'},t,true);
+  for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,Object.assign({clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),t,false);}
+  if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,myLook(),t,true);
   // линия навигатора: оставшийся путь пешком или на машине
   {const wl=player.vehicle?(player.vehicle.auto&&player.vehicle.auto.wps):(!player.bus&&player.waypoints);if(wl&&wl.length){ctx.save();ctx.strokeStyle='rgba(43,176,98,.75)';ctx.lineWidth=Math.max(0.8,2.2/z);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([Math.max(1.2,4/z),Math.max(1,3/z)]);ctx.beginPath();ctx.moveTo(player.x,player.y);for(let i=(player.vehicle?player.vehicle.auto.i||0:0);i<wl.length;i++)ctx.lineTo(wl[i][0],wl[i][1]);ctx.stroke();ctx.restore();}}
   if(player.waypoints&&!player.vehicle){const w=player.waypoints[player.waypoints.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(w[0],w[1],1.6+Math.sin(t*6)*0.3,0,TAU);ctx.stroke();}
@@ -108,8 +108,8 @@ function render(){
   for(const b of buses){if(b.x<vx0||b.x>vx1||b.y<vy0||b.y>vy1)continue;const [sx,sy0]=toS(b.x,b.y);const sy=sy0-2.2*z-10;ctx.fillStyle=b.color;rrect(ctx,sx-14,sy-8,28,16,4);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(b.route.ref,sx,sy+0.5);}
   {// в толпе подписываем только ближайших, иначе имена слипаются в кашу
     const arr=[...peerRender.values()];if(arr.length>12)arr.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
-    for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img);}}
-  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg);}
+    for(let i=0;i<arr.length;i++){const pr=arr[i];if(i>=12&&!pr.say)continue;const [sx,sy]=toS(pr.x,pr.y);if(sx<-60||sx>W+60||sy<-60||sy>H+60)continue;labelPlayer(sx,sy-Math.max(1.2*z,8),pr.name,false,pr.img,pr.look&&pr.look.frame);}}
+  if(!player.bus&&!player.inside){const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-Math.max((player.vehicle?2.2:1.2)*z,9),player.name,true,player.avatarImg,myLook().frame);}
   drawRallyLabels(toS,z);
   drawCrowd(toS,z);drawSpeedCams(toS,z);drawCityBubbles(toS,z);
   drawCompanionMark(toS,z);drawSituations(toS,z);
@@ -146,8 +146,9 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(sw,-0.66,0.16,0,TAU);ctx.arc(-sw,0.66,0.16,0,TAU);ctx.fill();
   ctx.fillStyle=p.clothes;rrect(ctx,-0.42,-0.56,0.84,1.12,0.4);ctx.fill();
   if(hi){ctx.fillStyle='rgba(255,255,255,.14)';rrect(ctx,-0.1,-0.5,0.46,1.0,0.3);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=0.05;rrect(ctx,-0.42,-0.56,0.84,1.12,0.4);ctx.stroke();
-    if(p.bag){ctx.fillStyle=p.bag;rrect(ctx,-0.3,0.45,0.42,0.3,0.06);ctx.fill();}}
+    if(p.bag){ctx.fillStyle=p.bag;if(p.backpack)rrect(ctx,-0.62,-0.3,0.3,0.6,0.08);else rrect(ctx,-0.3,0.45,0.42,0.3,0.06);ctx.fill();}}
   if(p.role==='courier'){ctx.fillStyle='#2B2B2B';rrect(ctx,-0.52,-0.3,0.32,0.6,0.06);ctx.fill();}
+  if(p.scarf){ctx.fillStyle=p.scarf;ctx.beginPath();ctx.ellipse(0.02,0,0.26,0.46,0,0,TAU);ctx.fill();if(hi){rrect(ctx,-0.46,0.14,0.36,0.14,0.05);ctx.fill();}}
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(0.05,0,0.34,0,TAU);ctx.fill();
   const hs=p.hairStyle||0;
   if(hs===4){ctx.fillStyle='#1E3480';ctx.beginPath();ctx.arc(0,0,0.36,0,TAU);ctx.fill();ctx.fillStyle='#E53935';ctx.fillRect(-0.05,-0.36,0.1,0.72);ctx.fillStyle='#0F1E55';ctx.beginPath();ctx.arc(0.22,0,0.2,0,TAU);ctx.fill();}
@@ -157,7 +158,17 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   else{ctx.fillStyle=p.hair;ctx.beginPath();ctx.arc(-0.13,0,0.27,0,TAU);ctx.fill();}
   if(hi&&hs!==4){ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(-0.12,-0.1,0.1,0,TAU);ctx.fill();}
   if(p.role==='guard'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0,0,0.32,0,TAU);ctx.fill();}
+  if(p.hat)drawHat(p.hat,hi);
+  if(p.glasses&&hi){ctx.strokeStyle=p.glasses;ctx.lineWidth=0.05;ctx.beginPath();ctx.arc(0.3,-0.12,0.07,0,TAU);ctx.moveTo(0.37,0.12);ctx.arc(0.3,0.12,0.07,0,TAU);ctx.moveTo(0.3,-0.05);ctx.lineTo(0.3,0.05);ctx.stroke();}
   ctx.restore();}
+// шапка сверху на голове (человек смотрит вдоль +x): вязаная, с помпоном, ушанка, тюбетейка, шляпа, кепка
+function drawHat(h,hi){const c=h.c;if(h.k==='felt'){ctx.fillStyle=shade(c,0.82);ctx.beginPath();ctx.arc(0,0,0.46,0,TAU);ctx.fill();ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.02,0,0.27,0,TAU);ctx.fill();return;}
+  if(h.k==='tub'){ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.06,0,0.23,0,TAU);ctx.fill();if(hi){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=0.03;ctx.beginPath();ctx.arc(-0.06,0,0.15,0,TAU);ctx.stroke();}return;}
+  if(h.k==='ush'){ctx.fillStyle=shade(c,0.8);ctx.beginPath();ctx.ellipse(0.04,-0.31,0.16,0.1,0,0,TAU);ctx.ellipse(0.04,0.31,0.16,0.1,0,0,TAU);ctx.fill();}
+  ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.03,0,0.32,0,TAU);ctx.fill();
+  if(h.k==='cap'){ctx.fillStyle=shade(c,0.75);ctx.beginPath();ctx.ellipse(0.3,0,0.14,0.22,0,0,TAU);ctx.fill();}
+  if(hi){ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.arc(-0.1,-0.1,0.1,0,TAU);ctx.fill();}
+  if(h.k==='pom'){ctx.fillStyle=shade(c,1.25);ctx.beginPath();ctx.arc(-0.14,0,0.11,0,TAU);ctx.fill();}}
 function drawCarSprite(x,y,hx,hy,L,Wd,color,kind,t,ex){ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));const hi=LOD>=2;
   ctx.fillStyle='rgba(0,0,0,.25)';rrect(ctx,-L/2+0.25,-Wd/2+0.3,L,Wd,0.5);ctx.fill();
   if(hi){ctx.fillStyle='#1A1A1A';for(const sx of [-L*0.3,L*0.3]){rrect(ctx,sx-0.36,-Wd/2-0.06,0.72,0.3,0.08);ctx.fill();rrect(ctx,sx-0.36,Wd/2-0.24,0.72,0.3,0.08);ctx.fill();}}
@@ -198,10 +209,17 @@ function drawPlayerWorld(x,y,hx,hy,veh,persona,t,me){
     if(me){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.25;ctx.beginPath();ctx.arc(x,y,veh.kind==='scooter'?1.3:3.1,0,TAU);ctx.stroke();}return;}
   if(player.state==='hurt'&&me){drawPerson(x,y,hx,hy,persona,0,{lying:true,scale:1.5});return;}
   drawPerson(x,y,hx,hy,persona,player.phase,{moving:true,ring:me,scale:1.8});}
-function labelPlayer(sx,sy,name,me,img){ctx.save();ctx.font='600 12px "IBM Plex Sans",system-ui';ctx.textAlign='left';ctx.textBaseline='middle';const tw=ctx.measureText(name).width;const aw=img?22:0;const w=tw+14+aw;const x0=sx-w/2,y0=sy-26;
+function labelPlayer(sx,sy,name,me,img,frame){ctx.save();ctx.font='600 12px "IBM Plex Sans",system-ui';ctx.textAlign='left';ctx.textBaseline='middle';const tw=ctx.measureText(name).width;const aw=img?22:0;const w=tw+14+aw;const x0=sx-w/2,y0=sy-26;
   ctx.fillStyle=me?'rgba(43,176,98,.95)':'rgba(20,30,26,.85)';rrect(ctx,x0,y0,w,22,8);ctx.fill();
+  if(frame)drawNameFrame(frame,x0,y0,w);
   if(img){ctx.save();ctx.beginPath();ctx.arc(x0+12,y0+11,9,0,TAU);ctx.clip();ctx.drawImage(img,x0+3,y0+2,18,18);ctx.restore();}
   ctx.fillStyle=me?'#0B2B17':'#fff';ctx.fillText(name,x0+7+aw,y0+11.5);ctx.restore();}
+// рамка имени из вещей: обводка; «значок» — точка у имени, «снежинка» — ❄ сбоку, «гирлянда» — огоньки по верху
+function drawNameFrame(f,x0,y0,w){ctx.save();if(f.k!=='pin'){ctx.strokeStyle=f.c;ctx.lineWidth=f.k==='thread'?1:2.2;rrect(ctx,x0-1.5,y0-1.5,w+3,25,9.5);ctx.stroke();}
+  if(f.k==='pin'){ctx.fillStyle=f.c;ctx.beginPath();ctx.arc(x0+w+5,y0+11,4,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();}
+  if(f.k==='flake'){ctx.fillStyle=f.c;ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText('❄',x0+w+8,y0+11.5);}
+  if(f.k==='garland'){const cols=['#F2C14E','#E24B6A','#2E9BD6','#6BCB77'];for(let i=0,n=Math.max(3,Math.floor(w/12));i<n;i++){ctx.fillStyle=cols[i%4];ctx.beginPath();ctx.arc(x0+6+i*(w-12)/(n-1),y0-1.5,2,0,TAU);ctx.fill();}}
+  ctx.restore();}
 let miniBg=null;
 function renderMini(){const tn=performance.now();if(!renderMini.t||tn-renderMini.t>500){renderMini.t=tn;renderMini.vis=mini.offsetParent!==null;}if(!renderMini.vis)return;/* видимость — раз в полсекунды: offsetParent каждый кадр пересчитывал раскладку страницы */const mw=mini.width,mh=mini.height;const bb=world.bbox;const sx=mw/(bb[2]-bb[0]),sy=mh/(bb[3]-bb[1]);const s=Math.min(sx,sy);const ox=(mw-(bb[2]-bb[0])*s)/2,oy=(mh-(bb[3]-bb[1])*s)/2;
   if(!miniBg){miniBg=document.createElement('canvas');miniBg.width=mw;miniBg.height=mh;const m=miniBg.getContext('2d');m.fillStyle='#DAD5C7';m.fillRect(0,0,mw,mh);m.setTransform(s,0,0,s,ox-bb[0]*s,oy-bb[1]*s);for(const a of world.areas){if(a.k!=='water'&&a.k!=='park'&&a.k!=='forest')continue;m.fillStyle=AREA_FILL[a.k];m.beginPath();m.moveTo(a.p[0],a.p[1]);for(let i=2;i<a.p.length;i+=2)m.lineTo(a.p[i],a.p[i+1]);m.closePath();m.fill();}
@@ -290,5 +308,5 @@ function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOvervie
   if(typeof routeOverlay==='function')routeOverlay(toS);
   drawRallyLabels(toS,z);drawCompanionMark(toS,z);drawSituations(toS,z);
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-26,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-17);}
-  {const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-10,player.name,true,player.avatarImg);}
+  {const [sx,sy]=toS(player.x,player.y);labelPlayer(sx,sy-10,player.name,true,player.avatarImg,myLook().frame);}
   renderMini();}
