@@ -117,6 +117,8 @@ function render(){
   ctx.font='700 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const ac of accidents){if(ac.medical)continue;const [sx,sy]=toS(ac.x,ac.y);ctx.fillStyle='rgba(220,58,68,.95)';rrect(ctx,sx-22,sy-30,44,18,5);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('ДТП',sx,sy-21);}
   for(const w of walkers){if(w.state!=='cross'||z<2.5)continue;const [sx,sy]=toS(w.x,w.y);ctx.fillStyle='rgba(235,187,75,.95)';rrect(ctx,sx-8,sy-22,16,14,4);ctx.fill();ctx.fillStyle='#2B2200';ctx.fillText('!',sx,sy-15);}
   if(typeof drawMetroSigns==='function')drawMetroSigns(vx0,vy0,vx1,vy1,z,toS);
+  // Навигационные метки поверх ночного затемнения. Издалека — прежнее рисование без новых проходов.
+  if(z>=3){drawTransportMarks(toS,z,vx0,vy0,vx1,vy1);drawPlayerBeacon(toS,z);drawActionTarget(toS,z);}
   // свои люди: имя над головой у тех, с кем уже знакомы
   if(z>2.2&&typeof FOLK!=='undefined'){ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';for(const f of FOLK.list){const w=f.w;if(!w||!f.met||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;const [sx,sy]=toS(w.x,w.y);const t='★ '+f.name;const tw=ctx.measureText(t).width+12;ctx.fillStyle='rgba(20,60,40,.85)';rrect(ctx,sx-tw/2,sy-46*Math.min(1.6,z/4)-9,tw,18,9);ctx.fill();ctx.fillStyle='#E9FFF1';ctx.fillText(t,sx,sy-46*Math.min(1.6,z/4));}}
   if(weather.rain.length){ctx.strokeStyle='rgba(120,150,190,.45)';ctx.lineWidth=1;ctx.beginPath();for(const r of weather.rain){const x=r[0]*W,y=r[1]*H;ctx.moveTo(x,y);ctx.lineTo(x-2,y+9*r[2]);}ctx.stroke();ctx.fillStyle='rgba(60,80,110,.12)';ctx.fillRect(0,0,W,H);}
@@ -127,6 +129,76 @@ function render(){
   renderMini();
 }
 function poly(p){ctx.beginPath();ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath();}
+
+// Четыре маленьких векторных значка: шашечки, встречные стрелки, ключ и самокат.
+// Растрируем один раз при смене DPR, чтобы не строить пути для каждой машины каждый кадр.
+let transportMarks=null,transportMarksDPR=0;
+function makeTransportMarks(){
+  transportMarks={};transportMarksDPR=DPR;
+  for(const kind of ['taxi','share','own','scooter']){
+    const c=document.createElement('canvas');c.width=c.height=20*DPR;const g=c.getContext('2d');g.scale(DPR,DPR);
+    g.fillStyle='#142B27';rrect(g,0,0,20,20,6);g.fill();
+    g.fillStyle=kind==='taxi'?'#FFDB60':kind==='share'?'#8EE5F0':kind==='scooter'?'#D3C2FF':'#FFFFFF';rrect(g,1.5,1.5,17,17,4.5);g.fill();
+    g.strokeStyle=g.fillStyle='#142B27';g.lineWidth=1.7;g.lineCap='round';g.lineJoin='round';
+    if(kind==='taxi'){for(let y=0;y<2;y++)for(let x=0;x<3;x++)if((x+y)%2===0)g.fillRect(4+x*4,6+y*4,4,4);}
+    else if(kind==='share'){g.beginPath();g.moveTo(5,7);g.lineTo(15,7);g.lineTo(12,4);g.moveTo(15,13);g.lineTo(5,13);g.lineTo(8,16);g.stroke();}
+    else if(kind==='own'){g.beginPath();g.arc(7,7,2.5,0,TAU);g.moveTo(9,9);g.lineTo(15,15);g.moveTo(12,12);g.lineTo(14,10);g.moveTo(14,14);g.lineTo(16,12);g.stroke();}
+    else{g.beginPath();g.arc(5,14,1.5,0,TAU);g.moveTo(16.5,14);g.arc(15,14,1.5,0,TAU);g.moveTo(5,12);g.lineTo(12,12);g.lineTo(14,5);g.lineTo(11,5);g.stroke();}
+    transportMarks[kind]=c;
+  }
+}
+function drawTransportMarks(toS,z,x0,y0,x1,y1){
+  if(!transportMarks||transportMarksDPR!==DPR)makeTransportMarks();
+  const mark=(v,kind)=>{if(v.x<x0||v.x>x1||v.y<y0||v.y>y1)return;
+    // У выбранного транспорта вместо второго значка будет одна метка E.
+    if(currentAction&&currentAction.at===v)return;
+    const [sx,sy]=toS(v.x,v.y);ctx.drawImage(transportMarks[kind],sx-8,sy-Math.max(13,1.5*z)-16,16,16);
+  };
+  for(const r of rentals)mark(r,r.kind==='scooter'?'scooter':'share');
+  if(ownCar&&ownCar.parked)mark(ownCar,'own');
+  for(const c of cars)if(c.kind==='taxi')mark(c,'taxi');
+}
+function drawPlayerBeacon(toS,z){
+  if(player.bus||player.inside)return;
+  const [sx,sy]=toS(player.x,player.y),v=player.vehicle;
+  const r=Math.max(11,(v&&v.kind!=='scooter'?3.1:1.7)*z);
+  ctx.save();ctx.translate(sx,sy);ctx.beginPath();ctx.arc(0,0,r,0,TAU);
+  ctx.strokeStyle='#102E28';ctx.lineWidth=6;ctx.stroke();ctx.strokeStyle='#FFFFFF';ctx.lineWidth=4;ctx.stroke();ctx.strokeStyle='#35D69B';ctx.lineWidth=2;ctx.stroke();
+  ctx.rotate(Math.atan2(player.hy,player.hx));ctx.beginPath();ctx.moveTo(r+7,0);ctx.lineTo(r+1,-4);ctx.lineTo(r+1,4);ctx.closePath();
+  ctx.strokeStyle='#102E28';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#FFFFFF';ctx.fill();ctx.restore();
+}
+function drawActionTarget(toS,z){
+  const a=currentAction;
+  if(scene==='interior'||!a||!a.at||!a.tk||!Number.isFinite(a.at.x)||!Number.isFinite(a.at.y))return;
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  let x=a.at.x,y=a.at.y,r=12;
+  const b=a.bld;
+  if(b&&b.p&&b.p.length>=6&&(a.tk==='poi'||a.tk==='home'||a.tk==='building')){
+    // Контур выбранного здания и ближайшая к игроку точка стены; POI может быть глубоко внутри дома.
+    const p=b.p,ex=z>1.4?EXT[0]*(b.hm||0):0,ey=z>1.4?EXT[1]*(b.hm||0):0;let best=Infinity;
+    ctx.beginPath();
+    for(let i=0;i<p.length;i+=2){const j=(i+2)%p.length,dx=p[j]-p[i],dy=p[j+1]-p[i+1];
+      const u=clamp(((player.x-p[i])*dx+(player.y-p[i+1])*dy)/(dx*dx+dy*dy||1),0,1);
+      const qx=p[i]+u*dx,qy=p[i+1]+u*dy,d=(qx-player.x)**2+(qy-player.y)**2;
+      if(d<best){best=d;x=qx;y=qy;}
+      const [sx,sy]=toS(p[i]+ex,p[i+1]+ey);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);
+    }
+    ctx.closePath();ctx.strokeStyle='rgba(20,35,30,.85)';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2;ctx.stroke();r=7;
+  }else if(a.tk==='taxi'||a.tk==='share'||a.tk==='own')r=Math.max(15,2.8*z);
+  else if(a.tk==='stop'||a.tk==='metro'||a.tk==='accident')r=16;
+  const [sx,sy]=toS(x,y);
+  if(sx<-r-30||sx>W+r+30||sy<-r-30||sy>H+r+30){ctx.restore();return;}
+  // Скобки отличаются от круглой метки игрока и не закрывают самого человека или машину.
+  ctx.beginPath();for(const dx of [-1,1])for(const dy of [-1,1]){
+    ctx.moveTo(sx+dx*(r-5),sy+dy*r);ctx.lineTo(sx+dx*r,sy+dy*r);ctx.lineTo(sx+dx*r,sy+dy*(r-5));
+  }
+  ctx.strokeStyle='#142B27';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2.5;ctx.stroke();
+  // Значок с внешней стороны цели, дальше от игрока. Координаты читаем с живого at, без таймеров и пульсации.
+  const dx=x-player.x,dy=y-player.y,L=Math.hypot(dx,dy);
+  const bx=sx+(L>0.01?dx/L:0)*(r+13),by=sy+(L>0.01?dy/L:-1)*(r+13);
+  ctx.fillStyle='#142B27';rrect(ctx,bx-11,by-11,22,22,6);ctx.fill();ctx.fillStyle='#FFDA69';rrect(ctx,bx-9,by-9,18,18,4);ctx.fill();
+  ctx.fillStyle='#142B27';ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('E',bx,by+0.5);ctx.restore();
+}
 function drawBuilding(b,z,night){const p=b.p;const n=p.length;
   if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
   const ex=EXT[0]*b.hm,ey=EXT[1]*b.hm;const win=z>4.2&&b.h>=1;const lit=night>0.3&&b.lit;
@@ -206,7 +278,10 @@ function drawBusSprite(b){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan
   if(b.route.type==='tram'){ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=0.12;ctx.beginPath();ctx.moveTo(-1,-0.9);ctx.lineTo(1,0.9);ctx.stroke();}
   if(b.route.type==='trolleybus'){ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=0.1;ctx.beginPath();ctx.moveTo(-1,-0.4);ctx.lineTo(-4,-0.6);ctx.moveTo(-1,0.4);ctx.lineTo(-4,0.6);ctx.stroke();}
   ctx.restore();}
-function drawScooter(x,y,hx,hy){ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(-0.6,-0.05,1.3,0.35);ctx.fillStyle='#2B2B2B';rrect(ctx,-0.65,-0.17,1.2,0.34,0.1);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(-0.6,0,0.17,0,TAU);ctx.arc(0.6,0,0.17,0,TAU);ctx.fill();ctx.fillStyle='#7B61FF';ctx.fillRect(-0.3,-0.12,0.6,0.24);ctx.strokeStyle='#333';ctx.lineWidth=0.09;ctx.beginPath();ctx.moveTo(0.55,-0.38);ctx.lineTo(0.55,0.38);ctx.stroke();if(LOD>=2){ctx.fillStyle='#444';ctx.beginPath();ctx.arc(0.55,-0.38,0.07,0,TAU);ctx.arc(0.55,0.38,0.07,0,TAU);ctx.fill();ctx.fillStyle='#FFF';ctx.fillRect(0.62,-0.06,0.08,0.12);}ctx.restore();}
+function drawScooter(x,y,hx,hy){ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(-0.6,-0.05,1.3,0.35);
+  // На обычном масштабе читается Т-образный силуэт; мелкие ручки и фонарь остаются только в LOD 2.
+  if(LOD>=1){ctx.strokeStyle='#F5F0FF';ctx.lineWidth=0.65;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-0.65,0);ctx.lineTo(0.55,0);ctx.moveTo(0.55,-0.55);ctx.lineTo(0.55,0.55);ctx.stroke();}
+  ctx.fillStyle='#2B2B2B';rrect(ctx,-0.65,-0.17,1.2,0.34,0.1);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(-0.6,0,0.17,0,TAU);ctx.arc(0.6,0,0.17,0,TAU);ctx.fill();ctx.fillStyle='#7B61FF';ctx.fillRect(-0.3,-0.12,0.6,0.24);ctx.strokeStyle='#333';ctx.lineWidth=LOD>=1?0.2:0.09;ctx.beginPath();ctx.moveTo(0.55,LOD>=1?-0.55:-0.38);ctx.lineTo(0.55,LOD>=1?0.55:0.38);ctx.stroke();if(LOD>=2){ctx.fillStyle='#444';ctx.beginPath();ctx.arc(0.55,-0.55,0.07,0,TAU);ctx.arc(0.55,0.55,0.07,0,TAU);ctx.fill();ctx.fillStyle='#FFF';ctx.fillRect(0.62,-0.06,0.08,0.12);}ctx.restore();}
 function drawPlayerWorld(x,y,hx,hy,veh,persona,t,me){
   if(veh){if(veh.kind==='scooter'){drawScooter(x,y,hx,hy);drawPerson(x-hx*0.1,y-hy*0.1,hx,hy,persona,0,{moving:false,ring:me,scale:1.3});}
     else drawCarSprite(x,y,hx,hy,veh.kind==='own'?4.6:4.5,1.9,veh.kind==='taxi'?'#F4C542':(veh.color||'#C62828'),veh.kind==='own'?'own':veh.kind==='taxi'?'taxi':'share',t,{crashed:veh.crashed});
