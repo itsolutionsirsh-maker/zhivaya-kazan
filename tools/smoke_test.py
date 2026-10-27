@@ -82,7 +82,8 @@ try:
         print('player hit:', pg.evaluate('({state:player.state,cine:cine?cine.text:null,acc:accidents.map(a=>a.kind)})'))
         pg.evaluate('player.state="ok";cine=null;cam.zt=4.5')
         # интерьер кафе
-        pg.evaluate('''(()=>{const poi=world.pois.find(p=>p.t==="cafe"&&p.n);player.x=poi.x+3;player.y=poi.y;})()''')
+        # днём и в открытое кафе: у заведений часы работы (rhythm.js)
+        pg.evaluate('''(()=>{zkSetTime((clock.day-1)*1440+13*60);const poi=world.pois.find(p=>p.t==="cafe"&&p.n&&(typeof poiOpen!=="function"||poiOpen(p)));player.x=poi.x+3;player.y=poi.y;})()''')
         time.sleep(0.5)
         print('action near cafe:', pg.evaluate('currentAction?currentAction.label:null'))
         pg.keyboard.press('e')
@@ -92,10 +93,11 @@ try:
         pg.evaluate('''(()=>{const t=interior.furn.find(f=>f.spot==="table"&&!f.taken);player.ix=t.x;player.iy=t.y+1.5;})()''')
         time.sleep(0.5)
         print('action at table:', pg.evaluate('currentAction?currentAction.label:null'))
+        pg.evaluate('player.money=Math.max(player.money,5000)')   # дорогое кафе: без денег кнопки блюд неактивны
         pg.keyboard.press('e')
         time.sleep(0.4)
         print('menu:', pg.evaluate('[...document.querySelectorAll("#orderList .order-item")].length'))
-        pg.click('#orderList .order-item')
+        pg.click('#orderList .order-item:not([disabled])')
         time.sleep(0.3)
         pg.evaluate('player.ix=interior.door.x;player.iy=interior.door.y-0.5')
         time.sleep(0.5)

@@ -20,9 +20,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // подготовить человека: игрок у его места, дождаться, пока появится, поставить в 8 м
     const ready = async id => { await closeCards(); await ev(`(()=>{const s=sitActive('folkAct');if(s)endSit(s);const f=FOLK.list.find(q=>q.id==='${id}');FA.cool={};f.day=[[0,'work']];f.dayOff=[[0,'work']];if(f.at!=='work'){folkDrop(f);f.trip=null;f.at='work';}const pl=f.places[f.at];player.vehicle=null;player.waypoints=null;player.x=pl.x+6;player.y=pl.y;cam.x=player.x;cam.y=player.y;})()`); await sleep(1600);
       return ev(`(()=>{const f=FOLK.list.find(q=>q.id==='${id}');if(!f.w)return false;f.w.x=player.x+7;f.w.y=player.y;return true;})()`); };
-    const go = async (id, act) => { if (!await ready(id)) return 'не появился'; await ev(`(()=>{const f=FOLK.list.find(q=>q.id==='${id}');FA.s=startSit('folkAct',{w:f.w,f,act:'${act}'});})()`); await sleep(3500);
+    const onlyAct = () => ev(`(()=>{const a=sitActive('folkAct');let k=0;while(SIT.card&&SIT.card.s!==a&&k++<6){const c=SIT.card;pickChoice(c,c.choices[c.choices.length-1]);}})()`);
+    const go = async (id, act) => { if (!await ready(id)) return 'не появился'; await ev(`(()=>{const f=FOLK.list.find(q=>q.id==='${id}');FA.s=startSit('folkAct',{w:f.w,f,act:'${act}'});})()`); await sleep(3500); await onlyAct();
       return ev(`(()=>{const s=sitActive('folkAct');return {d:s&&Math.round(dist(s.w.x,s.w.y,player.x,player.y)*10)/10,t:s&&Math.round(s.t*10)/10,фаза:s&&s.phase,карточка:SIT.card&&SIT.card.text,кнопки:SIT.card&&SIT.card.choices.map(c=>c.t)};})()`); };
-    const pickN = (i, rnd) => ev(`(()=>{const r=Math.random;${rnd != null ? `Math.random=()=>${rnd};` : ''}pickChoice(SIT.card,SIT.card.choices[${i}]);Math.random=r;})()`);
+    const pickN = async (i, rnd) => { await onlyAct(); return ev(`(()=>{const r=Math.random;${rnd != null ? `Math.random=()=>${rnd};` : ''}pickChoice(SIT.card,SIT.card.choices[${i}]);Math.random=r;})()`); };
     // бомбила: дороже счётчика, торг, поездка за договорённую цену
     console.log('2) бомбила:', JSON.stringify(await go('hamit', 'offer_ride')));
     await pickN(1, 0.1); await sleep(200);
