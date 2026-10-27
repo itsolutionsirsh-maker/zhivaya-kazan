@@ -1,4 +1,4 @@
-// Одинаковые снимки «до/после» для работы над графикой: игрок в толпе днём и вечером, такси/каршеринг/самокат/своя машина рядом, вход в кафе с кнопкой действия.
+// Одинаковые снимки «до/после» для работы над графикой: толпа, транспорт, вход, свои люди на Баумана (обычный масштаб и детали).
 // Телефон 390×844 и компьютер 1280×800. Запустить на сборке main («до») и на сборке своей ветки («после») в разные папки.
 // node tools/tests/shots.js /tmp/zk-dev 8790 /tmp/shots-before
 const {chromium} = require('playwright');
@@ -44,9 +44,38 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await sleep(1200); await closeCards();
       await pg.screenshot({path: `${OUT}/${dev}_04_entrance.png`});
       console.log(dev, '| кафе:', cafe, '| действие:', await ev('currentAction?currentAction.label+(currentAction.tk?" ["+currentAction.tk+"]":""):null'));
+      // Свои люди на Баумана: реальные персоны из данных, одни и те же четыре человека в обеих сборках.
+      // Последняя сцена: останавливаем кадры только в этой тестовой странице, чтобы расписание не увело людей.
+      await closeCards();
+      await ev('window.requestAnimationFrame=((raf)=>cb=>cb===frame?0:raf.call(window,cb))(window.requestAnimationFrame)');await sleep(100);
+      const folk = await ev(`(()=>{
+        const active=sitActive('folkAct');if(active)endSit(active);
+        zkSetTime((clock.day-1)*1440+13*60);updateClock(0);
+        const L=llToXY([55.79242,49.11140]),n=nearestNode(L[0],L[1],world.pedAdj,200),q=sidewalkPos(n);
+        player.x=q[0];player.y=q[1];player.vehicle=null;player.waypoints=null;cam.x=q[0];cam.y=q[1];cam.zt=cam.z=5.5;
+        for(let i=0;i<50;i++)folkDistrictTick();
+        const specs=[['karim','phone',-10,-10],['gazinur','cart',6,-10],['arslan','guitar',-10,7],['halil','broom',6,7]];
+        const ids=new Set(specs.map(s=>s[0]));
+        for(const w of walkers)if(!ids.has(w.folk)&&dist(w.x,w.y,q[0],q[1])<28)w.x+=80;
+        for(const [id,item] of specs){const f=FOLK.list.find(f=>f.id===id);
+          if(!f||f.p.item!==item)throw new Error('Нет персоны для снимка: '+id+' / '+item);
+          if(!f.w)folkSpawn(f,{x:q[0],y:q[1]});}
+        const own=walkers.filter(w=>w.folk),out=[];
+        for(const [id,item,dx,dy] of specs){const w=own.find(w=>w.folk===id);
+          if(!w)throw new Error('Не появился для снимка: '+id);
+          w.x=q[0]+dx;w.y=q[1]+dy;w.hx=1;w.hy=0;w.phase=0;w.state='folkStay';w.path=null;w.mv=null;w.walking=false;w.bus=null;w.inside=null;w.filming=item==='phone';
+          out.push({id,item,filming:w.filming});}
+        weather.rain=[];weather.kind='clear';currentAction=null;updateHud();currentAction=null;performance.now=()=>750;
+        render();return out;
+      })()`);
+      await pg.screenshot({path: `${OUT}/${dev}_05_folk_bauman.png`});
+      await ev('cam.zt=cam.z=9.5;render()');
+      await pg.screenshot({path: `${OUT}/${dev}_06_folk_detail.png`});
+      console.log(dev, '| свои люди на Баумана:', JSON.stringify(folk));
       await ctx.close();
     }
   } finally { await b.close(); srv.kill(); }
   console.log('снимки в', OUT);
   console.log(errors.length ? errors.join('\n') : 'no page errors');
+  if(errors.length)process.exitCode=1;
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
