@@ -162,8 +162,8 @@ function updatePopulation(dt){
 }
 // пешеходы на дороге и занятые переходы — пересчёт каждый кадр
 function updateRoadPeds(){roadPeds=[];activeCrossings=[];
-  const onFoot=!player.inside&&player.state!=='hurt'&&(!player.vehicle||player.vehicle.kind==='scooter')&&!player.bus;
-  const vehOnRoad=player.vehicle&&player.vehicle.kind!=='scooter';
+  const onFoot=!player.inside&&player.state!=='hurt'&&(!player.vehicle||isLightVehicle(player.vehicle.kind))&&!player.bus;
+  const vehOnRoad=player.vehicle&&!isLightVehicle(player.vehicle.kind);
   if(onFoot||player.state==='hurt'&&!player.inside){const ns=nearestRoadSeg(player.x,player.y,16);const onRoad=ns&&ns.d<ns.seg.r.hw+0.3;if(onRoad||player.state==='hurt')roadPeds.push({x:player.x,y:player.y,ref:'player',hurt:player.state==='hurt'});
     // переходы рядом с игроком
     world.cgrid.query(player.x-8,player.y-8,player.x+8,player.y+8,c=>{if(onZebra(c,player.x,player.y,1.2))activeCrossings.push(c);});}

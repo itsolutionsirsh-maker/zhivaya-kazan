@@ -16,12 +16,13 @@ function resolvePlace(name,x,y){const n=norm(name);if(!n)return null;let best=nu
 
 function startCompanion(w,mode,place){if(w.isInterior){const cw=w.companionOf;if(cw)w=cw;else return;}
   if(companion&&companion.w!==w)stopCompanion(true);
+  const f=typeof folkOf==='function'?folkOf(w):null;if(f){folkCancelRoute(f);f.away=true;f.retry=null;f.w=w;w.folk=f.id;w.temp=false;}
   let dest=null;if(mode==='go'&&place){dest=resolvePlace(place,w.x,w.y);if(!dest)mode='follow';}
   companion={w,mode,dest,arrived:false,t:0};player.escort=mode==='go'&&!!dest;w.companion=true;w.state='companion';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.cwps=null;w.repath=0;
   addEvent(dest?`${w.p.name} идёт с вами в «${dest.n}»`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
-function stopCompanion(silent){if(!companion)return;player.escort=false;player.waypoints=null;const w=companion.w;w.companion=false;w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
+function stopCompanion(silent){if(!companion)return;player.escort=false;player.waypoints=null;const w=companion.w;w.companion=false;if(w.inside&&interior&&interior.ret){w.x=interior.ret.x;w.y=interior.ret.y;}w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
   if(interior){interior.npcs=interior.npcs.filter(n=>n.companionOf!==w);}
-  if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;updateCompBox();}
+  if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;const f=typeof folkOf==='function'?folkOf(w):null;if(f){f.away=true;f.retry=null;folkGo(f,folkWant(f));}updateCompBox();}
 function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':'Идти за ним';$('#compBye').textContent=going?'Передумать':'Отпустить';
   $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас в «${c.dest.n}» · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:`🤝 ${c.w.p.name} с вами`;}
 $('#compTalk').addEventListener('click',()=>{if(!companion||player.busy)return;if(scene==='interior'){const n=compNpcInside();if(n)openChat(n);return;}openChat(companion.w);});
@@ -37,7 +38,7 @@ function escortStep(dt){const c=companion;if(!c||c.mode!=='go'||c.arrived||c.w.i
 
 function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=dt;
   if(w.state==='hurt'||w.bus){stopCompanion(true);return;}
-  if(player.inside||player.bus||(player.vehicle&&player.vehicle.kind!=='scooter')){w.inside=true;c.route=null;return;}
+  if(player.inside||player.bus||(player.vehicle&&player.vehicle.kind!=='scooter'&&player.vehicle.kind!=='bike')){w.inside=true;c.route=null;return;}
   if(w.inside){w.inside=false;const sp=[player.x-player.hx*1.5,player.y-player.hy*1.5];w.x=sp[0];w.y=sp[1];w.cwps=null;}
   // игрок уехал далеко (машина, автобус, самокат) — житель «догоняет»
   if(dist(w.x,w.y,player.x,player.y)>70){const n=nearestNode(player.x,player.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.node=n;w.cwps=null;c.route=null;}}
@@ -88,8 +89,12 @@ async function npcThink(w,extra){const base=w.isInterior&&interior?interior.ret:
 function scriptedThink(w,text){const t=norm(text);if(/(пойд[её]м|идем|пошли|айда|проводи|покажи дорогу|давай со мной|за мной)/.test(t))return {reply:pick(['Пойдём, мне как раз по пути!','Давай, веди!','Айда!']),action:'follow',place:''};
   if(/(пока|до свидания|сау бул|мне пора)/.test(t))return {reply:'Сау бул! Ещё увидимся.',action:'stop',place:''};return null;}
 function applyNpcAction(w,r){const real=w.companionOf||w;
+  if(w.isInterior&&(!interior||!interior.ret||(interior.npcs&&!interior.npcs.includes(w))))return null;
   if(r.action==='follow'||r.action==='go'){
-    if(w.isInterior&&!w.companionOf){const n=nearestNode(interior.ret.x,interior.ret.y,world.pedAdj,120);const nw=new Walker(w.role==='staff'?'resident':(w.role||'resident'),n>=0?n:pick(world.pedNodes));nw.p=w.p;nw.temp=true;nw.inside=true;walkers.push(nw);w.companionOf=nw;}
+    if(w.isInterior&&!w.companionOf){const f=typeof folkOf==='function'?folkOf(w):null;if(f&&f.driving)return null;let nw;
+      if(f){folkCancelRoute(f);nw=f.w||folkSpawn(f,interior.ret);if(!nw)return null;nw.x=interior.ret.x;nw.y=interior.ret.y;nw.folk=f.id;nw.temp=false;f.away=true;}
+      else{const n=nearestNode(interior.ret.x,interior.ret.y,world.pedAdj,120);if(n<0)return null;nw=new Walker(w.role==='staff'?'resident':(w.role||'resident'),n);nw.p=w.p;nw.temp=true;walkers.push(nw);}
+      nw.inside=true;w.companionOf=nw;}
     startCompanion(w.companionOf||w,r.action,r.place);
     const c=companion;return c?(c.dest?`${w.p.name} идёт с вами в «${c.dest.n}»`:`${w.p.name} идёт с вами`):null;}
   if(r.action==='stop'&&companion&&companion.w===real){stopCompanion(true);return `${w.p.name} больше не идёт с вами`;}

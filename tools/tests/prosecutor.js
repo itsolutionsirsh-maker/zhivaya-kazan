@@ -1,6 +1,7 @@
 // Прокурор Бирэн абый: приёмная на карте, грузный прокурор за столом, жалоба на штраф, сюжет из пяти шагов, «ушёл сам».
 // node tools/tests/prosecutor.js /tmp/zk-dev 8895 /tmp/zk-shots
 const {chromium} = require('playwright');
+const assert = require('node:assert/strict');
 const {spawn} = require('child_process');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8895, OUT = process.argv[4] || '/tmp';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -65,17 +66,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     console.log('12) журналист:', j && j[2]);
     if (j) { await ev(`(()=>{player.x=${j[0]}+1.2;player.y=${j[1]};})()`); await sleep(400); console.log('    действие:', await ev('currentAction&&currentAction.label')); await ev('currentAction&&currentAction.run()'); await sleep(300); await ok(); await sleep(300); await ok(); }
     console.log('    шаг:', await ev('prosState().step'), '(ждём 3 — проверка)');
+    assert.equal(await ev('prosState().step'), 3, 'До проверки нужно действительно пройти журналиста');
     // жалоба при журналисте — удовлетворяют
     await ev(`sitMoney(-1500,'Штраф за неправильную парковку')`);
     await to(poi[0], poi[1]); await ev('currentAction&&currentAction.run()'); await sleep(1800);
-    console.log('13) приёмная на шаге «проверка»:', JSON.stringify(await ev('({шаг:prosState().step,карточка:SIT.card&&SIT.card.title})'))); await ok(); await sleep(300); await ok();
-    await ev('player.cool.appeal=0;prosState().step=3;prosState().on=1'); const m1 = await ev('player.money');
-    await ev('(()=>{const r=Math.random;Math.random=()=>0.1;prosReception();pickChoice(SIT.card,SIT.card.choices[0]);Math.random=r;})()'); await sleep(200);
+    console.log('13) приёмная на шаге «проверка»:', JSON.stringify(await ev('({шаг:prosState().step,карточка:SIT.card&&SIT.card.title})')));
+    assert.equal(await ev('prosState().step'), 3, 'Один вход не завершает проверку');
+    await ev('zkSetTime(clock.minutes+61);player.ix=interior.w/2;player.iy=3.1;prosReception()');
+    assert.equal(await ev('prosState().step'), 4, 'Проверка завершена у стола без подмены прогресса');
+    await ev('pickChoice(SIT.card,SIT.card.choices[0])'); await sleep(350); // затем открывается настоящий приём
+    assert.match(await ev('SIT.card.choices[0].t'), /Подать жалобу/);
+    const m1 = await ev('player.money');
+    await ev('(()=>{const r=Math.random;Math.random=()=>0.1;pickChoice(SIT.card,SIT.card.choices[0]);Math.random=r;})()'); await sleep(200);
     console.log('    жалоба при журналисте:', JSON.stringify(await ev('SIT.card&&SIT.card.title')), '| деньги', m1, '→', await ev('player.money'), '(при случайности 0,1 без журналиста было бы «отклонили»)');
-    await ok(); await ev('prosState().step=4'); await ev('exitInterior()'); await sleep(300);
+    assert.equal(await ev('SIT.card.title'), 'Жалобу удовлетворили');
+    assert.equal(await ev('player.money'), m1+1500);
+    await ok(); await ev('exitInterior()'); await sleep(300);
     // шаг 5: лента на площади — ушёл по собственному желанию
     await to(sq[0], sq[1]); await sleep(1200);
     console.log('14) площадь:', JSON.stringify(await ev('({карточка:SIT.card&&SIT.card.title,шаг:prosState().step,нет_его:prosGone()})'))); await ok();
+    assert.equal(await ev('prosState().step'), 5, 'Последний шаг завершается только на площади');
+    assert.equal(await ev('prosGone()'), true);
     await to(poi[0], poi[1]); await ev('currentAction&&currentAction.run()'); await sleep(600);
     console.log('15) приёмная после ухода:', JSON.stringify(await ev(`({прокурор:!!interior.npcs.find(q=>q.role==='prosecutor'),действие:(player.ix=interior.w/2,player.iy=3.1,findActionInterior()||{}).label})`)));
     await ev('exitInterior()'); await ev('zkSetTime(clock.minutes+7*1440+60)'); await sleep(1600);
@@ -86,4 +97,5 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     console.log('17) разговор:', JSON.stringify(await ev(`[...document.querySelectorAll('#chatLog .m')].map(e=>e.textContent)`)), '| в подсказке для ИИ:', await ev(`(()=>{const n=interior.npcs.find(q=>q.role==='prosecutor');return /Бирэн абый, прокурор/.test(contextForNpc(n))&&/Никогда не называй сумм/.test(contextForNpc(n));})()`));
   } finally { await b.close(); srv.kill(); }
   console.log(errors.length ? errors.join('\n') : 'no page errors');
+  assert.deepEqual(errors, [], 'Ошибок страницы быть не должно');
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

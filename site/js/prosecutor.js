@@ -2,7 +2,7 @@
 // Данные — второго программиста: cityPeople (role:'prosecutor'), cityPlaces ('prosecutor-office'), cityTexts.prosecutor.
 // Персонаж вымышленный, это городская сатира: намёки и шутки, без сумм и схем. Приёмная — обычный бизнес-центр, не настоящая прокуратура.
 // Прогресс — PROG.pros (уходит в аккаунт вместе с PROG): штрафы для жалобы, шаг сюжета, сколько его не будет.
-const PROS={poi:null,w:null,t:0,onBau:false,jour:null,bau:null,bauN:-1};
+const PROS={poi:null,w:null,t:0,onBau:false,jour:null,bau:null,bauN:-1,visit:0};
 const PROS_LL={bauman:[55.79242,49.11140],market:[55.78655,49.10838],square:[55.79686,49.12514]};   // если в ориентирах не найдётся
 function prosData(){const P=(window.cityPeople||[]).find(p=>p.role==='prosecutor'),T=(window.cityTexts||{}).prosecutor,pl=(window.cityPlaces||[]).find(p=>p.id==='prosecutor-office');return P&&T&&pl?{P,T,pl}:null;}
 function prosState(){const S=PROG.pros||(PROG.pros={fines:[],step:0,on:0,met:0,ev:{}});if(!Array.isArray(S.fines))S.fines=[];if(!S.ev)S.ev={};return S;}
@@ -16,7 +16,8 @@ function prosGone(){const S=prosState();return (S.gone||0)>clock.minutes;}
 // ---------- штрафы: запоминаем, чтобы было что обжаловать (10 игровых дней) ----------
 function prosNoteFine(sum,why){sum=Math.round(sum);why=String(why||'Штраф');if(!(sum>0)||/владельцу/.test(why))return;const S=prosState();
   S.fines.push({t:Math.round(clock.minutes),sum,why:why.slice(0,90)});if(S.fines.length>8)S.fines.shift();progSave();}
-function prosFine(){const S=prosState(),now=clock.minutes;for(let i=S.fines.length-1;i>=0;i--){const f=S.fines[i];if(!f.done&&now-f.t<10*1440&&!((f.retry||0)>now))return f;}return null;}
+function prosFineActive(f){const now=clock.minutes;return !!f&&prosState().fines.includes(f)&&!f.done&&now-f.t<10*1440&&!((f.retry||0)>now);}
+function prosFine(){const S=prosState();for(let i=S.fines.length-1;i>=0;i--){const f=S.fines[i];if(prosFineActive(f))return f;}return null;}
 
 // ---------- приёмная на карте ----------
 function prosPlace(){if(!world||!world.meta||!world.pois)return;const D=prosData();if(!D)return;
@@ -30,14 +31,19 @@ function prosSeat(it){const D=prosData();if(!D)return null;let n=it.npcs.find(q=
   n={p,x:it.w/2,y:0.92,hx:0,hy:1,seated:true,phase:0,role:'prosecutor',isInterior:true,state:'idle',memory:p.memory};it.npcs.push(n);return n;}
 
 // ---------- приём: жалоба на штраф или разговор ----------
-function prosReception(){const D=prosData();if(!D||!interior)return;const S=prosState(),T=D.T;const n=prosSeat(interior);
+function prosAtDesk(it,visit){return scene==='interior'&&interior===it&&it&&it.kind==='prosecutor'&&visit===PROS.visit&&Math.abs(player.ix-it.w/2)<=2.2&&player.iy<=3.6;}
+function prosReception(){const D=prosData(),it=interior,visit=PROS.visit;if(!D||!prosAtDesk(it,visit))return;const S=prosState();const n=prosSeat(it);
   if(!n){sitCard({icon:'⚖️',title:'Приёмная прокурора',text:'Кресло пустое. Помощник разводит руками: «Бирэн абый ушёл по собственному желанию. Жалобы пока складываем в коробку».',ttl:14,choices:[{t:'Понятно',primary:true,run:()=>{}}]});return;}
   if(!S.met){S.met=1;progSave();}
+  // Проверка требует дойти до стола. Вход и повторный вход в кэшированный интерьер не двигают сюжет.
+  if(prosStep()&&prosStep().id==='check'){say(n,'Всё зарегистрировано. Теперь ждите городскую ленту.',6);prosDone('check');}
   say(n,pick(n.p.lines||['Вопрос-то решаемый…']),6);const f=prosFine();
   sitCard({icon:'⚖️',title:`${n.p.name}, прокурор`,text:f?`Ваш штраф: ${f.why} — ${fmtMoney(f.sum)}. Можно подать жалобу: бумагу кладут на стол, а там — как повезёт.`:'Штрафов, которые можно обжаловать, нет: жалобу принимают в течение 10 игровых дней.',ttl:0,
-    choices:[...(f?[{t:`Подать жалобу · ${fmtMoney(f.sum)}`,primary:true,run:()=>prosAppeal(n,f)}]:[]),{t:'Поговорить',primary:!f,run:()=>openChat(n)},{t:'Уйти',run:()=>{}}]});}
-function prosAppeal(n,f){const D=prosData();if(!D)return;const S=prosState(),A=D.T.appeal||{};if(!busyFor('appeal',60))return;spendTime(20);
-  const press=S.on&&S.step===3;   // журналист уже в деле — при нём прокурор вдруг всё подписывает
+    choices:[...(f?[{t:`Подать жалобу · ${fmtMoney(f.sum)}`,primary:true,run:()=>prosAppeal(n,f,it,visit)}]:[]),{t:'Поговорить',primary:!f,run:()=>{if(prosAtDesk(it,visit)&&it.npcs.includes(n)&&!prosGone())openChat(n);}},{t:'Уйти',run:()=>{}}]});}
+function prosAppeal(n,f,it=interior,visit=PROS.visit){const D=prosData();if(!D||!prosAtDesk(it,visit)||!it.npcs.includes(n)||prosGone())return;
+  if(!prosFineActive(f)){setHint('Эта жалоба уже рассмотрена или пока недоступна. Обратитесь в приёмную снова.');return;}
+  const S=prosState(),A=D.T.appeal||{};if(!busyFor('appeal',60))return;spendTime(20);
+  const press=S.on&&(S.step===3||S.step===4);   // поддержка журналиста действует и после регистрации проверки; совместимо со старыми сохранениями
   const r=Math.random(),out=press?'granted':r<0.5?'refused':r<0.82?'lost':'granted';const line=pick(A[out]||['Жалоба рассмотрена.']);say(n,line,6);
   if(out==='granted'){f.done=1;let back=f.sum;if(typeof ECON!=='undefined'&&ECON.owed>0){const o=Math.min(ECON.owed,back);ECON.owed-=o;back-=o;}   // штраф ушёл в долг по суду — сначала гасим долг
     if(back>0)sitMoney(back,`⚖️ Штраф отменён по жалобе (${f.why})`);else addEvent(`⚖️ Штраф отменён по жалобе (${f.why}): долг по суду уменьшен на ${fmtMoney(f.sum)}`,'say');sitMood(5);}
@@ -57,7 +63,7 @@ function prosMark(){for(const k of ['pros:go'])unmark(k);const st=prosStep();if(
   if(at)mark(null,'pros:go',at[0],at[1],icon,label,{arrow:true,color:'#8C2F39'});}
 function prosStart(){const S=prosState();if(S.on)return;S.on=1;S.step=0;S.ev={};progSave();prosAnnounce();}
 function prosAnnounce(){const st=prosStep();if(!st)return;addEvent(`⚖️ ${st.title}: ${st.do}`,'say');if(window.cityPhone)try{window.cityPhone.push({from:'Слухи',text:`${st.title}: ${st.do}`,kind:'event'});}catch(e){}prosMark();}
-function prosDone(){const st=prosStep();if(!st)return;const S=prosState(),r=st.reward||{};S.step++;S.ev={};progSave();unmark('pros:go');
+function prosDone(expected){const st=prosStep();if(!st||(expected&&st.id!==expected))return;const S=prosState(),r=st.reward||{};S.step++;S.ev={};progSave();unmark('pros:go');
   if(r.money)sitMoney(r.money,`⚖️ ${st.title}`);if(r.mood)sitMood(r.mood);
   const last=S.step>=5;if(last){S.gone=Math.round(clock.minutes+7*1440);S.back=0;progSave();sitRep(2,'вывели прокурора на чистую воду');}
   sitCard({icon:last?'📰':'⚖️',title:st.title,text:st.text,ttl:16,choices:[{t:last?'Вот это новости':'Дальше',primary:true,run:()=>{if(!last)prosAnnounce();}}],onTimeout:()=>{if(!last)prosAnnounce();}});}
@@ -89,7 +95,7 @@ defSit('prosecutor',{title:'Прокурор',quiet:true,always:true,
     return null;},
   actionInside(s){if(!interior||interior.kind!=='prosecutor')return null;if(Math.abs(player.ix-interior.w/2)>2.2||player.iy>3.6)return null;
     return {label:prosGone()?'Кресло прокурора пустое':'Приём у прокурора: жалоба на штраф или разговор',run:prosReception};}});
-defEnter(it=>{if(it.kind==='prosecutor'){const n=prosSeat(it);const st=prosStep();if(n&&st&&st.id==='check')setTimeout(()=>{if(interior!==it)return;say(n,pick((n.p.lines||[]).filter(t=>/Проверка|обед/.test(t)))||'У меня обед.',6);prosDone();},1200);return;}
+defEnter(it=>{PROS.visit++;if(it.kind==='prosecutor'){prosSeat(it);return;}
   const st=prosStep(),S=prosState();
   if(st&&st.id==='evidence'&&!S.ev.cafe&&it.kind==='cafe'&&prosOnBauman(player.x,player.y,45)){S.ev.cafe=1;progSave();prosMark();
     setTimeout(()=>{if(interior!==it)return;sitCard({icon:'📷',title:'Фото у кафе',text:'Официант показывает фото на телефоне: Бирэн абый у входа, смотрит строго в другую сторону. Теперь бы чек — говорят, коробки покупали на Колхозном рынке.',ttl:14,choices:[{t:'На рынок',primary:true,run:()=>{}}]});},800);}});

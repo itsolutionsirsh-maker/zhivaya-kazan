@@ -1,33 +1,46 @@
-// Скорость на «слабом телефоне»: 390×844, плотность 3, процессор замедлен в 4 раза. День и вечер (окна горят), обычный и дальний масштаб.
-// Одна папка — замер; две — «было» и «стало» подряд, чтобы сравнить (например, сборка main и сборка своей ветки).
-// node tools/tests/perf.js /tmp/zk-main [/tmp/zk-branch]
+// Rendering benchmark: phone viewport, DPR 3 (the game caps it at 2), CPU throttle ×4.
+// This is desktop Chromium emulation, not a measured physical phone.
+// node tools/tests/perf.js <built main> [<built branch>]
 const {chromium} = require('playwright');
 const {spawn} = require('child_process');
+const {measureCompletedFrames} = require('./render-metrics');
+const {stageDetailedFolk} = require('./visual-fixtures');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function measure(dir, port) {
-  const srv = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], {cwd: dir, stdio: 'ignore'});
-  await sleep(800);
-  const b = await chromium.launch();
+  const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const srv = spawn(python, ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], {cwd:dir, stdio:'ignore', windowsHide:true});
+  let serverError=null, b;
+  srv.on('error', error => { serverError=error; });
   try {
-    const ctx = await b.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true});
-    const pg = await ctx.newPage(); const errors = []; pg.on('pageerror', e => errors.push(String(e)));
-    await pg.goto(`http://127.0.0.1:${port}/index.html`);
-    await pg.waitForFunction('document.querySelector("#loading").hidden === true', null, {timeout: 90000}); await sleep(800);
-    await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(2500);
-    const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
-    const out = {};
-    for (const [label, hour, z] of [['день, обычный масштаб', 12, 5.5], ['вечер, окна горят', 21, 5.5], ['день, издалека', 12, 2.5]]) {
-      await pg.evaluate(`zkSetTime((clock.day-1)*1440+${hour}*60);cam.zt=cam.z=${z};`); await sleep(1500);
-      // кадры в секунду и худший кадр за 3 с + чистое время одного render() (среднее из 30)
-      out[label] = await pg.evaluate(`new Promise(r=>{let n=0,worst=0,last=performance.now();const t0=last;function f(){const now=performance.now();worst=Math.max(worst,now-last);last=now;n++;
-        if(now-t0>3000){let s=0;for(let i=0;i<30;i++){const a=performance.now();render();s+=performance.now()-a;}r({кадров_в_сек:Math.round(n/3),худший_кадр_мс:Math.round(worst),render_мс:Math.round(s/30*10)/10});}else requestAnimationFrame(f);}requestAnimationFrame(f);})`);
+    for (let i=0;i<40;i++) {
+      if (serverError) throw serverError;
+      if (srv.exitCode!==null) throw new Error('HTTP server exited: '+srv.exitCode);
+      try { const response=await fetch(`http://127.0.0.1:${port}/index.html`); if(response.ok) break; } catch (_) {}
+      if (i===39) throw new Error('HTTP server did not become ready');
+      await sleep(100);
     }
-    if (errors.length) out.ошибки = errors;
+    b=await chromium.launch();
+    const ctx = await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true});
+    const pg = await ctx.newPage(), errors=[]; pg.on('pageerror', e => errors.push(String(e)));
+    await pg.goto(`http://127.0.0.1:${port}/index.html`);
+    await pg.waitForFunction('document.querySelector("#loading").hidden === true', null, {timeout:90000}); await sleep(800);
+    await pg.fill('#pName','Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(2500);
+    const cdp=await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+    const day=await pg.evaluate('clock.day-1'), out={environment:'Chromium, 390×844, DPR 3 / game cap 2, CPU ×4',scenes:{}};
+    for (const [label,hour,z] of [['день, обычный масштаб',12,5.5],['вечер, окна горят',21,5.5],['день, издалека',12,2.5],['детали, четыре жителя с предметами',13,9.5]]) {
+      await pg.evaluate(({day,hour,z}) => {zkSetTime(day*1440+hour*60);cam.zt=cam.z=z;weather.rain=[];weather.kind='clear';},{day,hour,z});
+      const fixtures=z>8?await pg.evaluate(stageDetailedFolk):null;
+      await sleep(1500);
+      const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
+      if (result.completed_frames<2) throw new Error('No completed game frames: '+label);
+      out.scenes[label]={...result,...(fixtures?{fixtures}:{} )};
+    }
+    if (errors.length) throw new Error(errors.join('\n'));
     return out;
-  } finally { await b.close(); srv.kill(); }
+  } finally { if(b)await b.close(); srv.kill(); }
 }
 (async () => {
-  const dirs = process.argv.slice(2);
-  if (!dirs.length) { console.log('node tools/tests/perf.js <папка сборки> [<вторая папка>]'); process.exit(1); }
-  for (let i = 0; i < dirs.length; i++) console.log(dirs.length > 1 ? (i ? 'стало:' : 'было: ') : 'замер:', JSON.stringify(await measure(dirs[i], 8781 + i)));
-})().catch(e => { console.error('FAIL', e); process.exit(1); });
+  const dirs=process.argv.slice(2);
+  if (!dirs.length) throw new Error('node tools/tests/perf.js <папка сборки> [<вторая папка>]');
+  for(let i=0;i<dirs.length;i++) console.log(dirs.length>1?(i?'стало:':'было:'):'замер:',JSON.stringify(await measure(dirs[i],8781+i)));
+})().catch(e=>{console.error('FAIL',e);process.exitCode=1;});

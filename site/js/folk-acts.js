@@ -55,12 +55,13 @@ defSit('folkAct',{title:'Свои люди',quiet:true,
       else{if(!w.mv||!s.tg||dist(s.tg[0],s.tg[1],player.x,player.y)>4){s.tg=[player.x,player.y];moveActor(w,player.x,player.y,spd);}if(w.mv)stepActor(w,dt);}
       if(d<2.6){w.mv=null;faceTo(w,player.x,player.y);s.phase='talk';faOpen(s);return;}
       if(d>45||s.t>40||player.vehicle||player.inside){say(w,'Ну ладно, в другой раз.',3);endSit(s);}return;}
-    if(s.phase==='talk'){faceTo(w,player.x,player.y);if(d>25&&!SIT.card)endSit(s);if(!SIT.card&&!s.wait)endSit(s);return;}
+    if(s.phase==='talk'){faceTo(w,player.x,player.y);if(chatNpc&&(chatNpc===w||(typeof folkId==='function'&&folkId(w)&&folkId(chatNpc)===folkId(w))))return;
+      if(!w.companion&&w.state==='idle')w.state='sit';if(d>25&&!SIT.card)endSit(s);if(!SIT.card&&!s.wait)endSit(s);return;}
     if(s.phase==='race'){const r=s.race;r.left-=dt;if(dist(r.x,r.y,player.x,player.y)<25){faRaceEnd(s,true);return;}if(r.left<=0){faRaceEnd(s,false);return;}
       if(Math.floor(r.left)!==r.shown){r.shown=Math.floor(r.left);setHint(`Спор: до «${r.n}» — ${r.shown} с`);}return;}
     if(s.phase==='help'){const h=s.help;h.left-=dt;s.mvT-=dt;if(s.mvT<=0){s.mvT=0.7;const dd=dist(w.x,w.y,player.x,player.y);if(dd>2.2)moveActor(w,player.x,player.y,Math.min(WALK_SPEED*1.05,2+dd*0.5));}
       if(w.mv)stepActor(w,dt);if(dist(h.x,h.y,player.x,player.y)<15&&dist(w.x,w.y,player.x,player.y)<25){faHelpEnd(s,true);return;}if(h.left<=0||d>80){faHelpEnd(s,false);}return;}},
-  end(s){const w=s.w;if(w){w.filming=false;releaseActor(w);const f=faFolkOf(w);if(f&&f.w===w&&typeof folkGo==='function'){f.trip=null;folkGo(f,f.at);}}unmark('fa:go');FA.s=null;FA.t=rnd(90,150);}});
+  end(s){const w=s.w;if(w){w.filming=false;releaseActor(w);const f=faFolkOf(w);if(f&&f.w===w&&typeof folkGo==='function'){f.away=true;folkGo(f,folkWant(f));}}unmark('fa:go');FA.s=null;FA.t=rnd(90,150);}});
 
 function faCard(s,o){o.s=s;o.ttl=o.ttl==null?25:o.ttl;o.icon=o.icon||'💬';o.title=o.title||`${s.w.p.name}, ${s.w.p.job}`;o.onTimeout=o.onTimeout||(()=>endSit(s));sitCard(o);}
 function faOpen(s){const w=s.w,f=s.f,a=s.act,nm=w.p.name;
@@ -111,9 +112,10 @@ function faHelpEnd(s,ok){const w=s.w;unmark('fa:go');
 // поездка: машина подъезжает сразу, дальше — обычное такси (у бомбилы цена своя и фиксированная)
 function faRide(s,dst,fixed){const w=s.w;if(fixed&&player.money<fixed){setHint(`Не хватает: нужно ${fmtMoney(fixed)}`);endSit(s);return;}
   const n=nearestNode(player.x,player.y,world.carAdj,150);if(n<0){setHint('Сюда машине не подъехать');endSit(s);return;}
-  const c=new Car(fixed?'car':'taxi',n);taxiCall={car:c,dest:dst,state:'here',t:0};boardTaxi();const v=player.vehicle;if(v){v.fixedFare=fixed||null;v.driver=w.p.name;if(fixed)v.color=w.p.clothes||'#5A6B8C';}
-  addEvent(fixed?`🚗 Бомбила ${w.p.name} везёт: ${dst.n}, договорились на ${fmtMoney(fixed)}`:`🚕 Таксист ${w.p.name} везёт: ${dst.n}, по счётчику`,'say');
-  const f=faFolkOf(w);endSit(s);if(f)folkDrop(f);}   // он за рулём
+  const f=faFolkOf(w),c=new Car(fixed?'car':'taxi',n);if(fixed)c.color=w.p.clothes||'#5A6B8C';c.state='scene';c.speed=0;c.ttl=0;c.taxiFor=true;cars.push(c);
+  taxiCall={car:c,dest:dst,state:'here',t:0,folkDriver:f&&f.id,driver:w.p.name,fixedFare:fixed||null};endSit(s);if(f&&f.w){f.w.state='folkStay';f.w.path=null;}
+  if(boardTaxi())addEvent(fixed?`🚗 Бомбила ${w.p.name} везёт: ${dst.n}, договорились на ${fmtMoney(fixed)}`:`🚕 Таксист ${w.p.name} везёт: ${dst.n}, по счётчику`,'say');
+  else if(taxiCall&&dist(player.x,player.y,c.x,c.y)>9){setHint('Машина у обочины — подойдите и нажмите E');updateTripBox();}}
 
 // раз в 1,5–2,5 минуты кто-то из своих людей рядом подходит сам
 defWatch(dt=>{if(!world||typeof FOLK==='undefined'||!FOLK.ready)return;FA.t-=dt;if(FA.t>0)return;FA.t=3;if(!faCanStart())return;

@@ -27,6 +27,7 @@ function render(){
   const setWorld=()=>ctx.setTransform(DPR*z,0,0,DPR*z,DPR*(W/2-cam.x*z+shx),DPR*(H/2-cam.y*z+shy));
   setWorld();
   if(z<0.75){renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night);return;}
+  const pois=z>1.5?visiblePois(vx0,vy0,vx1,vy1,z):[]; // один список для входов и подписей
   // ---- площади
   for(const a of world.areas){if(a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;ctx.fillStyle=AREA_FILL[a.k]||'#ddd';poly(a.p);ctx.fill();
     if(a.k==='water'&&z>1.2){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.6;ctx.stroke();}}
@@ -59,16 +60,17 @@ function render(){
   drawWalls(z,vx0,vy0,vx1,vy1);
   // ---- здания
   bvis.sort((a,b)=>a.bb[3]-b.bb[3]);
-  winDark.length=0;winLit.length=0;
+  winDark.length=0;winLit.length=0;facadeWallsLeft=48;
   for(const b of bvis)drawBuilding(b,z,night);
   if(z>1.1)drawLandmarks(bvis,z);
   // окна и тени — одним путём без closePath: fill() замыкает каждую фигуру сам, а closePath в длинном пути в Chrome стоит квадратично (на телефоне было ~10 кадров в секунду)
   if(winDark.length){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winDark){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
   if(winLit.length&&night<=0.3){ctx.fillStyle='rgba(40,52,75,.42)';ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
+  if(LOD>=2)drawCafeEntrances(pois);
   // ---- остановки
-  if(z>1.2)for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(s.x-1.4,s.y-0.5,3,1.5);ctx.fillStyle=s.k==='tram'?'#C9B3D9':'#B9CCE3';rrect(ctx,s.x-1.5,s.y-0.7,3,1.4,0.2);ctx.fill();ctx.fillStyle=s.k==='tram'?'#8E3478':'#2F6DB5';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.45,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x+1.1,s.y-0.4,0.2,0,TAU);ctx.fill();}
+  if(z>1.2)for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;drawStop(s);}
   // ---- прокат и своя машина
-  for(const r of rentals){if(r.x<vx0||r.x>vx1||r.y<vy0||r.y>vy1)continue;if(r.kind==='scooter')drawScooter(r.x,r.y,r.hx,r.hy);else drawCarSprite(r.x,r.y,r.hx,r.hy,4.5,1.9,r.color,'share',t,null);}
+  for(const r of rentals){if(r.x<vx0||r.x>vx1||r.y<vy0||r.y>vy1)continue;if(r.kind==='scooter')drawScooter(r.x,r.y,r.hx,r.hy);else if(r.kind==='bike')drawBicycle(r.x,r.y,r.hx,r.hy);else drawCarSprite(r.x,r.y,r.hx,r.hy,4.5,1.9,r.color,'share',t,null);}
   if(ownCar&&ownCar.parked&&ownCar.x>vx0&&ownCar.x<vx1&&ownCar.y>vy0&&ownCar.y<vy1)drawCarSprite(ownCar.x,ownCar.y,ownCar.hx,ownCar.hy,4.6,1.9,ownCar.color,'own',t,null);
   // ---- происшествия: обломки, конусы
   for(const ac of accidents){if(ac.medical)continue;ctx.fillStyle='rgba(40,30,20,.5)';for(let i=0;i<6;i++){ctx.beginPath();ctx.arc(ac.x+Math.cos(i*1.3)*(1+i*0.5),ac.y+Math.sin(i*1.7)*(1+i*0.4),0.3,0,TAU);ctx.fill();}if(ac.police&&ac.police.state==='scene'){ctx.fillStyle='#F2651F';for(let i=0;i<4;i++){const an=i*1.57+0.7;ctx.beginPath();ctx.arc(ac.x+Math.cos(an)*7,ac.y+Math.sin(an)*7,0.5,0,TAU);ctx.fill();}}}
@@ -82,6 +84,7 @@ function render(){
   // ---- игрок и другие игроки
   for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,Object.assign({clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),t,false);}
   if(!player.bus&&!player.inside)drawPlayerWorld(player.x,player.y,player.hx,player.hy,player.vehicle?{kind:player.vehicle.kind,color:player.vehicle.color,crashed:player.vehicle.crashedLook,onRoad:player.vehicle.onRoad}:null,myLook(),t,true);
+  if(z>=3)drawJourneyHints(t*1000,vx0,vy0,vx1,vy1);
   // линия навигатора: оставшийся путь пешком или на машине
   {const wl=player.vehicle?(player.vehicle.auto&&player.vehicle.auto.wps):(!player.bus&&player.waypoints);if(wl&&wl.length){ctx.save();ctx.strokeStyle='rgba(43,176,98,.75)';ctx.lineWidth=Math.max(0.8,2.2/z);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([Math.max(1.2,4/z),Math.max(1,3/z)]);ctx.beginPath();ctx.moveTo(player.x,player.y);for(let i=(player.vehicle?player.vehicle.auto.i||0:0);i<wl.length;i++)ctx.lineTo(wl[i][0],wl[i][1]);ctx.stroke();ctx.restore();}}
   if(player.waypoints&&!player.vehicle){const w=player.waypoints[player.waypoints.length-1];ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(w[0],w[1],1.6+Math.sin(t*6)*0.3,0,TAU);ctx.stroke();}
@@ -100,7 +103,7 @@ function render(){
       const a=world.nodes[r.p[bi]],b=world.nodes[r.p[bi+1]];const tw=ctx.measureText(r.n).width;if(bl*z<tw+14)continue;const [sx,sy]=toS((a[0]+b[0])/2,(a[1]+b[1])/2);if(sx<-50||sx>W+50||sy<-20||sy>H+20)continue;let an=Math.atan2(b[1]-a[1],b[0]-a[0]);if(an>Math.PI/2)an-=Math.PI;if(an<-Math.PI/2)an+=Math.PI;done.add(r.n);
       ctx.save();ctx.translate(sx,sy);ctx.rotate(an);ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.strokeText(r.n,0,0);ctx.fillStyle='#3F3830';ctx.fillText(r.n,0,0);ctx.restore();}}
   if(z>1.5){ctx.textAlign='center';ctx.textBaseline='middle';const occ=new Set();const cell=z>4?26:34;const shown=[];
-    for(const p of visiblePois(vx0,vy0,vx1,vy1,z)){const [sx,sy]=toS(p.x,p.y);const k=Math.floor(sx/cell)*4096+Math.floor(sy/cell);if(occ.has(k))continue;occ.add(k);shown.push([p,sx,sy]);}
+    for(const p of pois){const [sx,sy]=toS(p.x,p.y);const k=Math.floor(sx/cell)*4096+Math.floor(sy/cell);if(occ.has(k))continue;occ.add(k);shown.push([p,sx,sy]);}
     for(const [p,sx,sy] of shown){ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(sx,sy,9,0,TAU);ctx.fill();ctx.font='11px system-ui';ctx.fillStyle='#000';ctx.fillText(POI_GLYPH[p.t]||'•',sx,sy+0.5);}
     if(z>4.2){ctx.font='500 10px "IBM Plex Sans",system-ui';for(const [p,sx,sy] of shown){if(!p.n)continue;ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.8)';ctx.strokeText(p.n,sx,sy+17);ctx.fillStyle='#3A3128';ctx.fillText(p.n,sx,sy+17);}}}
   if(z>2.6){ctx.font='600 10px "IBM Plex Sans",system-ui';ctx.textAlign='center';for(const s of world.stops){if(s.x<vx0||s.x>vx1||s.y<vy0||s.y>vy1)continue;const [sx,sy]=toS(s.x,s.y);ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.8)';ctx.strokeText(s.n,sx,sy-12);ctx.fillStyle='#24476F';ctx.fillText(s.n,sx,sy-12);}}
@@ -131,19 +134,20 @@ function render(){
 }
 function poly(p){ctx.beginPath();ctx.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);ctx.closePath();}
 
-// Четыре маленьких векторных значка: шашечки, встречные стрелки, ключ и самокат.
+// Пять маленьких векторных значков; максимум 5 × 40 × 40 × 4 = 32 000 байт при DPR 2.
 // Растрируем один раз при смене DPR, чтобы не строить пути для каждой машины каждый кадр.
 let transportMarks=null,transportMarksDPR=0;
 function makeTransportMarks(){
   transportMarks={};transportMarksDPR=DPR;
-  for(const kind of ['taxi','share','own','scooter']){
+  for(const kind of ['taxi','share','own','scooter','bike']){
     const c=document.createElement('canvas');c.width=c.height=20*DPR;const g=c.getContext('2d');g.scale(DPR,DPR);
     g.fillStyle='#142B27';rrect(g,0,0,20,20,6);g.fill();
-    g.fillStyle=kind==='taxi'?'#FFDB60':kind==='share'?'#8EE5F0':kind==='scooter'?'#D3C2FF':'#FFFFFF';rrect(g,1.5,1.5,17,17,4.5);g.fill();
+    g.fillStyle=kind==='taxi'?'#FFDB60':kind==='share'?'#8EE5F0':kind==='scooter'?'#D3C2FF':kind==='bike'?'#B9E6C3':'#FFFFFF';rrect(g,1.5,1.5,17,17,4.5);g.fill();
     g.strokeStyle=g.fillStyle='#142B27';g.lineWidth=1.7;g.lineCap='round';g.lineJoin='round';
     if(kind==='taxi'){for(let y=0;y<2;y++)for(let x=0;x<3;x++)if((x+y)%2===0)g.fillRect(4+x*4,6+y*4,4,4);}
     else if(kind==='share'){g.beginPath();g.moveTo(5,7);g.lineTo(15,7);g.lineTo(12,4);g.moveTo(15,13);g.lineTo(5,13);g.lineTo(8,16);g.stroke();}
     else if(kind==='own'){g.beginPath();g.arc(7,7,2.5,0,TAU);g.moveTo(9,9);g.lineTo(15,15);g.moveTo(12,12);g.lineTo(14,10);g.moveTo(14,14);g.lineTo(16,12);g.stroke();}
+    else if(kind==='bike'){g.beginPath();g.arc(5,13,3,0,TAU);g.moveTo(18,13);g.arc(15,13,3,0,TAU);g.moveTo(5,13);g.lineTo(8,7);g.lineTo(11,13);g.lineTo(5,13);g.moveTo(8,7);g.lineTo(13,7);g.lineTo(15,13);g.moveTo(13,7);g.lineTo(12,4);g.lineTo(15,4);g.stroke();}
     else{g.beginPath();g.arc(5,14,1.5,0,TAU);g.moveTo(16.5,14);g.arc(15,14,1.5,0,TAU);g.moveTo(5,12);g.lineTo(12,12);g.lineTo(14,5);g.lineTo(11,5);g.stroke();}
     transportMarks[kind]=c;
   }
@@ -155,14 +159,14 @@ function drawTransportMarks(toS,z,x0,y0,x1,y1){
     if(currentAction&&currentAction.at===v)return;
     const [sx,sy]=toS(v.x,v.y);ctx.drawImage(transportMarks[kind],sx-8,sy-Math.max(13,1.5*z)-16,16,16);
   };
-  for(const r of rentals)mark(r,r.kind==='scooter'?'scooter':'share');
+  for(const r of rentals)mark(r,r.kind==='scooter'?'scooter':r.kind==='bike'?'bike':'share');
   if(ownCar&&ownCar.parked)mark(ownCar,'own');
   for(const c of cars)if(c.kind==='taxi')mark(c,'taxi');
 }
 function drawPlayerBeacon(toS,z){
   if(player.bus||player.inside)return;
   const [sx,sy]=toS(player.x,player.y),v=player.vehicle;
-  const r=Math.max(11,(v&&v.kind!=='scooter'?3.1:1.7)*z);
+  const r=Math.max(11,(v&&v.kind!=='scooter'&&v.kind!=='bike'?3.1:1.7)*z);
   ctx.save();ctx.translate(sx,sy);ctx.beginPath();ctx.arc(0,0,r,0,TAU);
   ctx.strokeStyle='#102E28';ctx.lineWidth=6;ctx.stroke();ctx.strokeStyle='#FFFFFF';ctx.lineWidth=4;ctx.stroke();ctx.strokeStyle='#35D69B';ctx.lineWidth=2;ctx.stroke();
   ctx.rotate(Math.atan2(player.hy,player.hx));ctx.beginPath();ctx.moveTo(r+7,0);ctx.lineTo(r+1,-4);ctx.lineTo(r+1,4);ctx.closePath();
@@ -187,6 +191,9 @@ function drawActionTarget(toS,z,nameBox){
       const [sx,sy]=toS(p[i]+ex,p[i+1]+ey);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);
     }
     ctx.closePath();ctx.strokeStyle='rgba(20,35,30,.85)';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2;ctx.stroke();r=7;
+    // Если вход уже нарисован, метка указывает на него, а не на другую стену того же кафе.
+    const entry=LOD>=2&&a.tk==='poi'&&cafeEntryCache.get(a.at);
+    if(entry&&!entry.missing&&entry.b===b&&entry.polygon===b.p){x=entry.x;y=entry.y;}
   }else if(a.tk==='taxi'||a.tk==='share'||a.tk==='own')r=Math.max(15,2.8*z);
   else if(a.tk==='stop'||a.tk==='metro'||a.tk==='accident')r=16;
   const [sx,sy]=toS(x,y);
@@ -198,7 +205,8 @@ function drawActionTarget(toS,z,nameBox){
   ctx.strokeStyle='#142B27';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2.5;ctx.stroke();
   // Значок с внешней стороны цели, дальше от игрока. Координаты читаем с живого at, без таймеров и пульсации.
   const dx=x-player.x,dy=y-player.y,L=Math.hypot(dx,dy);
-  let bx=sx+(L>0.01?dx/L:0)*(r+13),by=sy+(L>0.01?dy/L:-1)*(r+13);
+  // Ограничиваем всегда, в том числе когда имя далеко и не было столкновения с ним.
+  let bx=clamp(sx+(L>0.01?dx/L:0)*(r+13),12,W-12),by=clamp(sy+(L>0.01?dy/L:-1)*(r+13),12,H-12);
   // Уже измеренная рамка имени, включая аватар и украшение; без повторного measureText.
   if(nameBox){const n=nameBox,hit=(x,y)=>x+13>n.x&&x-13<n.x+n.w&&y+13>n.y&&y-13<n.y+n.h;
     if(hit(bx,by)){
@@ -213,15 +221,78 @@ function drawActionTarget(toS,z,nameBox){
   ctx.fillStyle='#142B27';rrect(ctx,bx-11,by-11,22,22,6);ctx.fill();ctx.fillStyle='#FFDA69';rrect(ctx,bx-9,by-9,18,18,4);ctx.fill();
   ctx.fillStyle='#142B27';ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('E',bx,by+0.5);ctx.restore();
 }
-function drawBuilding(b,z,night){const p=b.p;const n=p.length;
+let facadeWallsLeft=48;
+function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=0;
   if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
   const ex=EXT[0]*b.hm,ey=EXT[1]*b.hm;const win=z>4.2&&b.h>=1;const lit=night>0.3&&b.lit;
   for(let i=0;i<n;i+=2){const j=(i+2)%n;const ax=p[i],ay=p[i+1],bx=p[j],by=p[j+1];const dx=bx-ax,dy=by-ay;const L=Math.hypot(dx,dy)||1;const nx=b.sgn*dy/L,ny=-b.sgn*dx/L;
     if(nx*EXT[0]+ny*EXT[1]>=0)continue;const light=0.62+0.38*Math.max(0,nx*-0.62+ny*-0.78);
     ctx.fillStyle=shade(b.wall,light);ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx+ex,by+ey);ctx.lineTo(ax+ex,ay+ey);ctx.closePath();ctx.fill();
+    // Два фасада на дом, 48 на кадр. Карниз, цоколь или пилястры — только на близком плане.
+    if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<2&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,Math.abs(b.i||0)%3);detailedWalls++;facadeWallsLeft--;}
     if(win&&L>3.2){const lv=Math.min(b.h,14);const ux=dx/L,uy=dy/L;const cols=Math.floor((L-1.2)/2.4);const gap=(L-1.2-cols*2.4)/2+0.6+0.7;const ws=(b.dash%1.5);for(let k=0;k<lv;k++){const v0=(k+0.3)/lv,v1=(k+0.72)/lv;const list=(lit&&((k*7+b.i)%5!==0))?winLit:winDark;for(let c=0;c<cols;c++){const s0=gap+c*2.4+ws,s1=s0+1.0;list.push([ax+ux*s0+ex*v0,ay+uy*s0+ey*v0,ax+ux*s1+ex*v0,ay+uy*s1+ey*v0,ax+ux*s1+ex*v1,ay+uy*s1+ey*v1,ax+ux*s0+ex*v1,ay+uy*s0+ey*v1]);}}}}
   ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
   if(z>4.5&&b.n&&b.area>400){ctx.save();ctx.font='500 1.6px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(40,30,20,.6)';ctx.fillText(b.n,b.cx+ex,b.cy+ey);ctx.restore();}}
+function drawFacadeDetail(ax,ay,bx,by,ex,ey,kind){
+  ctx.strokeStyle='rgba(250,239,210,.65)';ctx.lineWidth=0.22;ctx.beginPath();
+  ctx.moveTo(ax+ex*.88,ay+ey*.88);ctx.lineTo(bx+ex*.88,by+ey*.88);ctx.stroke();
+  ctx.strokeStyle='rgba(76,63,49,.24)';ctx.lineWidth=kind===1?.34:.18;ctx.beginPath();
+  if(kind===2){const dx=bx-ax,dy=by-ay;for(const u of [.13,.87]){ctx.moveTo(ax+dx*u,ay+dy*u);ctx.lineTo(ax+dx*u+ex*.84,ay+dy*u+ey*.84);}}
+  else{const v=kind===1?.12:.48;ctx.moveTo(ax+ex*v,ay+ey*v);ctx.lineTo(bx+ex*v,by+ey*v);}
+  ctx.stroke();
+}
+// Только геометрия, без новых растров. Не более 96 небольших записей и двух новых расчётов за кадр.
+const cafeEntryCache=new Map();
+function cafeEntry(p,b){
+  const poly=b&&b.p,old=cafeEntryCache.get(p);if(old&&old.b===b&&old.polygon===poly)return old;
+  let best=Infinity,out=null;
+  for(let i=0;poly&&b.hm>=1&&i<Math.min(poly.length,128);i+=2){const j=(i+2)%poly.length,ax=poly[i],ay=poly[i+1],dx=poly[j]-ax,dy=poly[j+1]-ay,L=Math.hypot(dx,dy);
+    if(L<3.2||(b.sgn*dy/L)*EXT[0]+(-b.sgn*dx/L)*EXT[1]>=0)continue;
+    const u=clamp(((p.x-ax)*dx+(p.y-ay)*dy)/(L*L),1.3/L,1-1.3/L),x=ax+u*dx,y=ay+u*dy,d=(x-p.x)**2+(y-p.y)**2;
+    if(d<best){best=d;out={b,polygon:poly,x,y,ux:dx/L,uy:dy/L};}
+  }
+  if(!out)out={b,polygon:poly,missing:true};
+  if(cafeEntryCache.size>=96)cafeEntryCache.delete(cafeEntryCache.keys().next().value);
+  cafeEntryCache.set(p,out);return out;
+}
+function drawCafeEntrances(pois){
+  if(LOD<2)return;let considered=0,created=0;
+  for(const p of pois){if(p.t!=='cafe'&&p.t!=='bar')continue;if(considered++>=6)break;
+    let e=cafeEntryCache.get(p);const known=p._b;
+    if(!e||known!==undefined&&e.b!==known||e.b&&e.polygon!==e.b.p){if(created>=2)continue;created++;
+      e=cafeEntry(p,poiBuilding(p));}
+    if(e.missing)continue;
+    const ex=EXT[0]*Math.min(3,e.b.hm),ey=EXT[1]*Math.min(3,e.b.hm);
+    const patch=(left,right,low,high,color)=>{ctx.fillStyle=color;ctx.beginPath();
+      ctx.moveTo(e.x+e.ux*left+ex*low,e.y+e.uy*left+ey*low);ctx.lineTo(e.x+e.ux*right+ex*low,e.y+e.uy*right+ey*low);
+      ctx.lineTo(e.x+e.ux*right+ex*high,e.y+e.uy*right+ey*high);ctx.lineTo(e.x+e.ux*left+ex*high,e.y+e.uy*left+ey*high);ctx.fill();};
+    patch(-.75,.75,0,.85,'#355753');patch(-.54,.54,.15,.7,'#A8C9C1'); // дверь и стекло, без выдуманного статуса «открыто»
+    patch(-1.25,1.25,.84,1.1,p.t==='bar'?'#9C634D':'#467D69');
+    patch(-1.25,1.25,.84,.91,'#EDE0BA');
+  }
+}
+function drawStop(s){
+  ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(s.x-1.4,s.y-.5,3,1.5);ctx.fillStyle=s.k==='tram'?'#C9B3D9':'#B9CCE3';rrect(ctx,s.x-1.5,s.y-.7,3,1.4,.2);ctx.fill();
+  if(LOD>=2){ // крыша, скамейка и стойки: постоянное число штрихов, без пассажиров-декораций
+    ctx.fillStyle='#607789';ctx.fillRect(s.x-1.55,s.y-.95,3.1,.36);ctx.fillStyle='#A87950';ctx.fillRect(s.x-1.05,s.y+.05,1.6,.25);
+    ctx.strokeStyle='#56616A';ctx.lineWidth=.12;ctx.beginPath();ctx.moveTo(s.x-1.25,s.y-.65);ctx.lineTo(s.x-1.25,s.y+.5);ctx.moveTo(s.x+.65,s.y-.65);ctx.lineTo(s.x+.65,s.y+.5);ctx.stroke();
+  }
+  ctx.fillStyle=s.k==='tram'?'#8E3478':'#2F6DB5';ctx.beginPath();ctx.arc(s.x+1.1,s.y-.4,.45,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x+1.1,s.y-.4,.2,0,TAU);ctx.fill();
+}
+function drawJourneyHints(now,x0,y0,x1,y1){
+  const hints=window.journeyVisualHints;if(!Array.isArray(hints))return;
+  for(let i=0;i<Math.min(8,hints.length);i++){const h=hints[i];if(!h||(h.kind!=='boarding'&&h.kind!=='exiting'))continue;
+    const age=now-h.startedAt,duration=Math.min(700,h.durationMs||450);
+    if(!Number.isFinite(age)||age<0||age>=duration||!Number.isFinite(h.fromX)||!Number.isFinite(h.fromY)||!Number.isFinite(h.toX)||!Number.isFinite(h.toY))continue;
+    if(Math.max(h.fromX,h.toX)<x0||Math.min(h.fromX,h.toX)>x1||Math.max(h.fromY,h.toY)<y0||Math.min(h.fromY,h.toY)>y1)continue;
+    const dx=h.toX-h.fromX,dy=h.toY-h.fromY,L=Math.hypot(dx,dy);if(L>30)continue; // переходы метро не рисуем как шаг через город
+    const phase=age/duration;ctx.save();ctx.fillStyle='#F6F0D2';ctx.strokeStyle='#24483F';ctx.lineWidth=.1;ctx.globalAlpha=reduceMotion?.75:(1-phase)*.9;
+    const count=reduceMotion?1:3;
+    for(let j=0;j<count;j++){const u=reduceMotion?1:clamp(phase*1.35-j*.16,0,1),side=j%2?-.18:.18;
+      ctx.beginPath();ctx.ellipse(h.fromX+dx*u+(L?dy/L*side:0),h.fromY+dy*u-(L?dx/L*side:0),.34,.16,Math.atan2(dy,dx),0,TAU);ctx.fill();ctx.stroke();}
+    ctx.restore();
+  }
+}
 // ---------- спрайты ----------
 function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD>=2&&!o.lying;ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx)+(o.lying?Math.PI/2:0));ctx.scale(S,S);
   const hv=p.build==='heavy',bw=hv?0.54:0.42,bl=hv?0.78:0.56,ha=hv?0.88:0.66;   // грузный: шире плечи и живот
@@ -361,10 +432,17 @@ function drawScooter(x,y,hx,hy){ctx.save();ctx.translate(x,y);ctx.rotate(Math.at
   // На обычном масштабе читается Т-образный силуэт; мелкие ручки и фонарь остаются только в LOD 2.
   if(LOD>=1){ctx.strokeStyle='#F5F0FF';ctx.lineWidth=0.65;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-0.65,0);ctx.lineTo(0.55,0);ctx.moveTo(0.55,-0.55);ctx.lineTo(0.55,0.55);ctx.stroke();}
   ctx.fillStyle='#2B2B2B';rrect(ctx,-0.65,-0.17,1.2,0.34,0.1);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(-0.6,0,0.17,0,TAU);ctx.arc(0.6,0,0.17,0,TAU);ctx.fill();ctx.fillStyle='#7B61FF';ctx.fillRect(-0.3,-0.12,0.6,0.24);ctx.strokeStyle='#333';ctx.lineWidth=LOD>=1?0.2:0.09;ctx.beginPath();ctx.moveTo(0.55,LOD>=1?-0.55:-0.38);ctx.lineTo(0.55,LOD>=1?0.55:0.38);ctx.stroke();if(LOD>=2){ctx.fillStyle='#444';ctx.beginPath();ctx.arc(0.55,-0.55,0.07,0,TAU);ctx.arc(0.55,0.55,0.07,0,TAU);ctx.fill();ctx.fillStyle='#FFF';ctx.fillRect(0.62,-0.06,0.08,0.12);}ctx.restore();}
+function drawBicycle(x,y,hx,hy){ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));
+  ctx.strokeStyle='#263733';ctx.lineWidth=LOD>=1?.2:.16;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-1.05,0);ctx.lineTo(-.48,0);ctx.moveTo(.48,0);ctx.lineTo(1.05,0);ctx.stroke();
+  ctx.strokeStyle=LOD>=1?'#E4F3DA':'#367952';ctx.lineWidth=LOD>=1?.56:.3;ctx.beginPath();ctx.moveTo(-.75,0);ctx.lineTo(.75,0);ctx.moveTo(.65,-.5);ctx.lineTo(.65,.5);ctx.stroke();
+  if(LOD>=1){ctx.strokeStyle='#367952';ctx.lineWidth=.22;ctx.beginPath();ctx.moveTo(-.75,0);ctx.lineTo(.65,0);ctx.moveTo(.65,-.5);ctx.lineTo(.65,.5);ctx.stroke();ctx.fillStyle='#27342C';ctx.fillRect(-.45,-.28,.38,.56);}
+  if(LOD>=2){ctx.strokeStyle='#A2AAA0';ctx.lineWidth=.07;ctx.strokeRect(-1.05,-.12,.57,.24);ctx.strokeRect(.48,-.12,.57,.24);ctx.fillStyle='#EED788';ctx.fillRect(.83,-.1,.12,.2);}
+  ctx.restore();}
 function drawPlayerWorld(x,y,hx,hy,veh,persona,t,me){
   if(veh){if(veh.kind==='scooter'){drawScooter(x,y,hx,hy);drawPerson(x-hx*0.1,y-hy*0.1,hx,hy,persona,0,{moving:false,ring:me,scale:1.3});}
+    else if(veh.kind==='bike'){drawBicycle(x,y,hx,hy);drawPerson(x-hx*.15,y-hy*.15,hx,hy,persona,0,{moving:false,ring:me,scale:1.15});}
     else drawCarSprite(x,y,hx,hy,veh.kind==='own'?4.6:4.5,1.9,veh.kind==='taxi'?'#F4C542':(veh.color||'#C62828'),veh.kind==='own'?'own':veh.kind==='taxi'?'taxi':'share',t,{crashed:veh.crashed});
-    if(me){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.25;ctx.beginPath();ctx.arc(x,y,veh.kind==='scooter'?1.3:3.1,0,TAU);ctx.stroke();}return;}
+    if(me){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.25;ctx.beginPath();ctx.arc(x,y,veh.kind==='scooter'||veh.kind==='bike'?1.3:3.1,0,TAU);ctx.stroke();}return;}
   if(player.state==='hurt'&&me){drawPerson(x,y,hx,hy,persona,0,{lying:true,scale:1.5});return;}
   drawPerson(x,y,hx,hy,persona,player.phase,{moving:true,ring:me,scale:1.8});}
 function labelPlayer(sx,sy,name,me,img,frame){ctx.save();ctx.font='600 12px "IBM Plex Sans",system-ui';ctx.textAlign='left';ctx.textBaseline='middle';const tw=ctx.measureText(name).width;const aw=img?22:0;const w=tw+14+aw;const x0=sx-w/2,y0=sy-26;

@@ -79,7 +79,7 @@ let speedCams=[];
 function initSpeedCams(){speedCams=[];const cand=world.roads.filter(r=>r.c<=5&&r.p.length>=2);for(let k=0;k<400&&speedCams.length<16;k++){const r=pick(cand);const i=Math.floor(Math.random()*(r.p.length-1));const a=world.nodes[r.p[i]],b=world.nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);if(L<40)continue;
   const x=(a[0]+b[0])/2,y=(a[1]+b[1])/2;if(speedCams.some(c=>dist(c.x,c.y,x,y)<300))continue;const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;speedCams.push({x,y,px:x-dy*(r.hw+1.2),py:y+dx*(r.hw+1.2),lim:r.lim||60,road:r.n||'улица',last:-1e9});}}
 let camsInit=false;
-defWatch(()=>{if(!camsInit&&world){camsInit=true;initSpeedCams();}const v=player.vehicle;if(!v||v.kind==='taxi'||v.kind==='scooter'||!speedCams.length)return;const kmh=Math.abs(v.speed)*3.6;const now=sitNow();
+defWatch(()=>{if(!camsInit&&world){camsInit=true;initSpeedCams();}const v=player.vehicle;if(!v||v.kind==='taxi'||isLightVehicle(v.kind)||!speedCams.length)return;const kmh=Math.abs(v.speed)*3.6;const now=sitNow();
   for(const c of speedCams){if(Math.abs(c.x-v.x)>20||Math.abs(c.y-v.y)>20||dist(c.x,c.y,v.x,v.y)>16||now-c.last<20)continue;c.last=now;camFlash=1;
     if(kmh>c.lim+20){const over=kmh-c.lim;const fine=over>40?1500:500;startSit('camfine',{kmh:Math.round(kmh),lim:c.lim,road:c.road,fine,car:v.kind});}}});
 let camFlash=0;

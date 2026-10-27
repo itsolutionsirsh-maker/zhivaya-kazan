@@ -227,17 +227,21 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <div class="modal" id="howtoModal" hidden>
   <div class="box">
     <h2>Как тут жить</h2>
+    <p>Вы на Баумана. Нажмите на свободное место — персонаж пойдёт туда. Подойдите к человеку или входу и нажмите жёлтую кнопку <kbd>E</kbd>.</p>
+    <p>🧭 Выберите место и транспорт. Для первой истории откройте ☰ → «История соседки»: узнайте, где найти Фиданию.</p>
+    <details><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">Все подсказки по управлению</summary>
     <div class="howto">
       <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span><kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
       <div class="tile"><b><span class="ic">🛴</span>Ехать</b><span>Самокаты стоят у остановок, каршеринг — у обочин, своя машина — у дома. Подойдите и нажмите <kbd>E</kbd>. Клик по карте — автопилот, <kbd>WASD</kbd> — руль.</span></div>
       <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
       <div class="tile"><b><span class="ic">💬</span>Общаться</b><span><kbd>Enter</kbd> или 💬 — чат. «Рядом» — сказать вслух (облачко, жители отвечают), «Город» — всем игрокам, «Личные» — одному игроку. Клик по жителю — разговор с ним, клик по игроку — личка.</span></div>
-      <div class="tile"><b><span class="ic">🧭</span>Поездки</b><span>🧭 — выбрать место и способ: пешком, автобусом (подскажет номер и где выйти) или такси с ценой. Проезд в автобусе — 40 ₽.</span></div>
+      <div class="tile"><b><span class="ic">🧭</span>Поездки</b><span>🧭 — выбрать место и способ: пешком, автобус, такси, самокат, велосипед, каршеринг или своя машина. Цена и подход к транспорту показаны до поездки. Автобус — 40 ₽.</span></div>
       <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>Зажмите мышь и тяните — карта двигается. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
       <div class="tile"><b><span class="ic">📢</span>Площади</b><span>На площади Свободы, Тысячелетия, Тукая и 1 Мая можно собрать людей: митинг, встреча или концерт. Жители тоже устраивают свои.</span></div>
       <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
     </div>
     <p>Энергию восстанавливает сон, сытость — еда, настроение — всё приятное. Деньги зарабатываются в офисе или дома за компьютером.</p>
+    </details>
     <div class="row"><button class="btn primary" id="howtoClose">Понятно, пошли</button></div>
   </div>
 </div>
@@ -346,6 +350,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <div class="modal" id="menuModal" hidden>
   <div class="box">
     <h2>Живая Казань</h2>
+    <div class="row"><button class="btn primary" id="neighbourStoryBtn">📚 История соседки</button></div>
     <p>Прототип городской симуляции: реальные улицы, дома и маршруты центра Казани из OpenStreetMap, жители-боты, транспорт, происшествия и интерьеры.</p>
     <div class="legend">
       <kbd>WASD</kbd><span>идти (Shift — бежать), клик по карте — пойти туда</span>
@@ -382,7 +387,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/chat.js"></script>
 <script src="js/talk.js"></script>
 <script src="js/companion.js"></script>
-<script src="js/transport.js"></script>
+<script src="js/transport.js"></script><script src="js/journey.js"></script>
 <script src="js/rhythm.js"></script>
 <script src="js/folk.js"></script>
 <script src="js/drunk.js"></script>
@@ -402,5 +407,5 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/people.js"></script>
 <script src="js/phone.js"></script>
 <script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk3.js"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/render.js"></script>
-<script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script>
+<script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script>
 <script src="js/main.js"></script>
