@@ -168,6 +168,8 @@ $('#startBtn').addEventListener('click',()=>{const nm0=$('#pName').value.trim();
   if((first&&p.district)||(!first&&p.district!==(prev.district||'')))settleInDistrict(p.district).then(d=>{if(!d||d.busy){p.district=prev?prev.district||'':'';saveProfile(p);applyProfile(p);setHint(d&&d.busy?'Сменить район можно пешком на улице или дома':'Не нашли дом в этом районе — попробуйте ещё раз (нужна связь)');return;}
     addEvent(d.name?`${player.name} вышел во двор: ${d.name}${d.parent?' · '+d.parent:''}`:`${player.name} вышел в город на улицу Баумана`);});
   else addEvent(`${player.name} вышел в город на улицу Баумана`);if(first||!flags.howtoSeen)showHowto();});
+// подсказка в поле имени — каждый раз другой пример
+{const ex=['Айдар', 'Алина', 'Рустем', 'Гульназ', 'Тимур', 'Камила', 'Артём', 'Диляра', 'Ильдар', 'Анастасия', 'Марат', 'Эльвира', 'Булат', 'Регина', 'Никита', 'Лейсан', 'Азат', 'Софья', 'Ринат', 'Аделя'];let k;try{k=crypto.getRandomValues(new Uint32Array(1))[0]%ex.length;}catch(e){k=Math.floor(Math.random()*ex.length);}$('#pName').placeholder='Например, '+ex[k];}
 $('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').click();});
 // самое сильное отдаление: чтобы вся карта помещалась на экран (для старой маленькой карты — как раньше, 0,22)
 function zMin(){const bb=world&&world.bbox;if(!bb||typeof W==='undefined')return 0.22;return Math.min(0.22,Math.max(0.01,0.9*Math.min(W/(bb[2]-bb[0]),H/(bb[3]-bb[1]))));}
