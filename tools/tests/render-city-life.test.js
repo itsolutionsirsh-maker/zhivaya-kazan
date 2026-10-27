@@ -28,6 +28,24 @@ function setup() {
 }
 const building=()=>({p:[0,0,20,0,20,20,0,20],sgn:1,hm:10,h:0,wall:'#aaa',roof:'#ddd',i:2,dash:0});
 
+test('sun shadows stay finite, reverse during the day, fade at night and repeat daily',()=>{
+  const {s}=setup(),morning=s.citySun(8*60,0),evening=s.citySun(18*60,0);
+  assert.ok(morning.x<0&&evening.x>0);assert.ok(s.citySun(23*60,1).alpha<morning.alpha/4);
+  assert.deepEqual(s.citySun(8*60+1440,0),morning);
+  for(let m=0;m<1440;m+=5){const sun=s.citySun(m,.5);assert.ok(Object.values(sun).every(Number.isFinite));assert.ok(Math.hypot(sun.x,sun.y)<.7);}
+});
+test('facade finish follows building use and coordinates, not chunk insertion order',()=>{
+  const {s}=setup(),b=building(),before=s.facadeKind(b);b.i+=1000;assert.equal(s.facadeKind(b),before);
+  b.t='warehouse';assert.equal(s.facadeKind(b),3);b.t='office';assert.equal(s.facadeKind(b),1);
+  b.t='museum';assert.equal(s.facadeKind(b),2);
+});
+test('every finish stays within the facade drawing budget',()=>{
+  const {s,calls,created}=setup();
+  for(let kind=0;kind<4;kind++){calls.length=0;s.drawFacadeDetail(0,0,120,0,6,-15,kind);
+    assert.equal(calls.filter(c=>c[0]==='stroke').length,1);assert.ok(calls.filter(c=>c[0]==='lineTo').length<=12);}
+  assert.equal(created.length,0);
+});
+
 test('E stays inside all four viewport edges, with and without a distant player name',()=>{
   const {s,calls}=setup();
   for(const [x,y] of [[1,422],[389,422],[195,1],[195,843],[1,1],[389,843]])for(const nameBox of [null,{x:160,y:370,w:70,h:30}]){

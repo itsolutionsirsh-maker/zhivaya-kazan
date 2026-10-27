@@ -94,20 +94,66 @@ function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainA
 
 // ---------- отрисовка интерьера ----------
 const FLOORS={granite:['#A39E94','#98938A'],wood:['#C9A77A','#BE9A6C'],dark:['#4A3B33','#43352E'],tiles:['#DDD9D0','#D3CFC6'],marble:['#E7E3DC','#DDD8CF'],carpet:['#8C9AA6','#86939F'],rug:['#A8433B','#9A3C35']};
+// Только оформление. Восемь векторных узоров, без растров размером с комнату.
+const interiorFloorPaths=new Map();
+const ROOM_FINISH={
+  warm:{wall:'#E2CFB1',trim:'#647C65',counter:'#657760',top:'#E0CEAC'},
+  home:{wall:'#E6D9C5',trim:'#8B6851',counter:'#B69A76',top:'#E6DCC9'},
+  public:{wall:'#D9E1DB',trim:'#527B78',counter:'#577E7B',top:'#D6E3DB'},
+  night:{wall:'#A79480',trim:'#72594D',counter:'#68483F',top:'#AD8B66'},
+  neutral:{wall:'#DDD7CA',trim:'#667B84',counter:'#667B84',top:'#D4D9D5'}
+};
+function interiorFinish(kind){
+  if(kind==='home')return ROOM_FINISH.home;
+  if(kind==='cafe'||kind==='library'||kind==='hotel')return ROOM_FINISH.warm;
+  if(kind==='bar'||kind==='theatre')return ROOM_FINISH.night;
+  if(kind==='metro'||kind==='bank'||kind==='hospital'||kind==='pharmacy')return ROOM_FINISH.public;
+  return ROOM_FINISH.neutral;
+}
+function interiorFloorPath(it){
+  const key=it.floor+':'+it.w+':'+it.h;let p=interiorFloorPaths.get(key);if(p)return p;
+  p=new Path2D();
+  if(it.floor==='wood'||it.floor==='dark'){
+    for(let row=0;row*0.4<it.h;row++){const y=row*.4;p.rect(0,y,it.w,.035);for(let x=row%3*.7;x<it.w;x+=2.1)p.rect(x,y,.035,.4);}
+  }else if(it.floor==='tiles'||it.floor==='marble'){
+    for(let y=0;y<it.h;y++)for(let x=y%2?1:0;x<it.w;x+=2)p.rect(x,y,1,1);
+  }else{for(let y=0;y<it.h;y+=.6)p.rect(0,y,it.w,.05);}
+  if(interiorFloorPaths.size>=8)interiorFloorPaths.delete(interiorFloorPaths.keys().next().value);
+  interiorFloorPaths.set(key,p);return p;
+}
+function drawInteriorFloor(it,night){
+  const fl=FLOORS[it.floor]||FLOORS.wood,finish=interiorFinish(it.kind);
+  ctx.fillStyle=fl[0];ctx.fillRect(0,0,it.w,it.h);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,it.w,it.h);ctx.clip();
+  ctx.fillStyle=fl[1];ctx.fill(interiorFloorPath(it));
+  // Цветная кромка и тень от стен под мебелью, без изменения проходимости.
+  ctx.strokeStyle=finish.trim;ctx.lineWidth=.09;ctx.strokeRect(.28,.28,it.w-.56,it.h-.56);
+  ctx.fillStyle='rgba(42,37,31,.12)';ctx.fillRect(0,0,it.w,.45);ctx.fillRect(0,.45,.22,it.h-.45);
+  // Только существующие окна. Не больше четырёх пятен даже в будущих больших комнатах.
+  ctx.fillStyle=`rgba(255,244,203,${.23*(1-night)})`;ctx.beginPath();let count=0;
+  for(const f of it.furn){if(f.t!=='window')continue;if(count++>=4)break;
+    const x=f.x-f.w/2,y=f.y+f.h/2,d=Math.min(3.6,it.h*.4),shift=.75;
+    for(let pane=0;pane<2;pane++){const a=x+pane*f.w/2+.08,b=x+(pane+1)*f.w/2-.08;
+      ctx.moveTo(a,y);ctx.lineTo(b,y);ctx.lineTo(b+shift,y+d);ctx.lineTo(a+shift,y+d);}}
+  ctx.fill();
+  if(night>.02){if(!lampSprite)makeLightSprites();ctx.globalAlpha=.25+.3*night;
+    const size=Math.min(it.w,it.h)*1.1;ctx.drawImage(lampSprite,it.w/2-size/2,it.h*.55-size/2,size,size);
+    ctx.globalAlpha=1;}
+  ctx.restore();
+}
 function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);
   const iz=clamp(Math.min((W-40)/(it.w+1),(H-250)/(it.h+1.5)),16,46);const ox=(W-it.w*iz)/2,oy=Math.max(124,(H-it.h*iz)/2-10);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
   // пол
-  const fl=FLOORS[it.floor]||FLOORS.wood;ctx.fillStyle=fl[0];ctx.fillRect(0,0,it.w,it.h);ctx.fillStyle=fl[1];ctx.save();ctx.beginPath();ctx.rect(0,0,it.w,it.h);ctx.clip();
-  if(it.floor==='wood'||it.floor==='dark'){for(let y=0;y<it.h;y+=0.4){ctx.fillRect(0,y,it.w,0.035);const off=((y/0.4)|0)%3*0.7;for(let x=off;x<it.w;x+=2.1)ctx.fillRect(x,y,0.035,0.4);}}
-  else if(it.floor==='tiles'||it.floor==='marble'){for(let y=0;y<it.h;y+=1)for(let x=((y)|0)%2?1:0;x<it.w;x+=2)ctx.fillRect(x,y,1,1);}
-  else{for(let y=0;y<it.h;y+=0.6)ctx.fillRect(0,y,it.w,0.05);}ctx.restore();
+  const fl=FLOORS[it.floor]||FLOORS.wood,finish=interiorFinish(it.kind);drawInteriorFloor(it,nightAmount());
   // мебель
   const t=performance.now()/1000;
   for(const f of it.furn)drawFurniture(f,it,t);
   if(it.kind==='metro'&&typeof drawMetroTrain==='function')drawMetroTrain(it,t);
   // стены
-  ctx.strokeStyle='#5B4B3F';ctx.lineWidth=0.4;ctx.strokeRect(0,0,it.w,it.h);ctx.fillStyle='#7A6756';ctx.fillRect(-0.2,-0.2,it.w+0.4,0.2);
+  ctx.strokeStyle=finish.trim;ctx.lineWidth=.4;ctx.strokeRect(0,0,it.w,it.h);
+  ctx.fillStyle=finish.wall;ctx.fillRect(-.2,-.38,it.w+.4,.28);ctx.fillRect(-.2,-.1,.16,it.h+.3);ctx.fillRect(it.w+.04,-.1,.16,it.h+.3);
+  ctx.fillStyle='rgba(255,248,224,.6)';ctx.fillRect(-.2,-.4,it.w+.4,.06);
   // дверь
   ctx.fillStyle=fl[0];ctx.fillRect(it.door.x-0.85,it.h-0.25,1.7,0.5);ctx.fillStyle='#6B5A4C';ctx.fillRect(it.door.x-0.85,it.h+0.2,1.7,0.08);ctx.fillStyle='rgba(255,255,255,.6)';ctx.font='0.4px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillText('выход',it.door.x,it.h+0.65);
   // люди
@@ -127,11 +173,12 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
     case 'table':ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.arc(f.x+0.1,f.y+0.12,f.w/2,0,TAU);ctx.fill();ctx.fillStyle=it.kind==='home'?'#E8DCC8':'#8B5E3C';ctx.beginPath();ctx.arc(f.x,f.y,f.w/2,0,TAU);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=0.05;ctx.stroke();
       if(f.taken){ctx.fillStyle='#F5F0E6';ctx.beginPath();ctx.arc(f.x-0.3,f.y,0.17,0,TAU);ctx.arc(f.x+0.3,f.y,0.17,0,TAU);ctx.fill();ctx.fillStyle='#C98B4B';ctx.beginPath();ctx.arc(f.x-0.3,f.y,0.1,0,TAU);ctx.fill();}else{ctx.fillStyle='#E6E1D7';ctx.beginPath();ctx.arc(f.x,f.y,0.12,0,TAU);ctx.fill();}break;
     case 'chair':ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.ang||0);ctx.fillStyle='rgba(0,0,0,.15)';ctx.fillRect(-0.2,-0.2,0.5,0.5);ctx.fillStyle=it.kind==='home'?'#D7C7B0':'#5B3A24';rrect(ctx,-0.25,-0.25,0.5,0.5,0.08);ctx.fill();ctx.fillStyle=it.kind==='home'?'#B9A68C':'#3E2616';ctx.fillRect(-0.3,-0.25,0.09,0.5);ctx.restore();break;
-    case 'counter':ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#6E4B2F';rrect(ctx,x,y,f.w,f.h,0.12);ctx.fill();ctx.fillStyle='#8C6440';ctx.fillRect(x+0.1,y+0.1,f.w-0.2,f.h-0.5);
+    case 'counter':{const finish=interiorFinish(it.kind);ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle=finish.counter;rrect(ctx,x,y,f.w,f.h,0.12);ctx.fill();ctx.fillStyle=finish.top;ctx.fillRect(x+0.1,y+0.1,f.w-0.2,f.h-0.5);
+      ctx.fillStyle='rgba(255,245,215,.45)';ctx.fillRect(x+.12,y+f.h-.18,f.w-.24,.06);}
       for(let i=0;i<f.w-1;i+=1.3){ctx.fillStyle='#F2EBDD';ctx.beginPath();ctx.arc(x+0.8+i,y+0.4,0.13,0,TAU);ctx.fill();}break;
     case 'machine':ctx.fillStyle='#2E2E2E';rrect(ctx,x,y,f.w,f.h,0.08);ctx.fill();ctx.fillStyle='#C0C0C0';ctx.fillRect(x+0.15,y+0.12,f.w-0.3,0.15);break;
     case 'board':ctx.fillStyle='#1E1E1E';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#E8E0C8';for(let i=0;i<3;i++)ctx.fillRect(x+0.3,y+0.08+i*0.1,f.w*0.5-i*0.6,0.04);break;
-    case 'window':ctx.fillStyle=isNight()?'#243A5A':'#A9D0F0';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillRect(x+f.w/2-0.03,y,0.06,f.h);break;
+    case 'window':ctx.fillStyle='#EAE5D8';ctx.fillRect(x-.08,y-.06,f.w+.16,f.h+.12);ctx.fillStyle=isNight()?'#243A5A':'#A9D0F0';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#F3EDDF';ctx.fillRect(f.x-.04,y,.08,f.h);ctx.fillStyle='rgba(255,255,255,.4)';ctx.fillRect(x+.08,y+.04,f.w*.36,.06);break;
     case 'shelf':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#D8D2C4';ctx.fillRect(x,y,f.w,f.h);const cols=[['#D64545','#3E8ED0','#F4B400'],['#2F9E6B','#E07B39','#8E44AD'],['#C2185B','#00897B','#5D4037']][f.goods||0];
       if(f.horiz){for(let i=0;i<f.w;i+=0.35)ctx.fillStyle=cols[Math.floor(i/0.35)%3],ctx.fillRect(x+0.05+i,y+0.1,0.25,f.h-0.2);}else{for(let i=0;i<f.h-0.2;i+=0.35){ctx.fillStyle=cols[Math.floor(i/0.35)%3];ctx.fillRect(x+0.1,y+0.1+i,f.w-0.2,0.25);}}break;
     case 'desk':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle=it.kind==='home'?'#E0D2BC':'#C9B99A';rrect(ctx,x,y,f.w,f.h,0.06);ctx.fill();ctx.fillStyle='#1F2A33';ctx.fillRect(f.x-0.35,y+0.08,0.7,0.14);ctx.fillStyle='#D8D8D8';ctx.fillRect(f.x-0.3,y+0.42,0.6,0.16);break;
@@ -143,7 +190,7 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
     case 'pedestal':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#EDE8DF';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle=['#8C6D3F','#4C6E8C','#8C4C4C','#5E8C5A'][f.c%4];ctx.beginPath();ctx.arc(f.x,f.y,0.3,0,TAU);ctx.fill();break;
     case 'sofa':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#4F6D8C';rrect(ctx,x,y,f.w,f.h,0.2);ctx.fill();ctx.fillStyle='#5F7E9E';for(let i=0;i<3;i++)rrect(ctx,x+0.15+i*(f.w-0.3)/3,y+0.3,(f.w-0.3)/3-0.1,f.h-0.4,0.1),ctx.fill();break;
     case 'tv':ctx.fillStyle='#111';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle=`hsl(${(t*40)%360},60%,55%)`;ctx.fillRect(x+0.08,y+0.05,f.w-0.16,f.h-0.1);break;
-    case 'rug':ctx.fillStyle='#B98C6B';ctx.beginPath();ctx.ellipse(f.x,f.y,f.w/2,f.h/2,0,0,TAU);ctx.fill();ctx.strokeStyle='#A07555';ctx.lineWidth=0.08;ctx.stroke();break;
+    case 'rug':ctx.fillStyle='#B98C6B';ctx.beginPath();ctx.ellipse(f.x,f.y,f.w/2,f.h/2,0,0,TAU);ctx.fill();ctx.strokeStyle='#E2C8A1';ctx.lineWidth=.07;ctx.beginPath();ctx.ellipse(f.x,f.y,f.w/2-.16,f.h/2-.16,0,0,TAU);ctx.stroke();ctx.strokeStyle='#885D47';ctx.beginPath();for(const u of [-.25,0,.25]){const a=f.x+f.w*u;ctx.moveTo(a,f.y-.26);ctx.lineTo(a+.22,f.y);ctx.lineTo(a,f.y+.26);ctx.lineTo(a-.22,f.y);ctx.lineTo(a,f.y-.26);}ctx.stroke();break;
     case 'bed':ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x+0.08,y+0.1,f.w,f.h);ctx.fillStyle='#F2EDE4';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();ctx.fillStyle='#5E7F9E';rrect(ctx,x+0.7,y+0.1,f.w-0.8,f.h-0.2,0.08);ctx.fill();ctx.fillStyle='#FFFFFF';rrect(ctx,x+0.1,y+0.2,0.5,f.h-0.4,0.1);ctx.fill();break;
     case 'wardrobe':ctx.fillStyle='#8C6440';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#6E4B2F';ctx.fillRect(f.x-0.02,y,0.04,f.h);break;
     case 'kitchen':ctx.fillStyle='#D9D4C8';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#8FA3B3';ctx.beginPath();ctx.arc(x+1,f.y,0.3,0,TAU);ctx.fill();ctx.fillStyle='#333';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(x+f.w-1.2+(i%2)*0.5,f.y-0.2+Math.floor(i/2)*0.4,0.14,0,TAU);ctx.fill();}break;

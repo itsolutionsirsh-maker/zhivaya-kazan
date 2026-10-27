@@ -5,6 +5,7 @@ const {chromium} = require('playwright');
 const {spawn} = require('child_process');
 const {measureCompletedFrames} = require('./render-metrics');
 const {stageDetailedFolk} = require('./visual-fixtures');
+const {stageCityLook} = require('./city-look-fixtures');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function measure(dir, port) {
   const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
@@ -34,6 +35,12 @@ async function measure(dir, port) {
       const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
       if (result.completed_frames<2) throw new Error('No completed game frames: '+label);
       out.scenes[label]={...result,...(fixtures?{fixtures}:{} )};
+    }
+    for(const [label,options] of [['фасад, день',{hour:13}],['фасад, ночь',{hour:23}],['кафе, день',{kind:'cafe',hour:13}],['квартира, ночь',{kind:'home',hour:23}],['метро',{kind:'metro',hour:23}]]){
+      const fixtures=await pg.evaluate(stageCityLook,options);await sleep(1500);
+      const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
+      if(result.completed_frames<2)throw new Error('No completed game frames: '+label);
+      out.scenes[label]={...result,fixtures};
     }
     if (errors.length) throw new Error(errors.join('\n'));
     return out;
