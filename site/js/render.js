@@ -18,8 +18,17 @@ function visiblePois(x0,y0,x1,y1,z){const out=[];const minPrio=z>4.5?6:z>3.2?5:z
 function isNight(){const h=(clock.minutes/60)%24;return h<6||h>=21;}
 function nightAmount(){const h=(clock.minutes/60)%24;if(h>=7&&h<18)return 0;if(h>=22||h<5)return 1;if(h>=18&&h<22)return (h-18)/4;return 1-(h-5)/2;}
 
+// Один расчёт на кадр. Издалека остаются прежние тени и освещение стен.
+function citySun(minutes,night){
+  const h=((minutes/60)%24+24)%24,a=clamp((h-6)/14,0,1)*Math.PI;
+  const x=-.55*Math.cos(a),y=.26+.12*Math.abs(Math.cos(a)),L=Math.hypot(x,y);
+  return {x,y,nx:-x/L,ny:-y/L,alpha:.2-.165*night};
+}
+let facadeSun=null;
+
 function render(){
   const z=cam.z;LOD=z>8?2:z>3?1:0;const t=performance.now()/1000;const night=nightAmount();
+  facadeSun=z>=3?citySun(clock.minutes,night):null;
   let shx=0,shy=0;if(shake>0){shake-=0.016;shx=(Math.random()-0.5)*shake*14;shy=(Math.random()-0.5)*shake*14;}
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle=GROUND;ctx.fillRect(0,0,W,H);
   const vx0=cam.x-W/2/z-20,vy0=cam.y-H/2/z-40,vx1=cam.x+W/2/z+20,vy1=cam.y+H/2/z+20;
@@ -51,10 +60,10 @@ function render(){
   if(z>1.6)for(const a of world.areas){if(a.k!=='parking'||!a.cars||a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;for(const c of a.cars)drawCarSprite(c.x,c.y,Math.cos(c.ang),Math.sin(c.ang),4.3,1.8,c.color,'car',t,null);}
   // ---- тени зданий
   const bvis=[];world.bgrid.query(vx0,vy0,vx1,vy1,b=>{if(b.bb[2]<vx0||b.bb[0]>vx1||b.bb[3]<vy0||b.bb[1]>vy1)return;bvis.push(b);});
-  if(z>1.4){ctx.fillStyle='rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=0.38*b.hm,sy=0.3*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);}ctx.fill();}
+  if(z>1.4){const sun=facadeSun;ctx.fillStyle=sun?`rgba(45,47,57,${sun.alpha})`:'rgba(50,40,25,.2)';ctx.beginPath();for(const b of bvis){const p=b.p;const sx=(sun?sun.x:.38)*b.hm,sy=(sun?sun.y:.3)*b.hm;ctx.moveTo(p[0]+sx,p[1]+sy);for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i]+sx,p[i+1]+sy);}ctx.fill();}
   // ---- деревья
   if(z>0.9){const tv=[];world.tgrid.query(vx0,vy0,vx1,vy1,tr=>{if(tr.x<vx0||tr.x>vx1||tr.y<vy0||tr.y>vy1)return;tv.push(tr);});
-    if(z>1.4){ctx.fillStyle='rgba(40,50,25,.22)';ctx.beginPath();for(const tr of tv){ctx.moveTo(tr.x+tr.r*0.4+tr.r,tr.y+tr.r*0.35);ctx.arc(tr.x+tr.r*0.4,tr.y+tr.r*0.35,tr.r,0,TAU);}ctx.fill();}
+    if(z>1.4){const sun=facadeSun;ctx.fillStyle=sun?`rgba(40,50,35,${sun.alpha})`:'rgba(40,50,25,.22)';ctx.beginPath();for(const tr of tv){const sx=tr.r*(sun?sun.x:.4),sy=tr.r*(sun?sun.y:.35);ctx.moveTo(tr.x+sx+tr.r,tr.y+sy);ctx.arc(tr.x+sx,tr.y+sy,tr.r,0,TAU);}ctx.fill();}
     for(let c=0;c<3;c++){ctx.fillStyle=TREE_C[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;ctx.moveTo(tr.x+tr.r,tr.y);ctx.arc(tr.x,tr.y,tr.r,0,TAU);}ctx.fill();
       if(z>2.2){ctx.fillStyle=TREE_HI[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;const r2=tr.r*0.55;ctx.moveTo(tr.x-tr.r*0.2+r2,tr.y-tr.r*0.25);ctx.arc(tr.x-tr.r*0.2,tr.y-tr.r*0.25,r2,0,TAU);}ctx.fill();}}}
   drawWalls(z,vx0,vy0,vx1,vy1);
@@ -223,23 +232,35 @@ function drawActionTarget(toS,z,nameBox){
   ctx.fillStyle='#142B27';ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('E',bx,by+0.5);ctx.restore();
 }
 let facadeWallsLeft=16;
+function facadeSeed(b){return Math.imul(Math.round(b.p[0]*10),73856093)^Math.imul(Math.round(b.p[1]*10),19349663);}
+function facadeKind(b){
+  if(/industrial|warehouse|garage|hangar|shed/.test(b.t||''))return 3;
+  if(/commercial|retail|office/.test(b.t||'')||b.h>=7)return 1;
+  if(/public|school|museum|theatre|university|civic/.test(b.t||''))return 2;
+  return (facadeSeed(b)>>>0)%2?0:2;
+}
 function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=0;
   if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
   const ex=EXT[0]*b.hm,ey=EXT[1]*b.hm;const win=z>4.2&&b.h>=1;const lit=night>0.3&&b.lit;
   for(let i=0;i<n;i+=2){const j=(i+2)%n;const ax=p[i],ay=p[i+1],bx=p[j],by=p[j+1];const dx=bx-ax,dy=by-ay;const L=Math.hypot(dx,dy)||1;const nx=b.sgn*dy/L,ny=-b.sgn*dx/L;
-    if(nx*EXT[0]+ny*EXT[1]>=0)continue;const light=0.62+0.38*Math.max(0,nx*-0.62+ny*-0.78);
+    if(nx*EXT[0]+ny*EXT[1]>=0)continue;const sun=facadeSun,light=sun ? .68+.32*(1-night)*Math.max(0,nx*sun.nx+ny*sun.ny) : .62+.38*Math.max(0,nx*-.62+ny*-.78);
     ctx.fillStyle=shade(b.wall,light);ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx+ex,by+ey);ctx.lineTo(ax+ex,ay+ey);ctx.closePath();ctx.fill();
     // Один фасад на дом, 16 на кадр. Карниз, цоколь или пилястры — только на близком плане.
-    if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<1&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,Math.abs(b.i||0)%3);detailedWalls++;facadeWallsLeft--;}
+    if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<1&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,facadeKind(b));detailedWalls++;facadeWallsLeft--;}
     if(win&&L>3.2){const lv=Math.min(b.h,14);const ux=dx/L,uy=dy/L;const cols=Math.floor((L-1.2)/2.4);const gap=(L-1.2-cols*2.4)/2+0.6+0.7;const ws=(b.dash%1.5);for(let k=0;k<lv;k++){const v0=(k+0.3)/lv,v1=(k+0.72)/lv;const list=(lit&&((k*7+b.i)%5!==0))?winLit:winDark;for(let c=0;c<cols;c++){const s0=gap+c*2.4+ws,s1=s0+1.0;list.push([ax+ux*s0+ex*v0,ay+uy*s0+ey*v0,ax+ux*s1+ex*v0,ay+uy*s1+ey*v0,ax+ux*s1+ex*v1,ay+uy*s1+ey*v1,ax+ux*s0+ex*v1,ay+uy*s0+ey*v1]);}}}}
   ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
   if(z>4.5&&b.n&&b.area>400){ctx.save();ctx.font='500 1.6px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(40,30,20,.6)';ctx.fillText(b.n,b.cx+ex,b.cy+ey);ctx.restore();}}
 function drawFacadeDetail(ax,ay,bx,by,ex,ey,kind){
-  // Один путь и один stroke вместо двух смен стиля и двух stroke на стену.
-  ctx.strokeStyle='rgba(250,239,210,.48)';ctx.lineWidth=.22;ctx.beginPath();
-  ctx.moveTo(ax+ex*.88,ay+ey*.88);ctx.lineTo(bx+ex*.88,by+ey*.88);
-  if(kind===2){const dx=bx-ax,dy=by-ay;for(const u of [.13,.87]){ctx.moveTo(ax+dx*u,ay+dy*u);ctx.lineTo(ax+dx*u+ex*.84,ay+dy*u+ey*.84);}}
-  else{const v=kind===1?.12:.48;ctx.moveTo(ax+ex*v,ay+ey*v);ctx.lineTo(bx+ex*v,by+ey*v);}
+  // Четыре отделки, не больше 12 отрезков и одного stroke на стену.
+  // Геометрия в плоскости стены: не превращает крышу или проход в новое препятствие.
+  const dx=bx-ax,dy=by-ay;
+  ctx.strokeStyle=kind===1?'rgba(207,231,230,.65)':'rgba(255,239,205,.72)';ctx.lineWidth=.25;ctx.beginPath();
+  const line=(u,v,U,V)=>{ctx.moveTo(ax+dx*u+ex*v,ay+dy*u+ey*v);ctx.lineTo(ax+dx*U+ex*V,ay+dy*U+ey*V);};
+  line(0,.91,1,.91);line(0,.08,1,.08);
+  if(kind===0){line(0,.81,1,.81);line(0,.48,1,.48);for(const u of [.05,.95])line(u,.08,u,.91);}
+  else if(kind===1){for(const u of [.2,.4,.6,.8])line(u,.08,u,.91);line(0,.48,1,.48);}
+  else if(kind===2){line(0,.83,1,.83);for(const u of [.09,.14,.86,.91])line(u,.08,u,.83);line(.07,.18,.16,.18);line(.84,.18,.93,.18);}
+  else{for(const u of [.16,.32,.48,.64,.8])line(u,.08,u,.91);}
   ctx.stroke();
 }
 // Только геометрия, без новых растров. Не более 96 небольших записей и двух новых расчётов за кадр.

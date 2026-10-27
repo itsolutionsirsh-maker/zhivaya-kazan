@@ -4,6 +4,7 @@
 const {chromium} = require('playwright');
 const {spawn} = require('child_process');
 const {parkSnapshotTaxi} = require('./visual-fixtures');
+const {stageCityLook} = require('./city-look-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -180,6 +181,17 @@ async function phoneUIShots(browser){
       const stop=await ev(`(()=>{const s=world.stops.slice().sort((a,b)=>dist(a.x,a.y,player.x,player.y)-dist(b.x,b.y,player.x,player.y))[0];if(!s)throw new Error('Нет остановки для снимка');
         const q=toSidewalk(s.x,s.y);player.x=q[0];player.y=q[1];cam.x=s.x;cam.y=s.y;cam.zt=cam.z=9.5;currentAction=null;render();return s.n;})()`);
       await pg.screenshot({path: `${OUT}/${dev}_07_stop_detail.png`});console.log(dev,'| остановка:',stop);
+      // Те же функции и точки на main и ветке; игровой RAF уже остановлен выше.
+      for(const [name,options] of [
+        ['08_facade_day',{hour:13}],['09_facade_evening',{hour:19}],['10_facade_night',{hour:23}],
+        ['11_facade_far',{hour:13,z:2.5}],['12_cafe_day',{kind:'cafe',hour:13}],
+        ['13_cafe_night',{kind:'cafe',hour:23}],['14_home_day',{kind:'home',hour:13}],
+        ['15_home_night',{kind:'home',hour:23}],['16_shop',{kind:'shop',hour:13}],['17_metro',{kind:'metro',hour:23}]
+      ]){
+        const fixture=await pg.evaluate(stageCityLook,options);await closeCards();
+        await ev("scene==='interior'?renderInterior():render()");
+        await pg.screenshot({path:`${OUT}/${dev}_${name}.png`});console.log(dev,name,JSON.stringify(fixture));
+      }
       await ctx.close();
     }
     await phoneUIShots(b);
