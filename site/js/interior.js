@@ -103,7 +103,8 @@ const ROOM_FINISH={
   night:{wall:'#A79480',trim:'#72594D',counter:'#68483F',top:'#AD8B66'},
   neutral:{wall:'#DDD7CA',trim:'#667B84',counter:'#667B84',top:'#D4D9D5'}
 };
-function interiorFinish(kind){
+function interiorFinish(kind,name=''){
+  if(typeof venueLook==='function')return venueLook({kind,name});
   if(kind==='home')return ROOM_FINISH.home;
   if(kind==='cafe'||kind==='library'||kind==='hotel')return ROOM_FINISH.warm;
   if(kind==='bar'||kind==='theatre')return ROOM_FINISH.night;
@@ -122,7 +123,7 @@ function interiorFloorPath(it){
   interiorFloorPaths.set(key,p);return p;
 }
 function drawInteriorFloor(it,night){
-  const fl=FLOORS[it.floor]||FLOORS.wood,finish=interiorFinish(it.kind);
+  const finish=interiorFinish(it.kind,it.name),fl=finish.floor||FLOORS[it.floor]||FLOORS.wood;
   ctx.fillStyle=fl[0];ctx.fillRect(0,0,it.w,it.h);
   ctx.save();ctx.beginPath();ctx.rect(0,0,it.w,it.h);ctx.clip();
   ctx.fillStyle=fl[1];ctx.fill(interiorFloorPath(it));
@@ -145,10 +146,11 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   const iz=clamp(Math.min((W-40)/(it.w+1),(H-250)/(it.h+1.5)),16,46);const ox=(W-it.w*iz)/2,oy=Math.max(124,(H-it.h*iz)/2-10);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
   // пол
-  const fl=FLOORS[it.floor]||FLOORS.wood,finish=interiorFinish(it.kind);drawInteriorFloor(it,nightAmount());
+  const finish=interiorFinish(it.kind,it.name),fl=finish.floor||FLOORS[it.floor]||FLOORS.wood;drawInteriorFloor(it,nightAmount());
   // мебель
   const t=performance.now()/1000;
-  for(const f of it.furn)drawFurniture(f,it,t);
+  const furnished=drawVenueLayer(it,iz);
+  for(const f of it.furn)if(!furnished||f.own||!VENUE_FURNITURE.has(f.t))drawFurniture(f,it,t);
   if(it.kind==='metro'&&typeof drawMetroTrain==='function')drawMetroTrain(it,t);
   // стены
   ctx.strokeStyle=finish.trim;ctx.lineWidth=.4;ctx.strokeRect(0,0,it.w,it.h);
@@ -161,7 +163,9 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
-  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';ctx.fillText(it.name,ox,oy+it.h*iz+34);{const nw=ctx.measureText(it.name).width,kr=KIND_RU[it.kind]||KIND_RU.default;ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';if(kr.toLowerCase()!==String(it.name).toLowerCase())ctx.fillText(kr,ox+nw+12,oy+it.h*iz+35);}
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';
+  {const left=Math.max(12,ox),space=W-left-12;let title=String(it.name||'');while(title.length>1&&ctx.measureText(title).width>space)title=title.slice(0,-2)+'…';ctx.fillText(title,left,oy+it.h*iz+34);
+    const nw=ctx.measureText(title).width,kr=it.kind==='worship'&&venueStyleId(it)==='mosque'?'мечеть':KIND_RU[it.kind]||KIND_RU.default;ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';if(kr.toLowerCase()!==String(it.name).toLowerCase()){const inline=nw+12+ctx.measureText(kr).width<=space;ctx.fillText(kr,inline?left+nw+12:left,oy+it.h*iz+(inline?35:53));}}
   const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   if(f.t==='rails'){ctx.fillStyle='#2B2A28';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#4A4440';for(let i=0;i<f.w;i+=0.7)ctx.fillRect(x+i,y+0.55,0.32,1.3);ctx.fillStyle='#B8B4AE';ctx.fillRect(x,y+0.75,f.w,0.08);ctx.fillRect(x,y+1.55,f.w,0.08);return;}
