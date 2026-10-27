@@ -20,7 +20,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await pg.waitForFunction('document.querySelector("#loading").hidden === true', null, {timeout: 90000}); await sleep(800);
       await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(2000);
       const closeCards = () => ev('(()=>{let k=0;while(SIT.card&&k++<6){const c=SIT.card;pickChoice(c,c.choices[c.choices.length-1]);}})()');
-      // одно и то же место: середина улицы Баумана, люди вокруг игрока
+      // одно и то же место у Профсоюзной, люди вокруг игрока
       const crowd = `(()=>{const L=llToXY([55.79242,49.11140]);const n=nearestNode(L[0],L[1],world.pedAdj,200);const q=sidewalkPos(n);player.x=q[0];player.y=q[1];cam.x=q[0];cam.y=q[1];cam.zt=cam.z=5.5;
         let k=0;for(const w of walkers){if(w.bus||w.inside||w.temp||k>=14)continue;const a=k*0.45,r=3+(k%4)*1.6;w.x=q[0]+Math.cos(a)*r;w.y=q[1]+Math.sin(a)*r;w.state='idle';w.ttl=30;w.path=null;k++;}return k;})()`;
       await ev(`zkSetTime((clock.day-1)*1440+13*60)`); await ev(crowd); await sleep(1200); await closeCards();
@@ -51,7 +51,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       const folk = await ev(`(()=>{
         const active=sitActive('folkAct');if(active)endSit(active);
         zkSetTime((clock.day-1)*1440+13*60);updateClock(0);
-        const L=llToXY([55.79242,49.11140]),n=nearestNode(L[0],L[1],world.pedAdj,200),q=sidewalkPos(n);
+        // На Баумана редкие узлы: nearestNode может перескочить на Профсоюзную.
+        // Берём точки через sidewalkPos вдоль самой пешеходной улицы, с шагом до 5 м.
+        const candidates=[];
+        for(const r of world.roads){if(r.c!==9||!/Баумана/i.test(r.n||''))continue;
+          for(let i=1;i<r.p.length;i++){const a=sidewalkPos(r.p[i-1]),b=sidewalkPos(r.p[i]),steps=Math.max(1,Math.ceil(dist(...a,...b)/5));
+            for(let k=0;k<=steps;k++){const t=k/steps;candidates.push({node:r.p[t<0.5?i-1:i],q:[lerp(a[0],b[0],t),lerp(a[1],b[1],t)]});}}}
+        const spots=candidates.filter(s=>{
+          const [x,y]=s.q,road=nearestRoadSeg(x,y,15);
+          return !inBuilding(x,y)&&(!road||road.d>road.seg.r.hw+2);
+        }),used=[];
+        const placeNear=(x,y)=>{
+          const s=spots.filter(s=>used.every(p=>dist(p.q[0],p.q[1],s.q[0],s.q[1])>=4))
+            .sort((a,b)=>dist(a.q[0],a.q[1],x,y)-dist(b.q[0],b.q[1],x,y))[0];
+          if(!s||dist(s.q[0],s.q[1],x,y)>30)throw new Error('Нет свободной пешеходной точки на Баумана');
+          used.push(s);return s;
+        };
+        const L=llToXY([55.79190,49.11240]),q=placeNear(L[0],L[1]).q;
         player.x=q[0];player.y=q[1];player.vehicle=null;player.waypoints=null;cam.x=q[0];cam.y=q[1];cam.zt=cam.z=5.5;
         for(let i=0;i<50;i++)folkDistrictTick();
         const specs=[['karim','phone',-10,-10],['gazinur','cart',6,-10],['arslan','guitar',-10,7],['halil','broom',6,7]];
@@ -63,8 +79,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         const own=walkers.filter(w=>w.folk),out=[];
         for(const [id,item,dx,dy] of specs){const w=own.find(w=>w.folk===id);
           if(!w)throw new Error('Не появился для снимка: '+id);
-          w.x=q[0]+dx;w.y=q[1]+dy;w.hx=1;w.hy=0;w.phase=0;w.state='folkStay';w.path=null;w.mv=null;w.walking=false;w.bus=null;w.inside=null;w.filming=item==='phone';
-          out.push({id,item,filming:w.filming});}
+          const spot=placeNear(q[0]+dx,q[1]+dy);
+          w.node=spot.node;w.x=spot.q[0];w.y=spot.q[1];w.hx=1;w.hy=0;w.phase=0;w.state='folkStay';w.path=null;w.mv=null;w.walking=false;w.bus=null;w.inside=null;w.filming=item==='phone';
+          out.push({id,item,filming:w.filming,x:w.x,y:w.y});}
         weather.rain=[];weather.kind='clear';currentAction=null;updateHud();currentAction=null;performance.now=()=>750;
         render();return out;
       })()`);
