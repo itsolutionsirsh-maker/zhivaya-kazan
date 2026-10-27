@@ -1,6 +1,6 @@
 // Общая поездка: выбор транспорта, подход, посадка и последний пеший участок.
 // Маршруты считает движок. ИИ и отдельные таймеры здесь не нужны.
-const JOURNEY={rental:null,resume:null,restored:new WeakSet()};
+const JOURNEY={rental:null,resume:null,restored:new WeakSet(),settled:[]};
 window.journeyVisualHints=[];
 function isLightVehicle(kind){return kind==='scooter'||kind==='bike';}
 function journeyIcon(kind){return {bike:'🚲',scooter:'🛴',car:'🚙',own:'🚗',taxi:'🚕',bus:'🚌'}[kind]||'🚶';}
@@ -77,11 +77,37 @@ function journeyDump(){
   if(!v&&!d&&!player.bus)return null;
   return {v:1,dest:journeyDest(d),mode:v?v.kind:player.bus?'bus':'walk',due:v?journeyBill(v):0,x:player.x,y:player.y};
 }
+// Квитанция относится к целому исходному снимку, а не только к цене поездки.
+// Не используем отдельный ключ localStorage: баланс и закрытый счёт пишутся атомарно.
+function journeyReceiptKey(state){
+  const s=state&&state.journey;
+  if(!s||s.v!==1||!Number.isFinite(state.t)||!Number.isFinite(s.due)||s.due<=0||s.due>=1000000)return null;
+  const d=s.dest||{};
+  const key=JSON.stringify([state.t,state.minutes,state.money,state.econ&&state.econ.owed||0,s.v,s.mode,s.due,s.x,s.y,d.x,d.y,d.n]);
+  return key.length<=2048?key:null;
+}
+function journeyReceipts(state){return Array.isArray(state&&state.journeySettled)?state.journeySettled.filter(k=>typeof k==='string'&&k.length<=2048).slice(-16):[];}
+function journeyKeepLocal(incoming){
+  const key=journeyReceiptKey(incoming);if(!key)return false;
+  try{return journeyReceipts(JSON.parse(localStorage.getItem('zk.state')||'null')).includes(key);}catch(e){return false;}
+}
+function journeyCheckpoint(state){
+  if(!state||window.zkNoSave)return;
+  const key=journeyReceiptKey(state);
+  if(key)JOURNEY.settled=[...JOURNEY.settled.filter(k=>k!==key),key].slice(-16);
+  // loadState ещё не закончил запуск мира: saveState здесь мог бы пересобрать
+  // незагруженные подсистемы. Сохраняем исходный снимок, меняя только расчёт поездки.
+  const next=Object.assign({},state,{t:Date.now(),x:player.x,y:player.y,money:player.money,
+    econ:Object.assign({},state.econ,{owed:ECON.owed}),journey:journeyDump(),journeySettled:JOURNEY.settled});
+  try{localStorage.setItem('zk.state',JSON.stringify(next));}
+  catch(e){setHint('Не удалось сохранить оплату поездки. Освободите место в хранилище браузера');}
+}
 // После загрузки не восстанавливаем устаревшие ссылки на автобус/машину. Сохраняем цель,
 // закрываем счёт на момент сохранения и даём выбрать свежий транспорт без платы за офлайн.
-function journeyRestore(s){
+function journeyRestore(s,state){
   if(!s||s.v!==1||JOURNEY.restored.has(s))return;JOURNEY.restored.add(s);JOURNEY.rental=null;JOURNEY.resume=journeyDest(s.dest);
   if(Number.isFinite(s.due)&&s.due>0&&s.due<1000000)journeyCharge(s.due,'Прерванная поездка');
   if(s.mode!=='walk'){const q=toSidewalk(player.x,player.y);if(q&&!inBuilding(q[0],q[1])){player.x=q[0];player.y=q[1];cam.x=q[0];cam.y=q[1];}}
+  if(Number.isFinite(s.due)&&s.due>0&&s.due<1000000)journeyCheckpoint(state);
   updateTripBox();
 }

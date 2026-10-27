@@ -147,7 +147,19 @@ async function tgwPoll(){if(!TGW.poll)return;if(performance.now()>TGW.until){TGW
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TGW.poll){clearTimeout(TGW.timer);tgwPoll();}});
 for(const id of ['#acctTgBtn','#pTgBtn'])if($(id))$(id).addEventListener('click',acctTgStart);
 // загрузить прогресс с сервера и перезапустить (локальные сохранения на это время выключены)
-function acctApply(j){window.zkNoSave=true;try{setRev(j.updated||0);localStorage.setItem('zk.state',JSON.stringify(j.state));if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');}catch(e){}const m=$('#acctMsg');if(m)m.textContent='Прогресс загружен с сервера — перезапускаем…';location.reload();}
+function acctApply(j){
+  // Поздний ответ с тем же неоплаченным снимком не откатывает уже закрытый счёт.
+  // Сохраняем весь локальный прогресс, включая профиль/город/задания, а не только деньги.
+  const keepLocal=typeof journeyKeepLocal==='function'&&journeyKeepLocal(j.state);
+  window.zkNoSave=true;
+  try{setRev(j.updated||0);if(!keepLocal){
+    localStorage.setItem('zk.state',JSON.stringify(j.state));
+    if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));
+    if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));
+    if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');
+  }}catch(e){}
+  const m=$('#acctMsg');if(m)m.textContent=keepLocal?'Поездка уже оплачена — продолжаем сохранённую игру…':'Прогресс загружен с сервера — перезапускаем…';location.reload();
+}
 // при запуске: если на сервере сохранение новее (играли с другого устройства) — взять его
 async function acctSyncOnBoot(){if(!acct||Net.syncing||Net.syncReady)return;if(acct.tg&&typeof TG!=='undefined'&&TG.on)return;   // в Телеге вход и загрузку делает tg.js
   Net.syncing=true;try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}

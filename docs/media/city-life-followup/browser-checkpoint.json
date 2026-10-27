@@ -1,0 +1,18 @@
+{
+  "first": {
+    "journey": null,
+    "money": 968,
+    "owed": 0,
+    "receipts": 1,
+    "savedMoney": 968,
+    "vehicle": false
+  },
+  "afterReplay": {
+    "money": 1018,
+    "owed": 0,
+    "passed": true,
+    "receipts": 2,
+    "savedMoney": 1018
+  },
+  "method": "Real loadState/acctApply, original JSON snapshot string; local test HTML disables frame before main.js, so no autosave; no live account/server"
+}
