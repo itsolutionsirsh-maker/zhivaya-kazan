@@ -58,7 +58,21 @@ const SPEC_STR={bar:{kind:'bar'},busk:{kind:'street'},pharmacy:{kind:'pharmacy'}
 function normSpec(x){if(!x)return null;if(typeof x==='string')return Object.assign({hints:[]},SPEC_STR[x]||{kind:x});return {kind:x.kind,hints:(x.hints||[]).map(h=>String(h).toLowerCase()),label:x.label||''};}
 function hintAnchor(hints,A,def){for(const h of hints){if(/бауман/.test(h))return A.bauman;if(/кремл/.test(h))return A.kremlin;if(/свобод/.test(h))return A.freedom;if(/ак барс|арен|стадион/.test(h))return A.stadium;}return def;}
 const KIND_TEST={bar:p=>p.t==='bar',cafe:p=>p.t==='cafe',restaurant:p=>p.t==='cafe',pharmacy:p=>p.t==='pharmacy',office:p=>p.t==='office'&&!!p.n,school:p=>p.t==='school'||p.t==='university',shop:p=>p.t==='shop'};
+// места под открытым небом (парк, площадь, набережная, вокзал, метро, улица): у них нет точки на карте — ищем по ориентиру
+// из landmarks.js или по названию улицы рядом с районом, и ставим человека на тротуар неподалёку (не все в одну точку)
+const OPEN_KIND=/^(park|square|embankment|station|metro|street)$/;
+function folkOpenSpot(sp,f,c,role){const norm=s=>String(s||'').toLowerCase().replace(/ё/g,'е');const hs=(sp.hints||[]).map(norm).filter(Boolean);let at=null,label='';
+  if(hs.length){let bs=0,bd=4500;for(const l of [...(window.cityLandmarks||[]),...(window.cityPlaces||[])]){if(!Array.isArray(l.ll))continue;const ns=[l.name].concat(l.alias||[]).map(norm);   // ориентиры и места для праздников и постов (city-people.js)
+    let sc=0;for(const h of hs)sc+=ns.some(n=>n===h)?2:ns.some(n=>n.includes(h))?1:0;if(!sc)continue;   // точное совпадение с названием важнее «вокзал» внутри «автовокзал»
+    const q=llToXY(l.ll);const d=dist(q[0],q[1],c[0],c[1]);if(d>4500)continue;if(sc>bs||(sc===bs&&d<bd)){bs=sc;bd=d;at=q;label=l.name;}}
+    if(!at){let bd2=3000;for(const r of world.roads){if(!r||!r.n||!r.p)continue;const rn=norm(r.n);if(!hs.some(h=>rn.includes(h)))continue;for(const i of r.p){const q=world.nodes[i];if(!q)continue;const d=dist(q[0],q[1],c[0],c[1]);if(d<bd2){bd2=d;at=[q[0],q[1]];label=r.n;}}}}}
+  if(!at)return null;const sd=hashStr(f.id+role);const jx=((sd%41)-20),jy=(((sd>>>6)%41)-20);   // ±20 м, у каждого своё место
+  const n=nearestNode(at[0]+jx,at[1]+jy,world.pedAdj,600);if(n<0)return null;const q=sidewalkPos(n);   // озеро или парк: ближайшая дорожка может быть далеко от центра
+  return {x:q[0],y:q[1],inside:false,node:n,open:true,kind:sp.kind,name:label?(role==='work'&&/^(taxi|bombila)$/.test(f.type)?'у машины, '+label:label):'на улице'};}
 function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
+  // таксист и бомбила из folk3 ждут пассажиров у своей машины (у вокзала, рынка, метро), а не сидят невидимыми в салоне
+  if(k==='taxi'&&/^(taxi|bombila)$/.test(f.type||'')&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
+  if(OPEN_KIND.test(k)&&f.type&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
   if(k==='taxi')return {x:a[0],y:a[1],inside:true,key:'taxi',name:'за рулём такси',kind:'taxi'};
   if(k==='home')return role==='work'?P.home:P.yard;
   if(k==='yard')return P.yard;

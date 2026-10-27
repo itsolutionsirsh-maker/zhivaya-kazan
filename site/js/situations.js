@@ -94,7 +94,7 @@ function finishPatrol(P,failed){const i=SIT.patrols.indexOf(P);if(i>=0)SIT.patro
   const car=P.car;car.busyPatrol=false;car.target=null;car.onScene=null;car.sceneXY=null;if(car.tempPatrol){car.remove=true;const k=policeCars.indexOf(car);if(k>=0)policeCars.splice(k,1);}else{car.state='idle';car.ttl=1;}}
 
 // ---------- цикл ----------
-function sitCanAuto(){return scene==='city'&&!player.busy&&!player.bus&&!cine&&player.state!=='hurt'&&!SIT.card&&!(typeof drunkSt!=='undefined'&&(drunkSt.patrol||drunkSt.arrestT>0))&&SIT.active.filter(s=>!s.def.quiet).length<2;}
+function sitCanAuto(){return scene==='city'&&!player.busy&&!player.bus&&!cine&&player.state!=='hurt'&&!SIT.card&&!(typeof drunkSt!=='undefined'&&(drunkSt.patrol||drunkSt.arrestT>0))&&SIT.active.filter(s=>!s.def.quiet).length<2&&!SIT.active.some(s=>!s.done&&s.def.id==='folkAct');}   // свой человек уже подошёл — не перебивать
 function updateSituations(rdt){const dt=rdt;
   if(!SIT.boot){SIT.boot=true;for(const d of Object.values(SIT.defs))if(d.always)startSit(d.id);if(player.job&&SIT.defs.job)startSit('job');}
   for(const s of SIT.active){if(s.done)continue;s.t+=dt;if(s.def.update)s.def.update(s,dt);if(s.maxT&&s.t>s.maxT)endSit(s);}

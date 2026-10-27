@@ -73,7 +73,7 @@ function findAction(){
   if(scene==='interior')return findActionInterior();
   if(player.state==='hurt')return {label:accidents.some(a=>a.victim==='player'&&a.amb&&a.amb.state==='scene')?'Врачи скорой осматривают вас…':'Ждём скорую…',run:()=>{}};
   if(player.bus)return {label:'Выйти на следующей остановке',run:()=>{player.exitNext=true;setHint('Выйдем на следующей остановке');}};
-  if(player.vehicle&&player.vehicle.kind==='taxi')return {label:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
+  if(player.vehicle&&player.vehicle.kind==='taxi')return {label:player.vehicle.fixedFare!=null?`Выйти здесь (${fmtMoney(player.vehicle.fixedFare)}, как договорились)`:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
   if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return actTarget({label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi},taxiCall.car,'taxi');
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
     if(v.kind==='own'&&v.speed<1&&typeof ECON!=='undefined'&&ECON.carCond<95&&world.pois.some(p=>p.t==='fuel'&&dist(p.x,p.y,v.x,v.y)<18))return repairAction(false);
