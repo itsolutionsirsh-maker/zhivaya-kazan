@@ -43,7 +43,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .modal h3.sub{margin:4px 0 -4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}.stack{display:flex;flex-direction:column;gap:8px}.rt-card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 #sitCard{position:relative;pointer-events:auto;width:min(92vw,440px);box-sizing:border-box;background:var(--panel-solid);border:1px solid var(--line);border-left:4px solid #E0A030;border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;overflow:hidden;animation:scIn .25s ease-out}
 #sitCard.alert{border-left-color:#D64545}#sitCard.good{border-left-color:#2BB062}#sitCard.call{border-left-color:#4A90E2;animation:scIn .25s ease-out,scRing 1s ease-in-out 3}
-#sitCard .sc-head{display:flex;align-items:center;gap:8px}#scIcon{font-size:18px}#scTitle{flex:1;font-size:14px}#scX{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+#sitCard .sc-head{display:flex;align-items:center;gap:8px}#scIcon{font-size:18px}#scTitle{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}#scX{flex:none;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
 #scText{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4}#scBtns{display:flex;flex-wrap:wrap;gap:6px}#scBtns .btn{font-size:12px;padding:6px 10px}#scBtns kbd{font-size:10px;opacity:.6;margin-right:5px}
 #scTimer{position:absolute;left:0;bottom:0;height:3px;background:#E0A030;transition:width .2s linear}#sitCard.alert #scTimer{background:#D64545}#sitCard.call #scTimer{background:#4A90E2}
 @keyframes scIn{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}@keyframes scRing{0%,100%{transform:none}25%{transform:rotate(-1deg)}75%{transform:rotate(1deg)}}
@@ -91,8 +91,11 @@ body.chat-open #joy{display:none!important}
 @keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 .bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
 #action{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0}
-#actBtn{font-size:13px;padding:10px 16px;border-radius:12px;max-width:min(92vw,520px);white-space:normal;line-height:1.25}
-#actBtn kbd{font-family:var(--font-mono);background:rgba(0,0,0,.25);border-radius:5px;padding:1px 6px;margin-right:6px;font-size:11px}
+#actBtn{font-size:13px;padding:11px 14px;border-radius:12px;min-height:48px;max-width:min(100%,520px);box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;line-height:1.3;box-shadow:0 2px 0 #142B27,0 0 0 2px rgba(20,43,39,.7)}
+#actBtn.primary{background:#FFDA69;color:#142B27;border-color:#FFF1BC}#actBtn.primary:hover{background:#FFE48D}
+#actBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+#actBtn kbd{font-family:var(--font-mono);background:#142B27;color:#FFDA69;border-radius:5px;padding:2px 6px;margin-right:6px;font-size:11px;display:inline-block}
+#action > div:not(#sitCard){max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
 #hint{font-size:11px;color:var(--muted);background:var(--panel);padding:4px 10px;border-radius:8px;border:1px solid var(--line)}
 #vehBox{font-size:12px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;background:var(--panel);padding:5px 10px;border-radius:8px;border:1px solid var(--line);color:var(--fg)}
 .side{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
@@ -102,6 +105,12 @@ body.chat-open #joy{display:none!important}
 #joy{width:118px;height:118px;border-radius:50%;background:rgba(14,24,20,.45);border:1px solid var(--line);position:relative;pointer-events:auto;flex:none;display:none;align-self:flex-end}
 #joy i{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.35);left:35px;top:35px;pointer-events:none}
 @media (pointer:coarse){#joy{display:block}}
+@media (max-width:640px){
+  .bottom{position:relative}
+  /* Карточка над всей нижней панелью: колонка E не сужает её и не сдвигает за экран.
+     Отдельный translate сохраняет центрирование во время scIn/scRing (они меняют transform). */
+  #sitCard{position:absolute;bottom:calc(100% + 8px);left:calc(50vw - max(16px,env(safe-area-inset-left,0px)));translate:-50% 0;width:calc(100vw - 16px);max-width:440px;max-height:calc(100vh - 180px);max-height:calc(100dvh - 180px);overflow-y:auto}
+}
 @media (max-width:640px){.brand{display:none}.clock{gap:6px;padding:6px 8px}.clock .meta{display:none}.clock .btn{padding:6px 7px;min-width:34px}.needs{margin-left:auto}.brand small{display:none}.brand h1{font-size:13px}#mini{display:none}.needs{min-width:160px;font-size:11px}#feed{width:min(260px,58vw)}#feed .ev{font-size:11.5px;padding:5px 8px}.clock .t{font-size:18px}}
 .order-list{display:flex;flex-direction:column;gap:8px}.order-item{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}.order-item:hover:not(:disabled){border-color:rgba(43,176,98,.7);background:rgba(43,176,98,.1)}.order-item:disabled{opacity:.45;cursor:not-allowed}.order-item span{display:block;font-size:14px}.order-item i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}.order-item b{white-space:nowrap;font-size:14px}.order-treat{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.order-treat input{width:16px;height:16px;accent-color:#2BB062}
 .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,10,8,.62);pointer-events:auto;padding:16px;box-sizing:border-box;z-index:20}
