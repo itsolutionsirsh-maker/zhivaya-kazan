@@ -86,10 +86,19 @@ test('cafes without buildings do not consume the cold-cache quota forever',()=>{
 });
 test('the selected cafe uses its drawn door for E instead of another nearest wall',()=>{
   const {s,calls}=setup(),b=building(),p={t:'cafe',x:8,y:8,_b:b};
-  s.player.x=1;s.player.y=30;s.drawCafeEntrances([p]);const entry=s.cafeEntry(p,b);assert.equal(entry.missing,undefined);
+  s.drawCafeEntrances([p]);const entry=s.cafeEntry(p,b);assert.equal(entry.missing,undefined);
+  s.player.x=entry.x-4;s.player.y=entry.y-5;   // снаружи, ближайшая стена в 4–5 м, нарисованная дверь в 6,4 м — метка у двери
   s.currentAction={tk:'poi',at:p,bld:b};calls.length=0;s.drawActionTarget((x,y)=>[100+x*5,100+y*5],9.5,null);
   const dx=entry.x-s.player.x,dy=entry.y-s.player.y,L=Math.hypot(dx,dy),e=calls.find(c=>c[0]==='fillText'&&c[1]==='E');
   assert.ok(Math.abs(e[2]-(100+entry.x*5+dx/L*20))<.00001);assert.ok(Math.abs(e[3]-(100+entry.y*5+dy/L*20+.5))<.00001);
+});
+test('a drawn door farther than 10 m does not pull E away from the wall next to the player',()=>{
+  const {s,calls}=setup(),b=building(),p={t:'cafe',x:8,y:8,_b:b};
+  s.player.x=-6;s.player.y=8;s.drawCafeEntrances([p]);const entry=s.cafeEntry(p,b);assert.equal(entry.missing,undefined);
+  assert.ok(Math.hypot(entry.x-s.player.x,entry.y-s.player.y)>10);
+  s.currentAction={tk:'poi',at:p,bld:b};calls.length=0;s.drawActionTarget((x,y)=>[100+x*5,100+y*5],9.5,null);
+  const e=calls.find(c=>c[0]==='fillText'&&c[1]==='E');
+  assert.ok(Math.abs(e[2]-(100+0*5+20))<.00001);assert.ok(Math.abs(e[3]-(100+8*5+.5))<.00001);
 });
 test('journey hints draw at most eight short real transitions without modifying them',()=>{
   const {s,calls,ctx}=setup();const hint={kind:'boarding',fromX:0,fromY:0,toX:2,toY:1,x:2,y:1,startedAt:900,durationMs:450};

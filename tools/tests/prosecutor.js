@@ -76,11 +76,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assert.equal(await ev('prosState().step'), 4, 'Проверка завершена у стола без подмены прогресса');
     await ev('pickChoice(SIT.card,SIT.card.choices[0])'); await sleep(350); // затем открывается настоящий приём
     assert.match(await ev('SIT.card.choices[0].t'), /Подать жалобу/);
-    const m1 = await ev('player.money');
+    // Штрафы выше наличных уходят в долг по суду (ECON.owed); при отмене штрафа сначала гасится он.
+    const m1 = await ev('player.money'), o1 = await ev('ECON.owed||0');
     await ev('(()=>{const r=Math.random;Math.random=()=>0.1;pickChoice(SIT.card,SIT.card.choices[0]);Math.random=r;})()'); await sleep(200);
     console.log('    жалоба при журналисте:', JSON.stringify(await ev('SIT.card&&SIT.card.title')), '| деньги', m1, '→', await ev('player.money'), '(при случайности 0,1 без журналиста было бы «отклонили»)');
     assert.equal(await ev('SIT.card.title'), 'Жалобу удовлетворили');
-    assert.equal(await ev('player.money'), m1+1500);
+    assert.equal((await ev('player.money')) - m1 + o1 - (await ev('ECON.owed||0')), 1500, 'Возврат 1 500 ₽: на руки или в погашение долга по суду');
     await ok(); await ev('exitInterior()'); await sleep(300);
     // шаг 5: лента на площади — ушёл по собственному желанию
     await to(sq[0], sq[1]); await sleep(1200);

@@ -191,9 +191,10 @@ function drawActionTarget(toS,z,nameBox){
       const [sx,sy]=toS(p[i]+ex,p[i+1]+ey);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);
     }
     ctx.closePath();ctx.strokeStyle='rgba(20,35,30,.85)';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#FFDA69';ctx.lineWidth=2;ctx.stroke();r=7;
-    // Если вход уже нарисован, метка указывает на него, а не на другую стену того же кафе.
+    // Если вход уже нарисован рядом с игроком, метка указывает на него, а не на другую стену того же кафе.
+    // Дверь дальше 10 м — только рисунок: войти можно с любой стены, метка остаётся у ближайшей.
     const entry=LOD>=2&&a.tk==='poi'&&cafeEntryCache.get(a.at);
-    if(entry&&!entry.missing&&entry.b===b&&entry.polygon===b.p){x=entry.x;y=entry.y;}
+    if(entry&&!entry.missing&&entry.b===b&&entry.polygon===b.p&&Math.hypot(entry.x-player.x,entry.y-player.y)<10){x=entry.x;y=entry.y;}
   }else if(a.tk==='taxi'||a.tk==='share'||a.tk==='own')r=Math.max(15,2.8*z);
   else if(a.tk==='stop'||a.tk==='metro'||a.tk==='accident')r=16;
   const [sx,sy]=toS(x,y);
