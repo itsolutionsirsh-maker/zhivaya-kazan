@@ -156,6 +156,79 @@ textarea{resize:vertical;min-height:64px}
 @media (max-width:480px){.howto{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
+/* Пакет 3. Геометрия телефона общая для сайта и Telegram; desktop остаётся прежним. */
+:root{--ui-height:100dvh;--ui-visible-height:100dvh;--ui-visible-top:0px;
+  --ui-top:calc(max(env(safe-area-inset-top,0px),var(--ui-tg-top,0px)) + var(--ui-content-top,0px));
+  --ui-bottom:calc(max(env(safe-area-inset-bottom,0px),var(--ui-tg-bottom,0px)) + var(--ui-content-bottom,0px));
+  --ui-left:calc(max(env(safe-area-inset-left,0px),var(--ui-tg-left,0px)) + var(--ui-content-left,0px));
+  --ui-right:calc(max(env(safe-area-inset-right,0px),var(--ui-tg-right,0px)) + var(--ui-content-right,0px))}
+.need,.ui-trip-stack{display:contents}.need-value,.needs-cue,.ui-sheet-close,.ui-sheet-grip,.ui-today-close{display:none}
+.ui-sheet-head{display:contents}#debtLbl{color:#FFB5A8;font-size:11px}.needs #debtLbl{grid-column:1/-1}
+@media (max-width:640px),(pointer:coarse) and (max-height:500px){
+  html,body{width:100%;max-width:100%;height:var(--ui-height);overflow:hidden;padding:0}
+  #hud{inset:0 0 auto;height:var(--ui-height);padding:calc(var(--ui-top) + 8px) calc(var(--ui-right) + 8px) calc(var(--ui-bottom) + 8px) calc(var(--ui-left) + 8px);gap:6px}
+  .card{background:rgba(14,24,20,.94)}
+  .top{position:relative;display:flex;flex-direction:column;gap:4px;flex-wrap:nowrap}
+  .brand,#mini{display:none}.clock{box-sizing:border-box;width:100%;padding:3px 5px;display:grid;grid-template-columns:minmax(44px,1fr) repeat(6,44px);gap:0;border-radius:12px}
+  .clock .t{font-size:17px;text-align:center}.clock .meta{display:none}
+  .clock .btn{width:44px;min-width:44px;height:44px;padding:0;font-size:17px;background:transparent;border-color:transparent}
+  .needs{box-sizing:border-box;min-width:0;width:100%;min-height:44px;margin:0;padding:6px 8px;display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:10px;position:relative}
+  .needs .need{display:flex;align-items:center;gap:3px;flex:none}.needs .need:has(.lbl[hidden]){display:none}
+  .needs .lbl{font-size:0;line-height:1}.needs .lbl::before{content:attr(data-icon);font-size:13px}
+  .needs .bar{width:22px;height:5px}.needs .money{display:block;min-width:0;margin:0 0 0 auto;font-size:12px}
+  .needs .money b{font-size:12px;display:block;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .needs #nameLbl{display:none}.needs #debtLbl{font-size:10px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1}
+  .needs[aria-expanded=true]{position:absolute;top:54px;left:0;z-index:21;display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;padding:14px;background:var(--panel-solid);box-shadow:var(--shadow)}
+  .needs[aria-expanded=true] .need{display:contents}.needs[aria-expanded=true] .need:has(.lbl[hidden]){display:none}
+  .needs[aria-expanded=true] .lbl{font-size:12px;line-height:1.4}.needs[aria-expanded=true] .lbl::before{content:none}
+  .needs[aria-expanded=true] .bar{width:100%;height:7px}.needs[aria-expanded=true] .need-value{display:block;font:12px var(--font-mono)}
+  .needs[aria-expanded=true] .money{grid-column:1/-1;display:flex;gap:8px;justify-content:space-between;margin:0}
+  .needs[aria-expanded=true] .money b{max-width:none;font-size:15px;white-space:normal;overflow-wrap:anywhere}
+  .needs[aria-expanded=true] #nameLbl{display:block;min-width:0;overflow-wrap:anywhere}
+  .needs[aria-expanded=true] #debtLbl{max-width:none;white-space:normal;grid-column:1/-1;font-size:12px}
+  .needs[aria-expanded=true] .needs-cue{display:block;grid-column:1/-1;color:var(--muted);font-size:11px}
+  #feed{width:100%;gap:3px}#feed .ev{box-sizing:border-box;min-width:0;padding:4px 7px;font-size:11px;line-height:16px;border-radius:6px;box-shadow:none;animation:none;background:rgba(14,24,20,.86);gap:6px}
+  #feed .ev .tm{font-size:9px;padding:0}#feed .ev>span:last-child{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  #feed .ev.alert,#feed .ev.call{border-left:3px solid var(--gold);color:#FFF0BF;background:#302719}
+  .bottom{position:relative;display:block;height:118px;flex:none}
+  #joy{position:absolute;left:0;bottom:0;display:block;width:118px;height:118px}
+  #action{position:static;display:contents}#actBtn{position:absolute;right:0;bottom:0;width:calc(100% - 140px);max-width:300px;min-height:64px;font-size:13px;padding:10px;border-radius:14px}
+  #actBtn{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-height:70px;overflow:hidden}
+  #actBtn kbd{font-size:12px}#hint{position:absolute;bottom:176px;left:0;right:0;box-sizing:border-box;padding:7px 10px;font-size:12px;line-height:17px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-height:48px;pointer-events:none}
+  .side{position:absolute;right:0;bottom:74px}.zoom{flex-direction:row;gap:4px}.zoom .btn{width:44px;height:44px;min-height:44px}
+  #tripBox,#compBox,#vehBox{width:100%;font-size:11px;min-width:0;flex-wrap:wrap;box-sizing:border-box}
+  .ui-trip-stack{position:absolute;bottom:232px;left:0;right:0;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+  .ui-trip-stack .btn{min-height:44px}#tripLbl,#compLbl{flex:1;min-width:0}
+  #sitCard{left:50%;bottom:calc(232px + var(--ui-trip-space,0px));width:100%;max-width:440px;max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 260px - var(--ui-trip-space,0px));touch-action:pan-y;overscroll-behavior:contain}
+  #scX{min-width:44px;min-height:44px}#scBtns .btn{min-height:44px}
+  html body #zkToday{left:calc(var(--ui-left) + 8px)!important;top:auto!important;bottom:calc(var(--ui-bottom) + 134px)!important;padding:8px 12px!important;font-size:12px!important;max-width:calc(100% - var(--ui-left) - var(--ui-right) - 160px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:10!important}
+  html body #zkTodayPanel{top:calc(var(--ui-top) + 106px)!important;left:calc(var(--ui-left) + 8px)!important;right:calc(var(--ui-right) + 8px)!important;width:auto!important;box-sizing:border-box;max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 170px)!important;touch-action:pan-y;overscroll-behavior:contain;background:var(--panel-solid)!important;color:var(--fg)!important}
+  #zkTodayPanel *{color:inherit!important}#zkTodayPanel button{min-height:44px;touch-action:manipulation}
+  #zkTodayPanel .ui-today-close{display:block;position:sticky;top:0;z-index:1;margin-left:auto;width:44px;height:44px;font-size:22px;background:var(--panel-solid)}
+  .modal{inset:auto 0 auto;top:var(--ui-visible-top);height:var(--ui-visible-height);display:flex;align-items:flex-end;justify-content:center;padding:calc(var(--ui-top) + 12px) var(--ui-right) 0 var(--ui-left);overflow:hidden;touch-action:none}
+  .modal .box{position:relative;width:100%;max-width:560px!important;max-height:100%;min-height:0;padding:0 16px calc(var(--ui-bottom) + 16px);border-radius:20px 20px 0 0;gap:14px;overflow-x:hidden;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;scroll-padding-top:80px;animation:uiSheetIn .18s ease-out}
+  .modal .box>*{flex-shrink:0;min-width:0;max-width:100%;overflow-wrap:anywhere}
+  .ui-sheet-head{display:grid;position:sticky;top:0;z-index:2;grid-template-columns:1fr auto;align-items:center;gap:4px 8px;padding:10px 0 12px;background:var(--panel-solid);border-bottom:1px solid var(--line);touch-action:none;flex-shrink:0}
+  .ui-sheet-grip{display:block;grid-column:1/-1;width:36px;height:4px;border-radius:3px;background:#577164;justify-self:center;margin-bottom:4px}
+  .ui-sheet-close{display:grid;place-items:center;width:44px;height:44px;min-height:44px;font-size:22px;padding:0}
+  .ui-sheet-head h2{font-size:16px;min-width:0}.ui-sheet-head .persona{min-width:0}.ui-sheet-head .persona .face{width:36px;height:36px}
+  .modal button,.modal .btn,#chatPanel button,#cpTabs button{min-height:44px;min-width:44px;touch-action:manipulation}
+  .modal input:not([type=checkbox]):not([type=color]):not([type=file]),.modal select,.modal textarea,#cpInput{font-size:16px;min-height:44px;min-width:0;touch-action:manipulation}
+  .modal .row{gap:8px}.modal .row input{min-width:0}.modal .legend{grid-template-columns:auto minmax(0,1fr)}
+  #clothes .sw{width:40px;height:40px}#logList,#rtList,#rtPlans{max-height:none;overflow:visible}
+  #chatPanel{left:calc(var(--ui-left) + 8px);right:calc(var(--ui-right) + 8px);bottom:auto;top:calc(var(--ui-visible-top) + var(--ui-visible-height) - var(--ui-bottom) - 8px);translate:0 -100%;width:auto;height:min(420px,calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 16px));max-height:100%;border-radius:16px;touch-action:pan-y;overscroll-behavior:contain}
+  #cpTabs{gap:0}#cpTabs button{padding:5px 8px;font-size:12px}.cp-top{padding:4px 6px}.cp-in{flex:none}#cpList{touch-action:pan-y;overscroll-behavior:contain}#netLbl{max-width:44px;white-space:normal}
+  #chatModal .box{height:min(560px,100%)}#chatModal .chat{flex:1;min-height:40px;max-height:none;overflow:auto;touch-action:pan-y}
+  .ui-keyboard #hud,.ui-keyboard #zkToday,.ui-keyboard #zkTodayPanel{visibility:hidden}
+  @keyframes uiSheetIn{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:500px){
+  .top{flex-direction:row;align-items:flex-start}.clock{width:54%;flex:none}.needs{width:calc(46% - 4px);min-height:52px;gap:5px}.needs .bar{width:18px}.needs .money b{font-size:11px}
+  .needs[aria-expanded=true]{left:auto;right:0;top:56px;width:min(360px,100%)}
+  .mid{justify-content:center}#feed{max-width:420px}#hint{left:134px;right:150px;bottom:76px;font-size:11px;max-height:46px}
+  .ui-trip-stack{left:134px;right:150px;bottom:126px}#sitCard{bottom:calc(126px + var(--ui-trip-space,0px));max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 160px - var(--ui-trip-space,0px))}
+  html body #zkTodayPanel{top:calc(var(--ui-top) + 64px)!important;max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 80px)!important}
+}
 </style>
 
 <canvas id="map"></canvas>
@@ -169,12 +242,13 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
       <button class="btn" id="routeBtn" title="Куда поехать">🧭</button><button class="btn" id="questBtn" title="Задания на сегодня">🎯</button><button class="btn" id="jobsBtn" title="Работа и жильё">💼</button><button class="btn" id="sayBtn" title="Сказать вслух (Enter)">💬</button><button class="btn" id="logBtn" title="Журнал событий">📰</button><button class="btn" id="menuBtn" title="Меню">☰</button>
     </div>
-    <div class="card needs">
-      <span class="lbl">Энергия</span><div class="bar" id="bEnergy"><i style="width:100%"></i></div>
-      <span class="lbl">Сытость</span><div class="bar" id="bFood"><i style="width:100%"></i></div>
-      <span class="lbl">Настроение</span><div class="bar" id="bMood"><i style="width:70%"></i></div>
-      <span class="lbl" id="lDrunk" hidden>🍺 Хмель</span><div class="bar drunkbar" id="bDrunk" hidden><i style="width:0%"></i></div>
+    <div class="card needs" id="needsPanel">
+      <div class="need"><span class="lbl" data-icon="⚡">Энергия</span><div class="bar" id="bEnergy" role="meter" aria-label="Энергия" aria-valuemin="0" aria-valuemax="100"><i style="width:100%"></i></div><span class="need-value"></span></div>
+      <div class="need"><span class="lbl" data-icon="🍲">Сытость</span><div class="bar" id="bFood" role="meter" aria-label="Сытость" aria-valuemin="0" aria-valuemax="100"><i style="width:100%"></i></div><span class="need-value"></span></div>
+      <div class="need"><span class="lbl" data-icon="☺">Настроение</span><div class="bar" id="bMood" role="meter" aria-label="Настроение" aria-valuemin="0" aria-valuemax="100"><i style="width:70%"></i></div><span class="need-value"></span></div>
+      <div class="need"><span class="lbl" id="lDrunk" data-icon="🍺" hidden>🍺 Хмель</span><div class="bar drunkbar" id="bDrunk" role="meter" aria-label="Хмель" aria-valuemin="0" aria-valuemax="100" hidden><i style="width:0%"></i></div><span class="need-value"></span></div>
       <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">3 000 ₽</b></div>
+      <span id="debtLbl" hidden></span><span class="needs-cue">Нажмите ещё раз, чтобы свернуть</span>
     </div>
   </div>
   <div class="mid"><div id="feed"></div></div>
@@ -269,7 +343,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   <div class="cp-top"><div id="cpTabs"><button data-t="near" class="on">Рядом<em></em></button><button data-t="city">Город<em></em></button><button data-t="dm">Личные<em></em></button></div><span id="netLbl"></span><button class="btn" id="cpClose" title="Закрыть">✕</button></div>
   <div id="cpHead" hidden><button class="btn" id="cpBack">←</button><b id="cpHeadName"></b><span id="cpHeadSt"></span></div>
   <div id="cpList"></div>
-  <div class="cp-in"><input type="text" id="cpInput" maxlength="240" placeholder="Сказать вслух"><button class="btn primary" id="cpSend">➤</button></div>
+  <div class="cp-in"><input type="text" id="cpInput" maxlength="240" placeholder="Сказать вслух" aria-label="Сообщение"><button class="btn primary" id="cpSend" aria-label="Отправить сообщение">➤</button></div>
 </div>
 
 <div class="modal" id="questModal" hidden>
@@ -408,4 +482,4 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <script src="js/phone.js"></script>
 <script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk3.js"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/render.js"></script>
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script>
-<script src="js/main.js"></script>
+<script src="js/main.js"></script><script src="js/ui.js"></script>

@@ -301,10 +301,11 @@ function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   //
     if(scene==='interior')renderInterior();else render();}
   requestAnimationFrame(frame);}
 function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;$('#weatherLbl').textContent=(weather.kind==='rain'?'🌧 дождь':weather.kind==='cloudy'?'☁️ пасмурно':isNight()?'🌙 ясно':'☀️ ясно');
-  setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){$('#bDrunk').querySelector('i').style.width=dr+'%';$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
+  setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){setBar('#bDrunk',dr);$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
+  if(typeof window.uiUpdateHud==='function')window.uiUpdateHud();
   const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${journeyIcon(v.kind)} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&!isLightVehicle(v.kind)?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
   currentAction=player.busy?null:findAction();const ab=$('#actBtn');if(currentAction){ab.hidden=false;ab.innerHTML='';const k=document.createElement('kbd');k.textContent='E';ab.append(k,document.createTextNode(currentAction.label));}else ab.hidden=true;}
-function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);}
+function setBar(sel,v){const b=$(sel),n=Math.round(clamp(v,0,100));b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);b.setAttribute('aria-valuenow',String(n));b.title=b.getAttribute('aria-label')+': '+n+'%';const value=b.parentElement.querySelector('.need-value');if(value&&value.textContent!==n+'%')value.textContent=n+'%';}
 
 // ---------- мультиплеер ----------
 function syncPeers(list){peers=list;const seen=new Set();
