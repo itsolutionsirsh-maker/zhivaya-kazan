@@ -102,28 +102,57 @@ function folkInit(){if(FOLK.ready||!world||!player.home)return;FOLK.ready=true;f
     f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);}
   window.cityFolkWhere=folkWhere;window.cityFolkAll=()=>FOLK.list.map(f=>folkWhere(f.id));}
 // игрок переехал (свой район в анкете или дом из сохранения догрузился): соседи по двору (ward 'yard') живут и работают у нового дома
-function folkReanchor(){if(!FOLK.ready)return;const A=folkAnchors();for(const f of FOLK.list){if(f.ward!=='yard')continue;folkDrop(f);f.trip=null;f.places=folkPlaces(f,A);f.at=folkWant(f);}}
+function folkReanchor(){if(!FOLK.ready)return;const A=folkAnchors();for(const f of FOLK.list){if(f.ward!=='yard')continue;const held=folkPersonBusy(f);folkCancelRoute(f);f.retry=null;f.places=folkPlaces(f,A);if(held){f.away=true;continue;}folkDrop(f);f.at=folkWant(f);f.away=false;}}
 // где должен быть по часам
 function folkWant(f){const h=cityHour();const off=f.dayOff&&isWeekend();const D=(off?f.dayOff:f.day)||[[0,'home'],[9,'work'],[18,'haunt'],[22,'home']];let at=D[D.length-1][1];for(const [hh,k] of D){if(h>=hh)at=k;}
   // закрытое место — значит не там
   const pl=f.places[at];if(pl&&pl.poi&&at==='haunt'&&typeof poiOpen==='function'&&!poiOpen(pl.poi))return 'home';return at;}
 function folkWhere(id){const f=FOLK.list.find(q=>q.id===id);if(!f)return null;const pl=f.trip?f.places[f.trip.to]:f.places[f.at];
+  if(f.driving)return {id,name:f.name,at:'road',place:'за рулём такси',x:f.driving.x,y:f.driving.y,known:f.met>0,text:`${f.name} везёт пассажира`};
   return {id,name:f.name,at:f.trip?'road':f.at,place:pl?pl.name:'',x:(f.w?f.w.x:pl&&pl.x),y:(f.w?f.w.y:pl&&pl.y),known:f.met>0,text:f.trip?`${f.name} идёт ${f.trip.to==='home'?'домой':'в «'+(pl&&pl.name)+'»'}`:f.at==='home'?`${f.name} дома`:f.at==='work'?`${f.name} на работе${pl&&pl.inside&&pl.key!=='taxi'?' в «'+pl.name+'»':pl?' · '+pl.name:''}`:`${f.name} ${pl&&pl.inside?'в «'+pl.name+'»':pl?pl.name:''}`};}
 // ---------- на улице ----------
 function folkPos(f){if(f.w)return [f.w.x,f.w.y];const pl=f.places[f.at];return pl?[pl.x,pl.y]:[0,0];}
-function folkSpawn(f,pl){const n=nearestNode(pl.x,pl.y,world.pedAdj,120);if(n<0)return null;const w=new Walker('resident',n);w.p=f.p;w.folk=f.id;w.spd=f.age>60?1.6:rnd(2.0,2.5);w.x=pl.x;w.y=pl.y;w.state='folkStay';
-  w.recover=function(){this.state='folkStay';this.ttl=0;};walkers.push(w);f.w=w;return w;}
-function folkDrop(f){if(!f.w)return;const i=walkers.indexOf(f.w);if(i>=0)walkers.splice(i,1);if(chatNpc===f.w&&typeof closeChat==='function')closeChat();f.w=null;}
+function folkSpawn(f,pl){const n=nearestNode(pl.x,pl.y,world.pedAdj,120);if(n<0)return null;const w=new Walker('resident',n);w.p=f.p;w.folk=f.id;w.spd=f.age>60?1.6:rnd(2.0,2.5);if(!pl.inside){w.x=pl.x;w.y=pl.y;}w.state='folkStay';
+  w.recover=function(){this.state='folkStay';this.ttl=0;};const update=w.update;
+  w.update=function(dt){if(!folkLeadStep(this,dt))update.call(this,dt);};walkers.push(w);f.w=w;return w;}
+function folkId(w){return w&&(w.folk||(w.p&&w.p.folk)||(w.companionOf&&folkId(w.companionOf)));}
+function folkOf(w){const id=folkId(w);return id?FOLK.list.find(f=>f.id===id):null;}
+// Один человек может сейчас быть представлен интерьерным NPC, спутником или водителем, без f.w.
+function folkPersonBusy(f){return !!(f.driving||folkBusy(f.w)||(chatNpc&&folkId(chatNpc)===f.id)||(typeof companion!=='undefined'&&companion&&folkId(companion.w)===f.id)||(typeof taxiCall!=='undefined'&&taxiCall&&taxiCall.folkDriver===f.id)||(typeof SIT!=='undefined'&&SIT.card&&SIT.card.neighbourStory&&folkId(SIT.card.participant)===f.id));}
+function folkCancelRoute(f){f.routeGen=(f.routeGen||0)+1;f.trip=null;const w=f.w;if(w){w.folkLead=null;if(w.state==='walk'||w.state==='routing'){w.path=null;w.state='folkStay';}}}
+function folkDrop(f){folkCancelRoute(f);if(!f.w)return;const i=walkers.indexOf(f.w);if(i>=0)walkers.splice(i,1);if(chatNpc===f.w&&typeof closeChat==='function')closeChat();f.w=null;}
 function folkBusy(w){return w&&(w.sitBy!=null||w.rally||w.rallySlot||w.state==='hurt'||w===chatNpc||w.companion||w.bus);}
-function folkGo(f,to){const from=f.places[f.at],dst=f.places[to];f.trip=null;
-  if(!dst){f.at=to;return;}
+// Короткое соединение с новым маршрутом проходим физически: пересчёт не переносит к старому узлу.
+function folkClearJoin(x0,y0,x1,y1){if(typeof wallBlocks==='function'&&wallBlocks(x0,y0,x1,y1))return false;const n=Math.max(1,Math.ceil(dist(x0,y0,x1,y1)/1.5));
+  for(let i=1;i<=n;i++){const x=x0+(x1-x0)*i/n,y=y0+(y1-y0)*i/n;if(inBuilding(x,y)||(typeof inWater==='function'&&inWater(x,y)))return false;}return true;}
+function folkLeadStep(w,dt){const l=w.folkLead;if(!l)return false;if(w.state!=='walk'||!l.valid()){w.folkLead=null;return true;}
+  const d=dist(w.x,w.y,l.x,l.y);if(d<0.05){w.folkLead=null;if(l.done)l.done();return true;}
+  const ux=(l.x-w.x)/d,uy=(l.y-w.y)/d,st=Math.min(d,w.spd*dt);const x=w.x+ux*st,y=w.y+uy*st;
+  if(unsafeStep(w.x,w.y,x+ux*1.2,y+uy*1.2))return true;if(inBuilding(x,y)){l.fail();return true;}
+  w.hx=ux;w.hy=uy;w.x=x;w.y=y;w.phase+=dt*7;if(st===d){w.folkLead=null;if(l.done)l.done();}return true;}
+function folkGo(f,to){if(folkPersonBusy(f))return false;if(f.retry&&f.retry.to===to&&clock.minutes<f.retry.until)return false;
+  const from=f.places[f.at],dst=f.places[to];folkCancelRoute(f);f.retry=null;
+  const fail=()=>{f.trip=null;f.away=true;f.retry={to,until:clock.minutes+15};if(f.w){f.w.path=null;f.w.folkLead=null;f.w.state='folkStay';}return false;};
+  if(!dst)return fail();
   const near=(pl)=>pl&&scene==='city'&&dist(pl.x,pl.y,player.x,player.y)<340;
-  if(dst.kind==='taxi'||(!near(from)&&!near(dst)&&!f.w)){folkDrop(f);f.at=to;return;}
-  let w=f.w||folkSpawn(f,from&&from.kind!=='taxi'?from:dst);if(!w){f.at=to;return;}
-  const goal=dst.node!=null?dst.node:nearestNode(dst.x,dst.y,world.pedAdj,120);if(goal<0){folkDrop(f);f.at=to;return;}
-  f.trip={to,t0:clock.minutes};w.state='routing';
-  requestPath(w,world.pedAdj,w.node,goal,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='folkStay';w.arrive();return;}w.path=path;w.seg=0;w.t=0;w.state='walk';});
-  w.arrive=function(){this.path=null;f.trip=null;f.at=to;if(dst.inside){folkDrop(f);}else{this.x=dst.x+rnd(-1,1);this.y=dst.y+rnd(-1,1);this.state='folkStay';}};}
+  if((dst.kind==='taxi'&&dst.inside)||(!near(from)&&!near(dst)&&!f.w&&!f.away)){folkDrop(f);f.at=to;f.away=false;return true;}
+  const w=f.w||folkSpawn(f,f.returnPos||(from&&!(from.kind==='taxi'&&from.inside)?from:dst));if(!w)return fail();f.returnPos=null;
+  const start=nearestNode(w.x,w.y,world.pedAdj,120),goal=dst.node!=null?dst.node:nearestNode(dst.x,dst.y,world.pedAdj,120);if(start<0||goal<0)return fail();
+  const trip=f.trip={to,t0:clock.minutes},gen=f.routeGen;const valid=()=>f.routeGen===gen&&f.w===w&&f.trip===trip&&!folkPersonBusy(f);
+  w.node=start;w.state='routing';
+  w.arrive=function(){if(!valid())return;this.path=null;this.folkLead=null;f.trip=null;f.at=to;f.away=false;f.retry=null;if(dst.inside){folkDrop(f);}else{this.x=dst.x;this.y=dst.y;this.state='folkStay';}};
+  requestPath(w,world.pedAdj,start,goal,pedCost,path=>{if(!valid()||w.state!=='routing')return;
+    if(!path||!path.length||path[0]!==start||path[path.length-1]!==goal){fail();return;}
+    if(path.length===1){const d=dist(w.x,w.y,dst.x,dst.y);if(d<=8){w.arrive();return;}
+      if(dst.inside||d>120||!clearLine(w.x,w.y,dst.x,dst.y)){fail();return;}w.state='walk';w.folkLead={x:dst.x,y:dst.y,valid,fail,done:()=>w.arrive()};return;}
+    w.path=path;w.seg=0;const a=world.nodes[path[0]],b=world.nodes[path[1]],L=dist(a[0],a[1],b[0],b[1]);if(!L){fail();return;}
+    const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L,r=edgeRoad(world.pedAdj,path[0],path[1]);const want=r&&r.c<=8?r.hw+1.3:0,off=want?Math.min(safeSideOff(path[0],path[1],want+0.6),want+w.off):w.off;
+    w.t=clamp((w.x-a[0])*dx+(w.y-a[1])*dy,0,L);const x=a[0]+dx*w.t-dy*off,y=a[1]+dy*w.t+dx*off;
+    if(dist(w.x,w.y,x,y)>0.5){if(!folkClearJoin(w.x,w.y,x,y)){fail();return;}w.folkLead={x,y,valid,fail};}w.state='walk';});return true;}
+function folkTaxiStart(fOrId,v){const f=typeof fOrId==='string'?FOLK.list.find(q=>q.id===fOrId):fOrId;if(!f||!v)return false;
+  f.driving=v;v.folkDriver=f.id;f.away=true;f.retry=null;folkDrop(f);return true;}
+function folkTaxiEnd(v){if(!v||!v.folkDriver)return;const f=FOLK.list.find(q=>q.id===v.folkDriver);delete v.folkDriver;if(!f||f.driving!==v)return;
+  f.driving=null;f.away=true;f.retry=null;const p=toSidewalk(v.x,v.y);f.returnPos={x:p[0],y:p[1]};folkGo(f,folkWant(f));}
 const FOLK_HI=['Привет, {n}!','О, {n}! Как сам?','{n}, здравствуй!','Салям, {n}!'];
 const FOLK_HI_F={fidania:['Улым, здравствуй! Покушал сегодня?','Ой, сосед! Как дела?'],lenar:['{n}! Послушай, новую выучил ♪','Братан, привет!'],marat:['Э, {n}! Куда едем?','Салям, {n}! Опять пробки…'],alsu:['Зай, привет. Заходи вечером','{n}, живой? Привет'],zulfiya:['Здравствуйте, {n}!'],gulnara:['Здравствуйте, {n}. Как самочувствие?'],ildar:['{n}! Наши сегодня играют, ты в курсе?'],rinat:['{n}! Голодный? Заходи']};
 const BUSK=['♪ Казан, Казан, син минем җаным… ♪','♪ (перебирает струны) ♪','♪ Ещё одну для хороших людей ♪','Спасибо, люди добрые!'];
@@ -138,18 +167,19 @@ function updateFolk(rdt){if(!world)return;if(!FOLK.ready){folkInit();if(!FOLK.re
   FOLK.t-=rdt;if(FOLK.t>0)return;FOLK.t=0.5;FOLK.dt=(FOLK.dt||0)+1;if(FOLK.dt%10===0)folkDistrictTick();
   for(const f of FOLK.list){
     if(f.w&&walkers.indexOf(f.w)<0)f.w=null;           // убрали чужим кодом
-    if(f.w&&folkBusy(f.w))continue;                   // занят ситуацией, митингом, разговором
+    if(f.driving&&f.driving!==player.vehicle)folkTaxiEnd(f.driving);
+    if(folkPersonBusy(f)){if(f.trip){folkCancelRoute(f);f.away=true;}if(f.w||f.driving)f.away=true;continue;}
     // сбился с пути (перебежал дорогу, постоял у ДТП) — идёт дальше
     if(f.w&&f.trip&&f.w.state!=='walk'&&f.w.state!=='routing'){const to=f.trip.to;f.trip=null;folkGo(f,to);}
     else if(f.w&&!f.trip&&f.w.state==='idle'){f.w.state='folkStay';}
     const want=folkWant(f);
-    if(want!==f.at&&!f.trip)folkGo(f,want);
+    if((want!==f.at||f.away)&&!f.trip)folkGo(f,want);
     else if(f.trip&&want!==f.trip.to){f.trip=null;folkGo(f,want);}   // планы поменялись по дороге
     const pl=f.places[f.at];
     // снаружи (двор, Баумана, у Кремля): показываем, когда игрок рядом
-    if(!f.trip&&pl&&!pl.inside){const d=dist(pl.x,pl.y,player.x,player.y);if(d<300&&scene==='city'&&!f.w){const w=folkSpawn(f,pl);if(w){w.x=pl.x+rnd(-1,1);w.y=pl.y+rnd(-1,1);}}else if(d>420&&f.w&&f.w!==chatNpc)folkDrop(f);}
-    if(f.w&&!f.trip&&pl&&pl.inside&&f.w!==chatNpc)folkDrop(f);
-    if(f.trip&&f.w&&dist(f.w.x,f.w.y,player.x,player.y)>460){f.at=f.trip.to;f.trip=null;folkDrop(f);}
+    if(!f.trip&&!f.away&&pl&&!pl.inside){const d=dist(pl.x,pl.y,player.x,player.y);if(d<300&&scene==='city'&&!f.w){const w=folkSpawn(f,pl);if(w){w.x=pl.x+rnd(-1,1);w.y=pl.y+rnd(-1,1);}}else if(d>420&&f.w&&f.w!==chatNpc)folkDrop(f);}
+    if(f.w&&!f.trip&&!f.away&&pl&&pl.inside&&f.w!==chatNpc)folkDrop(f);
+    if(f.trip&&f.w&&dist(f.w.x,f.w.y,player.x,player.y)>460){f.at=f.trip.to;f.away=false;folkDrop(f);}
     const w=f.w;if(!w)continue;const d=dist(w.x,w.y,player.x,player.y);
     if(w.state==='folkStay'){if(d<10)faceTo(w,player.x,player.y);
       if(pl&&pl.kind==='street'&&f.at==='work'&&/музыкант/.test(f.job)&&d<40&&Math.random()<0.025)say(w,pick(BUSK),4);}
@@ -165,12 +195,13 @@ function folkContext(w){const id=w&&(w.folk||(w.p&&w.p.folk));if(!id)return '';c
   const rel=f.met>1?` Собеседник — ${player.name}, вы знакомы: виделись ${f.met} ${f.met<5?'раза':'раз'}, последний раз ${clock.day-f.last<=0?'сегодня':clock.day-f.last===1?'вчера':(clock.day-f.last)+' дн. назад'}. Общайся как со знакомым.`:f.met===1?` Собеседник — ${player.name}, вы только что познакомились.`:` Собеседника (${player.name}) ты раньше не встречал${f.female?'а':''}.`;
   const ex=Array.isArray(f.lines)&&f.lines.length?` Твои словечки, для примера (не повторяй дословно): «${f.lines[hashStr(f.id+clock.day)%f.lines.length]}», «${f.lines[(hashStr(f.id)+1)%f.lines.length]}».`:'';
   const TY={drinker:' Любишь выпить, но выпивку не хвалишь и отказ спокойно принимаешь; ты немного грустный и смешной.',homeless:' У тебя нет дома, но ты держишься с достоинством, знаешь все дворы и не жалуешься на жизнь.',bombila:' Подвозишь без лицензии и хитришь с ценой, но без угроз — можно и поторговаться.',blogger:' Ведёшь свой канал, всё снимаешь на телефон и зовёшь подписаться; шумный, но не злой.',granny:' Сидишь у подъезда, всё про всех знаешь и жалуешься на порядок во дворе.',activist:' Пишешь жалобы в мэрию и всех зовёшь подписать.'};
-  return bio+sp+(TY[f.type]||'')+ex+rel;}
+  return bio+sp+(TY[f.type]||'')+ex+rel+(typeof neighbourStoryContext==='function'?neighbourStoryContext(f.id):'');}
 // внутри заведения: свой человек за стойкой или за столиком
 function folkInterior(it){if(!FOLK.ready||!it)return;
-  for(const n of it.npcs)if(n.origP){n.p=n.origP;n.origP=null;n.folk=null;}
-  it.npcs=it.npcs.filter(n=>!n.folkGuest);
-  for(const f of FOLK.list){if(f.trip)continue;const pl=f.places[f.at];if(!pl||!pl.inside||pl.key!==it.key)continue;
+  const held=n=>n===chatNpc||(n.companionOf&&typeof companion!=='undefined'&&companion&&companion.w===n.companionOf)||(typeof SIT!=='undefined'&&SIT.card&&SIT.card.neighbourStory&&SIT.card.participant===n);
+  for(const n of it.npcs)if(n.origP&&!held(n)){n.p=n.origP;n.origP=null;n.folk=null;}
+  it.npcs=it.npcs.filter(n=>!n.folkGuest||held(n));
+  for(const f of FOLK.list){if(f.trip||f.away||folkPersonBusy(f))continue;const pl=f.places[f.at];if(!pl||!pl.inside||pl.key!==it.key)continue;
     if(f.at==='work'){const st=it.npcs.find(n=>n.role==='staff'&&!n.origP);if(st){st.origP=st.p;st.p=f.p;st.folk=f.id;continue;}}
     const tb=it.furn.find(q=>q.spot==='table'&&!q.taken);let x,y,hx=0,hy=1;if(tb){x=tb.x-1.05;y=tb.y;hx=1;hy=0;tb.taken=true;}else{x=1.5+Math.random()*(it.w-3);y=2.5+Math.random()*(it.h-5);}
     it.npcs.push({p:f.p,x,y,hx,hy,seated:!!tb,phase:Math.random()*6,role:'resident',isInterior:true,state:'idle',memory:f.p.memory,folk:f.id,folkGuest:true});}}

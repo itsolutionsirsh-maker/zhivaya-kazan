@@ -1,0 +1,64 @@
+{
+  "viewport": "1280x720",
+  "durationMs": 5000,
+  "baseline": "50c92a4",
+  "method": "Actual completed render calls; one game frame loop active; other paused; no CPU throttle; not a real phone benchmark",
+  "samples": [
+    {
+      "build": "after-single-active",
+      "scene": "detail-9.5",
+      "completed_frames": 300,
+      "completed_interval_p50_ms": 16.7,
+      "completed_interval_p95_ms": 18.4,
+      "elapsed_ms": 5000,
+      "fps": 60,
+      "interval_samples": 299,
+      "render_p50_ms": 2.8,
+      "render_p95_ms": 4.1,
+      "render_samples": 300,
+      "sample_limit": 600
+    },
+    {
+      "build": "after-single-active",
+      "scene": "day-5.5",
+      "completed_frames": 261,
+      "completed_interval_p50_ms": 18.9,
+      "completed_interval_p95_ms": 23.9,
+      "elapsed_ms": 5020,
+      "fps": 52,
+      "interval_samples": 260,
+      "render_p50_ms": 4.1,
+      "render_p95_ms": 5.8,
+      "render_samples": 261,
+      "sample_limit": 600
+    },
+    {
+      "build": "before-single-active",
+      "scene": "day-5.5",
+      "completed_frames": 268,
+      "completed_interval_p50_ms": 18.4,
+      "completed_interval_p95_ms": 20.7,
+      "elapsed_ms": 5004,
+      "fps": 53.6,
+      "interval_samples": 267,
+      "render_p50_ms": 2.7,
+      "render_p95_ms": 3.8,
+      "render_samples": 268,
+      "sample_limit": 600
+    },
+    {
+      "build": "before-single-active",
+      "scene": "detail-9.5",
+      "completed_frames": 301,
+      "completed_interval_p50_ms": 16.6,
+      "completed_interval_p95_ms": 17.7,
+      "elapsed_ms": 5001,
+      "fps": 60.2,
+      "interval_samples": 300,
+      "render_p50_ms": 2.1,
+      "render_p95_ms": 2.4,
+      "render_samples": 301,
+      "sample_limit": 600
+    }
+  ]
+}

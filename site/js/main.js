@@ -59,8 +59,8 @@ async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id
   return d||{name:'',parent:''};}
 
 // ---------- автобус ----------
-function boardBus(bus,stop){player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
-function leaveBus(stop){const b=player.bus;player.bus=null;player.fare=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;addEvent(`Вы вышли на «${stop.n}»`);}
+function boardBus(bus,stop){if(player.vehicle||player.bus||player.inside)return false;journeyHint('boarding',bus,player.x,player.y,bus.x,bus.y);player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
+function leaveBus(stop){const b=player.bus;if(player.busPlan&&!busPlanExit(b,stop))player.busPlan=null;player.bus=null;player.fare=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;journeyHint('exiting',b,b.x,b.y,player.x,player.y);addEvent(`Вы вышли на «${stop.n}»`);}
 
 // ---------- действия ----------
 let currentAction=null;
@@ -74,11 +74,12 @@ function findAction(){
   if(player.state==='hurt')return {label:accidents.some(a=>a.victim==='player'&&a.amb&&a.amb.state==='scene')?'Врачи скорой осматривают вас…':'Ждём скорую…',run:()=>{}};
   if(player.bus)return {label:'Выйти на следующей остановке',run:()=>{player.exitNext=true;setHint('Выйдем на следующей остановке');}};
   if(player.vehicle&&player.vehicle.kind==='taxi')return {label:player.vehicle.fixedFare!=null?`Выйти здесь (${fmtMoney(player.vehicle.fixedFare)}, как договорились)`:'Выйти здесь (оплата по счётчику)',run:exitVehicle};
+  {const ja=journeyAction();if(ja)return ja;}
   if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return actTarget({label:`Сесть в такси: ${taxiCall.dest.n}`,run:boardTaxi},taxiCall.car,'taxi');
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
     if(v.kind==='own'&&v.speed<1&&typeof ECON!=='undefined'&&ECON.carCond<95&&world.pois.some(p=>p.t==='fuel'&&dist(p.x,p.y,v.x,v.y)<18))return repairAction(false);
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
-    return {label:v.kind==='scooter'?'Оставить самокат здесь':'Припарковать и выйти',run:exitVehicle};}
+    return {label:isLightVehicle(v.kind)?`Оставить ${v.spec.label} здесь`:'Припарковать и выйти',run:exitVehicle};}
   {const sa=sitAction();if(sa)return sa;}
   if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;if(player.busPlan)cancelTrip(true);setHint('Вы передумали ехать');}};
   // пришли с жителем к месту, о котором договорились — E заводит внутрь обоих (а не открывает разговор с ним)
@@ -88,7 +89,7 @@ function findAction(){
   let best=null,bd=1e9;
   for(const w of walkers){if(w.bus||w.state==='hurt'||w.inside||(companion&&w===companion.w))continue;const d=dist(w.x,w.y,player.x,player.y);if(w.role==='guard'&&d>2.2)continue;if(d<5&&d<bd){bd=d;best={label:`Поговорить: ${w.p.name}, ${w.role==='police'?'полиция':w.role==='guard'?'охранник':w.role==='courier'?'курьер':w.p.job}`,run:()=>openChat(w)};actTarget(best,w,'person');}}
   if(best)return best;
-  for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best=r.kind==='scooter'?{label:'Взять самокат · 50 ₽ + 6 ₽/мин',run:()=>enterVehicle(r)}:{label:'Взять каршеринг · 200 ₽ + 10 ₽/мин',run:()=>enterVehicle(r)};actTarget(best,r,r.kind==='scooter'?'scooter':'share');}}
+  for(const r of rentals){const d=dist(r.x,r.y,player.x,player.y);if(d<4&&d<bd){bd=d;best={label:`Взять ${VEH[r.kind].label} · ${VEH[r.kind].start} ₽ + ${VEH[r.kind].perMin} ₽/игр. мин`,run:()=>enterVehicle(r)};actTarget(best,r,isLightVehicle(r.kind)?r.kind:'share');}}
   if(ownCar&&ownCar.parked){const d=dist(ownCar.x,ownCar.y,player.x,player.y);if(d<4.5&&d<bd){bd=d;best=(typeof ECON!=='undefined'&&ECON.carCond<12)?repairAction(true):{label:`Сесть в свою машину${typeof ECON!=='undefined'&&ECON.carCond<60?' · '+Math.round(ECON.carCond)+'%':''}`,run:()=>enterVehicle(ownCar)};actTarget(best,ownCar,'own');}}
   if(best)return best;
   {const ma=typeof metroAction==='function'?metroAction():null;if(ma&&!world.stops.some(q=>dist(q.x,q.y,player.x,player.y)<ma.d-0.5&&routesAtStop(q).length))return ma;}
@@ -171,11 +172,12 @@ $('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').cli
 // самое сильное отдаление: чтобы вся карта помещалась на экран (для старой маленькой карты — как раньше, 0,22)
 function zMin(){const bb=world&&world.bbox;if(!bb||typeof W==='undefined')return 0.22;return Math.min(0.22,Math.max(0.01,0.9*Math.min(W/(bb[2]-bb[0]),H/(bb[3]-bb[1]))));}
 function showHowto(){$('#howtoModal').hidden=false;player.busy=true;}
+$('#neighbourStoryBtn').addEventListener('click',()=>{$('#menuModal').hidden=true;player.busy=false;neighbourStoryOpen();});
 $('#howtoClose').addEventListener('click',()=>{$('#howtoModal').hidden=true;player.busy=false;flags.howtoSeen=true;try{localStorage.setItem('zk.howto','1');}catch(e){}});
 
 // ---------- сохранение ----------
-function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,cool:player.cool||undefined,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,home:player.home?{x:player.home.cx,y:player.home.cy}:(player.homeAt?{x:player.homeAt[0],y:player.homeAt[1]}:null),homeless:!player.home&&!player.homeAt,bills:typeof bills!=='undefined'?{rent:bills.rent,util:bills.util,call:bills.call,era:bills.era}:undefined,delayAsked:!!player.delayAsked,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
-function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object'){player.job=s.job;if(/^poi\d+$/.test(player.job.key||'')&&isFinite(player.job.x)&&isFinite(player.job.y))player.job.key=poiKey(player.job);}/* старый ключ работы — по номеру, переводим на постоянный */if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,zMin(),16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else{player.home=null;player.homeAt=[s.home.x,s.home.y];}}else if(s.homeless){player.home=null;player.homeAt=null;}if(s.bills&&typeof bills!=='undefined')Object.assign(bills,s.bills);if(s.cool&&typeof s.cool==='object')player.cool=s.cool;player.delayAsked=!!s.delayAsked;if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');}catch(e){}}
+function saveState(){if(window.zkNoSave)return;try{const v=player.vehicle;localStorage.setItem('zk.state',JSON.stringify({t:Date.now(),x:player.x,y:player.y,energy:player.energy,food:player.food,mood:player.mood,money:player.money,pantry:player.pantry,drunk:Math.round(player.drunk||0),rep:player.rep||0,dossier:SIT.dossier,debt:player.debt||0,cold:!!player.cold,umbrella:!!player.umbrella,job:player.job?Object.assign({},player.job,{task:null}):null,minutes:clock.minutes,cool:player.cool||undefined,z:cam.zt,econ:typeof econDump==='function'?econDump():undefined,folk:typeof folkDump==='function'?folkDump():undefined,journey:journeyDump(),home:player.home?{x:player.home.cx,y:player.home.cy}:(player.homeAt?{x:player.homeAt[0],y:player.homeAt[1]}:null),homeless:!player.home&&!player.homeAt,bills:typeof bills!=='undefined'?{rent:bills.rent,util:bills.util,call:bills.call,era:bills.era}:undefined,delayAsked:!!player.delayAsked,own:ownCar&&ownCar.parked?{x:ownCar.x,y:ownCar.y,hx:ownCar.hx,hy:ownCar.hy}:(v&&v.kind==='own'?{x:v.x,y:v.y,hx:v.hx,hy:v.hy}:null)}));}catch(e){}}
+function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(!s)return;if(isFinite(s.x)&&isFinite(s.y)&&!inBuilding(s.x,s.y)){player.x=s.x;player.y=s.y;cam.x=s.x;cam.y=s.y;}player.energy=s.energy??player.energy;player.food=s.food??player.food;player.mood=s.mood??player.mood;player.money=s.money??player.money;player.pantry=s.pantry||0;player.drunk=s.drunk||0;player.rep=s.rep||0;player.debt=s.debt||0;player.cold=!!s.cold;player.umbrella=!!s.umbrella;if(s.job&&typeof s.job==='object'){player.job=s.job;if(/^poi\d+$/.test(player.job.key||'')&&isFinite(player.job.x)&&isFinite(player.job.y))player.job.key=poiKey(player.job);}/* старый ключ работы — по номеру, переводим на постоянный */if(Array.isArray(s.dossier))SIT.dossier=s.dossier.slice(-30);if(s.econ&&typeof econApply==='function')econApply(s.econ);if(s.folk)window.__folkSaved=s.folk;if(s.z){cam.z=clamp(s.z,zMin(),16);cam.zt=cam.z;}if(s.home&&isFinite(s.home.x)&&isFinite(s.home.y)){const b=homeAt(s.home.x,s.home.y);if(b){player.home=b;player.homeAt=null;}else{player.home=null;player.homeAt=[s.home.x,s.home.y];}}else if(s.homeless){player.home=null;player.homeAt=null;}if(s.bills&&typeof bills!=='undefined')Object.assign(bills,s.bills);if(s.cool&&typeof s.cool==='object')player.cool=s.cool;player.delayAsked=!!s.delayAsked;if(s.own&&ownCar){ownCar.x=s.own.x;ownCar.y=s.own.y;ownCar.hx=s.own.hx;ownCar.hy=s.own.hy;}flags.howtoSeen=!!localStorage.getItem('zk.howto');journeyRestore(s.journey);}catch(e){}}
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
@@ -218,17 +220,18 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
   if(pickingDest){pickDestAt(wx,wy);return;}
   followPlayer();
-  if(player.vehicle){if(player.vehicle.kind==='taxi')return;driveTo(wx,wy);return;}
+  if(player.vehicle){if(player.vehicle.kind==='taxi')return;if(driveTo(wx,wy)){player.vehicle.dest=journeyDest({x:wx,y:wy,n:'Точка на карте'});updateTripBox();}return;}
   for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
   player.talkTarget=null;walkTo(wx,wy);});
-function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return;}
+function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return false;}
   // близко и по прямой ничего не мешает (через парк, двор, площадь) — напрямик, без крюка по дорожкам
   const smart=!(player.replans>0);   // застряли и ищем путь заново — только по дорожкам
-  if(smart&&Math.hypot(wx-player.x,wy-player.y)<450&&clearLine(player.x,player.y,wx,wy)){player.waitingStop=null;player.waypoints=[[wx,wy]];return;}
-  const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0)return;player.waitingStop=null;
-  const path=astar(world.pedAdj,s,g,pedCost);const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=smart?cutCorners(wps,player.x,player.y):wps;}
+  if(smart&&Math.hypot(wx-player.x,wy-player.y)<450&&clearLine(player.x,player.y,wx,wy)){player.waitingStop=null;player.waypoints=[[wx,wy]];return true;}
+  const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0){player.waypoints=null;setHint('Пеший маршрут не найден');return false;}player.waitingStop=null;
+  const path=astar(world.pedAdj,s,g,pedCost);if(!path||!path.length||(path.length===1&&!clearLine(player.x,player.y,wx,wy))){player.waypoints=null;setHint('Пеший маршрут не найден');return false;}
+  const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=smart?cutCorners(wps,player.x,player.y):wps;return true;}
 // по прямой можно пройти: нет домов, стен, воды и проезжей части больших улиц (маленькую улицу перейти можно — подождём машины)
 let _water=null;
 function inWater(x,y){if(!_water||_water.src!==world.areas){_water=world.areas.filter(a=>a.k==='water');_water.src=world.areas;}for(const a of _water){if(x<a.bb[0]||x>a.bb[2]||y<a.bb[1]||y>a.bb[3])continue;if(pointInPoly(a.p,x,y))return true;}return false;}
@@ -264,7 +267,7 @@ function updatePlayer(dt){
 // шаг упирается в стену дома или кремля (если уже внутри контура — например, вышли из помещения — выпускаем)
 function blockedStep(x0,y0,x1,y1){if(wallBlocks(x0,y0,x1,y1))return true;return !!inBuilding(x1,y1)&&!inBuilding(x0,y0);}
 function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!blockedStep(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}
-function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.bus)return;if(player.vehicle&&player.vehicle.kind!=='scooter')return;
+function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.bus)return;if(player.vehicle&&!isLightVehicle(player.vehicle.kind))return;
   for(const v of cars.concat(buses)){if(v.crashed||v.speed<2.2||v.remove)continue;const ox=player.x-v.x,oy=player.y-v.y;if(Math.abs(ox)>9||Math.abs(oy)>9)continue;const f=ox*v.hx+oy*v.hy;const s=Math.abs(-ox*v.hy+oy*v.hx);if(Math.abs(f)<v.len*0.5+0.35&&s<v.wid*0.5+0.5){playerHitByCar(v);return;}}}
 function updateNeeds(gameMin){player.energy=clamp(player.energy-gameMin*0.085,0,100);player.food=clamp(player.food-gameMin*0.12,0,100);let target=55;if(player.food<25)target-=20;if(player.energy<20)target-=20;if(weather.kind==='rain')target-=5;player.mood=lerp(player.mood,target,Math.min(1,gameMin*0.004));}
 let dayPhaseAnnounced={};
@@ -297,7 +300,7 @@ function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   //
   requestAnimationFrame(frame);}
 function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;$('#weatherLbl').textContent=(weather.kind==='rain'?'🌧 дождь':weather.kind==='cloudy'?'☁️ пасмурно':isNight()?'🌙 ясно':'☀️ ясно');
   setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){$('#bDrunk').querySelector('i').style.width=dr+'%';$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
-  const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${v.kind==='scooter'?'🛴':'🚗'} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&v.kind!=='scooter'?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
+  const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${journeyIcon(v.kind)} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&!isLightVehicle(v.kind)?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
   currentAction=player.busy?null:findAction();const ab=$('#actBtn');if(currentAction){ab.hidden=false;ab.innerHTML='';const k=document.createElement('kbd');k.textContent='E';ab.append(k,document.createTextNode(currentAction.label));}else ab.hidden=true;}
 function setBar(sel,v){const b=$(sel);b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);}
 
