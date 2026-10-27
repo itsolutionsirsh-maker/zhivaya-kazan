@@ -77,7 +77,7 @@ function render(){
   for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBusSprite(b);}
   drawRallyWorld(z,t);
   // ---- люди
-  if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross'||!!w.mv||!!w.walking,scale:1.5});}
+  if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross'||!!w.mv||!!w.walking,scale:1.5,filming:w.filming,time:t});}
     for(const w of walkers){if(w.state==='hurt'&&w.x>vx0&&w.x<vx1&&w.y>vy0&&w.y<vy1)drawPerson(w.x,w.y,w.hx,w.hy,w.p,0,{lying:true,scale:1.5});}}
   // ---- игрок и другие игроки
   for(const pr of peerRender.values()){if(pr.b)continue;drawPlayerWorld(pr.x,pr.y,pr.hx,pr.hy,pr.veh,Object.assign({clothes:pr.c||'#4A90E2',skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),t,false);}
@@ -228,10 +228,12 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(0.1,0.15,o.lying?1.1:hv?0.95:0.75,hv?0.75:0.55,0,0,TAU);ctx.fill();
   if(o.ring){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.12;ctx.beginPath();ctx.arc(0,0,0.82,0,TAU);ctx.stroke();}
   const still=o.moving===false||o.seated||o.lying;const sw=still?0:Math.sin(phase)*0.3;
+  const filming=LOD>0&&!o.lying&&p.item==='phone'&&o.filming;
+  const handX=filming?0.9:sw,handY=filming?-ha*0.8:-ha;
   if(hi&&!o.seated){ctx.fillStyle=p.pants||'#2B2F3A';ctx.beginPath();ctx.ellipse(sw*1.1,-0.22,0.22,0.13,0,0,TAU);ctx.ellipse(-sw*1.1,0.22,0.22,0.13,0,0,TAU);ctx.fill();}
-  if(hi){ctx.strokeStyle=p.clothes;ctx.lineWidth=hv?0.26:0.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-0.05,-bl+0.06);ctx.lineTo(sw,-ha);ctx.moveTo(-0.05,bl-0.06);ctx.lineTo(-sw,ha);ctx.stroke();}
-  ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(sw,-ha,0.16,0,TAU);ctx.arc(-sw,ha,0.16,0,TAU);ctx.fill();
-  if(p.watch){ctx.fillStyle='#E8B830';ctx.beginPath();ctx.arc(sw-0.14,-ha+0.02,0.09,0,TAU);ctx.fill();if(hi){ctx.fillStyle='#FFF3C4';ctx.beginPath();ctx.arc(sw-0.16,-ha,0.035,0,TAU);ctx.fill();}}   // часы на руке — видно издалека
+  if(hi||filming){ctx.strokeStyle=p.clothes;ctx.lineWidth=hv?0.26:0.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-0.05,-bl+0.06);ctx.lineTo(handX,handY);ctx.moveTo(-0.05,bl-0.06);ctx.lineTo(-sw,ha);ctx.stroke();}
+  ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(handX,handY,0.16,0,TAU);ctx.arc(-sw,ha,0.16,0,TAU);ctx.fill();
+  if(p.watch){ctx.fillStyle='#E8B830';ctx.beginPath();ctx.arc(handX-0.14,handY+0.02,0.09,0,TAU);ctx.fill();if(hi){ctx.fillStyle='#FFF3C4';ctx.beginPath();ctx.arc(handX-0.16,handY,0.035,0,TAU);ctx.fill();}}   // часы на руке — видно издалека
   ctx.fillStyle=p.clothes;rrect(ctx,-bw,-bl,bw*2,bl*2,hv?0.55:0.4);ctx.fill();
   if(hv){ctx.fillStyle=p.clothes;ctx.beginPath();ctx.ellipse(0.32,0,0.44,0.6,0,0,TAU);ctx.fill();ctx.fillStyle=shade(p.clothes,1.3);ctx.beginPath();ctx.ellipse(0.4,0,0.3,0.42,0,0,TAU);ctx.fill();}   // живот вперёд, как у начальника
   if(p.tie){ctx.fillStyle='#F2F2EE';ctx.beginPath();ctx.ellipse(0.46,0,0.28,0.13,0,0,TAU);ctx.fill();ctx.fillStyle=p.tie;rrect(ctx,0.3,-0.06,hv?0.46:0.34,0.12,0.04);ctx.fill();}
@@ -250,7 +252,70 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   if(p.role==='guard'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0,0,0.32,0,TAU);ctx.fill();}
   if(p.hat)drawHat(p.hat,hi);
   if(p.glasses&&hi){ctx.strokeStyle=p.glasses;ctx.lineWidth=0.05;ctx.beginPath();ctx.arc(0.3,-0.12,0.07,0,TAU);ctx.moveTo(0.37,0.12);ctx.arc(0.3,0.12,0.07,0,TAU);ctx.moveTo(0.3,-0.05);ctx.lineTo(0.3,0.05);ctx.stroke();}
+  // Предмет в свободной руке: сезонная сумка p.bag остаётся на другой стороне.
+  // LOD 0 и лежащий человек — прежнее рисование, без предметов и вспышки.
+  if(LOD>0&&p.item&&!o.lying)drawPersonItem(p.item,hi,handX,handY,filming,o.time);
   ctx.restore();}
+let phoneFlashSprite=null;
+function drawPersonItem(item,hi,handX,handY,filming,time){
+  if(item==='keys'&&!hi)return;
+  ctx.save();ctx.translate(handX,handY);ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=0.12;ctx.strokeStyle='#34413F';
+  switch(item){
+    case 'phone':{
+      ctx.translate(0.2,-0.22);
+      // Один плавный цикл за 3 секунды; при уменьшении анимации — постоянный свет.
+      if(filming){if(!phoneFlashSprite){phoneFlashSprite=document.createElement('canvas');phoneFlashSprite.width=phoneFlashSprite.height=64;
+          const g=phoneFlashSprite.getContext('2d'),gr=g.createRadialGradient(32,32,2,32,32,32);gr.addColorStop(0,'rgba(255,250,223,.8)');gr.addColorStop(0.35,'rgba(255,242,196,.35)');gr.addColorStop(1,'rgba(255,242,196,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);}
+        const pulse=reduceMotion?0.45:0.5+0.5*Math.sin((time||0)*TAU/3),alpha=ctx.globalAlpha;
+        ctx.globalAlpha=alpha*(0.35+0.45*pulse);ctx.drawImage(phoneFlashSprite,-0.7,-0.95,1.9,1.9);ctx.globalAlpha=alpha;}
+      ctx.fillStyle='#24313D';ctx.strokeStyle='#E6EAE6';rrect(ctx,-0.24,-0.43,0.56,0.86,0.1);ctx.fill();ctx.stroke();
+      ctx.fillStyle=filming?'#FFF5D5':'#80C8DE';ctx.fillRect(-0.12,-0.28,0.29,filming?0.22:0.52);
+      if(hi){ctx.fillStyle='#10232B';ctx.beginPath();ctx.arc(0.04,-0.17,0.06,0,TAU);ctx.fill();ctx.fillStyle='#C4E5ED';ctx.fillRect(-0.09,0.27,0.23,0.04);}
+      break;}
+    case 'cart':{
+      // Тележка перед человеком: ручка, корзина и два колеса читаются уже при z≈5,5.
+      const cy=-handY;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0.7,cy-0.65);ctx.lineTo(0.7,cy+0.65);ctx.lineTo(-handX,cy*2);ctx.stroke();
+      ctx.fillStyle='#34413F';ctx.fillRect(1.05,cy-1.02,0.45,0.25);ctx.fillRect(1.05,cy+0.77,0.45,0.25);
+      ctx.fillStyle='#B6573F';rrect(ctx,0.85,cy-0.78,1.45,1.56,0.16);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#E4C18B';ctx.fillRect(1.02,cy-0.6,1.08,1.2);
+      if(hi){ctx.strokeStyle='#A77C4D';ctx.lineWidth=0.06;ctx.beginPath();ctx.moveTo(1.56,cy-0.6);ctx.lineTo(1.56,cy+0.6);ctx.moveTo(1.02,cy);ctx.lineTo(2.1,cy);ctx.stroke();
+        ctx.fillStyle='#8A3C42';ctx.beginPath();ctx.arc(1.3,cy-0.32,0.2,0,TAU);ctx.arc(1.8,cy+0.3,0.23,0,TAU);ctx.fill();}
+      break;}
+    case 'guitar':
+      ctx.translate(0.4,-0.27);ctx.fillStyle='#795133';ctx.fillRect(0.4,-0.13,1.35,0.26);ctx.fillRect(1.65,-0.2,0.36,0.4);
+      ctx.fillStyle='#E4A656';ctx.beginPath();ctx.moveTo(-0.55,0);
+      ctx.bezierCurveTo(-0.55,-0.66,0.1,-0.65,0.22,-0.34);ctx.bezierCurveTo(0.7,-0.6,0.97,-0.32,0.97,0);
+      ctx.bezierCurveTo(0.97,0.32,0.7,0.6,0.22,0.34);ctx.bezierCurveTo(0.1,0.65,-0.55,0.66,-0.55,0);ctx.closePath();ctx.fill();ctx.stroke();
+      if(hi){ctx.fillStyle='#493127';ctx.beginPath();ctx.arc(0.4,0,0.16,0,TAU);ctx.fill();ctx.fillRect(-0.2,-0.19,0.1,0.38);
+        ctx.strokeStyle='#F7E7BA';ctx.lineWidth=0.035;ctx.beginPath();ctx.moveTo(-0.15,-0.06);ctx.lineTo(1.8,-0.06);ctx.moveTo(-0.15,0.06);ctx.lineTo(1.8,0.06);ctx.stroke();}
+      break;
+    case 'broom':
+      ctx.strokeStyle='#735338';ctx.lineWidth=0.16;ctx.beginPath();ctx.moveTo(-0.28,0);ctx.lineTo(1.8,0);ctx.stroke();
+      ctx.fillStyle='#D5AE63';ctx.strokeStyle='#735338';ctx.lineWidth=0.1;ctx.beginPath();ctx.moveTo(1.55,-0.18);ctx.lineTo(2.2,-0.55);ctx.lineTo(2.2,0.55);ctx.lineTo(1.55,0.18);ctx.closePath();ctx.fill();ctx.stroke();
+      if(hi){ctx.beginPath();for(let j=-1;j<=1;j++){ctx.moveTo(1.66,j*0.1);ctx.lineTo(2.14,j*0.35);}ctx.stroke();ctx.fillStyle='#785C43';ctx.fillRect(1.55,-0.2,0.16,0.4);}
+      break;
+    case 'bag':
+      ctx.strokeStyle='#43595B';ctx.beginPath();ctx.ellipse(0.15,-0.19,0.23,0.21,0,0,TAU);ctx.stroke();
+      ctx.fillStyle='#719B95';rrect(ctx,-0.38,-0.88,1.05,0.65,0.12);ctx.fill();ctx.stroke();
+      if(hi){ctx.fillStyle='#B9D3C5';ctx.fillRect(-0.24,-0.76,0.16,0.4);ctx.fillRect(0.32,-0.76,0.16,0.4);}
+      break;
+    case 'bottle':
+      // Только непрозрачный бумажный пакет: ни горлышка, ни этикетки.
+      ctx.fillStyle='#C8995D';ctx.strokeStyle='#715435';ctx.beginPath();ctx.moveTo(-0.2,0.03);ctx.lineTo(-0.31,-0.91);ctx.lineTo(0.34,-0.91);ctx.lineTo(0.26,0.03);ctx.closePath();ctx.fill();ctx.stroke();
+      if(hi){ctx.fillStyle='#E6C48D';ctx.fillRect(-0.22,-0.85,0.47,0.15);ctx.strokeStyle='#AB7B47';ctx.lineWidth=0.06;ctx.beginPath();ctx.moveTo(0.13,-0.63);ctx.lineTo(0.16,-0.12);ctx.stroke();}
+      break;
+    case 'fishing':
+      ctx.strokeStyle='#35535B';ctx.lineWidth=0.1;ctx.beginPath();ctx.moveTo(-0.25,0.06);ctx.quadraticCurveTo(1.1,-0.05,2.55,-0.65);ctx.stroke();
+      if(hi){ctx.fillStyle='#A88C58';ctx.fillRect(-0.3,-0.08,0.6,0.17);ctx.fillStyle='#D8DCDC';ctx.beginPath();ctx.arc(0.25,0.16,0.16,0,TAU);ctx.fill();
+        ctx.strokeStyle='#96A8A5';ctx.lineWidth=0.035;ctx.beginPath();ctx.moveTo(2.55,-0.65);ctx.quadraticCurveTo(2.8,-0.3,2.4,0.65);ctx.stroke();ctx.fillStyle='#C8583F';ctx.fillRect(2.34,0.54,0.12,0.22);}
+      break;
+    case 'keys':
+      ctx.strokeStyle='#DAB652';ctx.lineWidth=0.09;ctx.beginPath();ctx.arc(0.16,-0.17,0.16,0,TAU);ctx.moveTo(0.31,-0.17);ctx.lineTo(0.7,-0.17);ctx.lineTo(0.7,-0.32);ctx.moveTo(0.53,-0.17);ctx.lineTo(0.53,-0.3);ctx.moveTo(0.24,-0.3);ctx.lineTo(0.54,-0.6);ctx.lineTo(0.65,-0.5);ctx.stroke();
+      break;
+  }
+  ctx.restore();
+}
 // шапка сверху на голове (человек смотрит вдоль +x): вязаная, с помпоном, ушанка, тюбетейка, шляпа, кепка
 function drawHat(h,hi){const c=h.c;if(h.k==='felt'){ctx.fillStyle=shade(c,0.82);ctx.beginPath();ctx.arc(0,0,0.46,0,TAU);ctx.fill();ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.02,0,0.27,0,TAU);ctx.fill();return;}
   if(h.k==='tub'){ctx.fillStyle=c;ctx.beginPath();ctx.arc(-0.06,0,0.23,0,TAU);ctx.fill();if(hi){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=0.03;ctx.beginPath();ctx.arc(-0.06,0,0.15,0,TAU);ctx.stroke();}return;}
