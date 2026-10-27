@@ -81,26 +81,28 @@ function courierTick(s,j,dt){if(!j.online)return;const o=j.order;
 
 // ---------- аренда и коммуналка ----------
 const RENT=7000,UTIL=1800;
+// аренда текущего жилья: обычная квартира — RENT, получше и с видом — из flats.js (housing.js), своя — 0
+function rentNow(){return typeof housingRent==='function'?housingRent():RENT;}
 const bills={lastDay:clock.day,remind:{}};
 // последний день недели dow с часом h, который уже наступил (часы общие, дни те же у всех)
 function lastDue(dow,h){let d=clock.day-((clock.day%7-dow+7)%7);if((d-1)*1440+h*60>clock.minutes)d-=7;return d;}
 defWatch(()=>{if(bills.era!==2){bills.era=2;bills.rent=lastDue(0,10);bills.util=lastDue(3,12);}   // переход на общие часы: старые дни были свои у каждого — считаем, что за эту неделю заплачено
   if(!player.home)return;const d=clock.day,h=gHour();
-  if(d%7===6&&h>=20&&bills.remind[d]!=='r'){bills.remind[d]='r';addEvent(`📅 Завтра платить за квартиру: ${fmtMoney(RENT)}`);}
+  if(d%7===6&&h>=20&&bills.remind[d]!=='r'){bills.remind[d]='r';if(rentNow()>0)addEvent(`📅 Завтра платить за квартиру: ${fmtMoney(rentNow())}`);}
   const r=lastDue(0,10),u=lastDue(3,12);   // пропустили несколько недель — списываем один раз
-  if(!(bills.rent>=r)){bills.rent=r;payBill(RENT,'Аренда квартиры за неделю');}
+  if(!(bills.rent>=r)){bills.rent=r;if(rentNow()>0)payBill(rentNow(),'Аренда квартиры за неделю');}
   if(!(bills.util>=u)){bills.util=u;payBill(UTIL,'Коммуналка (ЖКУ)');}
   if((player.debt||0)>0&&h>=11&&bills.call!==d&&d%7!==0){bills.call=d;startSit('landlord');}});
 function payBill(sum,what){if(player.money>=sum)sitMoney(-sum,what);else{const part=player.money;player.money=0;player.debt=(player.debt||0)+sum-part;addEvent(`${what}: не хватило ${fmtMoney(sum-part)} — долг ${fmtMoney(player.debt)}`,'alert');sitMood(-10);}}
 defSit('landlord',{title:'Хозяйка квартиры',quiet:true,
-  start(s){const d=player.debt||0;if(!d)return false;const evict=d>=RENT*2;
+  start(s){const d=player.debt||0;if(!d)return false;const evict=d>=Math.max(RENT,rentNow())*2;
     sitCard({s,icon:'📞',tone:'call',title:'Звонит хозяйка квартиры',text:evict?`«${player.name}, долг уже ${fmtMoney(d)}. Не заплатите до конца недели — съезжайте».`:`«${player.name}, добрый день. Когда будут деньги за квартиру? Долг ${fmtMoney(d)}».`,ttl:20,
       choices:[...(player.money>0?[{t:`Заплатить ${fmtMoney(Math.min(d,player.money))}`,primary:true,run:()=>{const p=Math.min(d,player.money);player.money-=p;player.debt=d-p;addEvent(player.debt?`Отдали ${fmtMoney(p)}, осталось ${fmtMoney(player.debt)}`:'Долг за квартиру закрыт','say');endSit(s);}}]:[]),
         {t:'Попросить отсрочку',run:()=>{if(!player.delayAsked){player.delayAsked=true;addEvent('Хозяйка: «Ладно, неделю подожду. Но не больше»');}else{addEvent('Хозяйка: «Сколько можно? Я уже давала отсрочку»','alert');sitMood(-6);if(evict)evictHome();}endSit(s);}},
         {t:'Сбросить',run:()=>{sitMood(-4);if(evict&&Math.random()<0.5)evictHome();endSit(s);}}],onTimeout:()=>endSit(s)});return true;}});
-function evictHome(){addEvent('🏠 Хозяйка сменила замки: вас выселили. Новое жильё — в 💼 «Работа и жильё», переночевать можно в гостинице','alert');player.home=null;player.debt=0;player.delayAsked=false;sitMood(-20);}
+function evictHome(){addEvent('🏠 Хозяйка сменила замки: вас выселили. Новое жильё — в 💼 «Работа и жильё», переночевать можно в гостинице','alert');player.home=null;player.homeAt=null;player.flat=null;player.debt=0;player.delayAsked=false;sitMood(-20);}
 function rentNewHome(){const homes=world.buildings.filter(b=>(b.t===''||b.t==='apartments'||b.t==='residential')&&b.h>=3&&dist(b.cx,b.cy,player.x,player.y)<500);if(!homes.length){setHint('Рядом нет квартир в аренду');return;}
-  if(player.money<RENT){setHint(`Нужно ${fmtMoney(RENT)} за первую неделю`);return;}player.money-=RENT;player.home=pick(homes);bills.rent=Math.max(lastDue(0,10),clock.day);mark(null,'home',player.home.cx,player.home.cy,'🏠','Новая квартира',{arrow:true,color:'#2BB062'});addEvent(`🏠 Вы сняли квартиру за ${fmtMoney(RENT)} в неделю`,'say');}
+  if(player.money<RENT){setHint(`Нужно ${fmtMoney(RENT)} за первую неделю`);return;}player.money-=RENT;player.flat=null;player.home=pick(homes);bills.rent=Math.max(lastDue(0,10),clock.day);mark(null,'home',player.home.cx,player.home.cy,'🏠','Новая квартира',{arrow:true,color:'#2BB062'});addEvent(`🏠 Вы сняли квартиру за ${fmtMoney(RENT)} в неделю`,'say');}
 
 // ---------- простуда, зонт, аптека ----------
 let wetT=0;
@@ -143,10 +145,10 @@ const _sitCtxBase=sitContextFor;
 sitContextFor=function(w){let t=_sitCtxBase(w);if(player.cold)t+=' Собеседник простужен и чихает.';if(player.job&&!player.job.courier)t+=` Собеседник работает: ${player.job.t.toLowerCase()} в «${player.job.name}».`;else if(player.job&&player.job.courier)t+=' Собеседник работает курьером доставки.';return t;};
 
 function renderHome(){const box=$('#jobsHome');box.innerHTML='';const c=document.createElement('div');c.className='rt-card';const b=document.createElement('b');const sp=document.createElement('span');const row=document.createElement('div');row.className='row';
-  if(player.home){b.textContent='🏠 Съёмная квартира';const left=7-(clock.day%7||7);sp.textContent=`Аренда ${fmtMoney(RENT)} раз в неделю (${left?'через '+left+' дн.':'сегодня'}), ЖКУ ${fmtMoney(UTIL)}.${player.debt?' Долг: '+fmtMoney(player.debt):' Долгов нет.'}`;
-    const show=document.createElement('button');show.className='btn';show.textContent='📍 Показать дом';show.addEventListener('click',()=>{mark(null,'home',player.home.cx,player.home.cy,'🏠','Дом',{arrow:true,color:'#2BB062'});closeJobs();});row.append(show);
+  if(player.home||player.flat){const hf=typeof housingFlat==='function'?housingFlat():null;b.textContent=hf?`🏠 ${hf.title}`:'🏠 Съёмная квартира';const left=7-(clock.day%7||7);sp.textContent=`${hf?hf.address+'. ':''}${rentNow()>0?'Аренда '+fmtMoney(rentNow())+' раз в неделю':'Своя квартира, аренды нет'} (${left?'через '+left+' дн.':'сегодня'}), ЖКУ ${fmtMoney(UTIL)}.${player.debt?' Долг: '+fmtMoney(player.debt):' Долгов нет.'}`;
+    const show=document.createElement('button');show.className='btn';show.textContent='📍 Показать дом';show.addEventListener('click',()=>{const hx=player.home?player.home.cx:player.homeAt&&player.homeAt[0],hy=player.home?player.home.cy:player.homeAt&&player.homeAt[1];if(!isFinite(hx))return;mark(null,'home',hx,hy,'🏠','Дом',{arrow:true,color:'#2BB062'});closeJobs();});row.append(show);
     if(player.debt){const pay=document.createElement('button');pay.className='btn primary';pay.textContent='Погасить долг';pay.addEventListener('click',()=>{const p=Math.min(player.debt,player.money);player.money-=p;player.debt-=p;addEvent(player.debt?`Погасили ${fmtMoney(p)}`:'Долг за квартиру закрыт','say');renderJobs();});row.append(pay);}}
   else{b.textContent='🏠 Жилья нет';sp.textContent=`Можно снять квартиру рядом: ${fmtMoney(RENT)} в неделю. Переночевать — в гостинице.`;const r=document.createElement('button');r.className='btn primary';r.textContent=`Снять квартиру · ${fmtMoney(RENT)}`;r.addEventListener('click',()=>{rentNewHome();renderJobs();});row.append(r);}
-  c.append(b,sp,row);box.append(c);}
+  c.append(b,sp,row);box.append(c);if(typeof housingRenderList==='function')housingRenderList(box);}
 $('#jobsBtn').addEventListener('click',()=>$('#jobsModal').hidden?openJobs():closeJobs());
 $('#jobsClose').addEventListener('click',closeJobs);
