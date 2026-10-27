@@ -21,7 +21,7 @@ function game(storage=new Map()){
     cars:[],buses:[],walkers:[],flags:{},keys:{},joyVec:[0,0],weather:{kind:'clear'},FOLK:{list:[]},
     performance:{now:()=>1000},Math:Object.create(Math),TAU:Math.PI*2,setTimeout:()=>0,clearTimeout:()=>{},
     $:s=>{if(!dom.has(s))dom.set(s,element());return dom.get(s);},document:{createElement:element},
-    localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v))},
+    localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},
     addEvent:t=>events.push(t),setHint:t=>hints.push(t),dist:(x,y,a,b)=>Math.hypot(x-a,y-b),
     clamp:(n,a,b)=>Math.min(b,Math.max(a,n)),fmtMoney:n=>n+' ₽',pedCost:()=>1,carCost:()=>1,
     nearestNode:(x,y,adj,r=120)=>{let best=-1,bd=r;nodes.forEach((n,i)=>{const d=Math.hypot(n[0]-x,n[1]-y);if(d<=bd){bd=d;best=i;}});return best;},
@@ -184,6 +184,86 @@ test('restoring the same captured snapshot twice cannot settle its due twice',()
   const g=game(),snapshot={v:1,dest:g.dest,mode:'bike',due:12,x:0,y:0};
   g.c.journeyRestore(snapshot);g.c.journeyRestore(snapshot);
   assert.equal(g.c.player.money,4988);assert.equal(g.c.ECON.owed,0);
+});
+
+function pendingRide(storage=new Map()){
+  const g=game(storage),o=g.rental('bike',0);g.c.startRentalPlan(o,g.dest);g.c.enterVehicle(o);g.c.clock.minutes+=4;g.c.saveState();
+  return {g,pending:JSON.parse(storage.get('zk.state'))};
+}
+function cloudApply(g,state){
+  g.c.setRev=u=>g.storage.set('zk.syncRev',String(u));g.c.location={reload:()=>{g.reloaded=true;}};
+  vm.runInContext(section(read('net.js'),'function acctApply(j)','// при запуске:'),g.c);
+  g.c.acctApply({updated:123,state,profile:{name:'Облако'},city:{test:'old'}});
+}
+
+test('interrupted ride is durably closed before the first autosave; repeated fresh reloads keep balance and target',()=>{
+  const {g,pending}=pendingRide();
+  for(let i=0;i<4;i++){
+    const fresh=game(g.storage);fresh.c.loadState();
+    assert.equal(fresh.c.player.money,4968);assert.equal(fresh.c.ECON.owed,0);
+    const saved=JSON.parse(g.storage.get('zk.state'));
+    assert.equal(saved.money,4968);assert.equal(saved.journey.due,0);assert.equal(saved.journey.mode,'walk');
+    assert.deepEqual(saved.journey.dest,g.dest);assert.equal(saved.journeySettled.length,1);
+    assert.equal(fresh.c.journeyKeepLocal(copy(pending)),true);
+  }
+});
+
+test('checkpoint atomically preserves loaded subsystems and splits insufficient funds into debt',()=>{
+  const {g,pending}=pendingRide();pending.money=5;pending.econ.owed=23;
+  pending.folk={marat:{mem:['Обещал помочь']}};pending.prog={quest:3};pending.extra={future:'kept'};
+  g.storage.set('zk.state',JSON.stringify(pending));
+  const fresh=game(g.storage);fresh.c.loadState();const saved=JSON.parse(g.storage.get('zk.state'));
+  assert.equal(fresh.c.player.money,0);assert.equal(saved.money,0);assert.equal(saved.econ.owed,30);
+  for(const key of ['folk','prog','extra'])assert.deepEqual(saved[key],pending[key]);
+  const again=game(g.storage);again.c.loadState();assert.equal(again.c.ECON.owed,30);assert.equal(again.c.player.money,0);
+});
+
+test('a delayed cloud copy of a settled snapshot preserves all local progress through the real acctApply',()=>{
+  const {g,pending}=pendingRide(),fresh=game(g.storage);fresh.c.loadState();
+  fresh.c.player.money+=100;fresh.c.saveState(); // progress after settlement must not be rolled back
+  g.storage.set('zk.profile',JSON.stringify({name:'Местный'}));g.storage.set('zk.citylife','{"day":5}');g.storage.set('zk.prog','{"quest":4}');
+  const before=new Map(g.storage);cloudApply(fresh,copy(pending));assert.equal(fresh.reloaded,true);
+  for(const key of ['zk.state','zk.profile','zk.citylife','zk.prog'])assert.equal(g.storage.get(key),before.get(key));
+  assert.equal(g.storage.get('zk.syncRev'),'123');
+  const again=game(g.storage);again.c.loadState();assert.equal(again.c.player.money,5068);assert.equal(again.c.ECON.owed,0);
+});
+
+test('receipt survives JSON key reordering and subsequent autosaves',()=>{
+  const {g,pending}=pendingRide(),fresh=game(g.storage);fresh.c.loadState();fresh.c.saveState();
+  pending.journey=Object.fromEntries(Object.entries(pending.journey).reverse());
+  assert.equal(fresh.c.journeyKeepLocal(pending),true);
+});
+
+test('another cloud snapshot with the same fare still replaces local progress',()=>{
+  const {g,pending}=pendingRide(),fresh=game(g.storage);fresh.c.loadState();
+  pending.t+=10000;pending.money=1000;pending.prog={quest:9};cloudApply(fresh,pending);
+  assert.deepEqual(JSON.parse(g.storage.get('zk.state')),pending);
+  assert.equal(JSON.parse(g.storage.get('zk.profile')).name,'Облако');
+  const again=game(g.storage);again.c.loadState();assert.equal(again.c.player.money,988);
+});
+
+test('cloud reset is not blocked by a previously settled journey',()=>{
+  const {g}=pendingRide(),fresh=game(g.storage);fresh.c.loadState();cloudApply(fresh,null);
+  assert.equal(g.storage.get('zk.state'),'null');
+  assert.equal(game(g.storage).c.journeyKeepLocal(null),false);
+});
+
+test('failed checkpoint leaves the original balance and fare together and can retry without accumulating debt',()=>{
+  const {g,pending}=pendingRide(),fresh=game(g.storage),write=fresh.c.localStorage.setItem;
+  fresh.c.localStorage.setItem=()=>{throw new Error('quota');};fresh.c.loadState();
+  assert.equal(fresh.c.player.money,4968);assert.deepEqual(JSON.parse(g.storage.get('zk.state')),pending);
+  assert.ok(fresh.hints.some(t=>t.includes('Не удалось сохранить')));
+  fresh.c.localStorage.setItem=write;fresh.c.saveState();
+  const again=game(g.storage);again.c.loadState();assert.equal(again.c.player.money,4968);
+  assert.equal(again.c.journeyKeepLocal(pending),true);
+});
+
+test('receipt history is bounded and reset does not leave a second ledger behind',()=>{
+  const {g,pending}=pendingRide();pending.journeySettled=Array.from({length:20},(_,i)=>'old-'+i);
+  g.storage.set('zk.state',JSON.stringify(pending));const fresh=game(g.storage);fresh.c.loadState();
+  assert.equal(JSON.parse(g.storage.get('zk.state')).journeySettled.length,16);
+  assert.deepEqual([...g.storage.keys()],['zk.state']);g.storage.delete('zk.state');
+  assert.equal(game(g.storage).c.journeyKeepLocal(pending),false);
 });
 
 test('bicycle final leg starts after dismount, and only reaching the goal reports completion',()=>{

@@ -60,7 +60,7 @@ function render(){
   drawWalls(z,vx0,vy0,vx1,vy1);
   // ---- здания
   bvis.sort((a,b)=>a.bb[3]-b.bb[3]);
-  winDark.length=0;winLit.length=0;facadeWallsLeft=48;
+  winDark.length=0;winLit.length=0;facadeWallsLeft=16;
   for(const b of bvis)drawBuilding(b,z,night);
   if(z>1.1)drawLandmarks(bvis,z);
   // окна и тени — одним путём без closePath: fill() замыкает каждую фигуру сам, а closePath в длинном пути в Chrome стоит квадратично (на телефоне было ~10 кадров в секунду)
@@ -222,22 +222,22 @@ function drawActionTarget(toS,z,nameBox){
   ctx.fillStyle='#142B27';rrect(ctx,bx-11,by-11,22,22,6);ctx.fill();ctx.fillStyle='#FFDA69';rrect(ctx,bx-9,by-9,18,18,4);ctx.fill();
   ctx.fillStyle='#142B27';ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('E',bx,by+0.5);ctx.restore();
 }
-let facadeWallsLeft=48;
+let facadeWallsLeft=16;
 function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=0;
   if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
   const ex=EXT[0]*b.hm,ey=EXT[1]*b.hm;const win=z>4.2&&b.h>=1;const lit=night>0.3&&b.lit;
   for(let i=0;i<n;i+=2){const j=(i+2)%n;const ax=p[i],ay=p[i+1],bx=p[j],by=p[j+1];const dx=bx-ax,dy=by-ay;const L=Math.hypot(dx,dy)||1;const nx=b.sgn*dy/L,ny=-b.sgn*dx/L;
     if(nx*EXT[0]+ny*EXT[1]>=0)continue;const light=0.62+0.38*Math.max(0,nx*-0.62+ny*-0.78);
     ctx.fillStyle=shade(b.wall,light);ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx+ex,by+ey);ctx.lineTo(ax+ex,ay+ey);ctx.closePath();ctx.fill();
-    // Два фасада на дом, 48 на кадр. Карниз, цоколь или пилястры — только на близком плане.
-    if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<2&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,Math.abs(b.i||0)%3);detailedWalls++;facadeWallsLeft--;}
+    // Один фасад на дом, 16 на кадр. Карниз, цоколь или пилястры — только на близком плане.
+    if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<1&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,Math.abs(b.i||0)%3);detailedWalls++;facadeWallsLeft--;}
     if(win&&L>3.2){const lv=Math.min(b.h,14);const ux=dx/L,uy=dy/L;const cols=Math.floor((L-1.2)/2.4);const gap=(L-1.2-cols*2.4)/2+0.6+0.7;const ws=(b.dash%1.5);for(let k=0;k<lv;k++){const v0=(k+0.3)/lv,v1=(k+0.72)/lv;const list=(lit&&((k*7+b.i)%5!==0))?winLit:winDark;for(let c=0;c<cols;c++){const s0=gap+c*2.4+ws,s1=s0+1.0;list.push([ax+ux*s0+ex*v0,ay+uy*s0+ey*v0,ax+ux*s1+ex*v0,ay+uy*s1+ey*v0,ax+ux*s1+ex*v1,ay+uy*s1+ey*v1,ax+ux*s0+ex*v1,ay+uy*s0+ey*v1]);}}}}
   ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
   if(z>4.5&&b.n&&b.area>400){ctx.save();ctx.font='500 1.6px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(40,30,20,.6)';ctx.fillText(b.n,b.cx+ex,b.cy+ey);ctx.restore();}}
 function drawFacadeDetail(ax,ay,bx,by,ex,ey,kind){
-  ctx.strokeStyle='rgba(250,239,210,.65)';ctx.lineWidth=0.22;ctx.beginPath();
-  ctx.moveTo(ax+ex*.88,ay+ey*.88);ctx.lineTo(bx+ex*.88,by+ey*.88);ctx.stroke();
-  ctx.strokeStyle='rgba(76,63,49,.24)';ctx.lineWidth=kind===1?.34:.18;ctx.beginPath();
+  // Один путь и один stroke вместо двух смен стиля и двух stroke на стену.
+  ctx.strokeStyle='rgba(250,239,210,.48)';ctx.lineWidth=.22;ctx.beginPath();
+  ctx.moveTo(ax+ex*.88,ay+ey*.88);ctx.lineTo(bx+ex*.88,by+ey*.88);
   if(kind===2){const dx=bx-ax,dy=by-ay;for(const u of [.13,.87]){ctx.moveTo(ax+dx*u,ay+dy*u);ctx.lineTo(ax+dx*u+ex*.84,ay+dy*u+ey*.84);}}
   else{const v=kind===1?.12:.48;ctx.moveTo(ax+ex*v,ay+ey*v);ctx.lineTo(bx+ex*v,by+ey*v);}
   ctx.stroke();
@@ -256,6 +256,12 @@ function cafeEntry(p,b){
   if(cafeEntryCache.size>=96)cafeEntryCache.delete(cafeEntryCache.keys().next().value);
   cafeEntryCache.set(p,out);return out;
 }
+// Четыре общих векторных шаблона: без новых путей/замыканий/растров каждый кадр.
+let cafeDoorPaths=null;
+function cafeDoorTemplates(){
+  if(!cafeDoorPaths)cafeDoorPaths=[[-.75,0,1.5,.85],[-.54,.15,1.08,.55],[-1.25,.84,2.5,.26],[-1.25,.84,2.5,.07]].map(r=>{const p=new Path2D();p.rect(...r);return p;});
+  return cafeDoorPaths;
+}
 function drawCafeEntrances(pois){
   if(LOD<2)return;let considered=0,created=0;
   for(const p of pois){if(p.t!=='cafe'&&p.t!=='bar')continue;if(considered++>=6)break;
@@ -264,12 +270,10 @@ function drawCafeEntrances(pois){
       e=cafeEntry(p,poiBuilding(p));}
     if(e.missing)continue;
     const ex=EXT[0]*Math.min(3,e.b.hm),ey=EXT[1]*Math.min(3,e.b.hm);
-    const patch=(left,right,low,high,color)=>{ctx.fillStyle=color;ctx.beginPath();
-      ctx.moveTo(e.x+e.ux*left+ex*low,e.y+e.uy*left+ey*low);ctx.lineTo(e.x+e.ux*right+ex*low,e.y+e.uy*right+ey*low);
-      ctx.lineTo(e.x+e.ux*right+ex*high,e.y+e.uy*right+ey*high);ctx.lineTo(e.x+e.ux*left+ex*high,e.y+e.uy*left+ey*high);ctx.fill();};
-    patch(-.75,.75,0,.85,'#355753');patch(-.54,.54,.15,.7,'#A8C9C1'); // дверь и стекло, без выдуманного статуса «открыто»
-    patch(-1.25,1.25,.84,1.1,p.t==='bar'?'#9C634D':'#467D69');
-    patch(-1.25,1.25,.84,.91,'#EDE0BA');
+    const paths=cafeDoorTemplates();ctx.save();ctx.transform(e.ux,e.uy,ex,ey,e.x,e.y);
+    ctx.fillStyle='#355753';ctx.fill(paths[0]);ctx.fillStyle='#A8C9C1';ctx.fill(paths[1]);
+    ctx.fillStyle=p.t==='bar'?'#9C634D':'#467D69';ctx.fill(paths[2]);
+    ctx.fillStyle='#EDE0BA';ctx.fill(paths[3]);ctx.restore();
   }
 }
 function drawStop(s){

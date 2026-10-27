@@ -1,0 +1,63 @@
+[
+  {
+    "build": "before",
+    "scene": "detail",
+    "completed_frames": 286,
+    "completed_interval_p50_ms": 17.1,
+    "completed_interval_p95_ms": 29.8,
+    "elapsed_ms": 5005,
+    "fps": 57.1,
+    "interval_samples": 285,
+    "render_p50_ms": 4.2,
+    "render_p95_ms": 10.1,
+    "render_samples": 286,
+    "sample_limit": 600,
+    "valid": true
+  },
+  {
+    "build": "after",
+    "scene": "detail",
+    "completed_frames": 300,
+    "completed_interval_p50_ms": 16.4,
+    "completed_interval_p95_ms": 24.5,
+    "elapsed_ms": 5004,
+    "fps": 60,
+    "interval_samples": 299,
+    "render_p50_ms": 5.2,
+    "render_p95_ms": 8.3,
+    "render_samples": 300,
+    "sample_limit": 600,
+    "valid": true
+  },
+  {
+    "build": "after",
+    "scene": "day",
+    "completed_frames": 233,
+    "completed_interval_p50_ms": 21,
+    "completed_interval_p95_ms": 31.1,
+    "elapsed_ms": 5016,
+    "fps": 46.5,
+    "interval_samples": 232,
+    "render_p50_ms": 8.8,
+    "render_p95_ms": 11.6,
+    "render_samples": 233,
+    "sample_limit": 600,
+    "valid": true
+  },
+  {
+    "build": "after",
+    "scene": "far",
+    "completed_frames": 5,
+    "completed_interval_p50_ms": 1001.8,
+    "completed_interval_p95_ms": 1005.8,
+    "elapsed_ms": 5011,
+    "fps": 1,
+    "interval_samples": 4,
+    "render_p50_ms": 8.9,
+    "render_p95_ms": 17.9,
+    "render_samples": 5,
+    "sample_limit": 600,
+    "valid": false,
+    "reason": "Background-tab throttling: only 5 completed frames / 5 seconds. Excluded from comparison."
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "kind": "Frozen scene, sequential real render calls, CPU x4; not FPS or GPU frame timing",
+  "results": [
+    {
+      "build": "before",
+      "p50_ms": 9.5,
+      "p95_ms": 12.4,
+      "samples": 60,
+      "z": 9.5
+    },
+    {
+      "build": "after",
+      "p50_ms": 7.3,
+      "p95_ms": 10.7,
+      "samples": 60,
+      "z": 9.5
+    },
+    {
+      "build": "after",
+      "p50_ms": 6.4,
+      "p95_ms": 9.7,
+      "samples": 60,
+      "z": 9.5
+    },
+    {
+      "build": "before",
+      "p50_ms": 7.5,
+      "p95_ms": 12.9,
+      "samples": 60,
+      "z": 9.5
+    },
+    {
+      "build": "before",
+      "p50_ms": 7.9,
+      "p95_ms": 13.5,
+      "samples": 60,
+      "z": 9.5
+    },
+    {
+      "build": "after",
+      "p50_ms": 6.5,
+      "p95_ms": 12.1,
+      "samples": 60,
+      "z": 9.5
+    }
+  ],
+  "viewport": [
+    390,
+    844,
+    3
+  ]
+}

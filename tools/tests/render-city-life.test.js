@@ -15,15 +15,16 @@ function drawingContext(calls) {
   }});
 }
 function setup() {
-  const calls=[],created=[],ctx=drawingContext(calls),map={style:{},getContext:()=>ctx},mini={getContext:()=>ctx};
+  const calls=[],created=[],paths=[],ctx=drawingContext(calls),map={style:{},getContext:()=>ctx},mini={getContext:()=>ctx};
   const s={console,Math,innerWidth:390,innerHeight:844,LOD:2,TAU:Math.PI*2,EXT:[-.3,-.5],reduceMotion:false,
     performance:{now:()=>1000},clamp:(v,lo,hi)=>Math.max(lo,Math.min(hi,v)),shade:c=>c,
+    Path2D:class {constructor(){paths.push(this);}rect(...r){this.rectArgs=r;}},
     $:id=>id==='#map'?map:mini,document:{createElement(){const c={getContext:()=>drawingContext([])};created.push(c);return c;}},
     player:{x:195,y:422,hx:1,hy:0},scene:'city',currentAction:null,cam:{z:9.5},rentals:[],cars:[],ownCar:null,
     rrect:(g,...args)=>calls.push(['rrect',...args]),poiBuilding:p=>p._b};
   s.window=s;s.addEventListener=()=>{};s.devicePixelRatio=2;
   vm.createContext(s);vm.runInContext(source,s);calls.length=0;
-  return {s,calls,created,ctx,run:code=>vm.runInContext(code,s)};
+  return {s,calls,created,paths,ctx,run:code=>vm.runInContext(code,s)};
 }
 const building=()=>({p:[0,0,20,0,20,20,0,20],sgn:1,hm:10,h:0,wall:'#aaa',roof:'#ddd',i:2,dash:0});
 
@@ -60,9 +61,19 @@ test('transport glyph cache includes bike, stays fixed, and is reused',()=>{
 test('facade detail has both a per-building and a per-frame cap, and no distant work',()=>{
   const {s,run}=setup();let details=0;s.drawFacadeDetail=()=>details++;
   const b=building();b.p=[];for(let i=0;i<20;i++)b.p.push(i%2?20:0,i*2);
-  s.drawBuilding(b,9.5,0);assert.equal(details,2);
-  for(let i=0;i<60;i++)s.drawBuilding(b,9.5,0);assert.equal(details,48);
-  run('facadeWallsLeft=48');s.LOD=0;s.drawBuilding(b,2.5,0);assert.equal(details,48);
+  s.drawBuilding(b,9.5,0);assert.equal(details,1);
+  for(let i=0;i<60;i++)s.drawBuilding(b,9.5,0);assert.equal(details,16);
+  run('facadeWallsLeft=16');s.LOD=0;s.drawBuilding(b,2.5,0);assert.equal(details,16);
+});
+
+test('facade ornament uses one stroke and doors reuse four vector paths without changing their geometry',()=>{
+  const {s,calls,paths,created}=setup(),b=building(),p={t:'cafe',x:8,y:8,_b:b};
+  s.drawFacadeDetail(0,0,20,0,-3,-5,2);assert.equal(calls.filter(c=>c[0]==='stroke').length,1);
+  calls.length=0;s.drawCafeEntrances([p]);assert.equal(paths.length,4);assert.equal(calls.length,7);
+  const e=s.cafeEntry(p,b),tr=calls.find(c=>c[0]==='transform');
+  [e.ux,e.uy,-.9,-1.5,e.x,e.y].forEach((v,i)=>assert.ok(Math.abs(tr[i+1]-v)<1e-10));
+  assert.deepEqual(paths.map(p=>p.rectArgs),[[-.75,0,1.5,.85],[-.54,.15,1.08,.55],[-1.25,.84,2.5,.26],[-1.25,.84,2.5,.07]]);
+  for(let i=0;i<100;i++)s.drawCafeEntrances([p]);assert.equal(paths.length,4);assert.equal(created.length,0);
 });
 test('cafe geometry is bounded; cold frames resolve no more than two entrances',()=>{
   const {s,run,created}=setup();let lookups=0;const b=building();
