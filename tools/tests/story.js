@@ -102,6 +102,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await begin('plates'); await choose('другой раз'); s = await ev(() => ({st: PROG.story.st, out: PROG.story.out, later: Math.round((PROG.story.at - Date.now()) / 60000)}));
     console.log('  отказ:', JSON.stringify(s)); assert.equal(s.st, 'later'); assert.ok(s.later >= 19);
     await sleep(6500); assert.equal(await ev(() => !!sitActive('story')), false, 'ушла');
+    // официант: «брат» или «сестра» — по имени игрока
+    const bro = await ev(() => { const n = player.name; const a = storySub({}).bro; player.name = 'Алия Хасанова'; const b = storySub({}).bro; player.name = n; return [a, b, storyFill('{Bro}, у нас недорого.', storySub({}))]; });
+    console.log('  обращение:', JSON.stringify(bro)); assert.deepEqual(bro, ['брат', 'сестра', 'Брат, у нас недорого.']);
   } finally { await b.close(); srv.kill(); }
   console.log(errors.length ? errors.join('\n') : 'no page errors');
   assert.deepEqual(errors, []);
