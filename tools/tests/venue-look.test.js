@@ -53,3 +53,13 @@ test('cached home furnishings keep rugs below sofas, and skip owned furniture an
   assert.ok(order.indexOf('rug')<order.indexOf('sofa'));assert.ok(order.includes('rug'));assert.ok(!order.includes('bed'));assert.ok(!order.includes('tv'));
   assert.equal(run('VENUE_FURNITURE.has("tv")'),false);
 });
+
+test('only story:ward receives beds, spawn, drip and doctor; its static layer is reused',()=>{
+  const {s,created}=setup(),ward=s.makeInterior('hospital','Палата','story:ward'),ordinary=s.makeInterior('hospital','Больница','hospital');
+  assert.equal(s.venueStyleId(ward),'ward');assert.equal(s.venueStyleId(ordinary),'pharmacy');assert.equal(ordinary.spawn,undefined);
+  assert.equal(ward.furn.filter(f=>f.t==='bed').length,3);assert.equal(ward.furn.filter(f=>f.t==='wardCabinet').length,3);
+  assert.ok(ward.furn.some(f=>f.t==='drip'));assert.ok(ward.furn.some(f=>f.t==='window'));assert.ok(ward.npcs.some(n=>n.p.job==='врач'&&n.y>7));
+  assert.ok(ward.furn.some(f=>f.t==='bed'&&f.walkable&&f.x===ward.spawn.x&&f.y===ward.spawn.y));
+  const before=JSON.stringify(ward);for(let i=0;i<120;i++)assert.equal(s.drawVenueLayer(ward,30),true);
+  assert.equal(created.length,1);assert.equal(JSON.stringify(ward),before);
+});

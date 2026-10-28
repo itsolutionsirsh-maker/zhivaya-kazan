@@ -7,9 +7,26 @@ const {parkSnapshotTaxi} = require('./visual-fixtures');
 const {stageCityLook} = require('./city-look-fixtures');
 const {venueScenes,stageVenueLook} = require('./venue-look-fixtures');
 const {stageSharedVenue} = require('./shared-venues-fixtures');
+const {stageStoryScene} = require('./story-ui-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function storyShots(browser){
+  for(const [name,width,height] of [['small',360,640],['phone',390,844],['desktop',1280,800]]){
+    const context=await browser.newContext({viewport:{width,height}}),pg=await context.newPage(),errors=[];
+    pg.on('pageerror',e=>errors.push(String(e)));
+    try{
+      await pg.goto(`http://127.0.0.1:${PORT}/index.html`);await pg.waitForFunction(()=>document.getElementById('loading').hidden,null,{timeout:90000});
+      await pg.fill('#pName','Тест');await pg.click('#startBtn');await pg.click('#howtoClose');await sleep(6500);
+      await pg.evaluate(()=>{window.requestAnimationFrame=(raf=>cb=>cb===frame?0:raf.call(window,cb))(window.requestAnimationFrame);});await sleep(80);
+      for(const kind of ['bill','menu','wake','ward','actors','phone']){
+        const fixture=await pg.evaluate(stageStoryScene,{kind});await sleep(kind==='wake'?2800:220);
+        await pg.screenshot({path:`${OUT}/${name}_story_${kind}.png`});console.log(name,'story_'+kind,JSON.stringify(fixture));
+      }
+      if(errors.length)throw Error(errors.join('\n'));
+    }finally{await context.close();}
+  }
+}
 // Один сценарий применяется к обеим сборкам. Проверки нового UI включаются только там,
 // где есть ui.js; базовая сборка также получает все снимки для честного сравнения.
 async function phoneUIShots(browser){
@@ -210,6 +227,7 @@ async function phoneUIShots(browser){
       await ctx.close();
     }
     await phoneUIShots(b);
+    await storyShots(b);
   } finally { if(b)await b.close(); srv.kill(); }
   console.log('снимки в', OUT);
   console.log(errors.length ? errors.join('\n') : 'no page errors');

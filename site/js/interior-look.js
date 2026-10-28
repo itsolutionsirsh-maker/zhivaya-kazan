@@ -1,6 +1,7 @@
 // Оформление существующей мебели, без новых препятствий и действий.
 // Казанские референсы и границы сходства: docs/INTERIOR-REFERENCES.md.
 const VENUE_STYLES={
+  ward:{wall:'#DEE9DD',trim:'#618C85',counter:'#94B7AC',top:'#EDF1E3',wood:'#B8CBC2',seat:'#81B2A7',accent:'#467A74',floor:['#DDE5DC','#CEDBD2'],motif:'tile'},
   coffee:{wall:'#D6C9B6',trim:'#514E44',counter:'#687C67',top:'#DCC7A6',wood:'#A88055',seat:'#687C67',accent:'#8C4E31',floor:['#C5AE8A','#B8A07D'],motif:'slats'},
   tatar:{wall:'#E6D9BE',trim:'#356955',counter:'#386A58',top:'#D5B384',wood:'#BE955F',seat:'#729884',accent:'#BC7646',floor:['#D6C19C','#C8B28D'],motif:'tulip'},
   bakery:{wall:'#EFE0C8',trim:'#9C7151',counter:'#A26D4D',top:'#EAD9BD',wood:'#C39969',seat:'#B99572',accent:'#B7653D',floor:['#DFCEB2','#D1BFA4'],motif:'tile'},
@@ -18,6 +19,7 @@ const VENUE_STYLES={
   metro:{wall:'#D1DAD5',trim:'#6E8B7C',counter:'#678777',top:'#D9DCD1',wood:'#9A9A87',seat:'#7A9383',accent:'#BDAB76',motif:'tile'}
 };
 function venueStyleId(it){
+  if(it.kind==='hospital'&&it.key==='story:ward')return 'ward';
   const k=it.kind,n=String(it.name||'').toLowerCase();
   if(k==='cafe'){
     if(/т[юүу]бет[еэ]й|tubat[aä]y|tubetey|кыстыбый|дом чая|ашхан/.test(n))return 'tatar';
@@ -28,7 +30,7 @@ function venueStyleId(it){
   return ({shop:'retail',bank:'office',hospital:'pharmacy',university:'office',school:'office',library:'coffee',police:'office',prosecutor:'office',default:'office'})[k]||(VENUE_STYLES[k]?k:'office');
 }
 function venueLook(it){return VENUE_STYLES[venueStyleId(it)];}
-const VENUE_FURNITURE=new Set(['table','chair','counter','machine','board','shelf','desk','stage','seat','painting','pedestal','sofa','bed','wardrobe','kitchen','fridge','plant','atm','pew','altar','printer','rug']);
+const VENUE_FURNITURE=new Set(['table','chair','counter','machine','board','shelf','desk','stage','seat','painting','pedestal','sofa','bed','wardrobe','kitchen','fridge','plant','atm','pew','altar','printer','rug','wardCabinet','drip']);
 // Один слой только для текущей комнаты. Картинки не входят в сохранения.
 // Максимум 1536×1536 RGBA (9 MiB), обычный телефон ~700×550.
 let venueLayer=null;
@@ -80,7 +82,11 @@ function drawVenueArchitecture(c,it,p){
   // Настенные бра; световой ореол остаётся на стене, ниже нет ложных препятствий.
   for(const x of [w*.12,w*.88]){const g=c.createRadialGradient(x,-.7,.02,x,-.7,.55);g.addColorStop(0,'rgba(255,236,171,.65)');g.addColorStop(1,'rgba(255,236,171,0)');venueBox(c,x-.55,-1.22,1.1,1.04,g);venueBox(c,x-.07,-.87,.14,.36,p.accent,.04);venueDot(c,x,-.72,.08,'#FFF2CC');}
   const sign=({cafe:id==='tatar'?'ЧАЙ · ВЫПЕЧКА':id==='bakery'?'СВЕЖАЯ ВЫПЕЧКА':'КОФЕ · ДЕСЕРТЫ',bar:'БАР · КУХНЯ',shop:'ПРОДУКТЫ',pharmacy:'АПТЕКА',market:'РЫНОК',bank:'ОБСЛУЖИВАНИЕ',hotel:'РЕГИСТРАЦИЯ',hospital:'РЕГИСТРАТУРА',museum:'ЭКСПОЗИЦИЯ',library:'ЧИТАЛЬНЫЙ ЗАЛ',school:'КЛАСС',university:'АУДИТОРИЯ',police:'ДЕЖУРНАЯ ЧАСТЬ',prosecutor:'ПРИЁМНАЯ',office:'ОФИС'})[k];
-  if(sign){const sw=Math.min(w*.55,7.5);venueBox(c,w/2-sw/2,-.98,sw,.57,p.trim,.07);venueText(c,sign,w/2,-.68,.24,'#F7EEDC',sw-.3);}
+  if(sign){const sw=Math.min(w*.55,7.5);venueBox(c,w/2-sw/2,-.98,sw,.57,p.trim,.07);venueText(c,id==='ward'?'ПАЛАТА · ТИХИЙ ЧАС':sign,w/2,-.68,.24,'#F7EEDC',sw-.3);}
+  if(id==='ward'){
+    for(const x of [4.65,9.35]){venueBox(c,x,-.08,.4,1.15,'#C7D7C7',.04);venueLine(c,[[x+.12,0],[x+.12,1]],'#94B3A5',.035);}
+    venueBox(c,w/2-1,.65,2,.3,'#EDF1E3',.05);for(let x=w/2-.85;x<w/2+.9;x+=.25)venueLine(c,[[x,.69],[x,.9]],'#A4BEB2',.035);
+  }
   if(k==='hotel'||k==='library'){
     venueBox(c,w*.25,h*.3,w*.5,h*.48,k==='hotel'?'#B3AA95':'#A7987E',.12);
     c.strokeStyle=p.accent;c.lineWidth=.07;c.strokeRect(w*.25+.12,h*.3+.12,w*.5-.24,h*.48-.24);
@@ -101,6 +107,13 @@ function venuePastry(c,x,y,r=.14){c.fillStyle='#D9954D';c.beginPath();c.moveTo(x
 function drawVenueFurniture(c,f,it,p){
   const x=f.x-f.w/2,y=f.y-f.h/2,k=it.kind,id=venueStyleId(it),tau=Math.PI*2;
   switch(f.t){
+    case 'wardCabinet':{
+      venueTop(c,f,p,'#E4EBDF');venueLine(c,[[x+.08,y+.35],[x+f.w-.08,y+.35]],p.trim,.025);venueBox(c,f.x-.1,y+.4,.2,.04,p.trim);venueCup(c,f.x,y+.18,.08);break;
+    }
+    case 'drip':{
+      venueLine(c,[[f.x-.2,f.y+.16],[f.x+.2,f.y+.16]],p.trim,.06);venueLine(c,[[f.x,f.y+.27],[f.x,f.y-.48],[f.x+.25,f.y-.48]],'#71988E',.05);
+      venueBox(c,f.x+.12,f.y-.42,.2,.3,'#D3EADC',.04);venueBox(c,f.x+.14,f.y-.26,.16,.11,'#A5CFC2',.025);venueLine(c,[[f.x+.22,f.y-.12],[f.x+.3,f.y+.22],[f.x-.3,f.y+.42]],'#7EA59B',.025);break;
+    }
     case 'table':{
       venueDot(c,f.x+.07,f.y+.1,f.w/2,'rgba(37,27,18,.2)');venueDot(c,f.x,f.y,f.w/2,p.trim);venueDot(c,f.x,f.y-.035,f.w/2-.045,p.wood);
       c.strokeStyle='rgba(255,240,205,.28)';c.lineWidth=.025;c.beginPath();c.arc(f.x,f.y-.03,f.w/2-.09,Math.PI,Math.PI*1.85);c.stroke();
