@@ -86,7 +86,7 @@ class Car{
     if(this.state!=='drive')return;
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
     const r=edgeRoad(this.siren()?world.emAdj:world.carAdj,a,b);
-    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(weather.kind==='rain')vlim*=0.85;
+    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(weather.kind==='rain')vlim*=0.85;if(r&&r.jam&&!this.siren())vlim=Math.min(vlim,2.5);   // день матча: подъезды к арене стоят (matchday.js)
     const rem=L-this.t;if(rem<14&&this.seg+2<this.path.length){const pc=world.nodes[this.path[this.seg+2]];const L2=dist(pb[0],pb[1],pc[0],pc[1])||1;const d2x=(pc[0]-pb[0])/L2,d2y=(pc[1]-pb[1])/L2;const cos=dx*d2x+dy*d2y;if(cos<0.85)vlim=Math.min(vlim,(this.siren()?6.5:4)+cos*3);}
     // спецмашина у места ДТП: встаёт рядом, даже если впереди зеваки или сам пострадавший
     if(this.siren()&&this.sceneXY&&dist(this.x,this.y,this.sceneXY[0],this.sceneXY[1])<16){this.speed=0;this.path=null;this.onArrive();return;}

@@ -1,6 +1,6 @@
 // ===== Кремль, площади, сборы, митинги, концерты =====
 const rallies=[];let rallyTimer=rnd(150,280);
-const RALLY_KIND={rally:{word:'Митинг',icon:'📢',color:'#8E44AD',size:[45,70],dur:200},meet:{word:'Сбор',icon:'🙋',color:'#2F6DB5',size:[20,35],dur:150},concert:{word:'Концерт',icon:'🎵',color:'#E07B39',size:[70,100],dur:260}};
+const RALLY_KIND={rally:{word:'Митинг',icon:'📢',color:'#8E44AD',size:[45,70],dur:200},meet:{word:'Сбор',icon:'🙋',color:'#2F6DB5',size:[20,35],dur:150},concert:{word:'Концерт',icon:'🎵',color:'#E07B39',size:[70,100],dur:260},match:{word:'Матч',icon:'🏟',color:'#1F6F3A',size:[40,60],dur:1e9}};
 const NPC_RALLIES=[['rally','Сохраним старую Казань'],['rally','За чистый Булак'],['rally','Больше велодорожек в центре'],['rally','Против точечной застройки'],['rally','За парк вместо парковки'],['meet','Субботник: убираем площадь'],['meet','Встреча клуба любителей татарской кухни'],['meet','Флешмоб: танцуем на площади'],['meet','Сбор волонтёров'],['concert','Уличный концерт: казанские группы'],['concert','Джаз под открытым небом'],['concert','Вечер татарской эстрады']];
 const CHANTS={rally:['Мы за!','Да!','Слышите нас?','Вместе!','Казань — наш дом!'],meet:['Привет всем!','О, и ты тут!','Начинаем?','Классно собрались','Фоткаемся!'],concert:['Ура!','Браво!','Ещё!','Огонь!','🎶']};
 const SIGN_COLORS=['#FFFFFF','#FFF3C4','#D7ECFF','#FFD9D9','#E3F7D4'];
@@ -41,7 +41,7 @@ function slotFor(r,i){const sq=r.sq;const off=r.kind==='concert'?7:3.2;
 
 function startRally(sq,kind,title,by){if(rallyAt(sq))return null;const K=RALLY_KIND[kind];
   const r={sq,kind,title:String(title||K.word).slice(0,60),by,t:0,dur:K.dur,target:Math.round(rnd(K.size[0],K.size[1])),joined:0,people:[],police:[],ending:false,recruitT:0,x:sq.x,y:sq.y};rallies.push(r);
-  addEvent(`${K.icon} ${K.word} · ${sq.n}: «${r.title}»${by==='player'?' — вы организатор':''}`,'rally');
+  if(by!=='quiet')addEvent(`${K.icon} ${K.word} · ${sq.n}: «${r.title}»${by==='player'?' — вы организатор':''}`,'rally');
   // полиция встаёт по периметру
   const pn=kind==='concert'?3:kind==='rally'?4:2;for(let i=0;i<pn;i++){const an=i/pn*TAU+0.4;const rr=Math.min(sq.r,18)+4;const x=sq.x+Math.cos(an)*rr,y=sq.y+Math.sin(an)*rr;const n=nearestNode(x,y,world.pedAdj,120);if(n<0)continue;
     const w=new Walker('police',nodeNear(world.pedNodes,[x,y],160));w.temp=true;walkers.push(w);r.police.push(w);sendTo(w,r,[x,y],true);}
@@ -61,7 +61,7 @@ function endRally(r,silent){r.ending=true;if(!silent){const K=RALLY_KIND[r.kind]
 function updateRallies(dt){
   for(const r of rallies.slice()){r.t+=dt;r.recruitT-=dt;
     if(r.recruitT<=0&&r.joined<r.target&&r.t<r.dur*0.7){r.recruitT=1.2;recruit(r,Math.min(4,r.target-r.joined));}
-    for(const w of r.people){if(w.state==='rally'&&!w.say&&Math.random()<dt*(r.kind==='concert'?0.06:0.03))w.say={t:pick(CHANTS[r.kind]),ttl:2.5};if(w.say){w.say.ttl-=dt;if(w.say.ttl<=0)w.say=null;}}
+    for(const w of r.people){if(w.state==='rally'&&!w.say&&Math.random()<dt*(r.kind==='concert'?0.06:0.03))w.say={t:pick(w.chants||r.chants||CHANTS[r.kind]),ttl:r.chants?4:2.5};if(w.say){w.say.ttl-=dt;if(w.say.ttl<=0)w.say=null;}}
     if(r.by==='peer'&&r.seen&&performance.now()-r.seen>8000)endRally(r,true);
     else if(r.t>=r.dur&&r.by!=='player')endRally(r);
     else if(r.by==='player'&&r.t>=r.dur*1.6)endRally(r);}
