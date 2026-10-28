@@ -19,12 +19,12 @@ function startCompanion(w,mode,place){if(w.isInterior){const cw=w.companionOf;if
   const f=typeof folkOf==='function'?folkOf(w):null;if(f){folkCancelRoute(f);f.away=true;f.retry=null;f.w=w;w.folk=f.id;w.temp=false;}
   let dest=null;if(mode==='go'&&place){dest=resolvePlace(place,w.x,w.y);if(!dest)mode='follow';}
   companion={w,mode,dest,arrived:false,t:0};player.escort=mode==='go'&&!!dest;w.companion=true;w.state='companion';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.cwps=null;w.repath=0;
-  addEvent(dest?`${w.p.name} идёт с вами в «${dest.n}»`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
+  addEvent(dest?`${w.p.name} идёт с вами в ${qName(dest.n)}`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
 function stopCompanion(silent){if(!companion)return;player.escort=false;player.waypoints=null;const w=companion.w;w.companion=false;if(w.inside&&interior&&interior.ret){w.x=interior.ret.x;w.y=interior.ret.y;}w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
   if(interior){interior.npcs=interior.npcs.filter(n=>n.companionOf!==w);}
   if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;const f=typeof folkOf==='function'?folkOf(w):null;if(f){f.away=true;f.retry=null;folkGo(f,folkWant(f));}updateCompBox();}
-function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':'Идти за ним';$('#compBye').textContent=going?'Передумать':'Отпустить';
-  $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас в «${c.dest.n}» · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:`🤝 ${c.w.p.name} с вами`;}
+function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':(c.w.p.female?'Идти за ней':'Идти за ним');$('#compBye').textContent=going?'Передумать':'Отпустить';
+  $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас в ${qName(c.dest.n)} · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:`🤝 ${c.w.p.name} с вами`;}
 $('#compTalk').addEventListener('click',()=>{if(!companion||player.busy)return;if(scene==='interior'){const n=compNpcInside();if(n)openChat(n);return;}openChat(companion.w);});
 $('#compBye').addEventListener('click',()=>{if(!companion)return;const c=companion,w=c.w;if(c.mode==='go'&&c.dest&&!c.arrived){const t=pick(['Ну ладно, в другой раз!','Эх, жаль. Ну, бывай!','Хорошо, передумали так передумали.']);w.say={t,ttl:5};nearLine(w.p.name,t,false);w.p.memory.push({role:'user',content:'Слушай, я передумал, давай в другой раз.'},{role:'assistant',content:t});}stopCompanion();});
 $('#compFollow').addEventListener('click',()=>{player.escort=!player.escort;player.waypoints=null;updateCompBox();});
@@ -51,7 +51,7 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     if(bd<1.5&&c.ri<R.length-1)c.ri++;
     if(pd>11){look();updateCompBox();return;}   // ждёт, пока игрок догонит
     stepTo(w,R[c.ri],pd>5?WALK_SPEED*1.1:WALK_SPEED*0.9,dt,true);   // ведёт в темпе игрока
-    if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;addEvent(`Вы с ${w.p.name} пришли: «${c.dest.n}». Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в «${c.dest.n}». E у входа — зайти вместе`);}
+    if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}
     updateCompBox();return;}
   else{T=[player.x-player.hx*1.6,player.y-player.hy*1.6];if(pd<2.6)T=null;}
   if(!T||dist(w.x,w.y,T[0],T[1])<stop){look();updateCompBox();return;}
@@ -69,7 +69,7 @@ function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.
   if(eat){const t=pick(['Я тут столик заняла, иди сюда!','Садись, я место заняла.','Вот свободный столик, давай сюда!']);npc.say={t:w.p.female?t:t.replace('заняла','занял'),ttl:6};}}
 function companionContext(w){const ww=w.companionOf||w;if(!companion||companion.w!==ww)return '';const c=companion;
   if(w.companionOf&&interior){const f=w.tableF;return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.`;}
-  return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в «${c.dest.n}».`:' Ты сейчас гуляешь вместе с собеседником.';}
+  return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в ${qName(c.dest.n)}.`:' Ты сейчас гуляешь вместе с собеседником.';}
 function drawCompanionMark(toS,z){if(!companion||companion.w.inside||player.inside)return;const w=companion.w;const [sx,sy]=toS(w.x,w.y);
   ctx.save();ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(sx,sy,Math.max(1.3*z,9),0,TAU);ctx.stroke();ctx.setLineDash([]);
   ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(20,30,26,.85)';const t='🤝 '+w.p.name;const tw=ctx.measureText(t).width+12;rrect(ctx,sx-tw/2,sy+Math.max(1.3*z,9)+4,tw,17,6);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(t,sx,sy+Math.max(1.3*z,9)+13);
@@ -96,6 +96,6 @@ function applyNpcAction(w,r){const real=w.companionOf||w;
       else{const n=nearestNode(interior.ret.x,interior.ret.y,world.pedAdj,120);if(n<0)return null;nw=new Walker(w.role==='staff'?'resident':(w.role||'resident'),n);nw.p=w.p;nw.temp=true;walkers.push(nw);}
       nw.inside=true;w.companionOf=nw;}
     startCompanion(w.companionOf||w,r.action,r.place);
-    const c=companion;return c?(c.dest?`${w.p.name} идёт с вами в «${c.dest.n}»`:`${w.p.name} идёт с вами`):null;}
+    const c=companion;return c?(c.dest?`${w.p.name} идёт с вами в ${qName(c.dest.n)}`:`${w.p.name} идёт с вами`):null;}
   if(r.action==='stop'&&companion&&companion.w===real){stopCompanion(true);return `${w.p.name} больше не идёт с вами`;}
   return null;}

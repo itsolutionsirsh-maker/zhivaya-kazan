@@ -103,6 +103,8 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     db.exec('CREATE TABLE IF NOT EXISTS accounts(k TEXT PRIMARY KEY,name TEXT,salt TEXT,pin TEXT,tok TEXT,state TEXT,profile TEXT,created REAL,updated REAL,fails INTEGER DEFAULT 0,lock_until REAL DEFAULT 0);CREATE INDEX IF NOT EXISTS acc_tok ON accounts(tok);CREATE TABLE IF NOT EXISTS tokens(tok TEXT PRIMARY KEY,k TEXT,t REAL);CREATE TABLE IF NOT EXISTS tgmap(id TEXT PRIMARY KEY,k TEXT);');
     // журнал заходов для цифр: только случайный номер устройства и день, без имён и адресов
     db.exec('CREATE TABLE IF NOT EXISTS visits(d TEXT,id TEXT,PRIMARY KEY(d,id)) WITHOUT ROWID;CREATE TABLE IF NOT EXISTS firsts(id TEXT PRIMARY KEY,d TEXT,src TEXT) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS firsts_d ON firsts(d);');
+    // воронка историй новичка (story.js): какой шаг прошёл игрок — только номер устройства (хэш) и день
+    db.exec('CREATE TABLE IF NOT EXISTS funnel(s TEXT,st TEXT,id TEXT,d TEXT,PRIMARY KEY(s,st,id)) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS funnel_d ON funnel(d);');
     for(const c of ['tg TEXT','city TEXT','refBy TEXT','invites TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
       tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
@@ -112,14 +114,15 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
       vis:db.prepare('INSERT OR IGNORE INTO visits(d,id) VALUES(?,?)'),first:db.prepare('INSERT OR IGNORE INTO firsts(id,d,src) VALUES(?,?,?)'),
       dau:db.prepare('SELECT d,COUNT(*) n FROM visits WHERE d>=? GROUP BY d'),nu:db.prepare('SELECT d,COUNT(*) n FROM firsts WHERE d>=? GROUP BY d'),
       ret:db.prepare("SELECT f.d,COUNT(*) n FROM firsts f JOIN visits v ON v.id=f.id AND v.d=date(f.d,'+'||?||' day') WHERE f.d>=? GROUP BY f.d"),
-      src:db.prepare('SELECT src,COUNT(*) n FROM firsts WHERE d>=? GROUP BY src ORDER BY n DESC LIMIT 12'),everyone:db.prepare('SELECT COUNT(*) n FROM firsts')};
+      src:db.prepare('SELECT src,COUNT(*) n FROM firsts WHERE d>=? GROUP BY src ORDER BY n DESC LIMIT 12'),everyone:db.prepare('SELECT COUNT(*) n FROM firsts'),
+      fun:db.prepare('INSERT OR IGNORE INTO funnel(s,st,id,d) VALUES(?,?,?,?)'),funStat:db.prepare('SELECT s,st,COUNT(*) n FROM funnel WHERE d>=? GROUP BY s,st')};
     const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
     return {kind:'sqlite',db,get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
       addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
       importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
       importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
       setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n,
-      visit:(id,d,src)=>{q.vis.run(d,id);q.first.run(id,d,src||'');},
+      visit:(id,d,src)=>{q.vis.run(d,id);q.first.run(id,d,src||'');},funnel:(s,st,id,d)=>q.fun.run(s,st,id,d),funnelStats:from=>q.funStat.all(from),
       stats:from=>{const m=rows=>Object.fromEntries(rows.map(r=>[r.d,r.n]));return {dau:m(q.dau.all(from)),nu:m(q.nu.all(from)),r1:m(q.ret.all(1,from)),r7:m(q.ret.all(7,from)),src:q.src.all(from),everyone:q.everyone.get().n};},
       backup:file=>db.exec("VACUUM INTO '"+file.replace(/'/g,"''")+"'")};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
@@ -129,7 +132,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
-    visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file),flush};})();
+    visit:()=>{},funnel:()=>{},funnelStats:()=>[],stats:()=>null,backup:file=>fs.copyFileSync(F,file),flush};})();
 // ---------- кошелёк: деньги аккаунта на сервере (wallet.js) ----------
 // Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
 const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
@@ -346,6 +349,10 @@ function notePeak(){const d=mskDay();if(peak.d!==d){peak.d=d;peak.n=0;}if(player
 // как долго у игроков грузится игра (без имён и IP): последние 500 заходов в памяти; на mod.html — медиана и «у 9 из 10»
 // ms — сколько прошло от открытия страницы: scripts (скрипты загружены), base (карта улиц пришла), build (построена), chunks (дома вокруг), shown (игра на экране)
 const BOOT=[],BOOT_K=['scripts','base','build','chunks','shown'];
+// шаг истории новичка (story.js): история, шаг и секрет устройства — храним только хэш от секрета
+const STORY_IDS=new Set(['plates','clofelin']);
+function storyReport(body,ip){if(!allow('story:'+ip,40,600))return {ok:1};const s=String(body.s||''),st=String(body.st||''),id=idstr(body.id);
+  if(!STORY_IDS.has(s)||!/^[a-z]{2,12}$/.test(st)||id.length<8)return {err:'bad'};try{store.funnel(s,st,sha('fun:'+id).slice(0,16),mskDay());}catch(e){}return {ok:1};}
 function bootReport(body,ip){if(!allow('boot:'+ip,6,600))return {ok:1};const ms=body&&body.ms;if(!ms||typeof ms!=='object')return {err:'bad'};
   const o={t:now(),tg:!!body.tg,conn:clean(String(body.conn||''),8)};for(const k of BOOT_K)o[k]=Math.max(0,Math.min(600000,Math.round(+ms[k]||0)));
   BOOT.push(o);if(BOOT.length>500)BOOT.shift();return {ok:1};}
@@ -353,8 +360,8 @@ function bootStats(){const day=BOOT.filter(o=>now()-o.t<86400);const q=(a,p)=>{i
   const out={n:day.length,tg:day.filter(o=>o.tg).length,slow:day.filter(o=>/2g|3g/.test(o.conn)).length};for(const k of BOOT_K){const a=day.map(o=>o[k]).filter(v=>v>0);out[k]=[q(a,0.5),q(a,0.9)];}return out;}
 function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);if(!st)return {err:'no_sqlite'};const rows=[];
   for(let i=0;i<days;i++){const d=mskDay(-i);const nu=st.nu[d]||0;rows.push({d,dau:st.dau[d]||0,nu,r1:st.r1[d]||0,r7:st.r7[d]||0,r1ready:i>=1,r7ready:i>=7});}
-  let wsum=null;try{wsum=wallet.summary();}catch(e){}
-  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,wallet:wsum,boot:bootStats(),
+  let wsum=null;try{wsum=wallet.summary();}catch(e){}let fun=[];try{fun=store.funnelStats(from);}catch(e){}
+  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,wallet:wsum,funnel:fun,boot:bootStats(),
     llm:{on:!!llmClient(),model:LLM.model,today:llmUse.d===day()?{n:llmUse.n,tin:llmUse.tin,tout:llmUse.tout}:{n:0,tin:0,tout:0},news:{text:NEWS.text,t:NEWS.t,src:NEWS.src,err:NEWS.err}}};}
 
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
@@ -485,6 +492,7 @@ async function handleReq(req,res){
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     if(a==='tgweb')return send(res,200,tgWebStart(req,ip));
     if(a==='boot')return send(res,200,bootReport(body,ip));
+    if(a==='story')return send(res,200,storyReport(body,ip));
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
