@@ -38,7 +38,7 @@ function renderChat(){
   if(!chatOpen())return;
   const list=$('#cpList');const input=$('#cpInput');list.innerHTML='';$('#cpHead').hidden=true;
   const online=Net.mode!=='off';
-  if(chatTab==='near'){input.placeholder='Сказать вслух — услышат все рядом';input.disabled=false;
+  if(chatTab==='near'){input.placeholder=sharedRoomId()?'Сказать посетителям этого заведения':'Сказать вслух — услышат все рядом';input.disabled=false;
     if(!chatStore.near.length){const e=document.createElement('p');e.className='cp-empty';e.textContent='Здесь то, что говорят рядом с вами: игроки и жители. Напишите — фраза появится облачком над головой.';list.append(e);}
     chatStore.near.forEach(l=>list.append(lineEl(l,'near')));}
   else if(chatTab==='city'){input.placeholder=online?'Написать всем игрокам в городе':'Общий чат — когда в игре есть другие игроки';input.disabled=!online;
@@ -55,7 +55,7 @@ function renderChat(){
     else{input.placeholder='Выберите, кому написать';input.disabled=true;const keys=new Set([...chatStore.dm.keys(),...Net.peers.map(p=>p.peer)].filter(k=>!modIgnored(k)));
       if(!keys.size){const e=document.createElement('p');e.className='cp-empty';e.textContent=online?'Других игроков пока нет.':'Вы играете одни. Личные сообщения — когда в игре есть другие люди.';list.append(e);}
       for(const k of keys){const c=chatStore.dm.get(k);const nm=(c&&c.name)||peerName(k)||'Игрок';const on=!!peerName(k);const pr=peerRender.get(k);const d=document.createElement('button');d.className='cp-person';
-        const dist0=pr?Math.round(dist(pr.x,pr.y,player.x,player.y)):null;d.innerHTML='';const b=document.createElement('b');b.textContent=nm;const s=document.createElement('span');s.textContent=(on?'в сети':'не в сети')+(dist0!=null?` · ${dist0} м`:'')+(c&&c.unread?` · новых: ${c.unread}`:'');d.append(b,s);
+        const dist0=pr?Math.round(dist(pr.x,pr.y,player.x,player.y)):null;d.innerHTML='';const b=document.createElement('b');b.textContent=nm;const s=document.createElement('span');s.textContent=(on?'в сети':'не в сети')+(sharedPeerHere(pr||{})?' · в этом заведении':dist0!=null?` · ${dist0} м`:'')+(c&&c.unread?` · новых: ${c.unread}`:'');d.append(b,s);
         d.addEventListener('click',()=>{dmTarget=k;renderChat();$('#cpInput').focus();});list.append(d);}}}
   list.scrollTop=list.scrollHeight;}
 $('#cpBack').addEventListener('click',()=>{dmTarget=null;renderChat();});

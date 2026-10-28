@@ -1,0 +1,17 @@
+{
+  "base": "bdb72c7ba40c5a75ac3f78007a9e502c4cb6b04e",
+  "twoLiveClients": true,
+  "nearSpeechDelivered": true,
+  "otherCafeDidNotReceiveNewSpeech": true,
+  "separateRoomsEmpty": true,
+  "errors": [],
+  "phoneCssViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "desktopViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "note": "Manual CUA checks on rebased build and shared fixture screenshots; not complete Playwright suites or a physical-phone test. Hidden-frame FPS samples are unsuitable for performance comparison."
+}

@@ -102,7 +102,7 @@ function findAction(){
   if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return actTarget({label:'Зайти домой',run:()=>enterInterior({kind:'home',name:typeof housingHomeName==='function'?housingHomeName():'Ваша квартира',key:typeof housingHomeKey==='function'?housingHomeKey():'home',x:player.x,y:player.y})},{x:player.home.cx,y:player.home.cy},'home',player.home);}
   for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return actTarget({label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}},ac,'accident');}}
   if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return actTarget({label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)},companion.w,'person');
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n)return actTarget({label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y})},{x:b.cx,y:b.cy},'building',b);
+  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n)return actTarget({label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y,venueAt:{x:b.cx,y:b.cy}})},{x:b.cx,y:b.cy},'building',b);
   return null;}
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}
@@ -114,7 +114,7 @@ function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school|prosecutor)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y})};}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y,venueAt:{x:poi.x,y:poi.y}})};}
   switch(poi.t){
     case 'atm':return {label:`Банкомат ${n}: карта и вклад`,run:()=>openBank('atm')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{spendTime(30);player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
@@ -218,7 +218,7 @@ canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.
   if(dragging){cam.x-=(e.clientX-pdown.lx)/cam.z;cam.y-=(e.clientY-pdown.ly)/cam.z;pdown.lx=e.clientX;pdown.ly=e.clientY;clampCam();}});
 canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;pdown=null;dragging=false;canvas.style.cursor='';});
 canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;pdown=null;return;}if(!pdown)return;if(dragging){dragging=false;pdown=null;canvas.style.cursor='';return;}const moved=Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y);pdown=null;if(moved>8||player.busy||player.bus||player.state==='hurt')return;
-  if(scene==='interior'){const it=interior;player.iwp=[(e.clientX-it.ox)/it.iz,(e.clientY-it.oy)/it.iz];return;}
+  if(scene==='interior'){const it=interior,x=(e.clientX-it.ox)/it.iz,y=(e.clientY-it.oy)/it.iz,pr=sharedPeerAt(x,y,.8);if(pr){openChatPanel('dm',pr.key);return;}player.iwp=[x,y];return;}
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
   if(pickingDest){pickDestAt(wx,wy);return;}
   followPlayer();
@@ -311,11 +311,11 @@ function setBar(sel,v){const b=$(sel),n=Math.round(clamp(v,0,100));b.querySelect
 function syncPeers(list){peers=list;const seen=new Set();
   for(const p of peers){seen.add(p.peer);let pr=peerRender.get(p.peer);if(!pr){pr={key:p.peer,x:p.presence.x,y:p.presence.y,tx:0,ty:0,name:'',img:null,imgSrc:null,hx:0,hy:1,b:0,c:'#4A90E2',veh:null};peerRender.set(p.peer,pr);}
     pr.tx=p.presence.x;pr.ty=p.presence.y;if(Math.abs(pr.x-pr.tx)+Math.abs(pr.y-pr.ty)>40){pr.x=pr.tx;pr.y=pr.ty;}pr.name=modName(p.presence.n);pr.hx=+p.presence.hx||0;pr.hy=+p.presence.hy||0;pr.b=p.presence.b?1:0;pr.c=/^#[0-9A-Fa-f]{6}$/.test(p.presence.c||'')?p.presence.c:'#4A90E2';{const w=p.presence.w&&typeof p.presence.w==='object'?p.presence.w:{};const wk=JSON.stringify(w);if(pr.wk!==wk){pr.wk=wk;pr.look=lookFromIds(w);}}pr.veh=p.presence.v?{kind:String(p.presence.v),color:/^#[0-9A-Fa-f]{6}$/.test(p.presence.vc||'')?p.presence.vc:'#2E9BD6'}:null;
-    onPeerSay(pr,p.presence.sy);
+    syncSharedPeer(pr,p.presence);onPeerSay(pr,p.presence.sy);
     const g=p.presence.g;if(g&&typeof g==='object'&&world.squares[g.s]&&RALLY_KIND[g.k]){const sq=world.squares[g.s];let r=rallyAt(sq);if(!r)r=startRally(sq,g.k,modClean(String(g.t||'').slice(0,60)),'peer');if(r&&r.by==='peer')r.seen=performance.now();}
     const a=typeof p.presence.a==='string'&&p.presence.a.startsWith('data:image/')?p.presence.a:null;if(a&&a!==pr.imgSrc){pr.imgSrc=a;const im=new Image();im.onload=()=>{pr.img=im;};im.src=a;}if(!a){pr.img=null;pr.imgSrc=null;}}
   for(const k of peerRender.keys())if(!seen.has(k))peerRender.delete(k);}
-function tickPeers(){for(const pr of peerRender.values()){pr.x=lerp(pr.x,pr.tx,0.25);pr.y=lerp(pr.y,pr.ty,0.25);}}
+function tickPeers(){for(const pr of peerRender.values()){pr.x=lerp(pr.x,pr.tx,0.25);pr.y=lerp(pr.y,pr.ty,0.25);tickSharedPeer(pr);}}
 setInterval(tickPeers,33);
 function initCaps(){netInit();}
 
