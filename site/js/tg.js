@@ -19,9 +19,9 @@ function tgBoot(){const W=window.Telegram&&window.Telegram.WebApp;if(!W)return;T
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof acctSave==='function')acctSave();});
   tgLogin();}
 // «Назад» Телеги закрывает открытое окно (как Esc)
-function tgOpenThing(){return [...document.querySelectorAll('.modal')].some(m=>!m.hidden)||(document.body.classList.contains('chat-open'))||(typeof scene!=='undefined'&&scene==='interior');}
+function tgOpenThing(){const today=document.getElementById('zkTodayPanel');return !!(today&&!today.hidden)||[...document.querySelectorAll('.modal')].some(m=>!m.hidden)||(document.body.classList.contains('chat-open'))||(typeof scene!=='undefined'&&scene==='interior');}
 function tgBackSync(){const W=TG.W;if(!W||!W.BackButton)return;const need=tgOpenThing();if(need&&!W.BackButton.isVisible)W.BackButton.show();else if(!need&&W.BackButton.isVisible)W.BackButton.hide();}
-function tgBack(){const ti=document.getElementById('tgIntro');if(ti&&!ti.hidden){tgIntroClose();return;}if([...document.querySelectorAll('.modal')].some(m=>!m.hidden)||document.body.classList.contains('chat-open')){window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));if(document.body.classList.contains('chat-open')&&typeof closeChatPanel==='function')closeChatPanel();return;}
+function tgBack(){if(typeof window.uiCloseDialog==='function'&&window.uiCloseDialog())return;const ti=document.getElementById('tgIntro');if(ti&&!ti.hidden){tgIntroClose();return;}if([...document.querySelectorAll('.modal')].some(m=>!m.hidden)||document.body.classList.contains('chat-open')){window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));if(document.body.classList.contains('chat-open')&&typeof closeChatPanel==='function')closeChatPanel();return;}
   if(typeof scene!=='undefined'&&scene==='interior'&&typeof exitInterior==='function'&&!(typeof METRO!=='undefined'&&METRO.ride&&METRO.ride.phase==='go'))exitInterior();}
 function tgDefaultName(){const u=TG.user;return u?[u.first_name,u.last_name].filter(Boolean).join(' ').slice(0,24):'';}
 function tgMsg(t){const m=document.getElementById('acctMsg');if(m)m.textContent=t;}

@@ -11,8 +11,8 @@
   color-scheme:dark;
 }
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.4;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
-#map{position:fixed;inset:0;width:100%;height:100%;display:block;background:#E4DFD3;cursor:grab}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.4;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:auto}
+#map{touch-action:none;position:fixed;inset:0;width:100%;height:100%;display:block;background:#E4DFD3;cursor:grab}
 #mini{cursor:pointer}
 #rallyKind{display:flex;gap:8px;flex-wrap:wrap}#rallyKind button.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 #hud{position:fixed;inset:0;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
@@ -155,7 +155,7 @@ textarea{resize:vertical;min-height:64px}
 .howto .tile .ic{font-size:20px}
 @media (max-width:480px){.howto{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
+html.tg body{overscroll-behavior:none}:where(html.tg) .btn{min-height:40px}
 /* Пакет 3. Геометрия телефона общая для сайта и Telegram; desktop остаётся прежним. */
 :root{--ui-height:100dvh;--ui-visible-height:100dvh;--ui-visible-top:0px;
   --ui-top:calc(max(env(safe-area-inset-top,0px),var(--ui-tg-top,0px)) + var(--ui-content-top,0px));
@@ -229,6 +229,26 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
   .ui-trip-stack{left:134px;right:150px;bottom:126px}#sitCard{bottom:calc(126px + var(--ui-trip-space,0px));max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 160px - var(--ui-trip-space,0px))}
   html body #zkTodayPanel{top:calc(var(--ui-top) + 64px)!important;max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 80px)!important}
 }
+/* Дополнение к пакету 3: прокручивается содержимое, действия остаются видны. */
+.ui-sheet-body,.ui-sheet-foot{display:contents}
+#joy{touch-action:none}
+.ui-dialog-open #map{pointer-events:none}
+@media (max-width:640px),(pointer:coarse) and (max-height:500px){
+  .ui-dialog-open #hud,.ui-dialog-open #zkToday{visibility:hidden}
+  .modal{touch-action:pan-y pinch-zoom}
+  .modal .box{overflow:hidden}
+  .ui-sheet-head{position:static}
+  .modal .box>.ui-sheet-body{display:flex;flex-direction:column;gap:14px;flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y pinch-zoom;scroll-padding:8px}
+  .ui-sheet-body>*{flex-shrink:0;min-width:0;max-width:100%;overflow-wrap:anywhere}
+  .ui-sheet-foot{display:flex;flex-direction:column;gap:8px;flex:none;border-top:1px solid var(--line);padding-top:10px}
+  .ui-sheet-foot:empty{display:none}.ui-sheet-foot .row>.btn{flex:1}
+  #chatModal .box>.ui-sheet-body,#logModal .box>.ui-sheet-body{overflow:hidden}
+  #chatModal .chat,#logList{min-height:0;flex-shrink:1;overflow:auto;max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 210px)}
+  #chatModal .chat{max-height:calc(var(--ui-visible-height) - var(--ui-top) - var(--ui-bottom) - 270px)}
+  #chatModal .ui-sheet-foot #chatSend{flex:0 0 auto}#chatModal .ui-sheet-foot .row>span:last-child{flex-wrap:wrap}
+  #clothes .sw{width:44px;height:44px}.menu-options .btn{flex:1 1 120px}
+}
+@media (max-width:359px){.clock{grid-template-columns:repeat(6,minmax(44px,1fr))}.clock .t{grid-column:1/-1;padding:4px 0}}
 </style>
 
 <canvas id="map"></canvas>
@@ -367,7 +387,7 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
 <div class="modal" id="routeModal" hidden>
   <div class="box">
     <h2 id="rtTitle">Куда поехать?</h2>
-    <input type="text" id="rtSearch" placeholder="Кафе, площадь, музей, улица…" maxlength="60">
+    <input type="text" id="rtSearch" aria-label="Найти место в городе" placeholder="Кафе, площадь, музей, улица…" maxlength="60">
     <div id="rtList"></div>
     <div id="rtPlans" hidden></div>
     <div class="row"><button class="btn" id="rtPick">📍 Указать на карте</button><button class="btn" id="rtClose">Закрыть</button></div>
@@ -444,7 +464,8 @@ html.tg body{overscroll-behavior:none}html.tg .btn{min-height:40px}
     <div id="ignBox"><h3 class="sub">Скрытые игроки</h3><div id="ignList"></div></div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
-    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row menu-options"><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button></div>
   </div>
 </div>
 

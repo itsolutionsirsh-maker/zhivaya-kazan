@@ -15,10 +15,21 @@ const keys={};const flags={};
 let roomNs=null,sampleFn=null,peers=[],peerRender=new Map();
 const feedEl=$('#feed');const feed=[];const FEED_LIFE=7000;
 function addEvent(text,kind){const t=fmtTime();feed.unshift({t,text,kind,at:performance.now()});if(feed.length>40)feed.pop();renderFeed();$('#logBtn').classList.add('ping');}
-function evEl(e){const d=document.createElement('div');d.className='ev'+(e.kind==='alert'?' alert':e.kind==='rally'?' rally':e.kind==='say'?' say':'');const tm=document.createElement('span');tm.className='tm';tm.textContent=e.t;const tx=document.createElement('span');tx.textContent=e.text;d.append(tm,tx);return d;}
-function renderFeed(){const now=performance.now();feedEl.innerHTML='';feed.filter(e=>now-e.at<FEED_LIFE).slice(0,2).forEach(e=>feedEl.append(evEl(e)));if(!$('#logModal').hidden){const l=$('#logList');l.innerHTML='';feed.forEach(e=>l.append(evEl(e)));}}
+function evEl(e){const d=document.createElement('div');d.feedEntry=e;d.className='ev'+(e.kind==='alert'?' alert':e.kind==='rally'?' rally':e.kind==='say'?' say':'');const tm=document.createElement('span');tm.className='tm';tm.textContent=e.t;const tx=document.createElement('span');tx.className='ev-text';tx.textContent=e.text;d.append(tm,tx);return d;}
+// Keep existing rows: the expiry timer must not restart animations or move a reader.
+function syncFeedRows(parent,entries){
+  const old=new Map(Array.from(parent.children,n=>[n.feedEntry,n]));let next=parent.firstChild;
+  for(const entry of entries){const row=old.get(entry)||evEl(entry);if(row!==next)parent.insertBefore(row,next);next=row.nextSibling;}
+  while(next){const n=next.nextSibling;next.remove();next=n;}
+}
+function renderFeed(){
+  const now=performance.now(),recent=feed.filter(e=>now-e.at<FEED_LIFE).slice(0,2);
+  syncFeedRows(feedEl,recent);feedEl.hidden=!recent.length;
+  if(!$('#logModal').hidden){const l=$('#logList'),top=l.scrollTop,height=l.scrollHeight;
+    syncFeedRows(l,feed);if(top>0)l.scrollTop=top+l.scrollHeight-height;}
+}
 setInterval(()=>{if(feedEl.childElementCount)renderFeed();},1000);
-$('#logBtn').addEventListener('click',()=>{$('#logBtn').classList.remove('ping');$('#logModal').hidden=false;player.busy=true;renderFeed();});
+$('#logBtn').addEventListener('click',()=>{$('#logBtn').classList.remove('ping');$('#logModal').hidden=false;player.busy=true;renderFeed();$('#logList').scrollTop=0;});
 $('#logClose').addEventListener('click',()=>{$('#logModal').hidden=true;player.busy=false;});
 function fmtTime(){const h=Math.floor(clock.minutes/60)%24,m=Math.floor(clock.minutes%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
 let hintTtl=0;function setHint(t){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=5;}
@@ -183,6 +194,7 @@ function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'n
 
 // ---------- ввод ----------
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
+  if(document.body.classList.contains('ui-dialog-open')||((e.key==='Enter'||e.key===' ')&&e.target.closest?.('button,a[href]')))return;
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
   if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(!$('#questModal').hidden)closeQuests();if(!$('#seasonModal').hidden)closeSeason();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
