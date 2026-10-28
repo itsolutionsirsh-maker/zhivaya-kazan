@@ -64,9 +64,9 @@ async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e
   for(const r of j.rows){const tr=el('tr');tr.append(el('td',null,r.d.slice(8)+'.'+r.d.slice(5,7)),el('td',null,String(r.dau)),el('td',null,String(r.nu)),el('td',null,pc(r.r1,r.nu,r.r1ready)),el('td',null,pc(r.r7,r.nu,r.r7ready)));T.append(tr);}
   $('#srcs').textContent=j.src.length?'Откуда пришли (3 недели): '+j.src.map(s=>`${s.src||'—'} ${s.n}`).join(' · '):'';}
 // кошелёк: баланс, журнал, начислить/списать (номер операции на форму — повторный клик не начислит дважды)
-const KIND={init:'перенос',local:'игра',xfer:'перевод',mod:'модератор',grant:'начисление',reset:'заново'};
+const KIND={init:'начало',local:'игра',xfer:'перевод',mod:'модератор',grant:'начисление',reset:'заново'};
 async function wallet(name,body){const O=$('#wOut');const j=await call(Object.assign({do:'wallet',name},body||{})).catch(()=>({err:'нет связи'}));O.innerHTML='';
-  if(!j.ok){O.append(el('p','msg',j.err==='no_account'?'Такого аккаунта нет':j.err==='why'?'Напишите причину':j.err==='amount'?'Сумма — целое число, не ноль':'Ошибка: '+(j.err||'?')));return;}
+  if(!j.ok){O.append(el('p','msg',j.err==='no_account'?'Такого аккаунта нет':j.err==='why'?'Напишите причину':j.err==='amount'?'Сумма — целое число, не ноль':j.err==='no_wallet'?'Кошелька ещё нет — заведётся, когда игрок сохранится в игре':'Ошибка: '+(j.err||'?')));return;}
   const c=el('div','card');c.append(el('div',null,`${j.name} (${j.k}) · на сервере: ${j.bal==null?'кошелька ещё нет — заведётся при входе в игру':j.bal.toLocaleString('ru-RU')+' ₽'}${j.bal!=null?` · заработано сегодня ${j.dayIn.toLocaleString('ru-RU')} ₽`:''}`));
   const f=el('div','row');const amt=el('input');amt.placeholder='Сумма, минус — списать';amt.inputMode='numeric';const why=el('input');why.placeholder='Причина';const go=el('button','go','Провести');const opid='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   go.onclick=async()=>{const v=Math.trunc(+amt.value);if(!v){alert('Сумма — целое число, не ноль');return;}if(!confirm(`${v>0?'Начислить':'Списать'} ${Math.abs(v)} ₽ игроку «${j.name}»?`))return;go.disabled=true;await wallet(name,{do:'grant',amt:v,why:why.value,id:opid});};

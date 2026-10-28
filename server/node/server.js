@@ -123,31 +123,23 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
       stats:from=>{const m=rows=>Object.fromEntries(rows.map(r=>[r.d,r.n]));return {dau:m(q.dau.all(from)),nu:m(q.nu.all(from)),r1:m(q.ret.all(1,from)),r7:m(q.ret.all(7,from)),src:q.src.all(from),everyone:q.everyone.get().n};},
       backup:file=>db.exec("VACUUM INTO '"+file.replace(/'/g,"''")+"'")};}
   const F=path.join(DATA,'accounts.json');let acc={};try{acc=JSON.parse(fs.readFileSync(F,'utf8'));}catch(e){}let dirty=false;
-  setInterval(()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);},3000).unref();
+  const flush=()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);};setInterval(flush,3000).unref();
   return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
     addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},setPin:(k,salt,pin)=>{acc[k].salt=salt;acc[k].pin=pin;dirty=true;},
     importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
-    visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file)};})();
+    visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file),flush};})();
 // ---------- кошелёк: деньги аккаунта на сервере (wallet.js) ----------
-// Первое обращение переносит деньги из последнего сохранения (карта + вклад, с потолком); дальше правда — здесь.
-const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs),
-  {seedOf:k=>{const a=store.get(k);return a&&a.state;}});
+// Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
+const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
 setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
-// устройство присылает изменения своих денег (операции с номерами) и получает баланс сервера; who — чей кошелёк оно помнит
-function walletApi(body){const acc=accByToken(body.token);if(!acc)return {err:'auth'};if(!allow('wallet:'+acc.k,30,60))return {err:'rate_limited'};
-  try{const who=wallet.whoOf(acc.k);
-    // операции, накопленные под другим аккаунтом (вышли и вошли под другим), сюда не проводим: только баланс, устройство начнёт заново
-    if(typeof body.who==='string'&&body.who&&body.who!==who)return Object.assign({ok:1,other:1},wallet.apply(acc.k,[]));
-    const r=wallet.apply(acc.k,body.ops);for(const x of r.res)if(x.cut)log('кошелёк: сверх потолка не засчитано',x.cut,'у',acc.k);
-    if(r.init&&r.init.req>r.init.amt)log('кошелёк: перенос урезан',r.init.req,'→',r.init.amt,'у',acc.k);
-    return Object.assign({ok:1},r);}catch(e){log('кошелёк не записался:',e.message);return {err:'busy'};}}
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
 const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
-function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2||name.includes(':'))return {err:'name'};   // «tg:…» — ключи аккаунтов Телегиif(!/^\d{4,8}$/.test(pin))return {err:'pin'};
+function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2||name.includes(':'))return {err:'name'};   // «tg:…» — ключи аккаунтов Телеги
+  if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
   if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
@@ -159,9 +151,14 @@ function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
 // base — версия (updated), которую устройство видело последней. Сервер новее (сохраняло другое устройство или «Начать заново») —
 // отказ conflict с серверной копией: устройство берёт её, а не затирает. Без base (старый клиент) — как раньше, последний пишет.
-function saveFor(token,state,profile,city,base){const a=accByToken(token);if(!a)return {err:'auth'};
+// wal = {who, ops} — изменения денег этого устройства (wallet.js): проводятся только вместе с принятым сохранением
+function saveFor(token,state,profile,city,base,wal){const a=accByToken(token);if(!a)return {err:'auth'};
   if(typeof base==='number'&&isFinite(base)&&(a.updated||0)>base+0.001)return accOut(a,{ok:0,err:'conflict'});const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
-  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};try{store.save(a.k,state||a.state,profile||a.profile,city||a.city);}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+  if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};let w=null;
+  try{w=wallet.commit(a.k,{prior:a.state,incoming:state,wal:wal&&typeof wal==='object'?wal:null},()=>store.save(a.k,state||a.state,profile||a.profile,city||a.city));}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}
+  if(w.init&&w.init.req>w.init.amt)log('кошелёк: перенос урезан',w.init.req,'→',w.init.amt,'у',a.k);
+  {const cut=w.res.reduce((s,x)=>s+(x.cut||0),0)+(w.init?w.init.firstReq-w.init.first:0);if(cut>0)log('кошелёк: сверх потолка не засчитано',cut,'у',a.k);}
+  const b=store.get(a.k);return {ok:1,updated:b?b.updated:now(),wallet:w};}
 function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
 // мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
 const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
@@ -238,7 +235,7 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
   body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);try{wallet.reset(a.k);}catch(e){log('кошелёк: сброс не записался',e.message);}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>store.save(a.k,null,a.profile,null));}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -329,7 +326,7 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
   if(act==='mute'&&target.length>=8){mutes.set(target,t+Math.max(1,+body.minutes||60)*60);return {ok:1};}
   // кошелёк игрока: баланс и журнал; grant — начислить или списать с причиной (id из формы: двойной клик не начислит дважды)
   if(act==='wallet'||act==='grant'){const k=modAccKey(body.name);if(!k)return {err:'no_account'};
-    if(act==='grant'){const why=clean(body.why,80);if(!why)return {err:'why'};const r=wallet.grant(k,body.amt,typeof body.id==='string'?body.id:undefined,why,'mod');if(r.err)return r;log('кошелёк: модератор',r.amt,'у',k,why);}
+    if(act==='grant'){const why=clean(body.why,80);if(!why)return {err:'why'};const r=wallet.grant(k,body.amt,typeof body.id==='string'?body.id:undefined,why,'mod');if(r.err)return r;if(!r.dup)log('кошелёк: модератор',r.amt,'у',k,why);}
     const acc=store.get(k);return Object.assign(wallet.info(k,40),{k,name:acc.name,tg:acc.tg||null});}
   let reports=[];try{reports=fs.readFileSync(path.join(DATA,'reports.jsonl'),'utf8').trim().split('\n').slice(-100).map(l=>{try{return JSON.parse(l);}catch(e){return null;}}).filter(Boolean).reverse();}catch(e){}
   const online=[...players.values()].map(p=>({id:p.id,n:(p.meta&&p.meta.n)||'Игрок'}));
@@ -480,8 +477,7 @@ async function handleReq(req,res){
     if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
-    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base));
-    if(a==='wallet')return send(res,200,walletApi(body));
+    if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base,body.wallet));
     if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
     if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
     if(a==='reset')return send(res,200,resetFor(body.token));
@@ -566,7 +562,7 @@ async function sendAdminFile(file,caption){if(!TG_TOKEN||!ADMIN_TG)return;
     const fd=new FormData();fd.append('chat_id',ADMIN_TG);fd.append('caption',caption);fd.append('document',new Blob([gz]),path.basename(file)+'.gz');
     const r=await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendDocument`,{method:'POST',body:fd,signal:AbortSignal.timeout(120000)}).then(r=>r.json());if(!r.ok)log('копия в Телегу:',r.description);}catch(e){log('копия в Телегу:',e.message);}}
 function doBackup(){const d=mskDay();fs.mkdirSync(BK,{recursive:true});const file=path.join(BK,'game-'+d+'.db');
-  try{if(fs.existsSync(file))fs.unlinkSync(file);store.backup(file);for(const x of ['mod.json','reports.jsonl'])if(fs.existsSync(path.join(DATA,x)))fs.copyFileSync(path.join(DATA,x),path.join(BK,x.replace('.',`-${d}.`)));
+  try{if(fs.existsSync(file))fs.unlinkSync(file);store.backup(file);for(const x of ['mod.json','reports.jsonl','wallet.json'])if(fs.existsSync(path.join(DATA,x)))fs.copyFileSync(path.join(DATA,x),path.join(BK,x.replace('.',`-${d}.`)));
     const old=fs.readdirSync(BK).filter(f=>{const m=/(\d{4}-\d\d-\d\d)/.exec(f);return m&&m[1]<mskDay(-7);});for(const f of old)fs.unlinkSync(path.join(BK,f));
     daily.backup=d;log('копия базы:',file,Math.round(fs.statSync(file).size/1024)+' КБ');if(ENV.BACKUP_TO_TG==='1')sendAdminFile(file,'Копия базы «Живой Казани» за '+d);}
   catch(e){log('копия базы не вышла:',e.message);sendAdmin('⚠️ Копия базы не сделалась: '+e.message);}}
@@ -587,7 +583,8 @@ async function importPhp(url,token){token=token||TG_TOKEN;if(!token)throw new Er
 const impI=process.argv.indexOf('--import-php');
 if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
 else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${!LLM.key?'выключен (нет ключа Claude на /setup)':!AnthropicSDK?'выключен (не установлен пакет @anthropic-ai/sdk — npm ci в server/node)':LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
-for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>process.exit(0));
+// остановка: JSON-хранилища (если без SQLite) дописать на диск — подтверждённые игрокам деньги не теряются
+for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>{try{wallet.flush();}catch(e){}try{if(store.flush)store.flush();}catch(e){}process.exit(0);});
 // последняя страховка: ошибка, которую не поймали выше, — в журнал, а не падение всего сервера (с ним вылетают все игроки)
 process.on('unhandledRejection',e=>log('необработанная ошибка (сервер работает дальше):',e&&e.stack||e));
 process.on('uncaughtException',e=>log('необработанное исключение (сервер работает дальше):',e&&e.stack||e));

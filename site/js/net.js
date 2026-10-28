@@ -103,12 +103,15 @@ function acctServerNewer(j){if(syncRev)return (j.updated||0)>syncRev+0.001;retur
 // решение при запуске (сайт — acctSyncOnBoot, Телега — tgAfter): true — берём серверную копию и перезапускаемся
 function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store'});return r.json();}
-function acctSnapshot(){if(window.zkNoSave)return null;if(typeof walletStage==='function')walletStage();try{saveState();}catch(e){}/* изменения денег — операцией кошелька, вместе с сохранением (wallet.js) */let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
-async function acctSave(){if(!acct||window.zkNoSave)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
-  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},snap));if(j.ok){if(j.updated)setRev(j.updated);if(typeof walletSync==='function')await walletSync();return;}
-    if(j.err==='conflict'){acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
+// снимок для сервера; wallet — изменения денег операциями (wallet.js), проводятся только вместе с этим сохранением
+function acctSnapshot(){if(window.zkNoSave)return null;const wo=typeof walletOut==='function'?walletOut():undefined;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(state)delete state.wal;if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city,wallet:wo?{who:wo.who,ops:wo.ops}:undefined,wsnap:wo?wo.snap:undefined};}
+// одно сохранение за раз: второе с той же base, пока первое в пути, сервер счёл бы чужим (конфликт)
+async function acctSave(){if(!acct||window.zkNoSave||Net.saving)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
+  Net.saving=true;const {wsnap,...body}=snap;
+  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},body));if(j.ok){if(j.updated)setRev(j.updated);if(typeof walletAfter==='function')walletAfter(j.wallet,wsnap);return;}
+    if(j.err==='conflict'){if(typeof walletDrop==='function')walletDrop();acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
     if(j.err==='too_big'&&!Net.bigTold){Net.bigTold=true;setHint('Сохранение слишком большое — на сервер не уходит. Напишите нам');}
-    if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}}
+    if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}finally{Net.saving=false;}}
 async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).catch(()=>({err:'net'}));
   const E={name:'Имя — от 2 букв',pin:'PIN — от 4 до 8 цифр',wrong_pin:'Неверный PIN для этого имени',locked:'Слишком много попыток. Подождите 15 минут',rate_limited:'Слишком часто. Попробуйте через минуту',net:'Нет связи с сервером'};
   if(j.err){$('#acctMsg').textContent=E[j.err]||'Не получилось';return;}
@@ -125,7 +128,7 @@ function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acc
 if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 setInterval(acctSave,30000);
-window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave||!Net.syncReady)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token,base:syncRev||undefined},snap))],{type:'application/json'}));}catch(e){}if(typeof walletBeacon==='function')walletBeacon();});
+window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave||!Net.syncReady)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token,base:syncRev||undefined},snap))],{type:'application/json'}));}catch(e){}});
 // ---------- вход на сайте через Телеграм: тот же аккаунт и прогресс, что в мини-приложении ----------
 // сервер даёт ссылку на бота с одноразовым кодом; игрок жмёт в боте «Да, войти»; сайт ждёт по своему секрету (до 5 минут)
 const TGW={poll:null,timer:null,until:0,link:''};
@@ -156,11 +159,11 @@ function acctApply(j){
   const keepLocal=typeof journeyKeepLocal==='function'&&journeyKeepLocal(j.state);
   window.zkNoSave=true;
   try{setRev(j.updated||0);if(!keepLocal){
+    if(j.state&&j.state.wal)delete j.state.wal;   // состояние кошелька — только своё (wallet.js); загруженная игра начинает с баланса сервера
     localStorage.setItem('zk.state',JSON.stringify(j.state));
     if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));
     if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));
     if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');
-    if(typeof walletRebase==='function')walletRebase(j.state);   // деньги этого сохранения — база кошелька (wallet.js)
   }}catch(e){}
   const m=$('#acctMsg');if(m)m.textContent=keepLocal?'Поездка уже оплачена — продолжаем сохранённую игру…':'Прогресс загружен с сервера — перезапускаем…';location.reload();
 }
