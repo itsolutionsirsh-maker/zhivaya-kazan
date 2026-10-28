@@ -1,9 +1,9 @@
 # Бот и мини-приложение в Телеге
 
 - Бот: **@zhivaya_kazan_bot** («Живая Казань»), создан 23.10.2026 в аккаунте Иршата.
-- Мини-приложение: **https://t.me/zhivaya_kazan_bot/game**: открывает `https://iks-ai-systems.ru/kazan/`.
+- Мини-приложение: **https://t.me/zhivaya_kazan_bot/game**: открывает `https://kazan.lifegorod.com/` (адрес меняется в @BotFather → /myapps → Edit Web App URL).
 - Кнопка меню бота «Играть» открывает тот же адрес.
-- Токен бота в репозитории не хранится. Он лежит только на сервере: в `public_html/kazan/config.php` (`'tg_bot_token'`), на VPS — в `/etc/zhivaya-kazan.env` (`TG_BOT_TOKEN`). Если токен утёк, в BotFather: `/mybots` → бот → API Token → Revoke, потом новый токен вписать на сервер.
+- Токен бота в репозитории не хранится. Он лежит только на сервере игры: вводится на `https://kazan.lifegorod.com/setup` (смена — `/setup#change` с ключом модератора), хранится в `/var/lib/zk/data/secrets.json`.
 
 ## Тексты в BotFather
 

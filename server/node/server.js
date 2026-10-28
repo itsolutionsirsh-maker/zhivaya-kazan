@@ -148,7 +148,7 @@ function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.leng
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
   if(!pinOk(a,pin)){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
   store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated};}
-// PIN: свой scrypt; у аккаунтов, перенесённых с PHP-хостинга, — bcrypt (после первого входа переводим на scrypt)
+// PIN: свой scrypt; у самых старых аккаунтов — bcrypt (после первого входа переводим на scrypt)
 function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
   try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
 function accByToken(token){return typeof token==='string'&&token.length>=20?store.byTok(sha(token)):null;}
@@ -425,7 +425,6 @@ async function apiLlm(body,ip){const cli=llmClient();if(!cli)return {err:'no_llm
 // Открыта, только пока токен бота не задан. Принимает лишь настоящий токен нашего бота (проверка getMe у Телеги),
 // поэтому чужой бот подставить нельзя. После сохранения служба перезапускается с новыми ключами.
 const SETUP_BOT=(ENV.SETUP_BOT||'zhivaya_kazan_bot').toLowerCase().replace(/^@/,'');
-const OLD_API=ENV.OLD_API_URL||'https://iks-ai-systems.ru/kazan/api.php';
 // вставленное из Телеги/заметок: пробелы, переносы, невидимые символы, кавычки, «длинные» тире и двоеточия, похожие кириллические буквы, приставка bot
 const LOOK={'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','Х':'X','а':'a','е':'e','о':'o','р':'p','с':'c','у':'y','х':'x'};
 function cleanKey(v){return String(v||'').normalize('NFKC').replace(/[\s\u00A0\u200B-\u200F\u2060\uFEFF]+/g,'').replace(/^["'`«»“”„]+|["'`«»“”„]+$/g,'').replace(/[\u2010-\u2015\u2212]/g,'-').replace(/[\uFF1A\uFE55]/g,':').replace(/[А-яЁё]/g,c=>LOOK[c]||c);}
@@ -440,14 +439,12 @@ async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rat
   if(!me||!me.ok)return {err:'token_wrong'};const uname=String(me.result&&me.result.username||'').toLowerCase();if(uname!==SETUP_BOT)return {err:'other_bot',bot:uname};
   let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}sec.TG_BOT_TOKEN=token;if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
   fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);
-  let imported=null;if(body.migrate!==false&&!again){   // перенос со старого сайта — только при первой настройке
-  try{imported=await importPhp(OLD_API,token);}catch(e){imported={err:e.message};}}
-  log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':'')+'; перенос:',JSON.stringify(imported));
+  log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':''));
   setTimeout(()=>process.exit(0),1500);   // systemd запустит заново уже с ключами
-  return {ok:1,bot:uname,imported,mod:ENV.MOD_TOKEN||''};}
+  return {ok:1,bot:uname,mod:ENV.MOD_TOKEN||''};}
 const SETUP_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Настройка · Живая Казань</title>
 <style>body{margin:0;background:#10161A;color:#E8EEF0;font:16px/1.45 system-ui,sans-serif}main{max-width:560px;margin:0 auto;padding:20px}h1{font-size:22px}label{display:block;margin:16px 0 6px;font-weight:600}small{color:#8FA3AE;display:block;margin-top:4px}input{width:100%;box-sizing:border-box;background:#18222A;color:#E8EEF0;border:1px solid #2A3842;border-radius:10px;padding:12px;font:inherit}button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:10px;background:#2F9E6B;color:#fff;font:600 17px system-ui;cursor:pointer}#st{margin-top:16px;white-space:pre-wrap}.ok{color:#7ee2a8}.bad{color:#ff9aa5}</style></head><body><main>
-<h1>Настройка сервера «Живой Казани»</h1><p>Один раз: вставьте ключи и нажмите «Сохранить». Сервер проверит токен у Телеги, перенесёт игроков со старого сайта и перезапустится.</p>
+<h1>Настройка сервера «Живой Казани»</h1><p>Один раз: вставьте ключи и нажмите «Сохранить». Сервер проверит токен у Телеги и перезапустится.</p>
 <div id="mw" hidden><label for="m">Ключ модератора</label><input id="m" autocomplete="off"><small>Сервер уже настроен. Чтобы сменить ключи (например, после нового токена у @BotFather), нужен ключ модератора — его показали при первой настройке.</small></div>
 <label for="t">Токен бота от @BotFather</label><input id="t" autocomplete="off" placeholder="1234567890:AAH…"><small>@BotFather → /mybots → @zhivaya_kazan_bot → API Token → нажать на строку, чтобы скопировать. Если сервер уже настроен и токен не меняется — можно оставить пустым.</small>
 <label for="a">Ваш id в Телеге (число)</label><input id="a" inputmode="numeric" placeholder="123456789"><small>Напишите боту @userinfobot — он ответит числом. Сюда будут приходить сводка по утрам и тревоги.</small>
@@ -457,7 +454,7 @@ const E={token_empty:'Вставьте токен бота от @BotFather',toke
 if(location.hash==='#change'||window.__configured)mw.hidden=false;
 go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
  go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';
- const im=j.imported||{};st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n'+(!j.imported?'Ключи обновлены.':im.err?'Перенос игроков не вышел: '+im.err:'Перенесено аккаунтов: '+(im.accounts||0)+', входов: '+(im.tokens||0)+', привязок Телеги: '+(im.tgLinks||0))+'\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
+ st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
 </script></body></html>`;
 
 // ---------- HTTP ----------
@@ -479,7 +476,6 @@ async function handleReq(req,res){
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
-    if(a==='mod'&&body.do==='import'){const r=modAdmin(req,{do:'stats'});if(r.err)return send(res,200,r);try{return send(res,200,Object.assign({ok:1},await importPhp(OLD_API)));}catch(e){return send(res,200,{err:e.message});}}
     if(a==='mod')return send(res,200,modAdmin(req,body));
     if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
@@ -579,19 +575,7 @@ function summary(){const st=statsOut(9);if(!st.ok)return;const y=st.rows[1],w=st
 function dailyTick(){const d=mskDay(),h=mskHour();if(h>=4&&daily.backup!==d)doBackup();if(h>=9&&daily.summary!==d){daily.summary=d;try{fs.writeFileSync(DAILYF,JSON.stringify({summary:d}));}catch(e){}summary();}}
 setInterval(dailyTick,300000).unref();setTimeout(dailyTick,60000).unref();
 
-// переезд с PHP-хостинга: node server.js --import-php https://сайт/kazan/api.php — забирает аккаунты, ключи входа и привязки Телеги
-async function importPhp(url,token){token=token||TG_TOKEN;if(!token)throw new Error('нужен TG_BOT_TOKEN в окружении — им подписан ключ выгрузки');
-  const key=sha('export:'+token).slice(0,40);const r=await fetch(url.replace(/\?.*$/,'')+'?a=export',{headers:{'X-Export-Key':key},signal:AbortSignal.timeout(60000)});const j=await r.json();if(!j.ok)throw new Error('выгрузка: '+(j.err||r.status));
-  const km=k=>typeof k==='string'&&k.startsWith('n:')?k.slice(2):k;let na=0,ns=0,nt=0,ng=0;
-  for(const x of j.accounts||[]){const k=km(x.k);const cur=store.get(k);if(cur&&(cur.updated||0)>=(x.updated||0)){ns++;continue;}
-    if(cur)try{wallet.forget(k);}catch(e){}   // сохранение заменяется целиком — кошелёк заведётся заново из него при следующем сохранении
-    store.importAcc({k,name:clean(x.name,24)||'Игрок',salt:x.pin?'bcrypt':'',pin:x.pin||'',state:x.state,profile:x.profile,city:x.city,created:x.created,updated:x.updated,tg:x.tg?String(x.tg):null,refBy:km(x.refBy)||null,invites:Array.isArray(x.invites)?x.invites:[]});na++;}
-  for(const t of j.tokens||[]){if(/^[a-f0-9]{64}$/.test(t.h)&&store.get(km(t.k))){store.importTok(t.h,km(t.k),t.t);nt++;}}
-  for(const m of j.tgm||[]){const k=km(m.k);if(/^\d{3,15}$/.test(m.id)&&store.get(k)){store.tgSet(m.id,k);ng++;}}
-  return {accounts:na,skipped:ns,tokens:nt,tgLinks:ng};}
-const impI=process.argv.indexOf('--import-php');
-if(impI>0){importPhp(process.argv[impI+1]||'').then(r=>{console.log('Перенесено:',JSON.stringify(r));process.exit(0);},e=>{console.error('Не вышло:',e.message);process.exit(1);});}
-else server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${!LLM.key?'выключен (нет ключа Claude на /setup)':!AnthropicSDK?'выключен (не установлен пакет @anthropic-ai/sdk — npm ci в server/node)':LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
+server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${!LLM.key?'выключен (нет ключа Claude на /setup)':!AnthropicSDK?'выключен (не установлен пакет @anthropic-ai/sdk — npm ci в server/node)':LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 // остановка: JSON-хранилища (если без SQLite) дописать на диск — подтверждённые игрокам деньги не теряются
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>{try{wallet.flush();}catch(e){}try{if(store.flush)store.flush();}catch(e){}process.exit(0);});
 // последняя страховка: ошибка, которую не поймали выше, — в журнал, а не падение всего сервера (с ним вылетают все игроки)

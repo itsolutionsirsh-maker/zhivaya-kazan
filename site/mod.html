@@ -22,7 +22,6 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <div class="row"><input id="tok" type="password" placeholder="Ключ модератора" autocomplete="off"><button class="go" id="load">Обновить</button></div>
 <p class="msg" id="st"></p>
 <h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><p class="msg" id="boot"></p><p class="msg" id="llm"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
-<div class="row" style="margin-top:10px"><button id="imp">Перенести игроков со старого сайта (Beget)</button><span class="msg" id="impst"></span></div>
 <h2>Истории новичка (сколько устройств дошло до шага, за 3 недели)</h2><div class="wrap"><table id="funnel"></table></div>
 <h2>Жалобы (новые сверху)</h2><div id="reps"></div>
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
@@ -82,7 +81,7 @@ async function wallet(name,body){const O=$('#wOut');const j=await call(Object.as
   const w=el('div','wrap');w.append(T);c.append(w);O.append(c);}
 $('#wGo').onclick=()=>{const n=$('#wName').value.trim();if(n)wallet(n);};
 $('#load').onclick=()=>{load();loadStats();};
-$('#imp').onclick=async()=>{if(!confirm('Забрать аккаунты со старого сайта? Новые данные на этом сервере не затираются.'))return;$('#impst').textContent='Переношу…';const j=await call({do:'import'}).catch(()=>({err:'нет связи'}));$('#impst').textContent=j.ok?`Перенесено аккаунтов: ${j.accounts}, пропущено (здесь новее): ${j.skipped}, входов: ${j.tokens}, привязок Телеги: ${j.tgLinks}`:'Ошибка: '+(j.err||'?');};$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
+$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
 </script>
 </body>
 </html>

@@ -117,8 +117,6 @@ function Wallet(be,opt){opt=opt||{};const L=Object.assign({},LIM,opt.limits||{})
     ops:w?be.ops(k,Math.max(1,Math.min(200,n||30))).map(o=>({id:o.id,amt:o.amt,req:o.req,kind:o.kind,why:o.why,peer:o.peer,bal:o.bal,t:o.t})):[]};}
   // старые операции с устройств больше не нужны для повторов; начальные, переводы и начисления храним
   function prune(){return be.prune(now()-L.keepDays*86400);}
-  // забыть кошелёк (сохранение аккаунта заменили целиком — перенос со старого сайта): заведётся заново из нового сохранения
-  function forget(k){return be.tx(()=>{be.del(k);return {ok:1};});}
-  return {commit,transfer,grant,reset,info,prune,forget,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
+  return {commit,transfer,grant,reset,info,prune,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
 
 module.exports={Wallet,sqliteBackend,jsonBackend,LIM,mskDay,stateTotal};
