@@ -5,6 +5,7 @@ const {chromium} = require('playwright');
 const {spawn} = require('child_process');
 const {parkSnapshotTaxi} = require('./visual-fixtures');
 const {stageCityLook} = require('./city-look-fixtures');
+const {venueScenes,stageVenueLook} = require('./venue-look-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -191,6 +192,12 @@ async function phoneUIShots(browser){
         const fixture=await pg.evaluate(stageCityLook,options);await closeCards();
         await ev("scene==='interior'?renderInterior():render()");
         await pg.screenshot({path:`${OUT}/${dev}_${name}.png`});console.log(dev,name,JSON.stringify(fixture));
+      }
+      // Supply the shared fixture before evaluating the self-contained venue scene.
+      await pg.addScriptTag({content:stageCityLook.toString()});
+      for(const [name,options] of venueScenes){
+        const fixture=await pg.evaluate(stageVenueLook,options);await closeCards();await ev('renderInterior()');
+        await pg.screenshot({path:`${OUT}/${dev}_venue_${name}.png`});console.log(dev,'venue_'+name,JSON.stringify(fixture));
       }
       await ctx.close();
     }
