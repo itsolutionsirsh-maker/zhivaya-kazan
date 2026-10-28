@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "checks": 11,
+  "results": [
+    "two guests see each other; adjacent venue and street isolated",
+    "indoor position and facing delivered while outdoor position stays fixed",
+    "near speech remains inside its venue",
+    "existing direct messages work for room guests",
+    "HTTP fallback and WebSocket share the same room membership",
+    "HTTP room switch removes the old membership",
+    "exit removes indoor avatar and clears old room speech",
+    "entering another cafe does not leave a street ghost",
+    "disconnect and reconnect leave exactly one avatar",
+    "malformed coordinates cannot enter the room index",
+    "legacy street clients remain compatible"
+  ]
+}

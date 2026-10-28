@@ -1,0 +1,9 @@
+{
+  "validForComparison": false,
+  "baseBeforeRebase": "00a3240",
+  "reason": "Hidden iframe RAF throttling; no valid performance results for the final bdb72c7 base.",
+  "samples": {
+    "before": "{\"completed_frames\":9,\"elapsed_ms\":5011,\"fps\":1.8,\"completed_interval_p50_ms\":17,\"completed_interval_p95_ms\":1017.4,\"render_p50_ms\":0.4,\"render_p95_ms\":0.5,\"interval_samples\":8,\"render_samples\":9,\"sample_limit\":600}",
+    "after": "{\"completed_frames\":6,\"elapsed_ms\":5014,\"fps\":1.2,\"completed_interval_p50_ms\":1002.5,\"completed_interval_p95_ms\":1016.8,\"render_p50_ms\":0.5,\"render_p95_ms\":0.7,\"interval_samples\":5,\"render_samples\":6,\"sample_limit\":600}"
+  }
+}

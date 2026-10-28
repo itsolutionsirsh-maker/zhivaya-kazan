@@ -3,7 +3,7 @@ const HEAR_R=45;          // на каком расстоянии слышно (
 let sayCounter=0,saySent=null;
 function pos(){return scene==='interior'&&interior?{x:interior.ret.x,y:interior.ret.y}:{x:player.x,y:player.y};}
 function sayAloud(text){const txt=drunkify(modClean(String(text||'').trim()).slice(0,140));if(!txt)return;
-  player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter};nearLine(player.name,txt,true);pushPresence();
+  player.say={t:txt,ttl:6};saySent={t:txt,i:++sayCounter,room:sharedRoomId()};nearLine(player.name,txt,true);pushPresence();
   // жители рядом слышат и один из них отвечает
   const p=pos();let npc=null,bd=7;
   if(scene==='interior'&&interior){for(const n of interior.npcs){const d=dist(n.x,n.y,player.ix,player.iy);if(d<3&&d<bd){bd=d;npc=n;}}}
@@ -20,8 +20,7 @@ async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);
   w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};nearLine(w.p.name,reply,false);}
 // фразы других игроков (приходят через presence)
-function onPeerSay(pr,s){if(!s||typeof s.t!=='string'||s.i===pr.sayI)return;pr.sayI=s.i;if(modIgnored(pr.key))return;const t=modClean(s.t.slice(0,140));pr.say={t,ttl:6};
-  const p=pos();if(dist(pr.x,pr.y,p.x,p.y)<HEAR_R)nearLine(pr.name,t,false,pr.key);}
+function onPeerSay(pr,s){if(!s||typeof s.t!=='string'||s.i===pr.sayI)return;pr.sayI=s.i;if(modIgnored(pr.key)||!sharedCanHear(pr,s))return;const t=modClean(s.t.slice(0,140));pr.say={t,ttl:6};nearLine(pr.name,t,false,pr.key);}
 function updateSay(dt){if(player.say){player.say.ttl-=dt;if(player.say.ttl<=0)player.say=null;}
   for(const w of walkers){if(w.say&&!w.rally){w.say.ttl-=dt;if(w.say.ttl<=0)w.say=null;}}
   if(interior)for(const n of interior.npcs){if(n.say){n.say.ttl-=dt;if(n.say.ttl<=0)n.say=null;}}
@@ -41,4 +40,5 @@ function drawCityBubbles(toS,z){const lift=Math.max(1.6*z,12)+24;const items=[];
   for(const it of items){const b=bubbleLines(it[2].t);let y0=it[1]-b.h-10;let moved=true;let guard=0;while(moved&&guard++<20){moved=false;for(const q of placed){if(Math.abs(q.x-it[0])<(q.w+b.w)/2+4&&y0<q.y0+q.h+4&&y0+b.h+4>q.y0){y0=q.y0-b.h-4;moved=true;}}}
     b.y0=y0;placed.push({x:it[0],y0,w:b.w,h:b.h});drawBubble(it[0],it[1],it[2].t,it[2].ttl,it[3],b);}}
 function drawInteriorBubbles(it){for(const n of it.npcs){if(!n.say)continue;drawBubble(it.ox+n.x*it.iz,it.oy+n.y*it.iz-it.iz*0.5,n.say.t,n.say.ttl,false);}
+  for(const pr of peerRender.values()){if(sharedPeerHere(pr)&&pr.say)drawBubble(it.ox+pr.ix*it.iz,it.oy+(pr.iy-.55)*it.iz-26,pr.say.t,pr.say.ttl,false);}
   if(player.say)drawBubble(it.ox+player.ix*it.iz,it.oy+player.iy*it.iz-it.iz*0.5-26,player.say.t,player.say.ttl,true);}

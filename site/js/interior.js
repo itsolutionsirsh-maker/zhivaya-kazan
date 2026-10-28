@@ -1,8 +1,8 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
 const KIND_RU={cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
-function makeInterior(kind,name,key){
-  const rng=seeded(hashStr(key));const R=(a,b)=>a+rng()*(b-a);
+function makeInterior(kind,name,key,room){
+  const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
   const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],default:[12,9]};
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
@@ -39,10 +39,10 @@ function makeInterior(kind,name,key){
     default:{it.floor='tiles';F('counter',w/2,1.1,5,1.1,{spot:'counter'});NPC(w/2,0.5,{role:'staff',job:'администратор'});for(let i=0;i<4;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});NPC(3+rng()*(w-6),3+rng()*(h-6),{wander:true});}
   }
   return it;}
-function enterInterior(src){insideShot(src);const key=src.key;let it=interiorCache.get(key);if(!it){it=makeInterior(src.kind,src.name,key);interiorCache.set(key,it);}refreshCrowd(it);folkInterior(it);homeItemsSync(it);
-  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;
+function enterInterior(src){insideShot(src);const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
+  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
   addEvent(`Вы зашли в «${src.name}»`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
-function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;}
+function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
   if(y>it.h-0.35-r){if(Math.abs(x-it.door.x)<0.85)return y>it.h+0.8;return true;}
@@ -56,6 +56,7 @@ function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
 function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
+  const pa=sharedPeerAction();if(pa)return pa;
   if(it.kind==='metro'&&py<3.8&&typeof metroTrainAction==='function'){const ma=metroTrainAction();if(ma)return ma;}   // у края платформы — поезд важнее разговора
   for(const n of it.npcs){if(n.companionOf&&n.tableF&&!n.tableF.ordered)continue;const d=dist(n.x,n.y,px,py);if(d<1.6&&d<bd){bd=d;best=actTarget({label:`Поговорить: ${n.p.name}${n.companionOf?'':', '+n.p.job}`,run:()=>openChat(n)},n,'person');}}
   if(best)return best;
@@ -160,13 +161,14 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   ctx.fillStyle=fl[0];ctx.fillRect(it.door.x-0.85,it.h-0.25,1.7,0.5);ctx.fillStyle='#6B5A4C';ctx.fillRect(it.door.x-0.85,it.h+0.2,1.7,0.08);ctx.fillStyle='rgba(255,255,255,.6)';ctx.font='0.4px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillText('выход',it.door.x,it.h+0.65);
   // люди
   for(const n of it.npcs)drawPerson(n.x,n.y,n.hx,n.hy,n.p,n.phase,{scale:0.55,seated:n.seated});
+  drawSharedPeople();
   drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';
   {const left=Math.max(12,ox),space=W-left-12;let title=String(it.name||'');while(title.length>1&&ctx.measureText(title).width>space)title=title.slice(0,-2)+'…';ctx.fillText(title,left,oy+it.h*iz+34);
     const nw=ctx.measureText(title).width,kr=it.kind==='worship'&&venueStyleId(it)==='mosque'?'мечеть':KIND_RU[it.kind]||KIND_RU.default;ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';if(kr.toLowerCase()!==String(it.name).toLowerCase()){const inline=nw+12+ctx.measureText(kr).width<=space;ctx.fillText(kr,inline?left+nw+12:left,oy+it.h*iz+(inline?35:53));}}
-  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
+  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawSharedLabels(it);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   if(f.t==='rails'){ctx.fillStyle='#2B2A28';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#4A4440';for(let i=0;i<f.w;i+=0.7)ctx.fillRect(x+i,y+0.55,0.32,1.3);ctx.fillStyle='#B8B4AE';ctx.fillRect(x,y+0.75,f.w,0.08);ctx.fillRect(x,y+1.55,f.w,0.08);return;}
   if(f.own){drawOwnFurniture(f);return;}

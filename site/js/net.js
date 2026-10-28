@@ -14,7 +14,7 @@ const lastSeen=new Map();             // peer → последний прочи�
 let httpOut=[],httpSince=0,httpFirst=true;
 
 function buildPresence(){const p={x:Math.round(player.x*10)/10,y:Math.round(player.y*10)/10,n:player.name.slice(0,24),r:player.role,hx:Math.round(player.hx*100)/100,hy:Math.round(player.hy*100)/100,b:(player.bus||player.inside)?1:0,c:myClothes(),w:wornIds(),v:player.vehicle?player.vehicle.kind:null,vc:player.vehicle?player.vehicle.color:null};
-  p.sy=saySent;p.g=player.rally?{s:player.rally.sq.i,k:player.rally.kind,t:player.rally.title}:null;
+  sharedPresence(p);p.sy=saySent;p.g=player.rally?{s:player.rally.sq.i,k:player.rally.kind,t:player.rally.title}:null;
   if(Net.mode==='room')p.m=outbox.slice(-4);
   if(player.thumb&&player.thumb.length<2600)p.a=player.thumb;
   if(Net.mode==='room'){let s=JSON.stringify(p);while(s.length>3900&&p.m&&p.m.length){p.m.shift();s=JSON.stringify(p);}if(s.length>3900){delete p.a;}}
@@ -40,7 +40,7 @@ async function httpLoop(){for(;;){
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
     if(j.pid)Net.pid=j.pid;if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myPid()){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myPid())continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
     if(typeof j.seq==='number')httpSince=j.seq;httpFirst=false;setNetStatus(true);
-  }catch(e){setNetStatus(false);}
+  }catch(e){Net.peers=[];syncPeers([]);setNetStatus(false);}
   await new Promise(r=>setTimeout(r,document.hidden?3000:800));}}
 
 function makeHttpSample(){
@@ -58,24 +58,27 @@ let wsSock=null,wsFails=0,wsLastPush=0,wsLastMeta='';const wsPeers=new Map();
 let wsLastP=null;
 // координаты — только если сдвинулся или повернулся, а стоя на месте — раз в 3 секунды (раньше ~7 раз в секунду всегда: трафик и батарея)
 function wsPush(){const t=performance.now();if(!wsSock||wsSock.readyState!==1||t-wsLastPush<140)return;const p=buildPresence();
-  const q=wsLastP;if(q&&t-wsLastPush<3000&&Math.abs(q.x-p.x)<0.05&&Math.abs(q.y-p.y)<0.05&&Math.abs(q.hx-p.hx)<0.02&&Math.abs(q.hy-p.hy)<0.02&&q.b===p.b)return;wsLastPush=t;wsLastP={x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b};
-  wsSock.send(JSON.stringify({t:'p',x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b}));
-  const m={n:p.n,r:p.r,c:p.c,w:p.w,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a};const ms=JSON.stringify(m);if(ms!==wsLastMeta){wsLastMeta=ms;wsSock.send(JSON.stringify({t:'m',m}));}}
+  const m={n:p.n,r:p.r,c:p.c,w:p.w,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a},ms=JSON.stringify(m);
+  const pos={x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b,room:p.room,ix:p.ix,iy:p.iy,ihx:p.ihx,ihy:p.ihy},ps=JSON.stringify(pos);
+  if(ps===wsLastP&&ms===wsLastMeta&&t-wsLastPush<3000)return;wsLastPush=t;
+  // Position first: the server must know the room before accepting its speech.
+  if(ps!==wsLastP||ms===wsLastMeta){wsSock.send(JSON.stringify(Object.assign({t:'p'},pos)));wsLastP=ps;}
+  if(ms!==wsLastMeta){wsLastMeta=ms;wsSock.send(JSON.stringify({t:'m',m}));}}
 function wsApply(d){
   if(d.m)for(const [sid,id,meta] of d.m){let e=wsPeers.get(sid);if(!e){e={peer:id,presence:{x:0,y:0,hx:0,hy:1,b:0}};wsPeers.set(sid,e);}e.peer=id;Object.assign(e.presence,meta);}
-  if(d.p)for(const [sid,x,y,hx,hy,b] of d.p){const e=wsPeers.get(sid);if(!e)continue;e.presence.x=x/10;e.presence.y=y/10;e.presence.hx=hx/100;e.presence.hy=hy/100;e.presence.b=b;}
+  if(d.p)for(const [sid,x,y,hx,hy,b,room,ix,iy,ihx,ihy] of d.p){const e=wsPeers.get(sid);if(!e)continue;e.presence.x=x/10;e.presence.y=y/10;e.presence.hx=hx/100;e.presence.hy=hy/100;e.presence.b=b;e.presence.room=room||null;e.presence.ix=ix/100;e.presence.iy=iy/100;e.presence.ihx=ihx/100;e.presence.ihy=ihy/100;}
   if(d.g)for(const sid of d.g)wsPeers.delete(sid);
   if(d.c){Net.crowd=d.c;}if(typeof d.n==='number')Net.online=d.n;
   Net.peers=[...wsPeers.values()];syncPeers(Net.peers);setNetStatus(true);}
 function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';let opened=false;
   try{wsSock=new WebSocket(url);}catch(e){wsFallback();return;}
-  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p,src:netSrc()}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
+  wsSock.onopen=()=>{opened=true;wsFails=0;Net.mode='ws';wsPeers.clear();wsLastMeta='';wsLastP=null;wsLastPush=0;Net.peers=[];syncPeers([]);const p=buildPresence();wsSock.send(JSON.stringify({t:'hello',id:myCid,p,src:netSrc()}));wsLastMeta=JSON.stringify({n:p.n,r:p.r,c:p.c,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a});setNetStatus(true);};
   wsSock.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.t==='w')wsApply(d);
     else if(d.t==='msg'){const m=d.m;if(m.from===myPid())return;if(m.to&&m.to!==myPid())return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
     else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
-  wsSock.onclose=()=>{setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
+  wsSock.onclose=()=>{Net.peers=[];wsPeers.clear();Net.crowd=[];syncPeers([]);setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
 function wsFallback(){if(Net.mode==='http')return;Net.mode='http';httpLoop();}
 // толпа сверх показанных игроков: сервер шлёт только сколько человек в каждой клетке 10×10 м

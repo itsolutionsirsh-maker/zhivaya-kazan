@@ -6,6 +6,7 @@ const {spawn} = require('child_process');
 const {parkSnapshotTaxi} = require('./visual-fixtures');
 const {stageCityLook} = require('./city-look-fixtures');
 const {venueScenes,stageVenueLook} = require('./venue-look-fixtures');
+const {stageSharedVenue} = require('./shared-venues-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -198,6 +199,10 @@ async function phoneUIShots(browser){
       for(const [name,options] of venueScenes){
         const fixture=await pg.evaluate(stageVenueLook,options);await closeCards();await ev('renderInterior()');
         await pg.screenshot({path:`${OUT}/${dev}_venue_${name}.png`});console.log(dev,'venue_'+name,JSON.stringify(fixture));
+      }
+      for(const [name,crowd] of [['18_shared_cafe',false],['19_shared_cafe_crowd',true]]){
+        const fixture=await pg.evaluate(stageSharedVenue,{crowd});await closeCards();await ev('renderInterior()');
+        await pg.screenshot({path:`${OUT}/${dev}_${name}.png`});console.log(dev,name,JSON.stringify(fixture));
       }
       await ctx.close();
     }

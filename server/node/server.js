@@ -10,6 +10,7 @@
 'use strict';
 const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {WebSocketServer}=require('ws');
+const VenueRoom=require('../../site/js/venue-room.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -228,6 +229,17 @@ function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};sto
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
 const players=new Map();let nextSid=1;const bySid=new Map();
+// Separate membership prevents street crowds from evicting room guests from the nearby limit.
+const venueMembers=new Map();
+function venueLeave(p){if(!p.room)return;const members=venueMembers.get(p.room);if(members){members.delete(p);if(!members.size)venueMembers.delete(p.room);}p.room=null;}
+function venueMove(p,d){const v=VenueRoom.read(d),id=v?v.room:null;
+  if(p.room!==id){venueLeave(p);p.meta.sy=null;p.metaS='';p.sayAt=0;p.metaV++;p.dense=false;
+    if(id){let members=venueMembers.get(id);if(!members){members=new Set();venueMembers.set(id,members);}members.add(p);}}
+  p.room=id;p.ix=v?v.ix:0;p.iy=v?v.iy:0;p.ihx=v?v.ihx:0;p.ihy=v?v.ihy:0;
+}
+function visibleMeta(p){return Object.assign({},p.meta,{sy:p.meta.sy&&now()-(p.sayAt||0)<6?p.meta.sy:null});}
+function venueStamp(p){return p.room?[p.room,p.ix,p.iy,p.ihx,p.ihy].join('|'):'';}
+function positionPacket(p){return [p.sid,Math.round(p.x*10),Math.round(p.y*10),Math.round(p.hx*100),Math.round(p.hy*100),p.b,p.room||null,Math.round((p.ix||0)*100),Math.round((p.iy||0)*100),Math.round((p.ihx||0)*100),Math.round((p.ihy||0)*100)];}
 // две сетки: крупная (50 м) — быстро понять, сколько людей вокруг; мелкая (10 м) — найти ближайших в толпе и посчитать её по клеткам
 const CF=10;const coarse=new Map(),fine=new Map();const gkey=(cx,cy)=>(cx+5000)*20000+(cy+5000);
 function gridMove(p){const ck=gkey(Math.floor(p.x/CELL),Math.floor(p.y/CELL)),fk=gkey(Math.floor(p.x/CF),Math.floor(p.y/CF));if(p.cell===ck&&p.fcell===fk)return;gridDel(p);
@@ -237,7 +249,11 @@ function gridDel(p){if(p.cell==null)return;const c=coarse.get(p.cell);if(c){c.se
   const f=fine.get(p.fcell);if(f){f.delete(p);if(!f.size)fine.delete(p.fcell);}p.cell=null;p.fcell=null;}
 function around(x,y,R,cb){const c0=Math.floor((x-R)/CELL),c1=Math.floor((x+R)/CELL),r0=Math.floor((y-R)/CELL),r1=Math.floor((y+R)/CELL);for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(c)for(const p of c.set)cb(p);}}
 // ближайшие соседи: в редком месте — все в радиусе; в толпе — по кольцам мелкой сетки, пока не наберётся K
-function nearest(p,R,K,out){out.length=0;const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);let total=0;
+function nearest(p,R,K,out){out.length=0;
+  if(p.room){const members=venueMembers.get(p.room);if(!members)return 0;
+    for(const o of members)if(o!==p)out.push([Math.hypot(o.ix-p.ix,o.iy-p.iy),o]);
+    const total=out.length;if(total>K){out.sort((a,b)=>a[0]-b[0]);out.length=K;}return total;}
+  const c0=Math.floor((p.x-R)/CELL),c1=Math.floor((p.x+R)/CELL),r0=Math.floor((p.y-R)/CELL),r1=Math.floor((p.y+R)/CELL);let total=0;
   for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(c)total+=c.set.size;}
   const add=o=>{if(o===p)return;const d=Math.hypot(o.x-p.x,o.y-p.y);if(d<=R)out.push([d,o]);};
   if(total<=K*2){around(p.x,p.y,R,add);}
@@ -249,16 +265,18 @@ function crowdCells(p,R){const res=[];const c0=Math.floor((p.x-R)/CELL),c1=Math.
   for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(!c)continue;for(const [fk,n] of c.fine){res.push([Math.floor(fk/20000)-5000,fk%20000-5000,n]);if(res.length>=800)return res;}}return res;}
 const META_KEYS=['n','r','c','v','vc','sy','g','a','w'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
-  if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;gridMove(p);}
+  if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;venueMove(p,d);if(p.room)gridDel(p);else gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
   if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
-    if(m.sy&&typeof m.sy==='object'){if(modBlocked(p))m.sy=null;else if(typeof m.sy.t==='string')m.sy={t:Mod.clean(clean(m.sy.t,140)),i:+m.sy.i||0};}
+    if('sy' in m){const sy=m.sy;if(!sy||typeof sy!=='object'||typeof sy.t!=='string'||!Number.isSafeInteger(sy.i)||modBlocked(p)||modMuted(p)||(p.b&&!p.room)||(sy.room||null)!==(p.room||null))m.sy=null;
+      else{m.sy={t:Mod.clean(clean(sy.t,140)),i:sy.i,room:p.room||null};
+        if(!p.meta.sy||p.meta.sy.i!==sy.i){if(allow('say:'+p.id,6,10))p.sayAt=now();else m.sy=null;}}}
     if('w' in m){const w=m.w,o={};if(w&&typeof w==='object')for(const k of ['h','s','g','b','f'])if(typeof w[k]==='string'&&/^[a-z0-9-]{1,24}$/.test(w[k]))o[k]=w[k];m.w=o;}   // надетые вещи — только номера вещей витрины
     if(m.g&&typeof m.g==='object'&&typeof m.g.t==='string')m.g=Object.assign({},m.g,{t:Mod.clean(clean(m.g.t,60))});if(typeof m.a==='string'&&(m.a.length>2600||!m.a.startsWith('data:image/')))delete m.a;const s=JSON.stringify(m);if(s.length<=4000&&s!==p.metaS){p.meta=Object.assign(p.meta||{},m);p.metaS=s;p.metaV++;}}
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
-  p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
-function delPlayer(p){players.delete(p.id);bySid.delete(p.sid);gridDel(p);}
+  p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,room:null,ix:0,iy:0,ihx:0,ihy:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
+function delPlayer(p){players.delete(p.id);bySid.delete(p.sid);venueLeave(p);gridDel(p);}
 setInterval(()=>{const t=now();for(const p of players.values())if(!p.ws&&t-p.t>15)delPlayer(p);},5000).unref();
 
 // ---------- чат ----------
@@ -324,7 +342,7 @@ function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);
 function apiSync(body,ip){const priv=idstr(body.id);if(priv.length<8)return {err:'bad_id'};const id=pubOf(priv);const p=addPlayer(id,null);p.priv=priv;p.http=true;p.ip=ip;setPresence(p,body.p);visit(priv,body.src,ip);notePeak();
   for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
-  const list=[];around(p.x,p.y,VIEW_R,o=>{if(o!==p&&list.length<VIEW_K)list.push({id:o.id,p:Object.assign({},o.meta,{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b})});});
+  const nearby=[];nearest(p,VIEW_R,VIEW_K,nearby);const list=nearby.map(([,o])=>({id:o.id,p:Object.assign(visibleMeta(o),{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b,room:o.room,ix:o.ix,iy:o.iy,ihx:o.ihx,ihy:o.ihy})}));
   return {players:list,msgs:mine,seq,online:players.size,pid:id};}
 
 // ---------- ИИ: лимит на игрока в день и общий лимит в день ----------
@@ -501,14 +519,14 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
   for(const p of players.values()){if(!p.ws||p.ws.readyState!==1)continue;
     // в плотной толпе — меньше соседей и вдвое реже (2,5 раза в секунду): иначе площадь на тысячи человек съест процессор
     if(p.dense&&(tick+p.sid)%2)continue;
-    const total=nearest(p,VIEW_R,p.dense?VIEW_K_CROWD:VIEW_K,cand);p.dense=total>VIEW_K*3;const shown=new Set();const pos=[],meta=[],gone=[];
+    const total=nearest(p,VIEW_R,p.dense?VIEW_K_CROWD:VIEW_K,cand);p.dense=!p.room&&total>VIEW_K*3;const shown=new Set();const pos=[],meta=[],gone=[];
     for(const [d,o] of cand){shown.add(o.sid);const v=p.view.get(o.sid);
-      if(!v||v.v!==o.metaV)meta.push([o.sid,o.id,o.meta]);
-      const far=d>NEAR_R;if(!v||Math.abs(v.x-o.x)>0.05||Math.abs(v.y-o.y)>0.05||v.b!==o.b){if(!v||!far||tick%2===0){pos.push([o.sid,Math.round(o.x*10),Math.round(o.y*10),Math.round(o.hx*100),Math.round(o.hy*100),o.b]);p.view.set(o.sid,{v:o.metaV,x:o.x,y:o.y,b:o.b});continue;}}
+      if(!v||v.v!==o.metaV)meta.push([o.sid,o.id,visibleMeta(o)]);
+      const stamp=venueStamp(o),far=!p.room&&d>NEAR_R;if(!v||Math.abs(v.x-o.x)>0.05||Math.abs(v.y-o.y)>0.05||v.hx!==o.hx||v.hy!==o.hy||v.b!==o.b||v.venue!==stamp){if(!v||!far||tick%2===0){pos.push(positionPacket(o));p.view.set(o.sid,{v:o.metaV,x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b,venue:stamp});continue;}}
       if(!v||v.v!==o.metaV)p.view.set(o.sid,Object.assign(v||{x:NaN,y:NaN,b:-1},{v:o.metaV}));}
     for(const sid of p.view.keys())if(!shown.has(sid)){gone.push(sid);p.view.delete(sid);}
     const msg={t:'w'};let any=false;if(pos.length){msg.p=pos;any=true;}if(meta.length){msg.m=meta;any=true;}if(gone.length){msg.g=gone;any=true;}
-    if(tick%10===p.sid%10){msg.n=players.size;any=true;if(total>VIEW_K){msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=total>VIEW_K;}
+    if(tick%10===p.sid%10){msg.n=players.size;any=true;if(!p.room&&total>VIEW_K){msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=!p.room&&total>VIEW_K;}
     if(any)wsSend(p,msg);}
   stats.tickMs=stats.tickMs*0.9+Number(process.hrtime.bigint()-t0)/1e6*0.1;},200).unref();
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
