@@ -41,6 +41,20 @@ for(const [name,mk] of Object.entries(backends)){
     r=w.commit('p',{prior:{money:1},incoming:null});assert.deepEqual(r.res,[],'без state — ничего');
     clock.t+=1;r=w.commit('p',{prior:{money:500},incoming:{money:500},wal:{who:w.who('p'),ops:[]}});assert.deepEqual(r.res,[],'новая версия с пустыми операциями — разницу не считаем');});
 
+  test(`${name}: устройство без отпечатка (загрузило игру с сервера) — изменения при запуске засчитываются разницей`,()=>{
+    const {w}=setup();w.commit('p',{prior:{money:10000},incoming:{money:10000},wal:{ops:[]}});
+    // утренний платёж по кредиту при запуске: −1100 до первого ответа сервера
+    let r=w.commit('p',{prior:{money:10000},incoming:{money:8900},wal:{ops:[]}});assert.equal(r.bal,8900);assert.equal(r.res[0].id,'old');assert.equal(r.other,0);
+    r=w.commit('p',{prior:{money:8900},incoming:{money:9e9},wal:{ops:[]}});assert.equal(r.bal,8900+LIM.winMax,'под потолки');
+    r=w.commit('p',{prior:{money:1},incoming:{money:5},wal:{who:'чужой-отпечаток',ops:[]}});assert.equal(r.other,1);assert.deepEqual(r.res,[],'чужой отпечаток — разницу не считаем');});
+
+  test(`${name}: новых операций — не больше perHour в час, остальные ждут`,()=>{
+    const {w,clock,save}=setup();w.commit('p',{});const mk=(p,n)=>Array.from({length:n},(_,i)=>({id:'op-'+p+String(i).padStart(4,'0'),amt:1}));
+    for(let i=0;i<3;i++)assert.equal(save('p',mk('a'+i+'-',500)).res.length,500);
+    let r=save('p',mk('b-',500));assert.equal(r.res.length,0,'час исчерпан — не проводим и не отвечаем');
+    assert.equal(save('p',mk('a0-',10)).res.filter(x=>x.dup).length,10,'повторы — отвечаем всегда');
+    clock.t+=3601;r=save('p',mk('b-',500));assert.equal(r.res.length,500,'через час — проводим');});
+
   test(`${name}: перенос со старого сайта заменил сохранение — кошелёк заводится заново из нового`,()=>{
     const {w}=setup();w.commit('p',{prior:{money:4000}});assert.equal(w.info('p').bal,4000);
     w.forget('p');assert.equal(w.info('p').bal,null);const r=w.commit('p',{prior:{money:25000},incoming:{money:25000}});assert.equal(r.bal,25000);assert.ok(r.init);});

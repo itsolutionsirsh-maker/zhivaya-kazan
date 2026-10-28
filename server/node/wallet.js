@@ -12,11 +12,13 @@
 // Кошелёк заводится при первом сохранении после запуска кошелька. Деньги берутся из прежней серверной копии
 // сохранения (не из той, что пришла сейчас), не больше LIM.migrate; без неё — стартовые. Разница пришедшего
 // сохранения с прежним (у нового аккаунта — деньги гостя сверх стартовых) — как обычный заработок, под потолки.
-// Старая версия игры (открыта во время обновления) кошелька не знает и сохраняет без поля wallet: её деньги
-// засчитываются так же — разницей с прошлым принятым сохранением (проверка base на сервере), под потолки.
+// Старая версия игры (открыта во время обновления) кошелька не знает и сохраняет без поля wallet; устройство, которое
+// ещё не получило отпечаток (первое сохранение после загрузки игры с сервера или после старой версии), шлёт wallet
+// без who. Их деньги засчитываются разницей с прошлым принятым сохранением (проверка base: это та копия, которую
+// устройство загрузило или сохранило последней), под потолки — утренний платёж по кредиту при запуске не теряется.
 'use strict';
 const crypto=require('crypto');
-const LIM={start:3000,migrate:300000,win:600,winMax:60000,dayMax:300000,op:60000,batch:500,keepDays:60};
+const LIM={start:3000,migrate:300000,win:600,winMax:60000,dayMax:300000,op:60000,batch:500,perHour:1500,keepDays:60};
 const ID_RE=/^[A-Za-z0-9_-]{6,48}$/;
 const mskDay=t=>new Date(t*1000+3*3600e3).toISOString().slice(0,10);
 const int=v=>v===null||v===undefined||v===''||typeof v==='boolean'||!Number.isFinite(+v)?NaN:Math.trunc(+v);
@@ -36,11 +38,12 @@ function sqliteBackend(db){
     add:db.prepare('INSERT INTO wops(k,id,amt,req,kind,why,peer,bal,t) VALUES(?,?,?,?,?,?,?,?,?)'),
     ops:db.prepare('SELECT * FROM wops WHERE k=? ORDER BY t DESC LIMIT ?'),
     gained:db.prepare("SELECT COALESCE(SUM(amt),0) AS n FROM wops WHERE k=? AND kind='local' AND amt>0 AND t>?"),
+    count:db.prepare("SELECT COUNT(*) AS n FROM wops WHERE k=? AND kind='local' AND t>?"),
     prune:db.prepare("DELETE FROM wops WHERE t<? AND kind='local'"),del:db.prepare('DELETE FROM wallet WHERE k=?'),
     sum:db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(bal),0) AS total FROM wallet')};
   let depth=0;
   return {kind:'sqlite',get:k=>q.get.get(k)||null,put:w=>q.put.run(w.k,w.bal,w.gen||0,w.day,w.dayIn,w.created,w.updated),op:(k,id)=>q.op.get(k,id)||null,
-    add:o=>q.add.run(o.k,o.id,o.amt,o.req,o.kind,o.why,o.peer||null,o.bal,o.t),ops:(k,n)=>q.ops.all(k,n),gained:(k,since)=>q.gained.get(k,since).n,
+    add:o=>q.add.run(o.k,o.id,o.amt,o.req,o.kind,o.why,o.peer||null,o.bal,o.t),ops:(k,n)=>q.ops.all(k,n),gained:(k,since)=>q.gained.get(k,since).n,count:(k,since)=>q.count.get(k,since).n,
     prune:before=>Number(q.prune.run(before).changes),del:k=>q.del.run(k),summary:()=>q.sum.get(),flush:()=>{},
     // одна запись — одна транзакция: сохранение и его деньги, перевод — у обоих сразу; ошибка посреди — откат всего
     tx:fn=>{if(depth)return fn();depth++;db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){try{db.exec('ROLLBACK');}catch(_){}throw e;}finally{depth--;}}};}
@@ -55,6 +58,7 @@ function jsonBackend(file,fs){let S={w:{},ops:{}};if(file&&fs){try{S=JSON.parse(
     add:o=>{list(o.k).push(Object.assign({},o));dirty=true;},
     ops:(k,n)=>list(k).slice(-n).reverse(),
     gained:(k,since)=>{const l=list(k);let s=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local'&&l[i].amt>0)s+=l[i].amt;return s;},
+    count:(k,since)=>{const l=list(k);let n=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local')n++;return n;},
     prune:before=>{let n=0;for(const k in S.ops){const l=S.ops[k],m=l.filter(o=>o.t>=before||o.kind!=='local');n+=l.length-m.length;S.ops[k]=m;}if(n)dirty=true;return n;},
     del:k=>{delete S.w[k];dirty=true;},summary:()=>{const v=Object.values(S.w);return {n:v.length,total:v.reduce((s,w)=>s+w.bal,0)};},tx:fn=>fn(),flush};}
 
@@ -74,18 +78,23 @@ function Wallet(be,opt){opt=opt||{};const L=Object.assign({},LIM,opt.limits||{})
     const w={k,bal:amt,gen:0,day:mskDay(t),dayIn:0,created:t,updated:t};journal(w,{id:opId('i:'),amt,req,kind:'init',why:p==null?'стартовые деньги':'перенос денег из сохранения'},t);
     const inc=stateTotal(incoming);let first=0;if(inc!=null&&inc!==req)first=local(w,opId('f:'),inc-req,t);
     be.put(w);w.migrated={amt,req,first,firstReq:inc!=null?inc-req:0};return w;}
-  function applyOps(w,ops,res,t){for(const o of ops.slice(0,L.batch)){
+  // новых операций (не повторов) — не больше perHour в час: честное устройство шлёт ~120 и одну пачку после долгого
+  // офлайна; сверх — не проводим и не отвечаем, устройство пришлёт их позже (журнал не раздувается)
+  function applyOps(w,ops,res,t){let room=L.perHour-be.count(w.k,t-3600);for(const o of ops.slice(0,L.batch)){
     const cid=o&&typeof o==='object'?String(o.id||''):'';if(!ID_RE.test(cid)){res.push({id:cid.slice(0,48),err:'bad'});continue;}
     const id='c:'+cid,old=be.op(w.k,id);if(old){res.push({id:cid,amt:old.amt,req:old.req,dup:1});continue;}
     const req=int(o.amt);if(!Number.isFinite(req)||Math.abs(req)>1e9){res.push({id:cid,err:'bad'});continue;}
     if(!req){res.push({id:cid,amt:0,req:0});continue;}
+    if(room--<=0)continue;
     const amt=local(w,id,req,t);res.push(amt===req?{id:cid,amt,req}:{id:cid,amt,req,cut:req-amt});}}
   // сохранение принято: o = {prior: прежнее state на сервере, incoming: пришедшее state, wal: {who, ops}};
   // write() — запись сохранения, в той же транзакции. Ответ — баланс, отпечаток и итог по каждой операции
   function commit(k,o,write){o=o||{};return be.tx(()=>{const t=now();let w=be.get(k);const init=w?null:(w=create(k,o.prior,o.incoming,t)).migrated;
     newDay(w,t);const who=whoOf(k,w.gen);const res=[];let other=0;const wal=o.wal&&typeof o.wal==='object'?o.wal:null;
-    if(wal){const mine=typeof wal.who==='string'&&wal.who===who;if(Array.isArray(wal.ops)&&wal.ops.length&&mine)applyOps(w,wal.ops,res,t);else if(!mine&&(wal.who||(Array.isArray(wal.ops)&&wal.ops.length)))other=1;}
-    // старая версия игры: кошелька не знает — её деньги разницей с прошлым принятым сохранением, под потолки
+    const ops=wal&&Array.isArray(wal.ops)?wal.ops:[],hasWho=!!(wal&&typeof wal.who==='string'&&wal.who);
+    if(hasWho){if(wal.who===who){if(ops.length)applyOps(w,ops,res,t);}else other=1;}   // чужой аккаунт или прежняя игра — не проводим
+    else if(ops.length)other=1;   // операции без отпечатка эта версия не шлёт
+    // старая версия игры или устройство без отпечатка: деньги разницей с прошлым принятым сохранением, под потолки
     else if(!init){const inc=stateTotal(o.incoming),pri=stateTotal(o.prior);if(inc!=null&&pri!=null&&inc!==pri){const req=inc-pri,amt=local(w,opId('o:'),req,t);res.push(amt===req?{id:'old',amt,req}:{id:'old',amt,req,cut:req-amt});}}
     if(write)write();be.put(w);return {bal:w.bal,who,res,init,other};});}
   // перевод между игроками — только по решению сервера (обе стороны согласились, поездка закончилась и т. п.).
