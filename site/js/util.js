@@ -14,6 +14,8 @@ function angDiff(a,b){let d=b-a;while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;r
 function fmtMoney(v){return Math.round(v).toLocaleString('ru-RU')+' ₽';}
 
 // постоянный ключ места (кафе, работа, отдел полиции): по координатам — номер p.i зависит от порядка загрузки кварталов и после перезагрузки другой
+// название в кавычках: «Кафе» — но не «Кафе «Пеликан»» (у некоторых названий кавычки уже внутри)
+function qName(n){n=String(n||'');return /[«"]/.test(n)?n:`«${n}»`;}
 function poiKey(p){return 'p'+Math.round(p.x)+'_'+Math.round(p.y);}
 class Grid{
   constructor(cell){this.cell=cell;this.m=new Map();}
