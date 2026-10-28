@@ -35,26 +35,29 @@ const VENUE_FURNITURE=new Set(['table','chair','counter','machine','board','shel
 // Максимум 1536×1536 RGBA (9 MiB), обычный телефон ~700×550.
 let venueLayer=null;
 const VENUE_FIELDS=['t','x','y','w','h','ang','goods','horiz','c','row','spot'];
-function venueLayerMatches(layer,it,scale){
-  if(!layer||layer.it!==it||layer.scale!==scale||layer.kind!==it.kind||layer.name!==it.name||layer.w!==it.w||layer.h!==it.h||layer.floor!==it.floor||layer.furniture.length!==it.furn.length)return false;
+function venueHospitality(it){return it.kind==='cafe'||it.kind==='bar';}
+function venueLayerTop(it){return venueHospitality(it)?2.5:1.5;}
+function venueLayerMatches(layer,it,scale,night=0){
+  if(!layer||layer.it!==it||layer.scale!==scale||layer.night!==night||layer.kind!==it.kind||layer.key!==it.key||layer.name!==it.name||layer.w!==it.w||layer.h!==it.h||layer.floor!==it.floor||layer.furniture.length!==it.furn.length)return false;
   for(let i=0;i<it.furn.length;i++){const f=it.furn[i],old=layer.furniture[i];
     if(old.own!==!!f.own||old.taken!==!!f.taken||old.ordered!==!!f.ordered)return false;
     for(const field of VENUE_FIELDS)if(old[field]!==f[field])return false;
   }return true;
 }
-function drawVenueLayer(it,iz){
-  const scale=Math.min(iz*DPR,72,1536/(it.w+1),1536/(it.h+2));
-  if(!venueLayerMatches(venueLayer,it,scale)){
-    const canvas=document.createElement('canvas');canvas.width=Math.ceil((it.w+1)*scale);canvas.height=Math.ceil((it.h+2)*scale);
+function drawVenueLayer(it,iz,nightAmount=0){
+  const top=venueLayerTop(it),night=venueHospitality(it)&&nightAmount>=.5?1:0;
+  const scale=Math.min(iz*DPR,72,1536/(it.w+1),1536/(it.h+top+.5));
+  if(!venueLayerMatches(venueLayer,it,scale,night)){
+    const canvas=document.createElement('canvas');canvas.width=Math.ceil((it.w+1)*scale);canvas.height=Math.ceil((it.h+top+.5)*scale);
     const c=canvas.getContext('2d');if(!c)return false;
-    c.setTransform(scale,0,0,scale,.5*scale,1.5*scale);
-    const look=venueLook(it);drawVenueArchitecture(c,it,look);
+    c.setTransform(scale,0,0,scale,.5*scale,top*scale);
+    const look=venueLook(it);drawVenueArchitecture(c,it,look,night);
     // Собственная мебель и экраны рисуются живыми в interior.js.
     for(const f of it.furn)if(!f.own&&VENUE_FURNITURE.has(f.t))drawVenueFurniture(c,f,it,look);
     const furniture=it.furn.map(f=>{const old={own:!!f.own,taken:!!f.taken,ordered:!!f.ordered};for(const field of VENUE_FIELDS)old[field]=f[field];return old;});
-    venueLayer={it,canvas,scale,kind:it.kind,name:it.name,w:it.w,h:it.h,floor:it.floor,furniture};
+    venueLayer={it,canvas,scale,night,kind:it.kind,key:it.key,name:it.name,w:it.w,h:it.h,floor:it.floor,furniture};
   }
-  ctx.drawImage(venueLayer.canvas,-.5,-1.5,venueLayer.canvas.width/scale,venueLayer.canvas.height/scale);return true;
+  ctx.drawImage(venueLayer.canvas,-.5,-top,venueLayer.canvas.width/scale,venueLayer.canvas.height/scale);return true;
 }
 function venueBox(c,x,y,w,h,color,r=0){c.fillStyle=color;if(r){rrect(c,x,y,w,h,r);c.fill();}else c.fillRect(x,y,w,h);}
 function venueDot(c,x,y,r,color){c.fillStyle=color;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();}
@@ -64,7 +67,8 @@ function venueTulip(c,x,y,s,color){
   c.strokeStyle=color;c.lineWidth=.045*s;c.beginPath();c.moveTo(x,y+.2*s);c.lineTo(x,y-.05*s);c.moveTo(x,y+.14*s);c.quadraticCurveTo(x-.25*s,y+.1*s,x-.2*s,y-.04*s);c.moveTo(x,y+.1*s);c.quadraticCurveTo(x+.25*s,y+.06*s,x+.2*s,y-.08*s);c.stroke();
   c.fillStyle=color;c.beginPath();c.moveTo(x,y-.05*s);c.bezierCurveTo(x-.25*s,y-.08*s,x-.19*s,y-.28*s,x-.17*s,y-.3*s);c.lineTo(x,y-.2*s);c.lineTo(x+.17*s,y-.3*s);c.bezierCurveTo(x+.19*s,y-.28*s,x+.25*s,y-.08*s,x,y-.05*s);c.fill();
 }
-function drawVenueArchitecture(c,it,p){
+function drawVenueArchitecture(c,it,p,night=0){
+  if(venueHospitality(it)){drawHospitalityArchitecture(c,it,p,night);return;}
   const w=it.w,h=it.h,k=it.kind,id=venueStyleId(it);
   // Приподнятая задняя стена за игровой границей; не закрывает выход.
   const grad=c.createLinearGradient(0,-1.2,0,0);grad.addColorStop(0,p.wall);grad.addColorStop(1,p.top);
@@ -104,7 +108,189 @@ function venueTop(c,f,p,color){
 }
 function venueCup(c,x,y,r=.12){venueDot(c,x,y,r*1.28,'#F3ECDD');venueDot(c,x+r*.9,y,r*.4,'#E5DCCC');venueDot(c,x,y,r*.76,'#68482C');venueDot(c,x-.02,y-.02,r*.25,'#C39B68');}
 function venuePastry(c,x,y,r=.14){c.fillStyle='#D9954D';c.beginPath();c.moveTo(x,y-r);c.lineTo(x+r,y+r*.7);c.lineTo(x-r,y+r*.7);c.closePath();c.fill();venueDot(c,x,y,.025,'#8B562E');}
+// Детали общепита запекаются в один слой текущей комнаты. Размеры, действия,
+// проходимость и состав людей берутся из прежнего makeInterior().
+function venueSoftLight(c,x,y,r,alpha=.16){
+  const g=c.createRadialGradient(x,y,.05,x,y,r);g.addColorStop(0,`rgba(255,225,160,${alpha})`);g.addColorStop(1,'rgba(255,225,160,0)');
+  venueBox(c,x-r,y-r,r*2,r*2,g);
+}
+function venueBread(c,x,y,r=.17){
+  c.fillStyle='#AD6935';c.beginPath();c.ellipse(x,y+.025,r,r*.63,-.3,0,Math.PI*2);c.fill();
+  c.fillStyle='#E6AF62';c.beginPath();c.ellipse(x,y-.015,r*.92,r*.57,-.3,0,Math.PI*2);c.fill();
+  for(const d of [-.06,.03])venueLine(c,[[x+d-.02,y-.08],[x+d+.035,y+.04]],'#F9D998',.025);
+}
+function venueGlass(c,x,y,color='#DDA45B'){
+  venueDot(c,x+.02,y+.035,.13,'rgba(20,23,19,.25)');venueDot(c,x,y,.12,'#D5E2D3');venueDot(c,x,y,.085,color);
+  venueLine(c,[[x-.06,y-.06],[x-.01,y-.08]],'#FFFFFF',.025);
+}
+function venueTeapot(c,x,y){
+  venueDot(c,x,y,.18,'#EEE2C5');venueDot(c,x,y-.02,.13,'#FBF0D8');venueDot(c,x,y-.02,.045,'#456B59');
+  venueLine(c,[[x+.14,y+.04],[x+.26,y-.09]],'#E6D6B4',.075);
+  c.strokeStyle='#D8C6A1';c.lineWidth=.045;c.beginPath();c.arc(x-.17,y,.095,1.2,5);c.stroke();
+}
+function drawHospitalityArchitecture(c,it,p,night){
+  const w=it.w,h=it.h,id=venueStyleId(it),bar=id==='bar',bakery=id==='bakery',tatar=id==='tatar';
+  // Тихие вариации досок и рабочая плитка. Только плоские материалы под мебелью.
+  c.save();c.beginPath();c.rect(.2,.2,w-.4,h-.4);c.clip();
+  for(let row=0;row<h/.4;row++)for(let col=0;col<w/2.1;col++){
+    const x=col*2.1+(row%3)*.7,y=row*.4;
+    if((row+col)%3===0)venueBox(c,x+.045,y+.05,2,.3,bar?'rgba(250,211,154,.055)':'rgba(255,249,218,.13)');
+    venueLine(c,[[x+.2,y+.14],[x+1.85,y+.16]],'rgba(52,37,23,.055)',.018);
+  }
+  venueBox(c,.35,.35,w-.7,2.25,bar?'#4C554C':tatar?'#AABDB0':'#D7D6C7');
+  c.strokeStyle=bar?'#687064':'#F1EDDC';c.lineWidth=.025;c.beginPath();
+  for(let x=.35;x<w;x+=.55){c.moveTo(x,.35);c.lineTo(x,2.6);}for(let y=.35;y<2.65;y+=.55){c.moveTo(.35,y);c.lineTo(w-.35,y);}c.stroke();
+  venueBox(c,.35,2.6,w-.7,.07,p.accent);
+  for(const f of it.furn)if(f.t==='table'){
+    if(bar){venueDot(c,f.x,f.y,1.37,'rgba(32,25,23,.12)');venueSoftLight(c,f.x,f.y,1.5,.19);}
+    else venueSoftLight(c,f.x,f.y,1.4,.10);
+  }
+  const dx=it.door.x;venueBox(c,dx-1,h-1.15,2,.85,bar?'#3B3C33':p.trim,.08);
+  for(let y=h-1.06;y<h-.4;y+=.12)venueLine(c,[[dx-.88,y],[dx+.88,y]],'rgba(242,226,193,.23)',.025);
+  c.restore();
+  // Высокая задняя стена: теперь читаются окно, меню и рабочая зона.
+  const wall=c.createLinearGradient(0,-2.3,0,0);wall.addColorStop(0,bar?'#3D4943':p.wall);wall.addColorStop(1,bar?'#66705C':p.top);
+  venueBox(c,-.2,-2.25,w+.4,2.3,wall);venueBox(c,-.2,-2.3,w+.4,.1,p.trim);
+  c.save();c.beginPath();c.rect(0,-2.18,w,1.62);c.clip();
+  if(bar||bakery){
+    c.strokeStyle=bar?'rgba(222,209,174,.12)':'rgba(128,86,57,.15)';c.lineWidth=.025;c.beginPath();
+    for(let r=0;r<6;r++){const y=-2.18+r*.3;c.moveTo(0,y);c.lineTo(w,y);for(let x=(r%2)*.5;x<w;x+=1){c.moveTo(x,y);c.lineTo(x,y+.3);}}c.stroke();
+  }else if(tatar){
+    venueBox(c,0,-2.08,w,.28,'#356955');for(let x=.4;x<w;x+=.65)venueTulip(c,x,-1.94,.42,'#E9D7A7');
+  }else{for(let x=w-4.6;x<w;x+=.17)venueBox(c,x,-2.18,.065,1.6,'#8F7758');}
+  c.restore();
+  venueBox(c,0,-.6,w,.6,bar?'#30473D':p.counter);
+  for(let x=.3;x<w;x+=.55)venueLine(c,[[x,-.54],[x,-.09]],'rgba(246,228,181,.19)',.022);
+  venueBox(c,0,-.64,w,.055,p.accent);venueBox(c,0,-.12,w,.16,p.trim);
+  if(!bar){
+    for(const f of it.furn)if(f.t==='window'){
+      const x=f.x-f.w/2;venueBox(c,x-.13,-2.08,f.w+.26,1.52,p.trim,.04);
+      venueBox(c,x,-1.96,f.w,1.25,night?'#263F4A':'#AFCAC4');
+      // Условный вид улицы через стекло, без фотографии и отдельной текстуры.
+      for(let i=0;i<4;i++){
+        const bx=x+i*f.w/4,by=-1.55-(i%2)*.12;venueBox(c,bx,by,f.w/4-.04,-.71-by,night?'#374950':['#B5A387','#C6B99D'][i%2]);
+        for(let j=0;j<2;j++)venueBox(c,bx+.13+j*.22,by+.13,.13,.2,night?'#DDBB79':'#6F8B8B');
+      }
+      venueLine(c,[[x+.15,-1.9],[x+.75,-.8],[x+.92,-.8],[x+.32,-1.9]],'rgba(255,255,247,.33)',.045);
+      venueBox(c,f.x-.045,-1.96,.09,1.25,'#EEE6D5');venueBox(c,x,-1.31,f.w,.06,'#EEE6D5');
+      venueBox(c,x-.16,-.72,f.w+.32,.13,'#EEE2C7',.025);
+    }
+  }else{
+    // Стеллаж напитков в стене; нейтральная посуда без торговых марок.
+    venueBox(c,.75,-2.08,3.55,1.44,'#293D34',.05);
+    for(let r=0;r<2;r++){
+      for(let i=0;i<8;i++){
+        const x=1+i*.4,y=-1.93+r*.65,col=['#8B9F6E','#C49B61','#B78864'][i%3];
+        venueBox(c,x+.055,y,.09,.11,col,.018);venueBox(c,x,y+.1,.2,.31,col,.035);venueBox(c,x+.025,y+.23,.15,.09,'#E4D4B1');
+      }venueBox(c,.83,-1.45+r*.65,3.39,.08,'#B89B66');
+    }
+  }
+  // Меню вывеской, без выдуманных цен, расходящихся с игровыми.
+  const mx=w*.5,mw=4.35;venueBox(c,mx-mw/2-.07,-2.08,mw+.14,1.39,p.accent,.04);venueBox(c,mx-mw/2,-2.01,mw,1.25,bar?'#243C34':'#304A3D',.02);
+  venueText(c,tatar?'АШ БУЛСЫН':bakery?'ИЗ ПЕЧИ':bar?'БАР · КУХНЯ':'КОФЕЙНЯ',mx,-1.69,.35,'#F6E8C5',mw-.3);
+  venueLine(c,[[mx-1.7,-1.43],[mx+1.7,-1.43]],'#A5B095',.025);
+  venueText(c,tatar?'ЧАЙ  ·  ЭЧПОЧМАК':bakery?'ХЛЕБ  ·  ДЕСЕРТЫ':bar?'ЛИМОНАД  ·  ГОРЯЧЕЕ':'КОФЕ  ·  ВЫПЕЧКА',mx,-1.15,.21,'#E1D7B7',mw-.3);
+  // Ниша справа: кофейные пакеты, чайная посуда или хлебные корзины.
+  const sx=w-4.3;venueBox(c,sx,-1.94,3.3,1.18,bar?'#314239':'#D5C19D',.035);
+  for(let row=0;row<2;row++){
+    for(let i=0;i<5;i++){
+      const x=sx+.28+i*.58,y=-1.7+row*.49;
+      if(bakery)venueBread(c,x+.13,y,.23);
+      else if(tatar){venueDot(c,x+.12,y,.17,'#F4E7C7');venueDot(c,x+.12,y,.09,p.trim);}
+      else if(bar)venueGlass(c,x+.12,y,'#BDAD76');
+      else{venueBox(c,x,y-.16,.32,.31,i%2?'#A37249':'#E8D4A6',.02);venueBox(c,x+.04,y-.06,.24,.1,'#F5EDD6');}
+    }venueBox(c,sx,-1.42+row*.49,3.3,.07,p.wood);
+  }
+  for(const x of [.47,w-.47]){
+    venueSoftLight(c,x,-1.25,.62,.5);venueLine(c,[[x,-2.23],[x,-1.52]],p.trim,.04);
+    venueBox(c,x-.19,-1.55,.38,.22,bar?'#C6A468':p.trim,.045);venueBox(c,x-.13,-1.34,.26,.045,'#FFF1C3');
+  }
+  // Низкий боковой плинтус оставляет видимыми людей и проходы.
+  venueBox(c,.2,.2,.11,h-.5,p.trim);venueBox(c,w-.31,.2,.11,h-.5,p.trim);
+}
+function drawHospitalityFurniture(c,f,it,p){
+  const id=venueStyleId(it),bar=id==='bar',tatar=id==='tatar',bakery=id==='bakery',x=f.x-f.w/2,y=f.y-f.h/2;
+  switch(f.t){
+    case 'board':return true; // Доска теперь на поднятой задней стене.
+    case 'table':{
+      const r=f.w/2;venueDot(c,f.x+.08,f.y+.17,r+.03,'rgba(27,24,20,.24)');venueDot(c,f.x,f.y+.09,r,bar?'#322E28':'#6F5237');
+      venueDot(c,f.x,f.y-.025,r,bar?'#BC9C68':p.trim);venueDot(c,f.x,f.y-.04,r-.045,bar?'#665144':bakery?'#F0E4CC':p.wood);
+      c.save();c.beginPath();c.arc(f.x,f.y-.04,r-.065,0,Math.PI*2);c.clip();
+      for(let j=-2;j<=2;j++)venueLine(c,[[x,f.y+j*.19],[x+f.w,f.y+j*.19+.03]],bar?'rgba(234,202,155,.12)':'rgba(106,75,44,.16)',.018);c.restore();
+      if(tatar){venueBox(c,f.x-.14,y+.06,.28,f.h-.15,'#F1E6CB',.02);venueTulip(c,f.x,f.y,.44,p.trim);}
+      // Заказ и занятость уже входят в ключ кеша. Сервировка не создаёт предметов игры.
+      if(f.taken||f.ordered){
+        for(const dx of [-.28,.28]){
+          venueDot(c,f.x+dx,f.y+.04,.2,'#E9DBC0');venueDot(c,f.x+dx,f.y+.02,.16,'#FAF2DB');
+          if(bar){venueBox(c,f.x+dx-.08,f.y-.04,.16,.12,'#B76A3D',.04);for(let j=0;j<3;j++)venueLine(c,[[f.x+dx-.06+j*.05,f.y+.08],[f.x+dx-.035+j*.05,f.y+.14]],'#DCA958',.035);}
+          else if(tatar)venuePastry(c,f.x+dx,f.y,.13);else venueBread(c,f.x+dx,f.y,.13);
+        }
+        if(tatar)venueTeapot(c,f.x,f.y-.28);else if(bar)venueGlass(c,f.x,f.y-.3);else venueCup(c,f.x,f.y-.3,.10);
+      }else{
+        venueBox(c,f.x+.18,f.y-.2,.18,.28,'#F1E6D0',.02);venueLine(c,[[f.x+.22,f.y-.11],[f.x+.31,f.y-.11]],p.trim,.02);
+        if(bar){venueDot(c,f.x-.16,f.y,.11,'#B49461');venueDot(c,f.x-.16,f.y,.065,'#FFDEA1');}
+        else{venueDot(c,f.x-.14,f.y,.09,'#EBDEC4');venueLine(c,[[f.x-.14,f.y],[f.x-.18,f.y-.18]],p.trim,.025);venueDot(c,f.x-.18,f.y-.18,.065,bakery?'#D19B83':'#608364');}
+      }return true;
+    }
+    case 'chair':{
+      c.save();c.translate(f.x,f.y);c.rotate(f.ang||0);
+      venueBox(c,-.24,-.21,.57,.55,'rgba(20,24,18,.25)',.1);
+      for(const a of [-.19,.19])for(const b of [-.19,.19])venueBox(c,a-.025,b-.025,.05,.05,'#463C2F');
+      venueBox(c,-.24,-.24,.5,.48,p.trim,.12);venueBox(c,-.18,-.2,.4,.38,bar?'#A36952':bakery?'#C9957A':p.seat,.10);
+      venueBox(c,-.33,-.27,.13,.54,bar?'#8F5646':p.wood,.065);venueLine(c,[[-.28,-.19],[-.28,.19]],'rgba(255,231,184,.4)',.025);
+      venueLine(c,[[-.12,-.15],[.14,-.15]],'rgba(255,245,221,.24)',.025);c.restore();return true;
+    }
+    case 'counter':{
+      venueTop(c,f,p,bar?'#546357':bakery?'#F0DFC3':'#DDD5BC');
+      const fy=y+f.h-.32;venueBox(c,x+.035,fy,f.w-.07,.3,bar?'#304A3D':p.counter,.025);
+      for(let a=x+.16;a<x+f.w-.1;a+=.18)venueLine(c,[[a,fy+.045],[a,fy+.26]],'rgba(238,222,183,.2)',.022);
+      venueBox(c,x+.05,fy-.045,f.w-.1,.045,'#F2D5A0');venueBox(c,x+.07,y+f.h-.04,f.w-.14,.04,p.trim);
+      const cw=Math.min(3.65,f.w*.31),cx=x+.18;
+      if(!bar){
+        // Стеклянная витрина: два подноса, блик, металлический кант.
+        venueBox(c,cx,y+.08,cw,.78,'#57786D',.045);venueBox(c,cx+.07,y+.14,cw-.14,.64,'#C8B48C',.025);
+        for(let r=0;r<2;r++)for(let i=0;i<5;i++){
+          const a=cx+.3+i*(cw-.5)/5,b=y+.29+r*.29;venueBox(c,a-.12,b-.105,.31,.21,'#E9D9B4',.025);
+          if(tatar)venuePastry(c,a+.035,b,.12);else venueBread(c,a+.035,b,.12);
+        }
+        venueBox(c,cx+.08,y+.16,cw-.16,.58,'rgba(192,225,220,.16)');venueLine(c,[[cx+.25,y+.16],[cx+.65,y+.72],[cx+.95,y+.72]],'rgba(255,255,255,.6)',.045);
+        venueLine(c,[[cx+.03,y+.08],[cx+cw-.03,y+.08],[cx+cw-.03,y+.82]],'#ECF1DD',.045);
+        if(tatar){venueTeapot(c,f.x-.6,y+.43);for(const a of [f.x-.05,f.x+.4])venueCup(c,a,y+.44,.12);}
+        else{
+          // Подносы, стопки чашек и салфетки рядом с местом выдачи.
+          venueBox(c,f.x-.9,y+.15,1.7,.65,p.wood,.04);
+          for(let i=0;i<3;i++){venueCup(c,f.x-.58+i*.48,y+.38,.12);venueLine(c,[[f.x-.67+i*.48,y+.54],[f.x-.48+i*.48,y+.54]],'#EDE3CC',.025);}
+        }
+      }else{
+        venueBox(c,cx,y+.12,3.6,.68,'#273F35',.04);
+        for(let i=0;i<4;i++)venueGlass(c,cx+.45+i*.72,y+.43,['#D9AA62','#AEB978','#C78261','#CCB779'][i]);
+        venueBox(c,f.x-.6,y+.16,1.2,.62,'#B69666',.045);venueBox(c,f.x-.55,y+.21,1.1,.52,'#544E39',.025);
+        for(let i=0;i<3;i++)venueDot(c,f.x-.3+i*.3,y+.44,.105,['#DFB346','#9EA962','#DBA55A'][i]);
+      }
+      const px=x+f.w-1.03;venueBox(c,px+.16,y+.42,.46,.27,'#566257',.03);venueBox(c,px,y+.12,.79,.39,'#293F37',.04);
+      venueBox(c,px+.07,y+.17,.65,.23,'#A8C3AB',.02);venueLine(c,[[px+.13,y+.26],[px+.53,y+.26]],'#5D8475',.035);
+      venueBox(c,px-.32,y+.34,.22,.26,'#ECE0C2',.02);return true;
+    }
+    case 'machine':{
+      if(bar){
+        venueBox(c,x,y,f.w,f.h,'#2C4338',.04);
+        for(const dx of [.24,.6]){
+          venueLine(c,[[x+dx,y+.5],[x+dx,y+.17],[x+dx+.13,y+.17],[x+dx+.13,y+.3]],'#DBC797',.07);
+          venueDot(c,x+dx,y+.12,.075,'#F2DC9D');venueGlass(c,x+dx+.13,y+.4);
+        }
+      }else{
+        venueTop(c,f,p,'#B9C7BE');venueBox(c,x+.025,y+.02,f.w-.05,.22,bar?'#304A3D':p.counter,.035);
+        for(const dx of [.24,.6]){
+          venueDot(c,x+dx,y+.13,.06,'#F5ECD7');venueLine(c,[[x+dx,y+.27],[x+dx,y+.36],[x+dx+.1,y+.36]],'#303E37',.04);venueCup(c,x+dx,y+.47,.085);
+        }
+        venueBox(c,x+.1,y+.56,f.w-.2,.035,'#6D7F75');
+      }return true;
+    }
+    default:return false;
+  }
+}
 function drawVenueFurniture(c,f,it,p){
+  if(venueHospitality(it)&&drawHospitalityFurniture(c,f,it,p))return;
   const x=f.x-f.w/2,y=f.y-f.h/2,k=it.kind,id=venueStyleId(it),tau=Math.PI*2;
   switch(f.t){
     case 'wardCabinet':{

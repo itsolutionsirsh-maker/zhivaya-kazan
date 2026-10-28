@@ -31,3 +31,19 @@ test('window light is bounded and stays below furniture; night reuses one small 
   s.drawInteriorFloor(it,0);assert.equal(calls.filter(c=>c[0]==='moveTo').length,8);assert.equal(calls.filter(c=>c[0]==='drawImage').length,0);
   calls.length=0;s.drawInteriorFloor(it,1);assert.equal(calls.filter(c=>c[0]==='drawImage').length,1);
 });
+
+test('food venues fit their raised wall, floor and exit on portrait and landscape phones',()=>{
+  const {s}=setup();s.venueHospitality=it=>it.kind==='cafe'||it.kind==='bar';s.venueLayerTop=()=>2.5;
+  for(const [width,height] of [[360,640],[390,844],[412,915],[844,390],[1280,800]]){
+    for(const it of [{kind:'cafe',w:16,h:11},{kind:'bar',w:14,h:10}]){
+      const v=s.interiorView(it,width,height);
+      assert.ok(v.iz>0);assert.ok(v.ox-.5*v.iz>=0);assert.ok(v.ox+(it.w+.5)*v.iz<=width);
+      assert.ok(v.oy-2.5*v.iz>=115.9);assert.ok(v.oy+(it.h+.8)*v.iz<=height-90);
+      // The same origin and scale round-trip pointer targets into room coordinates.
+      for(const [x,y] of [[it.w/2,it.h],[2.9,4.6]]){
+        assert.ok(Math.abs(((v.ox+x*v.iz)-v.ox)/v.iz-x)<1e-10);
+        assert.ok(Math.abs(((v.oy+y*v.iz)-v.oy)/v.iz-y)<1e-10);
+      }
+    }
+  }
+});

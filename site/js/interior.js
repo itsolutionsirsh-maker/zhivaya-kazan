@@ -153,15 +153,25 @@ function drawInteriorFloor(it,night){
     ctx.globalAlpha=1;}
   ctx.restore();
 }
+function interiorView(it,width,height){
+  if(venueHospitality(it)){
+    // Видна вся комната вместе с поднятой стеной и выходом, включая телефон боком.
+    const top=116,bottom=width>height?98:height<720?276:176,pad=venueLayerTop(it),available=Math.max(40,height-top-bottom);
+    const iz=Math.max(2,Math.min((width-40)/(it.w+1),available/(it.h+pad+.9),46));
+    return {iz,ox:(width-it.w*iz)/2,oy:top+pad*iz+Math.max(0,(available-(it.h+pad+.9)*iz)/2)};
+  }
+  const iz=Math.max(16,Math.min((width-40)/(it.w+1),(height-250)/(it.h+1.5),46));
+  return {iz,ox:(width-it.w*iz)/2,oy:Math.max(124,(height-it.h*iz)/2-10)};
+}
 function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);
-  const iz=clamp(Math.min((W-40)/(it.w+1),(H-250)/(it.h+1.5)),16,46);const ox=(W-it.w*iz)/2,oy=Math.max(124,(H-it.h*iz)/2-10);it.iz=iz;it.ox=ox;it.oy=oy;
+  const {iz,ox,oy}=interiorView(it,W,H);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
   // пол
-  const finish=interiorFinish(it.kind,it.name),fl=finish.floor||FLOORS[it.floor]||FLOORS.wood;drawInteriorFloor(it,nightAmount());
+  const finish=interiorFinish(it.kind,it.name),fl=finish.floor||FLOORS[it.floor]||FLOORS.wood,night=nightAmount();drawInteriorFloor(it,night);
   // мебель
   const t=performance.now()/1000;
-  const furnished=drawVenueLayer(it,iz);
-  for(const f of it.furn)if(!furnished||f.own||!VENUE_FURNITURE.has(f.t))drawFurniture(f,it,t);
+  const furnished=drawVenueLayer(it,iz,night);
+  for(const f of it.furn)if(!furnished||f.own||(!VENUE_FURNITURE.has(f.t)&&!(venueHospitality(it)&&f.t==='window')))drawFurniture(f,it,t);
   if(it.kind==='metro'&&typeof drawMetroTrain==='function')drawMetroTrain(it,t);
   // стены
   ctx.strokeStyle=finish.trim;ctx.lineWidth=.4;ctx.strokeRect(0,0,it.w,it.h);
