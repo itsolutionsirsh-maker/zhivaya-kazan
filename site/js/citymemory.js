@@ -15,24 +15,24 @@ const MEM_REP=[[/донести сумку/,'carried'],[/угостили/,'fed'
 // {street} — в форме после «на»: «на улице Баумана».
 const MEM_PAPER={
   helped:['Происшествие на {street}: пострадавшему помогли дождаться скорой. Врачи говорят — вовремя. Спасибо, {name}!','На {street} человеку стало плохо, но рядом нашёлся {name}: скорая приехала к живому разговору, а не к толпе.'],
-  carried:['{who} просит передать спасибо: тяжёлую сумку до самого подъезда донёс {name}. Соседи такое запоминают.'],
-  fed:['На {street} человека без дома сегодня угостили обедом. Угощал {name}. Мелочь, а день у кого-то стал лучше.'],
-  bought:['Уличная торговля жива: у продавца {who} сегодня купили {what}. Покупатель — {name}, обещал вернуться.'],
-  tipped:['{who} играл на {street}, и в футляр упала монета от {name}. Песня, говорят, стала громче.'],
+  carried:['Сумку {who_g} донесли до самого подъезда — спасибо, {name}. Соседи такое запоминают.'],
+  fed:['На {street} человека без дома сегодня угостили обедом — спасибо, {name}. Мелочь, а день у кого-то стал лучше.'],
+  bought:['Уличная торговля жива: у продавца {who_g} сегодня купили {what}. Покупатель — {name}.'],
+  tipped:['На {street} играла музыка {who_g}, и в футляр упала монета. Слушатель — {name}. Песня, говорят, стала громче.'],
   books:['Коробка сказок дошла до «{place}»: соседка Фидания и {name} собрали книги для соседского чтения.'],
-  thief:['На {street} карманник не ушёл далеко: его догнал {name}. Полиция благодарит.'],
-  wallet:['Потерянный кошелёк вернулся к владельцу. Нашёл и отдал — {name}. В Казани так бывает.'],
-  complaint:['Жалоба жителей с {street} поедет в мэрию: передать её взялся {name}. Двор ждёт.'],
+  thief:['На {street} карманник не ушёл далеко — спасибо, {name}. Полиция благодарит.'],
+  wallet:['Потерянный кошелёк вернулся к владельцу — спасибо, {name}. В Казани так бывает.'],
+  complaint:['Жалоба жителей поедет в мэрию: передать её обещано, и обещание — за {name}. Двор ждёт.'],
   prosecutor:['Дело Бирэн абый: в приёмной снова движение. Источник редакции — горожанин {name}.'],
   moved:['Новосёл недели — {name}: новый адрес {address} ({district}). Соседи присматриваются.'],
-  shift:['В «{place}» новый сотрудник: смену ({job}) закрыл {name}. Начальство довольно.'],
+  shift:['В «{place}» закрыта ещё одна смена ({job}). Новый сотрудник — {name}, начальство довольно.'],
   rep:['Город обсуждает горожанина {name}: «{why}».'],
   fined:['Штрафов за день стало на один больше: {what}, {sum}. Получатель — {name}.'],
   crash:['ДТП на {street}: участник — {name}. Обошлось без тяжёлых последствий, ждали ГИБДД.'],
   hit:['На {street} машина задела пешехода. Пострадавший — {name}, скорая приехала быстро.'],
-  drunk:['Вечером на {street} горожанин {name} громко объяснял прохожим устройство мира. Устройство мира не возражало.'],
-  cold:['Сезон простуд: под дождём промок даже {name}. Аптеки напоминают про зонты.'],
-  evicted:['Квартирный вопрос: у {name} спор с хозяйкой закончился переездом. Гостиницы рядом есть.'],
+  drunk:['Вечером на {street} было шумно: прохожим объясняли устройство мира. Говорят, это {name}. Устройство мира не возражало.'],
+  cold:['Сезон простуд: под дождём промокли многие, в том числе {name}. Аптеки напоминают про зонты.'],
+  evicted:['Квартирный вопрос: спор с хозяйкой закончился переездом. Новое жильё ищет {name}. Гостиницы рядом есть.'],
   newcomer:['В городе новый житель — {name} ({district}). Добро пожаловать в Казань.'],
   quiet:['В городе спокойно: пробки обычные, трамваи по расписанию.','День без происшествий. Даже голуби на Баумана вели себя прилично.','Тихий день: дворники успели больше, чем обещали.']
 };
@@ -80,13 +80,27 @@ function memNote(kind,info){
   S.deeds.push(d);S.deeds=S.deeds.filter(x=>clock.day-x.day<=10).slice(-40);
   for(const id of Object.keys(S.told)){S.told[id]=(S.told[id]||[]).filter(n=>S.deeds.some(x=>x.id===n));if(!S.told[id].length)delete S.told[id];}
   progSave();return d;}
+// Имя своего человека по падежам: {who} — кто (Нина), {who_g} — у кого/для кого (Нины), {who_d} — кому (Нине),
+// {who_v} — кого (Нину), {who_t} — с кем (Ниной). Женские имена на согласный (Гульназ, Ляйсан) не склоняются.
+function memDecl(name,female,cs){
+  if(!name)return ({g:'соседа',d:'соседу',v:'соседа',t:'соседом'})[cs]||'сосед';if(!cs)return name;const n=name;
+  if(/ия$/.test(n)){const s=n.slice(0,-1);return ({g:s+'и',d:s+'и',v:s+'ю',t:s+'ей'})[cs];}
+  if(/а$/.test(n)){const s=n.slice(0,-1);return ({g:s+(/[гкхжшщч]$/.test(s)?'и':'ы'),d:s+'е',v:s+'у',t:s+(/[жшщчц]$/.test(s)?'ей':'ой')})[cs];}
+  if(/я$/.test(n)){const s=n.slice(0,-1);return ({g:s+'и',d:s+'е',v:s+'ю',t:s+'ей'})[cs];}
+  if(female)return n;
+  if(/[йь]$/.test(n)){const s=n.slice(0,-1);return ({g:s+'я',d:s+'ю',v:s+'я',t:s+'ем'})[cs];}
+  if(/[бвгджзклмнпрстфхцчшщ]$/.test(n))return ({g:n+'а',d:n+'у',v:n+'а',t:n+(/[жшщчц]$/.test(n)?'ем':'ом')})[cs];
+  return n;}
+// просто {who} — только там, где нужен именительный: в начале фразы, после точки, тире, двоеточия, запятой или «и».
+// Иначе текст пропускаем (до падежных {who_g}…), чтобы не вышло «сумку Нина донесли».
+function memUsable(text){const t=String(text);let i=-1;while((i=t.indexOf('{who}',i+1))>=0){const before=t.slice(0,i);if(!/(^|[.!?:—–,]\s*|\s[иИ]\s+)$/.test(before))return false;}return true;}
 function memFill(text,d){const name=(typeof player!=='undefined'&&player.name)||'горожанин';
-  return String(text).replace(/\{(\w+)\}/g,(m,k)=>{const v=k==='name'?name:k==='street'?memOn(d&&d.street):k==='sum'?(d&&d.sum?fmtMoney(d.sum):''):k==='n'?String(2+Math.floor(Math.random()*2)):d&&d[k]!=null?String(d[k]):'';
+  return String(text).replace(/\{(\w+)\}/g,(m,k)=>{const wc=/^who_([gdvt])$/.exec(k);const v=k==='name'?name:wc?memDecl(d&&d.who,d&&d.whoF,wc[1]):k==='street'?memOn(d&&d.street):k==='sum'?(d&&d.sum?fmtMoney(d.sum):''):k==='n'?String(2+Math.floor(Math.random()*2)):d&&d[k]!=null?String(d[k]):'';
     return v||({street:'одной из улиц города',who:'сосед',place:'центр города',what:'покупку',job:'работа',address:'новый адрес',district:'Казань',why:'сделали что-то хорошее'})[k]||'';}).replace(/\s+([,.!?])/g,'$1').trim().replace(/^./,c=>c.toUpperCase());}
-function memPaperTexts(kind){const T=((window.cityPaper&&window.cityPaper.templates)||[]).filter(t=>t&&t.kind===kind&&t.text).map(t=>t.text);return T.length?T:(MEM_PAPER[kind]||[]);}
+function memPaperTexts(kind){const T=((window.cityPaper&&window.cityPaper.templates)||[]).filter(t=>t&&t.kind===kind&&t.text&&memUsable(t.text)).map(t=>t.text);return T.length?T:(MEM_PAPER[kind]||[]);}
 function memGossipTexts(kind,type){const G=Array.isArray(window.cityGossip)?window.cityGossip:[];
-  const own=type?G.filter(g=>g&&g.kind===kind&&g.type===type).flatMap(g=>g.lines||[]):[];if(own.length)return own;
-  const all=G.filter(g=>g&&g.kind===kind&&!g.type).flatMap(g=>g.lines||[]);return all.length?all:(MEM_GOSSIP[kind]||[]);}
+  const own=type?G.filter(g=>g&&g.kind===kind&&g.type===type).flatMap(g=>g.lines||[]).filter(memUsable):[];if(own.length)return own;
+  const all=G.filter(g=>g&&g.kind===kind&&!g.type).flatMap(g=>g.lines||[]).filter(memUsable);return all.length?all:(MEM_GOSSIP[kind]||[]);}
 const memRank=k=>{const i=MEM_ORDER.indexOf(k);return i<0?99:i;};
 
 // ---------- вечерняя газета ----------
@@ -132,7 +146,7 @@ function memWeatherLine(){const k=memWeatherKind();if(!k)return null;const W=(wi
 
 // ---------- подключение ----------
 function memInit(){MEM.ready=true;
-  wrap('sitRep',(r,a)=>{const n=a[0],why=a[1];if(!why)return;const m=MEM_REP.find(([re])=>re.test(why));const fa=typeof sitActive==='function'&&sitActive('folkAct'),who=fa&&fa.w&&fa.w.p?fa.w.p.name:'';if(m)memNote(m[1],{why,who});else if(n)memNote('rep',{why,good:n>0?1:0});});
+  wrap('sitRep',(r,a)=>{const n=a[0],why=a[1];if(!why)return;const m=MEM_REP.find(([re])=>re.test(why));const fa=typeof sitActive==='function'&&sitActive('folkAct'),who=fa&&fa.w&&fa.w.p?fa.w.p.name:'',whoF=fa&&fa.f&&fa.f.female?1:0;if(m)memNote(m[1],{why,who,whoF});else if(n)memNote('rep',{why,good:n>0?1:0});});
   wrap('playerCrash',()=>memNote('crash'));
   wrap('playerHitByCar',()=>memNote('hit'));
   wrap('prosNoteFine',(r,a)=>{const sum=Math.round(a[0]||0),what=String(a[1]||'штраф');if(sum>0&&!/владельцу/.test(what))memNote('fined',{sum,what:what.replace(/^[^А-Яа-яA-Za-z]+/,'')});});
@@ -140,7 +154,7 @@ function memInit(){MEM.ready=true;
   wrap('evictHome',()=>memNote('evicted'));
   wrap('housingMove',(r,a)=>{const f=a[0];if(r&&f)memNote('moved',{address:f.address,district:typeof housingDistrictName==='function'?housingDistrictName(f):''});});
   wrap('shiftEnd',(r,a)=>{const j=a[0];if(j&&j.len&&j.present/(j.len*60)>=0.7)memNote('shift',{job:j.t||'смена',place:j.name||''});});
-  wrap('addEvent',(r,a)=>{const m=/^Покупка: (.+) · (.+)$/.exec(String(a[0]||''));if(m)memNote('bought',{what:m[1],who:m[2]});});
+  wrap('addEvent',(r,a)=>{const m=/^Покупка: (.+) · (.+)$/.exec(String(a[0]||''));if(m){const f=typeof FOLK!=='undefined'&&FOLK.list.find(q=>q.name===m[2]);memNote('bought',{what:m[1],who:m[2],whoF:f&&f.female?1:0});}});
   // контекст для ИИ дописываем к ответу folkContext (wrap не меняет возврат)
   const fc=window.folkContext;if(typeof fc==='function')window.folkContext=function(...a){const r=fc.apply(this,a);return r?r+memContext():r;};
   const S=memState();if(!S.started){S.started=1;const fresh=!PROG.c||!Object.keys(PROG.c).length;if(fresh)memNote('newcomer',{district:memDistrict()});progSave();}}
