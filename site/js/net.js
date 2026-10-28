@@ -103,9 +103,9 @@ function acctServerNewer(j){if(syncRev)return (j.updated||0)>syncRev+0.001;retur
 // решение при запуске (сайт — acctSyncOnBoot, Телега — tgAfter): true — берём серверную копию и перезапускаемся
 function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store'});return r.json();}
-function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
+function acctSnapshot(){if(window.zkNoSave)return null;if(typeof walletStage==='function')walletStage();try{saveState();}catch(e){}/* изменения денег — операцией кошелька, вместе с сохранением (wallet.js) */let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
 async function acctSave(){if(!acct||window.zkNoSave)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
-  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},snap));if(j.ok){if(j.updated)setRev(j.updated);return;}
+  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},snap));if(j.ok){if(j.updated)setRev(j.updated);if(typeof walletSync==='function')await walletSync();return;}
     if(j.err==='conflict'){acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
     if(j.err==='too_big'&&!Net.bigTold){Net.bigTold=true;setHint('Сохранение слишком большое — на сервер не уходит. Напишите нам');}
     if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}}
@@ -125,7 +125,7 @@ function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acc
 if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 setInterval(acctSave,30000);
-window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave||!Net.syncReady)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token,base:syncRev||undefined},snap))],{type:'application/json'}));}catch(e){}});
+window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave||!Net.syncReady)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token,base:syncRev||undefined},snap))],{type:'application/json'}));}catch(e){}if(typeof walletBeacon==='function')walletBeacon();});
 // ---------- вход на сайте через Телеграм: тот же аккаунт и прогресс, что в мини-приложении ----------
 // сервер даёт ссылку на бота с одноразовым кодом; игрок жмёт в боте «Да, войти»; сайт ждёт по своему секрету (до 5 минут)
 const TGW={poll:null,timer:null,until:0,link:''};
@@ -160,6 +160,7 @@ function acctApply(j){
     if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));
     if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));
     if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');
+    if(typeof walletRebase==='function')walletRebase(j.state);   // деньги этого сохранения — база кошелька (wallet.js)
   }}catch(e){}
   const m=$('#acctMsg');if(m)m.textContent=keepLocal?'Поездка уже оплачена — продолжаем сохранённую игру…':'Прогресс загружен с сервера — перезапускаем…';location.reload();
 }
@@ -181,5 +182,5 @@ async function netInit(){
     if(r){roomNs=r;Net.mode='room';r.onPeers(()=>{const list=roomPeers();Net.peers=list;syncPeers(list);readRoomMsgs(list);setNetStatus(true);},()=>{roomNs=null;Net.mode='off';peerRender.clear();setNetStatus(false);});pushPresence();setNetStatus(true);return;}}
   if(location.protocol.startsWith('http')&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
     try{const t0=Date.now();const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){if(j.now>1e12){const off=j.now-(t0+Date.now())/2;if(Math.abs(off)>2000)clockOff=off;}   // часы игры у всех по серверу, даже если на телефоне время сбито
-      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
+      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
   Net.mode='off';setNetStatus(false);}

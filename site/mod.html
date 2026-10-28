@@ -12,7 +12,7 @@ main{max-width:860px;margin:0 auto;padding:16px}h1{font-size:20px;margin:4px 0 1
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{flex:1;min-width:0;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit}
 button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer}button.go{background:var(--accent);border-color:var(--accent);color:#fff}button.bad{border-color:var(--bad);color:#ffb3bc}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}.meta{color:var(--muted);font-size:12px}.txt{margin:6px 0;overflow-wrap:anywhere}
-.msg{color:var(--muted);margin:8px 0}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600;font-size:12px}.wrap{overflow-x:auto}.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.msg{color:var(--muted);margin:8px 0}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600;font-size:12px}.wrap{overflow-x:auto}.wj td:nth-child(2),.wj th:nth-child(2){text-align:left}.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -27,6 +27,8 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
 <h2>Баны</h2><div id="bans"></div>
 <h2>Сейчас в игре</h2><div id="online"></div>
+<h2>Кошелёк игрока</h2><p class="msg">Деньги аккаунта хранятся на сервере. Имя для входа по PIN или номер Телеграма. Сверх потолков заработка сервер не засчитывает — это видно в журнале (запрошено → проведено).</p>
+<div class="row"><input id="wName" placeholder="Имя или номер Телеграма" autocomplete="off"><button id="wGo">Показать</button></div><div id="wOut"></div>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -51,7 +53,7 @@ async function load(){$('#st').textContent='Загружаю…';let j;try{j=awa
   const O=$('#online');O.innerHTML='';if(!j.online.length)O.append(el('p','msg','Никого'));for(const p of j.online){const c=el('div','card');c.append(el('div','meta',`${p.n} · ${p.id}`),actions(p.id,p.n));O.append(c);}}
 async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e){return;}if(!j.ok){$('#sum').textContent=j.err==='no_sqlite'?'Цифры есть только с базой SQLite (Node 22+)':'';return;}
   const pc=(a,b,ready)=>!ready?'…':b?Math.round(a/b*100)+'%':'—';
-  $('#sum').textContent=`Всего игроков за всё время: ${j.everyone} · сейчас в игре: ${j.online} · пик сегодня: ${j.peakToday}. «…» — день ещё не наступил.`;
+  $('#sum').textContent=`Всего игроков за всё время: ${j.everyone} · сейчас в игре: ${j.online} · пик сегодня: ${j.peakToday}${j.wallet?` · кошельков на сервере: ${j.wallet.n}, денег у игроков: ${Number(j.wallet.total).toLocaleString('ru-RU')} ₽`:''}. «…» — день ещё не наступил.`;
   const b=j.boot,sec=v=>v==null?'—':(v/1000).toFixed(1).replace('.',',')+' с',pair=k=>b[k]?`${sec(b[k][0])} (у 9 из 10 — до ${sec(b[k][1])})`:'—';
   {const L=j.llm,t=L&&L.today;if(L)$('#llm').textContent=!L.on?'ИИ жителей выключен: на /setup нет ключа Claude (или сервер ещё не поставил пакет).':
     `ИИ жителей: ${L.model}, сегодня ответов ${t.n}, токенов на входе ${t.tin}, на выходе ${t.tout}${/haiku-5-5/.test(L.model)?` (≈ $${(t.tin*0.1/1e6+t.tout*0.5/1e6).toFixed(2)} по тарифу Haiku 5.5)`:''}. `+
@@ -61,6 +63,17 @@ async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e
   const T=$('#days');T.innerHTML='';const h=el('tr');for(const t of ['День','Игроков','Новых','Вернулись на 2-й день','Вернулись через неделю'])h.append(el('th',null,t));T.append(h);
   for(const r of j.rows){const tr=el('tr');tr.append(el('td',null,r.d.slice(8)+'.'+r.d.slice(5,7)),el('td',null,String(r.dau)),el('td',null,String(r.nu)),el('td',null,pc(r.r1,r.nu,r.r1ready)),el('td',null,pc(r.r7,r.nu,r.r7ready)));T.append(tr);}
   $('#srcs').textContent=j.src.length?'Откуда пришли (3 недели): '+j.src.map(s=>`${s.src||'—'} ${s.n}`).join(' · '):'';}
+// кошелёк: баланс, журнал, начислить/списать (номер операции на форму — повторный клик не начислит дважды)
+const KIND={init:'перенос',local:'игра',xfer:'перевод',mod:'модератор',grant:'начисление',reset:'заново'};
+async function wallet(name,body){const O=$('#wOut');const j=await call(Object.assign({do:'wallet',name},body||{})).catch(()=>({err:'нет связи'}));O.innerHTML='';
+  if(!j.ok){O.append(el('p','msg',j.err==='no_account'?'Такого аккаунта нет':j.err==='why'?'Напишите причину':j.err==='amount'?'Сумма — целое число, не ноль':'Ошибка: '+(j.err||'?')));return;}
+  const c=el('div','card');c.append(el('div',null,`${j.name} (${j.k}) · на сервере: ${j.bal==null?'кошелька ещё нет — заведётся при входе в игру':j.bal.toLocaleString('ru-RU')+' ₽'}${j.bal!=null?` · заработано сегодня ${j.dayIn.toLocaleString('ru-RU')} ₽`:''}`));
+  const f=el('div','row');const amt=el('input');amt.placeholder='Сумма, минус — списать';amt.inputMode='numeric';const why=el('input');why.placeholder='Причина';const go=el('button','go','Провести');const opid='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  go.onclick=async()=>{const v=Math.trunc(+amt.value);if(!v){alert('Сумма — целое число, не ноль');return;}if(!confirm(`${v>0?'Начислить':'Списать'} ${Math.abs(v)} ₽ игроку «${j.name}»?`))return;go.disabled=true;await wallet(name,{do:'grant',amt:v,why:why.value,id:opid});};
+  f.append(amt,why,go);c.append(f);const T=el('table','wj');const h=el('tr');for(const t of ['Когда','Что','Запрошено','Проведено','Баланс'])h.append(el('th',null,t));T.append(h);
+  for(const o of j.ops){const tr=el('tr');tr.append(el('td',null,fmt(o.t)),el('td',null,(KIND[o.kind]||o.kind)+(o.why?' · '+o.why:'')+(o.peer?' · '+o.peer:'')),el('td',null,String(o.req)),el('td',null,String(o.amt)),el('td',null,String(o.bal)));T.append(tr);}
+  const w=el('div','wrap');w.append(T);c.append(w);O.append(c);}
+$('#wGo').onclick=()=>{const n=$('#wName').value.trim();if(n)wallet(n);};
 $('#load').onclick=()=>{load();loadStats();};
 $('#imp').onclick=async()=>{if(!confirm('Забрать аккаунты со старого сайта? Новые данные на этом сервере не затираются.'))return;$('#impst').textContent='Переношу…';const j=await call({do:'import'}).catch(()=>({err:'нет связи'}));$('#impst').textContent=j.ok?`Перенесено аккаунтов: ${j.accounts}, пропущено (здесь новее): ${j.skipped}, входов: ${j.tokens}, привязок Телеги: ${j.tgLinks}`:'Ошибка: '+(j.err||'?');};$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
 </script>

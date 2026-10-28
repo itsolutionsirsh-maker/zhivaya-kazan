@@ -11,6 +11,7 @@
 const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {WebSocketServer}=require('ws');
 const VenueRoom=require('../../site/js/venue-room.js');
+const WalletLib=require('./wallet.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -113,7 +114,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
       ret:db.prepare("SELECT f.d,COUNT(*) n FROM firsts f JOIN visits v ON v.id=f.id AND v.d=date(f.d,'+'||?||' day') WHERE f.d>=? GROUP BY f.d"),
       src:db.prepare('SELECT src,COUNT(*) n FROM firsts WHERE d>=? GROUP BY src ORDER BY n DESC LIMIT 12'),everyone:db.prepare('SELECT COUNT(*) n FROM firsts')};
     const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
-    return {kind:'sqlite',get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
+    return {kind:'sqlite',db,get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
       addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
       importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
       importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
@@ -129,6 +130,19 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
     visit:()=>{},stats:()=>null,backup:file=>fs.copyFileSync(F,file)};})();
+// ---------- кошелёк: деньги аккаунта на сервере (wallet.js) ----------
+// Первое обращение переносит деньги из последнего сохранения (карта + вклад, с потолком); дальше правда — здесь.
+const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs),
+  {seedOf:k=>{const a=store.get(k);return a&&a.state;}});
+setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
+// устройство присылает изменения своих денег (операции с номерами) и получает баланс сервера; who — чей кошелёк оно помнит
+function walletApi(body){const acc=accByToken(body.token);if(!acc)return {err:'auth'};if(!allow('wallet:'+acc.k,30,60))return {err:'rate_limited'};
+  try{const who=wallet.whoOf(acc.k);
+    // операции, накопленные под другим аккаунтом (вышли и вошли под другим), сюда не проводим: только баланс, устройство начнёт заново
+    if(typeof body.who==='string'&&body.who&&body.who!==who)return Object.assign({ok:1,other:1},wallet.apply(acc.k,[]));
+    const r=wallet.apply(acc.k,body.ops);for(const x of r.res)if(x.cut)log('кошелёк: сверх потолка не засчитано',x.cut,'у',acc.k);
+    if(r.init&&r.init.req>r.init.amt)log('кошелёк: перенос урезан',r.init.req,'→',r.init.amt,'у',acc.k);
+    return Object.assign({ok:1},r);}catch(e){log('кошелёк не записался:',e.message);return {err:'busy'};}}
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
@@ -224,7 +238,7 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
   body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};store.save(a.k,null,a.profile,null);try{wallet.reset(a.k);}catch(e){log('кошелёк: сброс не записался',e.message);}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -313,10 +327,17 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
     if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
   if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
   if(act==='mute'&&target.length>=8){mutes.set(target,t+Math.max(1,+body.minutes||60)*60);return {ok:1};}
+  // кошелёк игрока: баланс и журнал; grant — начислить или списать с причиной (id из формы: двойной клик не начислит дважды)
+  if(act==='wallet'||act==='grant'){const k=modAccKey(body.name);if(!k)return {err:'no_account'};
+    if(act==='grant'){const why=clean(body.why,80);if(!why)return {err:'why'};const r=wallet.grant(k,body.amt,typeof body.id==='string'?body.id:undefined,why,'mod');if(r.err)return r;log('кошелёк: модератор',r.amt,'у',k,why);}
+    const acc=store.get(k);return Object.assign(wallet.info(k,40),{k,name:acc.name,tg:acc.tg||null});}
   let reports=[];try{reports=fs.readFileSync(path.join(DATA,'reports.jsonl'),'utf8').trim().split('\n').slice(-100).map(l=>{try{return JSON.parse(l);}catch(e){return null;}}).filter(Boolean).reverse();}catch(e){}
   const online=[...players.values()].map(p=>({id:p.id,n:(p.meta&&p.meta.n)||'Игрок'}));
   return {ok:1,reports,bans:modState.bans,ipbans:Object.keys(modState.ipbans).length,mutes:[...mutes].filter(([,u])=>u>t).map(([id,u])=>({id,until:Math.floor(u)})),online};}
 
+// аккаунт для модератора: имя входа по PIN, номер Телеги или ключ (tg:…)
+function modAccKey(name){const s=clean(String(name||''),40);if(!s)return null;const c=[s.toLowerCase(),s];if(/^\d{3,15}$/.test(s)){const m=store.tgGet(s);if(m)c.unshift(m);c.push('tg:'+s);}
+  for(const k of c)if(store.get(k))return k;return null;}
 // ---------- цифры: кто зашёл сегодня (раз в сутки на устройство), пик онлайна ----------
 const seen={d:'',set:new Set()};const peak={d:'',n:0};
 // Номер игрока из его браузера (zk.cid) — секрет: по нему сервер узнаёт игрока. Другим (в мире, чате, личных) виден только
@@ -335,7 +356,8 @@ function bootStats(){const day=BOOT.filter(o=>now()-o.t<86400);const q=(a,p)=>{i
   const out={n:day.length,tg:day.filter(o=>o.tg).length,slow:day.filter(o=>/2g|3g/.test(o.conn)).length};for(const k of BOOT_K){const a=day.map(o=>o[k]).filter(v=>v>0);out[k]=[q(a,0.5),q(a,0.9)];}return out;}
 function statsOut(days){const from=mskDay(-(days-1));const st=store.stats(from);if(!st)return {err:'no_sqlite'};const rows=[];
   for(let i=0;i<days;i++){const d=mskDay(-i);const nu=st.nu[d]||0;rows.push({d,dau:st.dau[d]||0,nu,r1:st.r1[d]||0,r7:st.r7[d]||0,r1ready:i>=1,r7ready:i>=7});}
-  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,boot:bootStats(),
+  let wsum=null;try{wsum=wallet.summary();}catch(e){}
+  return {ok:1,rows,src:st.src,everyone:st.everyone,online:players.size,peakToday:peak.n,wallet:wsum,boot:bootStats(),
     llm:{on:!!llmClient(),model:LLM.model,today:llmUse.d===day()?{n:llmUse.n,tin:llmUse.tin,tout:llmUse.tout}:{n:0,tin:0,tout:0},news:{text:NEWS.text,t:NEWS.t,src:NEWS.src,err:NEWS.err}}};}
 
 // ---------- совместимость с api.php (опрос раз в 0,8 с — для старых клиентов и малого онлайна) ----------
@@ -449,7 +471,7 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
@@ -459,6 +481,7 @@ async function handleReq(req,res){
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base));
+    if(a==='wallet')return send(res,200,walletApi(body));
     if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
     if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
     if(a==='reset')return send(res,200,resetFor(body.token));
