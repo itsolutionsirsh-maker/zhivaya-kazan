@@ -23,7 +23,7 @@ for(const [name,mk] of Object.entries(backends)){
     // аккаунт был до кошелька: прежняя копия 12 000 + вклад 3 000, пришло на 500 больше
     let r=w.commit('old',{prior:{money:12000,econ:{dep:3000}},incoming:{money:12500,econ:{dep:3000}},wal:{ops:[]}});
     assert.equal(r.bal,15500);assert.deepEqual([r.init.amt,r.init.req,r.init.first],[15000,15000,500]);assert.equal(r.other,0);
-    assert.equal(w.commit('old',{prior:{money:1},incoming:{money:9e9}}).init,null,'заводится один раз');
+    assert.equal(w.commit('old',{prior:{money:1},incoming:{money:1},wal:{who:w.who('old'),ops:[]}}).init,null,'заводится один раз');
     // очень богатое старое сохранение — потолок переноса
     r=w.commit('rich',{prior:{money:900000,econ:{dep:50000}},incoming:{money:950000}});assert.equal(r.bal,LIM.migrate);assert.deepEqual([r.init.amt,r.init.req],[LIM.migrate,950000]);
     // новый аккаунт: прежней копии нет — стартовые; деньги гостя сверх стартовых — заработком, под потолок
@@ -32,6 +32,18 @@ for(const [name,mk] of Object.entries(backends)){
     r=w.commit('poor',{prior:null,incoming:{money:500}});assert.equal(r.bal,500);
     assert.equal(w.commit('bad',{prior:{money:'много'},incoming:null}).bal,LIM.start,'испорченное сохранение — стартовые');
     assert.deepEqual(w.info('old').ops.map(o=>o.kind).sort(),['init','local']);});
+
+  test(`${name}: старая версия игры (без поля wallet) — деньги разницей с прошлым принятым сохранением, под потолки`,()=>{
+    const {w,clock}=setup();w.commit('p',{prior:{money:10000},incoming:{money:10000},wal:{ops:[]}});
+    let r=w.commit('p',{prior:{money:10000},incoming:{money:30000}});assert.equal(r.bal,30000);assert.equal(r.res[0].id,'old');
+    r=w.commit('p',{prior:{money:30000},incoming:{money:29000}});assert.equal(r.bal,29000);
+    r=w.commit('p',{prior:{money:29000},incoming:{money:9e9}});assert.equal(r.bal,29000+LIM.winMax-20000,'под потолок за 10 минут');assert.ok(r.res[0].cut>0);
+    r=w.commit('p',{prior:{money:1},incoming:null});assert.deepEqual(r.res,[],'без state — ничего');
+    clock.t+=1;r=w.commit('p',{prior:{money:500},incoming:{money:500},wal:{who:w.who('p'),ops:[]}});assert.deepEqual(r.res,[],'новая версия с пустыми операциями — разницу не считаем');});
+
+  test(`${name}: перенос со старого сайта заменил сохранение — кошелёк заводится заново из нового`,()=>{
+    const {w}=setup();w.commit('p',{prior:{money:4000}});assert.equal(w.info('p').bal,4000);
+    w.forget('p');assert.equal(w.info('p').bal,null);const r=w.commit('p',{prior:{money:25000},incoming:{money:25000}});assert.equal(r.bal,25000);assert.ok(r.init);});
 
   test(`${name}: операция с тем же номером не начисляет второй раз`,()=>{
     const {w,save}=setup();w.commit('p',{});
@@ -59,7 +71,7 @@ for(const [name,mk] of Object.entries(backends)){
     const {w,save}=setup();w.commit('p',{});
     const r=save('p',[{id:'x',amt:5},{id:'op-good01',amt:'12'},{id:'op-bad-02',amt:'abc'},{id:'op-bad-03',amt:1e12},null,{id:'op-zero1',amt:0},{id:'op-bool1',amt:true},{id:'op-null1',amt:null}]);
     assert.deepEqual(r.res.map(x=>x.err||x.amt),['bad',12,'bad','bad','bad',0,'bad','bad']);assert.equal(r.bal,LIM.start+12);
-    assert.equal(save('p',Array.from({length:80},(_,i)=>({id:'op-many'+String(i).padStart(3,'0'),amt:1}))).res.length,LIM.batch,'за раз — не больше пачки');});
+    assert.equal(save('p',Array.from({length:600},(_,i)=>({id:'op-many'+String(i).padStart(3,'0'),amt:1}))).res.length,LIM.batch,'за раз — не больше пачки (клиент копит не больше 500)');});
 
   test(`${name}: заработок упирается в потолки, траты — в ноль`,()=>{
     const {w,clock,save}=setup();w.commit('p',{});

@@ -3,7 +3,8 @@
 // 4 ответ на сохранение потерялся — после «Играть здесь» деньги не задвоены; 5 вклад — те же деньги;
 // 6 потратили и закрыли вкладку — дошло; 7 второе устройство; 8 начисление модератора; 9 устаревшее устройство
 // тратит и закрывается — не проводится; 10 оно же открывается снова — деньги с сервера; 11 кредит на устаревшем
-// устройстве — ни денег, ни долга; 12 «Начать заново» на одном устройстве, а на другом висел заработок прежней игры.
+// устройстве — ни денег, ни долга; 12 «Начать заново» на одном устройстве, а на другом висел заработок прежней игры;
+// 13 старая версия игры сохраняет без кошелька — сервер считает разницу; 14 «Начать заново» без связи — ничего не стёрто.
 // Сборка: python3 tools/dev_build.py /tmp/zk-dev && python3 -I tools/split_map.py site/kazan.json /tmp/zk-dev/map
 // Тест:   node tools/tests/wallet-browser.js /tmp/zk-dev 8983
 const {chromium} = require('playwright');
@@ -96,6 +97,15 @@ const api = (a, body, head) => fetch(`${BASE}/api.php`, {method: 'POST', headers
     await A.evaluate(() => document.querySelector('#otherDevGo').click()); await sleep(1500); await settle(A, 'Алсу');
     await save(A); s = await st(A); w = await server(); const sb = await st(B);
     console.log('12) начать заново:', JSON.stringify(s), JSON.stringify(sb), 'сервер', w.bal); assert.equal(w.bal, 3000); assert.equal(s.total, 3000); assert.equal(sb.total, 3000);
+    // 13) старая версия игры (открыта во время обновления) сохраняет без поля wallet: её траты сервер считает сам — разницей
+    await A.evaluate(() => { window.__wo = walletOut; window.walletOut = () => undefined; player.money -= 1000; }); await save(A);
+    await A.evaluate(() => { window.walletOut = window.__wo; }); w = await server(); s = await st(A);
+    console.log('13) старая версия:', w.bal, JSON.stringify(s)); assert.equal(w.bal, 2000); assert.equal(s.total, 2000);
+    // 14) «Начать заново» без связи с сервером: здесь ничего не стёрто, игра идёт дальше
+    await A.evaluate(() => { player.money -= 500; window.__ac = acctCall; window.acctCall = async (a, body) => a === 'reset' ? {err: 'busy'} : window.__ac(a, body); const x = document.querySelector('#resetBtn'); x.click(); x.click(); });
+    await sleep(800); const rf = await A.evaluate(() => ({money: player.money, noSave: !!window.zkNoSave, state: !!localStorage.getItem('zk.state')})); await A.evaluate(() => { window.acctCall = window.__ac; });
+    console.log('14) сброс без связи:', JSON.stringify(rf)); assert.equal(rf.noSave, false); assert.equal(rf.state, true); assert.equal(rf.money, 1500);
+    await save(A); w = await server(); assert.equal(w.bal, 1500, 'игра продолжилась, трата дошла');
   } finally { await b.close(); srv.kill(); fs.rmSync(DATA, {recursive: true, force: true}); }
   const wl = srvLog.split('\n').filter(l => /кошел|ошибк/i.test(l)); if (wl.length) console.log(wl.join('\n'));
   console.log(errors.length ? errors.join('\n') : 'no page errors');

@@ -198,7 +198,9 @@ $('#howtoBtn').addEventListener('click',()=>{$('#menuModal').hidden=true;showHow
 $('#changeChar').addEventListener('click',()=>{$('#menuModal').hidden=true;showProfile();});
 // «Начать заново»: второе нажатие подтверждает. Стирает только своё: прогресс здесь и в аккаунте на сервере (имя и вход остаются)
 let resetArm=0;$('#resetBtn').addEventListener('click',async()=>{const b=$('#resetBtn');if(Date.now()-resetArm>4000){resetArm=Date.now();b.textContent='Точно? Всё сбросится — нажмите ещё раз';setTimeout(()=>{if(Date.now()-resetArm>=4000)b.textContent='Начать заново';},4100);return;}
-  window.zkNoSave=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function'){const r=await acctCall('reset',{token:acct.token});if(r&&r.updated&&typeof setRev==='function')setRev(r.updated);}}catch(e){}
+  // с аккаунтом — только если сервер сбросил (иначе старая копия и деньги на сервере остались бы, а здесь — новая игра)
+  window.zkNoSave=true;let done=true;try{if(typeof acct!=='undefined'&&acct&&typeof acctCall==='function'){done=false;const r=await acctCall('reset',{token:acct.token});if(r&&(r.ok||r.err==='auth')){done=true;if(r.updated&&typeof setRev==='function')setRev(r.updated);}}}catch(e){}
+  if(!done){window.zkNoSave=false;b.textContent='Начать заново';resetArm=0;setHint('Нет связи с сервером — игра не сброшена. Попробуйте ещё раз');return;}
   // zk.prog — задания, значки, обучение; zk.invq — приглашения: тоже с начала (раньше оставались и гасили вечерние события новой игры)
   try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk','zk.prog','zk.invq'])localStorage.removeItem(k);}catch(e){}location.reload();});
 
