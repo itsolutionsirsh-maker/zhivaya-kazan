@@ -1,10 +1,12 @@
 // Только представление: размеры, состояние панелей, лента и жест закрытия.
 // Счета, события, пауза и диалоги остаются в своих игровых обработчиках.
 function uiViewportMetrics(height,viewport,telegram,editing){
+  height=Number.isFinite(height)&&height>0?height:1;
   const stable=telegram&&Number.isFinite(telegram.viewportStableHeight)&&telegram.viewportStableHeight>0?telegram.viewportStableHeight:height;
-  const visual=viewport&&viewport.scale===1&&viewport.height>0?viewport:null;
-  const visible=Math.min(stable,visual?visual.height:height);
-  return {stable,visible,top:visual?Math.max(0,visual.offsetTop||0):0,keyboard:!!editing&&stable-visible>100};
+  const visual=viewport&&viewport.scale===1&&Number.isFinite(viewport.height)&&viewport.height>0?viewport:null;
+  const top=visual&&Number.isFinite(visual.offsetTop)?Math.max(0,Math.min(height-1,visual.offsetTop)):0;
+  const visible=Math.max(1,Math.min(stable,height-top,visual?visual.height:height));
+  return {stable,visible,top,keyboard:!!editing&&stable-visible>100};
 }
 function uiSwipeCloses(dx,dy){return dy>=72&&Math.abs(dx)<Math.min(50,dy/2);}
 function uiFeedRemaining(at,now){return Math.max(0,5500-(now-at));}
@@ -61,7 +63,7 @@ function uiFeedRemaining(at,now){return Math.max(0,5500-(now-at));}
   function syncFeed(){
     clearTimeout(feedTimer);let next=Infinity;
     [...feedBox.children].forEach((el,i)=>{
-      const event=typeof feed!=='undefined'&&feed[i];
+      const event=el.feedEntry||(typeof feed!=='undefined'&&feed[i]);
       const left=event?uiFeedRemaining(event.at,performance.now()):0;
       el.hidden=phone.matches&&left<=0;
       el.classList.toggle('call',!!event&&event.kind==='call');
@@ -93,11 +95,16 @@ function uiFeedRemaining(at,now){return Math.max(0,5500-(now-at));}
   const modals=[...document.querySelectorAll('.modal')];
   for(const modal of modals){
     const box=modal.querySelector('.box');if(!box)continue;
+    const children=[...box.children],last=children[children.length-1];
     const title=box.querySelector('h2,.persona'),head=document.createElement('div');head.className='ui-sheet-head';
     const grip=document.createElement('span');grip.className='ui-sheet-grip';grip.setAttribute('aria-hidden','true');head.append(grip);
     box.prepend(head);if(title){head.append(title);if(!title.id)title.id=modal.id+'Title';modal.setAttribute('aria-labelledby',title.id);}
+    const body=document.createElement('div'),foot=document.createElement('div');body.className='ui-sheet-body';foot.className='ui-sheet-foot';
+    for(const node of children){if(node===title)continue;
+      if((node===last&&node.classList.contains('row'))||(modal.id==='chatModal'&&node.contains(document.getElementById('chatInput'))))foot.append(node);else body.append(node);}
+    box.append(body,foot);
     modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
-    const original=document.getElementById(closes[modal.id]);let close=null,start=null,previous=null;
+    const original=document.getElementById(closes[modal.id]);let close=null,start=null;
     grip.hidden=!original;
     if(original){
       close=document.createElement('button');close.type='button';close.className='btn ui-sheet-close';close.textContent='×';close.setAttribute('aria-label','Закрыть окно');head.append(close);
@@ -112,17 +119,46 @@ function uiFeedRemaining(at,now){return Math.max(0,5500-(now-at));}
       head.addEventListener('lostpointercapture',()=>{start=null;box.style.translate='';});
     }
     new MutationObserver(()=>{
-      if(!modal.hidden){previous=document.activeElement;box.scrollTop=0;if(phone.matches&&close)close.focus({preventScroll:true});setExpanded(false);}
-      else{start=null;box.style.translate='';if(previous&&previous.isConnected&&!modals.some(m=>!m.hidden))previous.focus({preventScroll:true});}
+      if(!modal.hidden){box.scrollTop=0;body.scrollTop=0;setExpanded(false);}
+      else{start=null;box.style.translate='';}
     }).observe(modal,{attributes:true,attributeFilter:['hidden']});
   }
-  document.addEventListener('keydown',e=>{
-    if(e.key!=='Tab'||!phone.matches)return;
-    const modal=modals.find(m=>!m.hidden);if(!modal)return;
-    const focusable=[...modal.querySelectorAll('button,input,textarea,select,a[href],[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);
-    if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];
-    if(e.shiftKey&&(document.activeElement===first||!modal.contains(document.activeElement))){e.preventDefault();last.focus();}
-    else if(!e.shiftKey&&(document.activeElement===last||!modal.contains(document.activeElement))){e.preventDefault();first.focus();}
-  });
+  function bindDialogs(){
+    const today=document.getElementById('zkTodayPanel'),todayButton=document.getElementById('zkToday'),chat=document.getElementById('chatPanel');
+    const panels=modals.concat([today,chat].filter(Boolean));let active=null,previous=null;
+    for(const [panel,label] of [[today,'Казань сегодня'],[chat,'Чат города']])if(panel){panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',label);}
+    if(todayButton)todayButton.setAttribute('aria-controls','zkTodayPanel');
+    const focusable=panel=>[...panel.querySelectorAll('button,input,textarea,select,a[href],summary,[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);
+    function syncDialogs(){
+      const next=panels.filter(p=>!p.hidden).reverse().sort((a,b)=>(parseInt(getComputedStyle(b).zIndex)||0)-(parseInt(getComputedStyle(a).zIndex)||0))[0]||null;
+      const hud=document.getElementById('hud');hud.inert=!!next;document.body.classList.toggle('ui-dialog-open',!!next);
+      if(todayButton){todayButton.inert=!!next;todayButton.setAttribute('aria-expanded',String(!!today&&!today.hidden));}
+      if(active===next)return;
+      if(!active&&next)previous=document.activeElement;active=next;
+      if(next){
+        for(const key in keys)keys[key]=false;
+        if(joyId!==null&&joy.hasPointerCapture(joyId))joy.releasePointerCapture(joyId);
+        joyId=null;joyOrigin=null;joyVec=[0,0];joyKnob.style.transform='';
+        if(!next.contains(document.activeElement)){const title=next.querySelector('.ui-sheet-head h2,.ui-sheet-head .persona');if(title)title.tabIndex=-1;(title||focusable(next)[0]||next).focus({preventScroll:true});}
+      }else if(previous&&previous.isConnected){previous.focus({preventScroll:true});previous=null;}
+    }
+    window.uiCloseDialog=function(){
+      if(!active)return false;
+      const close=document.getElementById(closes[active.id])||(active===chat?document.getElementById('cpClose'):active===today?today.querySelector('.ui-today-close'):null);
+      if(close&&!close.disabled)close.click();return true;
+    };
+    const observer=new MutationObserver(syncDialogs);for(const panel of panels)observer.observe(panel,{attributes:true,attributeFilter:['hidden']});syncDialogs();
+    window.addEventListener('keydown',e=>{
+      if(!active)return;
+      if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();window.uiCloseDialog();return;}
+      if(e.key!=='Tab')return;
+      const controls=focusable(active),first=controls[0],last=controls[controls.length-1];
+      if(!first){e.preventDefault();return;}
+      if(!controls.includes(document.activeElement)){e.preventDefault();(e.shiftKey?last:first).focus();}
+      else if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    },true);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindDialogs,{once:true});else bindDialogs();
   layout();
 })();

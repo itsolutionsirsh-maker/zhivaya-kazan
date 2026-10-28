@@ -35,6 +35,8 @@ async function phoneUIShots(browser){
           const modal=[...document.querySelectorAll('.modal')].find(el=>!el.hidden);
           const close=modal&&modal.querySelector('.ui-sheet-close');
           if(visible(close))controls.sheetClose=box(close);
+          const footer=modal&&modal.querySelector('.ui-sheet-foot');
+          if(footer)for(const [i,button] of [...footer.querySelectorAll('button')].entries())if(visible(button))controls['footer'+i]=box(button);
           return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1,controls,
             sheet:modal?{id:modal.id,...box(modal.querySelector('.box'))}:null,
             feed:[...document.querySelectorAll('#feed .ev')].filter(visible).map(box)};
@@ -46,6 +48,7 @@ async function phoneUIShots(browser){
           for(const [a,b] of [['joy','actBtn'],['hint','zoom'],['hint','actBtn'],['zkToday','zoom'],['zkToday','joy']])if(overlap(c[a],c[b]))throw new Error(name+'/'+scene+': overlap '+a+'/'+b);
           for(const [id,r] of Object.entries(c))if(r.x< -1||r.right>geometry.width+1||r.y< -1||r.bottom>geometry.height+1)throw new Error(name+'/'+scene+': offscreen '+id);
           for(const id of ['actBtn','sheetClose','cpSend'])if(c[id]&&c[id].h<44)throw new Error(name+'/'+scene+': small button '+id);
+          for(const [id,r] of Object.entries(c))if(id.startsWith('footer')&&r.h<44)throw new Error(name+'/'+scene+': small footer button');
           if(scene==='day_feed'&&c.needsPanel.h>52)throw new Error(name+': status is not one row');
         }
         await pg.screenshot({path:`${OUT}/ui_${name}_${scene}.png`});
