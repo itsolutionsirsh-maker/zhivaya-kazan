@@ -12,7 +12,7 @@ const STORY_AFTER=['police','witness','prosecutor','bank','wait'];
 const STORY_FB={
   plates:{
     names:['Алина','Диляра','Кристина','Эльвира','Карина','Регина','Ангелина','Лейсан','Милана','Камила'],
-    venues:[{name:'Лаунж «Шафран»',kind:'cafe'},{name:'Ресторан «Изумруд»',kind:'cafe'},{name:'Кафе «Белая ночь»',kind:'cafe'},{name:'Бар-ресторан «Версаль»',kind:'cafe'},{name:'Лаунж «Амбер»',kind:'cafe'}],
+    venues:[{name:'Лаунж «Сладкий вечер»',kind:'cafe'},{name:'Кафе «Тёплый плед»',kind:'cafe'},{name:'Кафе «Белая скатерть»',kind:'cafe'},{name:'Лаунж «Золотая вилка»',kind:'cafe'},{name:'Лаунж «Кружевной»',kind:'cafe'}],
     menu:[{name:'Устрицы «Морской бриз»',price:9800},{name:'Шампанское, бутылка',price:24000},{name:'Фирменный чай «Императорский»',price:3500},{name:'Фруктовая тарелка',price:6400},{name:'Кальян «Премиум»',price:7900},
       {name:'Салат с камчатским крабом',price:5600},{name:'Коктейль «Для дамы»',price:4200},{name:'Сырная тарелка',price:4800},{name:'Десерт «Золотой»',price:3900},{name:'Вода «Альпийская»',price:1200},{name:'Тартар из тунца',price:6900},{name:'Коньяк, 200 мл',price:11500}],
     approach:['Извините, вы не подскажете, как пройти к Кремлю? Я тут совсем запуталась…','Ой, привет! Мы с тобой нигде не виделись? Лицо очень знакомое.','Простите, у вас зажигалки нет? Ладно, неважно. Вы местный?','Привет! Ты так уверенно идёшь — сразу видно, город знаешь.'],
@@ -55,9 +55,15 @@ const STORY_FB={
 function storyData(id){return (window.cityStories&&window.cityStories[id])||{};}
 function storyList(id,key){const D=storyData(id);for(const src of [D.lines,D.after]){const L=src&&src[key];if(Array.isArray(L)&&L.filter(Boolean).length)return L.filter(Boolean);}
   const top=D[key];if(Array.isArray(top)&&top.length)return top;return (STORY_FB[id]&&STORY_FB[id][key])||[''];}
-function storyFill(t,o){o=o||{};const P=PROG.story||{};const sub={name:player.name||'',place:o.place||(P.v&&P.v.n)||'',sum:o.sum!=null?fmtMoney(o.sum):'',street:o.street||''};
-  return String(t||'').replace(/\{(\w+)\}/g,(m,k)=>sub[k]!=null?sub[k]:'');}
-function storyLine(id,key,o){return storyFill(pick(storyList(id,key)),o);}
+// {street} — улица в форме после «на»: у заведения (или там, где игрок очнулся — o.at); не нашлась — такие реплики не берём
+function storyStreet(x,y){const r=typeof nearestRoadName==='function'?nearestRoadName(x,y):'';return r?(typeof memOn==='function'?memOn(r):r):'';}
+// подстановки: {name}, {place} (с кавычками), {sum}, {street} — в форме после «на»: у заведения или там, где игрок очнулся (o.at)
+function storySub(o,needStreet){o=o||{};const P=PROG.story||{};const v=o.v||STORY.v||P.v,at=o.at||v;
+  return {name:player.name||'',place:o.place||(v&&v.n)||'',sum:o.sum>0?fmtMoney(o.sum):'',street:o.street||(needStreet&&at?storyStreet(at.x,at.y):'')};}
+function storyFill(t,sub){return String(t||'').replace(/\{(\w+)\}/g,(m,k)=>sub[k]!=null?sub[k]:'');}
+// реплики, где подставить нечего (нет суммы, улица не нашлась), не берём — если есть другие
+function storyLine(id,key,o){const L=storyList(id,key);const sub=storySub(o,L.some(t=>/\{street\}/.test(t)));
+  const ok=L.filter(t=>[...String(t).matchAll(/\{(\w+)\}/g)].every(m=>sub[m[1]]));return storyFill(pick(ok.length?ok:L),sub);}
 // воронка: каждый шаг — один раз с устройства, без имён
 function storyStep(id,st){const k=id+':'+st;if(STORY.sent[k])return;STORY.sent[k]=1;PROG.storyF=PROG.storyF||{};if(PROG.storyF[k])return;PROG.storyF[k]=1;progSave();
   if(!/^https?:/.test(location.protocol)||typeof myCid==='undefined')return;
@@ -80,7 +86,8 @@ function storyFree(){return scene==='city'&&world&&world.meta&&!player.vehicle&&
 
 // ---------- сама история: подходит, зовёт, ведёт, внутри — выборы ----------
 defSit('story',{title:'История новичка',quiet:true,
-  start(s){const id=s.id;const name=pick(storyList(id,'names'));const q=spotNear(22,40);if(!q)return false;const n=nearestNode(q[0],q[1],world.pedAdj,60);if(n<0)return false;
+  start(s){const id=s.id;const name=pick(storyList(id,'names'));const q=spotNear(22,40);if(!q)return false;
+    s.v=storyVenue(id);if(!s.v)return false;s.key='story:'+id+':'+Math.round(s.v.x)+'_'+Math.round(s.v.y);STORY.v=s.v;/* в приглашении уже звучит название ({place}) */const n=nearestNode(q[0],q[1],world.pedAdj,60);if(n<0)return false;
     const w=new Walker('resident',n);w.temp=true;w.p=storyPersona(id,name);w.x=q[0];w.y=q[1];walkers.push(w);s.w=takeActor(s,w,'sit');moveActor(w,player.x,player.y,2.7);s.phase='come';s.rt=1;
     if(/ и /.test(name)){const w2=new Walker('resident',n);w2.temp=true;w2.p=storyPersona(id,name.split(' и ')[1]);w2.x=q[0]+1;w2.y=q[1]+0.6;walkers.push(w2);s.w2=takeActor(s,w2,'sit');moveActor(w2,player.x,player.y,2.7);}
     storyStep(id,'offer');return true;},
@@ -102,14 +109,13 @@ defSit('story',{title:'История новичка',quiet:true,
     if(s.phase==='inside'&&scene!=='interior'&&!s.ending){storyOut(s,'avoided','Вы вышли на улицу. Новые знакомые остались внутри.');}},
   action(s){const v=s.v;if(s.phase!=='go'||!v||scene!=='city'||dist(v.x,v.y,player.x,player.y)>7)return null;
     return {label:`Зайти в «${v.n.replace(/^.*«|»$/g,'')||v.n}» (${s.w.p.name} с вами)`,run:()=>{unmark('sdoor');enterInterior({kind:v.kind,name:v.n,key:s.key,x:player.x,y:player.y});}};},
-  end(s){player.busy=false;if(s.it)s.it.npcs=s.it.npcs.filter(n=>!n.storyTwo);if(companion&&companion.w===s.w)stopCompanion(true);unmark('sdoor');
+  end(s){player.busy=false;if(STORY.v===s.v)STORY.v=null;if(s.it)s.it.npcs=s.it.npcs.filter(n=>!n.storyTwo);if(companion&&companion.w===s.w)stopCompanion(true);unmark('sdoor');
     for(const w of [s.w,s.w2]){if(!w)continue;w.sitBy=null;const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);}s.actors=[];}});   // ушли насовсем
 function storyAbort(s){endSit(s);}   // не случилось (уехал, ушёл) — история придёт позже
 function storyRefuse(s){const w=s.w;say(w,storyLine(s.id,'refused'),5);storyStep(s.id,'refused');
   const P=PROG.story;if(P&&P.out==='refused')storySave({st:'done'});else storySave({id:s.id,st:'later',out:'refused',at:Date.now()+20*60e3});
   const q=spotNear(40,70);if(q){moveActor(w,q[0],q[1],2.4);if(s.w2)moveActor(s.w2,q[0],q[1],2.4);}s.phase='leave';s.lt=6;}
-function storyGo(s){const id=s.id,w=s.w;const v=storyVenue(id);if(!v){say(w,'Ой, а там сегодня закрыто… В другой раз!',5);s.phase='leave';s.lt=4;return;}
-  s.v=v;s.key='story:'+id+':'+Math.round(v.x)+'_'+Math.round(v.y);w.sitBy=null;w.mv=null;if(s.w2){s.w2.mv=null;}
+function storyGo(s){const id=s.id,w=s.w,v=s.v;w.sitBy=null;w.mv=null;if(s.w2){s.w2.mv=null;}
   startCompanion(w,'follow');if(!companion||companion.w!==w){endSit(s);return;}
   Object.assign(companion,{mode:'go',dest:{x:v.x,y:v.y,n:v.n},route:null,arrived:false});player.escort=false;updateCompBox();
   mark(s,'sdoor',v.x,v.y,v.kind==='bar'?'🍸':'🍽',v.n,{arrow:true,color:'#8E3B6B'});s.phase='go';s.wt=4;storyStep(id,'go');
@@ -145,16 +151,16 @@ function platesBill(s){if(s.ending)return;const id='plates',w=s.w;const o=s.orde
     storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» ${o.items.map(m=>`${m.name} — ${fmtMoney(m.price)}`).join(' · ')}. Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}))}],dflt:()=>platesBill2(s,choices,line)}));}
 function platesBill2(s,choices,line){const o=s.order;storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,choices},storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}));}
 function platesPay(s,sum){const lost=Math.min(sum,Math.max(0,Math.round(player.money||0)));player.money-=lost;addEvent(`🧾 Счёт в ${qName(s.v.n)}: −${fmtMoney(lost)}`,'alert');
-  storyOut(s,'caught',`Официант: «${storyLine('plates','paid')}» Её телефон больше не отвечает. Похоже, это была ловушка — с полицией дело ещё можно вернуть.`,{lost,how:'paid'});}
+  storyOut(s,'caught',`Официант: «${storyLine('plates','paid')}» Её телефон больше не отвечает. Похоже, это была ловушка — с полицией дело ещё можно вернуть.`,{lost,how:'paid',bill:s.order.sum});}
 function platesGuard(s){const id='plates';storyStep(id,'guard');const money=Math.max(0,Math.round(player.money||0));
-  sitCard(storyCard({s,icon:'🕴',title:'Охрана',text:`«${storyLine(id,'guard')}»`,tone:'alert',
+  sitCard(storyCard({s,icon:'🕴',title:'Охрана',text:`«${storyLine(id,'guard',{sum:s.order.sum})}»`,tone:'alert',
     choices:[{t:money>=s.order.sum?`Ладно, заплачу ${fmtMoney(s.order.sum)}`:`Отдать всё, что есть (${fmtMoney(money)})`,run:()=>platesPay(s,Math.min(money,s.order.sum))},{t:'Позвонить 112',primary:true,run:()=>platesCall(s)},{t:'Не буду',run:()=>platesBeaten(s)}],dflt:()=>platesBeaten(s)}));}
 function platesCall(s){const id='plates';const tea=Math.min(600,Math.max(0,Math.round(player.money||0)));
   sitCard(storyCard({s,icon:'📞',title:'112',text:`Охранник: «${storyLine(id,'call')}» Через десять минут у входа наряд. Официант вдруг вспоминает, что вы заказывали только чай: ${fmtMoney(tea)}.`,tone:'good',
     choices:[{t:'Заплатить за чай и дать показания',primary:true,run:()=>{if(tea)player.money-=tea;storyOut(s,'called',`👮 Полиция приняла показания на месте. ${qName(s.v.n)} проверят — вы заплатили только за свой чай.`);}}],dflt:()=>{if(tea)player.money-=tea;storyOut(s,'called','👮 Полиция приняла показания на месте.');}}));}
 function platesBeaten(s){const id='plates';const lost=Math.max(0,Math.round(player.money||0));
   sitCard(storyCard({s,icon:'🌑',title:s.v.n,tone:'alert',text:'Охрана выводит вас во двор «поговорить». Дальше — темнота.',choices:[{t:'…',primary:true,run:()=>{
-    player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten'});storyWard();}}],dflt:()=>{player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten'});storyWard();}}));}
+    player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order.sum});storyWard();}}],dflt:()=>{player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order.sum});storyWard();}}));}
 // больница: игрок приходит в себя в палате ближайшей больницы
 function storyWard(){const hs=world.pois.filter(p=>p.t==='hospital');let h=null,bd=1e9;for(const p of hs){const d=dist(p.x,p.y,player.x,player.y);if(d<bd){bd=d;h=p;}}
   if(h){const q=toSidewalk(h.x,h.y);player.x=q[0];player.y=q[1];cam.x=player.x;cam.y=player.y;}
@@ -180,7 +186,7 @@ function clofDrink(s){const id='clofelin';storyStep(id,'drink');const lost=Math.
 function clofWake(){const id='clofelin';let q=null;const sq=(world.squares||[]).filter(x=>dist(x.x,x.y,player.x,player.y)<900).sort((a,b)=>dist(a.x,a.y,player.x,player.y)-dist(b.x,b.y,player.x,player.y))[0];
   if(sq)q=toSidewalk(sq.x,sq.y);if(!q)q=spotNear(150,400);if(q){player.x=q[0];player.y=q[1];cam.x=player.x;cam.y=player.y;}
   player.energy=Math.min(player.energy,30);player.mood=clamp(player.mood-30,0,100);
-  const lines=[storyLine(id,'wake'),storyLine(id,'wake')].filter((t,i,a)=>a.indexOf(t)===i);
+  const here={x:player.x,y:player.y};const lines=[storyLine(id,'wake',{at:here}),storyLine(id,'wake',{at:here})].filter((t,i,a)=>a.indexOf(t)===i);
   const done=()=>{setHint('Заблокируйте карту в отделении банка — оно отмечено на карте');storyAfterStart();};
   storyShow('wake',{kind:'bench',lines,onDone:done},storyCard({icon:'🌅',title:'Утро',text:lines.join(' '),choices:[{t:'Встать',primary:true,run:done}],dflt:done}));}
 
@@ -204,9 +210,9 @@ defSit('storyafter',{title:'Дело о мошенниках',quiet:true,multi:f
   actionInside(s){const P=PROG.story;if(!P||scene!=='interior'||!interior)return null;const k=interior.kind,place=P.v&&P.v.n||'';
     if(P.st==='bank'&&k==='bank')return {label:'Заблокировать карту и написать заявление',run:()=>{spendTime(20);const t=storyLine(P.id,'bank');storyStep(P.id,'bank');storySave({st:'police'});unmark('safter');
       sitCard(storyCard({icon:'🏦',title:'Банк',text:`«${t}» ${storyLine(P.id,'phone')}`,choices:[{t:'Дальше — в полицию',primary:true,run:()=>{}}]}));storyAfterMarks(s);}};
-    if(P.st==='police'&&k==='police')return {label:`Заявление: ${qName(place)}`,run:()=>{spendTime(40);const t=storyLine(P.id,'police');storyStep(P.id,'police');storySave({st:'witness'});unmark('safter');
+    if(P.st==='police'&&k==='police')return {label:`Заявление: ${qName(place)}`,run:()=>{spendTime(40);const t=storyLine(P.id,'police',{sum:P.bill});storyStep(P.id,'police');storySave({st:'witness'});unmark('safter');
       sitCard(storyCard({icon:'👮',title:'Дежурный',text:`«${t}»`,choices:[{t:'Найти свидетеля',primary:true,run:()=>{}}]}));setHint(`Найдите свидетеля у ${qName(place)} — место отмечено на карте`);storyAfterMarks(s);}};
-    if(P.st==='prosecutor'&&k==='prosecutor')return {label:`Передать материалы о ${qName(place)}`,run:()=>{spendTime(30);const t=storyLine(P.id,'prosecutor');storyStep(P.id,'prosecutor');storySave({st:'wait',at:Date.now()+90e3});unmark('safter');
+    if(P.st==='prosecutor'&&k==='prosecutor')return {label:`Передать материалы о ${qName(place)}`,run:()=>{spendTime(30);const t=storyLine(P.id,'prosecutor',{sum:P.bill});storyStep(P.id,'prosecutor');storySave({st:'wait',at:Date.now()+90e3});unmark('safter');
       sitCard(storyCard({icon:'⚖️',title:'Прокурор',text:`«${t}»`,choices:[{t:'Ждать решения',primary:true,run:()=>{}}]}));setHint('Дело ушло в суд. Новости придут в телефон');}};
     return null;}});
 function storyAfterMarks(s){const P=PROG.story;if(!P)return;let p=null,icon='📍',lbl='';
@@ -215,8 +221,7 @@ function storyAfterMarks(s){const P=PROG.story;if(!P)return;let p=null,icon='�
   else if(P.st==='witness'&&P.v){p=P.v;icon='🗣';lbl=`Свидетель у ${qName(P.v.n)}`;}
   else if(P.st==='prosecutor'){if(typeof prosPlace==='function')prosPlace();p=storyNearest('prosecutor');icon='⚖️';lbl='Приёмная прокурора';}
   if(p)mark(s,'safter',p.x,p.y,icon,lbl,{arrow:true,color:'#2D4A9E'});else unmark('safter');}
-function storyFinale(){const P=PROG.story;if(!P||P.st!=='wait')return;const id=P.id;const text=storyLine(id,'finale',{place:P.v&&P.v.n});
-  const back=Math.max(0,P.lost||0)+(P.how==='beaten'?5000:2000);storySave({st:'done',out:'won'});storyStep(id,'done');
+function storyFinale(){const P=PROG.story;if(!P||P.st!=='wait')return;const id=P.id;const back=Math.max(0,P.lost||0)+(P.how==='beaten'?5000:2000);const text=storyLine(id,'finale',{sum:back});storySave({st:'done',out:'won'});storyStep(id,'done');
   if(window.cityPhone&&typeof window.cityPhone.push==='function'){try{window.cityPhone.push({from:id==='plates'?'Прокуратура':'Полиция',text,kind:'story'});}catch(e){}}
   addEvent(`⚖️ ${text}`,'say');if(back)sitMoney(back,'Возврат по делу о мошенниках');cityTrack('story_win');if(typeof memNote==='function')memNote(id+'_win',{place:P.v&&P.v.n});
   if(typeof sitRep==='function')sitRep(5,'довели дело мошенников до конца');sitMood(15);}
