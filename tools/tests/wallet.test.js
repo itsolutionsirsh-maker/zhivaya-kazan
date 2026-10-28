@@ -55,10 +55,6 @@ for(const [name,mk] of Object.entries(backends)){
     assert.equal(save('p',mk('a0-',10)).res.filter(x=>x.dup).length,10,'повторы — отвечаем всегда');
     clock.t+=3601;r=save('p',mk('b-',500));assert.equal(r.res.length,500,'через час — проводим');});
 
-  test(`${name}: перенос со старого сайта заменил сохранение — кошелёк заводится заново из нового`,()=>{
-    const {w}=setup();w.commit('p',{prior:{money:4000}});assert.equal(w.info('p').bal,4000);
-    w.forget('p');assert.equal(w.info('p').bal,null);const r=w.commit('p',{prior:{money:25000},incoming:{money:25000}});assert.equal(r.bal,25000);assert.ok(r.init);});
-
   test(`${name}: операция с тем же номером не начисляет второй раз`,()=>{
     const {w,save}=setup();w.commit('p',{});
     let a=save('p',[{id:'op-aaaa01',amt:2400},{id:'op-aaaa02',amt:-500}]);assert.equal(a.bal,LIM.start+1900);assert.deepEqual(a.res.map(x=>x.amt),[2400,-500]);

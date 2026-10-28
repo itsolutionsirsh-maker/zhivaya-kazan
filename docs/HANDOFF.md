@@ -12,7 +12,6 @@
 - **DNS:** зона lifegorod.com — в FlokiNET, услуга «DNS Management Account» → Log in to cPanel → Zone Editor (A: `lifegorod.com`, `kazan` → 213.218.161.82; `www` — CNAME). `lifegorod.com` и `www` пересылают в игру (Caddy).
 - **Консоль сервера** без SSH: FlokiNET → услуга VPS → noVNC Console. В ней не набираются символы с Shift (`: & | _ > " {`), поэтому скрипты названы без подчёркиваний (`tools/citymap.sh`), а команды пишем без конвейеров.
 - **Защита:** ufw (22, 80, 443), fail2ban на SSH, автообновления безопасности (`install.sh`).
-- **Старый хостинг (Бегет):** `iks-ai-systems.ru/kazan/` перенаправляет на новый адрес. Ветку `beget-build` на GitHub можно удалить.
 
 ## Карта всей Казани
 

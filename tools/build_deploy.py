@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Сборка для своего сайта: deploy/kazan/ (index.html, js/, kazan.json, api.php) + kazan.zip для заливки."""
-import os, shutil, zipfile, sys
+"""Сборка для сервера игры: deploy/kazan/ (index.html, js/, kazan.json, mod.html) — её раздаёт server/node/server.js."""
+import os, shutil, sys
 ROOT = os.path.join(os.path.dirname(__file__), '..')
-SITE, SERVER = os.path.join(ROOT, 'site'), os.path.join(ROOT, 'server')
+SITE = os.path.join(ROOT, 'site')
 OUT = os.path.join(ROOT, 'deploy', 'kazan')
-shutil.rmtree(OUT, ignore_errors=True); os.makedirs(os.path.join(OUT, 'data'))
+shutil.rmtree(OUT, ignore_errors=True); os.makedirs(OUT)
 body = open(os.path.join(SITE, 'zhivaya-kazan.html'), encoding='utf-8').read()
 head = ('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
@@ -24,17 +24,7 @@ shutil.copy(os.path.join(SITE, 'kazan.json'), OUT)
 if os.path.isdir(os.path.join(SITE, 'map')):
     shutil.copytree(os.path.join(SITE, 'map'), os.path.join(OUT, 'map'))   # карта всей Казани кусками
 if os.path.exists(os.path.join(SITE, 'mod.html')):
-    shutil.copy(os.path.join(SITE, 'mod.html'), OUT)   # страница модератора (работает с сервером на VPS)
+    shutil.copy(os.path.join(SITE, 'mod.html'), OUT)   # страница модератора
 if os.path.isdir(os.path.join(SITE, 'img')):
     shutil.copytree(os.path.join(SITE, 'img'), os.path.join(OUT, 'img'))
-shutil.copy(os.path.join(SERVER, 'api.php'), OUT)
-shutil.copy(os.path.join(SERVER, 'config.sample.php'), OUT)
-shutil.copy(os.path.join(SERVER, 'data.htaccess'), os.path.join(OUT, 'data', '.htaccess'))
-zp = os.path.join(ROOT, 'deploy', 'kazan.zip')
-with zipfile.ZipFile(zp, 'w', zipfile.ZIP_DEFLATED) as z:
-    for d, _, fs in os.walk(OUT):
-        if os.path.relpath(d, OUT).split(os.sep)[0] == 'map':
-            continue   # кусковая карта — только для своего сервера, на старый хостинг не нужна
-        for f in fs:
-            full = os.path.join(d, f); z.write(full, os.path.relpath(full, os.path.dirname(OUT)))
-print('deploy →', OUT, '| zip', os.path.getsize(zp) // 1024, 'КБ')
+print('deploy →', OUT)
