@@ -81,7 +81,8 @@ function storyPersona(id,name){const p=makePersona('resident');p.name=name;p.fem
   p.job='';p.ctx=`Ты — ${name}. Вы только что познакомились с собеседником на улице, и ты зовёшь его посидеть в заведении рядом. Ты весёлый человек, делаешь комплименты, расспрашиваешь о работе. О ценах и о себе говоришь уклончиво.`;return p;}
 // выдуманное заведение: тротуар у дома в 60–170 м, рядом нет настоящих заведений
 function storyVenue(id){const V=storyList(id,'venues').filter(v=>v&&v.name);const v=pick(V.length?V:STORY_FB[id].venues);
-  for(let k=0;k<30;k++){const q=spotNear(60,170);if(!q)continue;if(world.pois.some(p=>Math.abs(p.x-q[0])<30&&Math.abs(p.y-q[1])<30&&dist(p.x,p.y,q[0],q[1])<30))continue;if(!inBuildingNear(q[0],q[1]))continue;
+  for(let k=0;k<60;k++){const q=spotNear(60,170+k*4);if(!q)continue;const R0=k<30?30:18;   // в плотном центре — дальше и чуть ближе к соседям
+    if(world.pois.some(p=>Math.abs(p.x-q[0])<R0&&Math.abs(p.y-q[1])<R0&&dist(p.x,p.y,q[0],q[1])<R0))continue;if(!inBuildingNear(q[0],q[1]))continue;
     return {x:q[0],y:q[1],n:v.name,kind:v.kind==='bar'?'bar':'cafe'};}return null;}
 function storyPick(){if(typeof cityHour!=='function')return null;const h=cityHour();if(h>=11&&h<18)return 'plates';if(h>=19||h<2)return 'clofelin';if(h>=18&&h<19)return Math.random()<0.5?'plates':'clofelin';return null;}
 function storyFree(){return scene==='city'&&world&&world.meta&&!player.vehicle&&!player.bus&&!player.busy&&!player.inside&&!companion&&!SIT.card&&player.state==='ok'&&!player.waitingStop&&!sitActive('story')&&!window.zkNoStory;}

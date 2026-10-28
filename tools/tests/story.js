@@ -33,8 +33,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const at = h => ev(h => { zkSetTime((clock.day - 1) * 1440 + h * 60); }, h);
     // начать историю: человек подходит (подтягиваем поближе), карточка-приглашение, «Пойдём», дошли, зашли
     const begin = async id => {
-      await ev(id => { delete PROG.story; const n = nearestNode(0, 0, world.pedAdj, 400); const q = sidewalkPos(n); player.x = q[0]; player.y = q[1]; cam.x = q[0]; cam.y = q[1]; player.money = 10000; storyStart(id); const s = sitActive('story'); s.w.x = player.x + 3; s.w.y = player.y; }, id);
-      for (let i = 0; i < 40 && !(await ev(() => !!SIT.card)); i++) await sleep(250);
+      await ev(id => { delete PROG.story; const n = nearestNode(0, 0, world.pedAdj, 400); const q = sidewalkPos(n); player.x = q[0]; player.y = q[1]; cam.x = q[0]; cam.y = q[1]; player.money = 10000; let s = null; for (let k = 0; k < 8 && !s; k++) s = storyStart(id); s.w.x = player.x + 3; s.w.y = player.y; }, id);
+      // чужие карточки (недельная сводка, звонки) закрываем — ждём именно приглашение
+      for (let i = 0; i < 60 && !(await ev(() => !!SIT.card && SIT.card.choices.some(o => /Пойдём/.test(o.t)))); i++) { await ev(() => { const c = SIT.card; if (c && !c.choices.some(o => /Пойдём/.test(o.t))) pickChoice(c, c.choices[c.choices.length - 1]); }); await sleep(250); }
+      await ev(() => { player.money = 10000; ECON.dep = 0; });   // чужие карточки могли тронуть деньги
       const c = await card(); console.log(`  ${id}: подходит —`, JSON.stringify(c).slice(0, 220)); assert.ok(c && /Пойдём/.test(c.choices.join()));
       return c;
     };
