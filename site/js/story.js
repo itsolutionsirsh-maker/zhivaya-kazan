@@ -104,7 +104,7 @@ defSit('story',{title:'История новичка',quiet:true,
     if(s.phase==='go'){
       if(!companion||companion.w!==w){storyOut(s,'avoided','Вы передумали и ушли своей дорогой.');return;}
       s.wt=(s.wt||8)-dt;if(s.wt<=0&&dist(w.x,w.y,player.x,player.y)<8){s.wt=rnd(10,16);say(w,storyLine(id,'walk'),5);}
-      if(scene==='interior'&&interior&&interior.key===s.key){s.phase='inside';s.it=interior;player.busy=true;storyStep(id,'inside');Object.assign(companion,{arrived:true,mode:'follow'});updateCompBox();
+      if(scene==='interior'&&interior&&interior.key===s.key){s.phase='inside';s.it=interior;player.busy=true;storyStep(id,'inside');Object.assign(companion,{arrived:true,mode:'follow'});updateCompBox();storyStaff(interior,id);
         if(s.w2){const c=interior.npcs.find(n2=>n2.companionOf===w);if(c)interior.npcs.push({p:s.w2.p,x:c.x-2.1,y:c.y,hx:1,hy:0,seated:true,phase:0,role:'resident',isInterior:true,state:'idle',memory:s.w2.p.memory,storyTwo:true});}
         setTimeout(()=>id==='plates'?platesTable(s):clofTable(s),1200);}
       return;}
@@ -113,6 +113,9 @@ defSit('story',{title:'История новичка',quiet:true,
     return {label:`Зайти в «${v.n.replace(/^.*«|»$/g,'')||v.n}» (${s.w.p.name} с вами)`,run:()=>{unmark('sdoor');enterInterior({kind:v.kind,name:v.n,key:s.key,x:player.x,y:player.y});}};},
   end(s){player.busy=false;if(STORY.v===s.v)STORY.v=null;if(s.it)s.it.npcs=s.it.npcs.filter(n=>!n.storyTwo);if(companion&&companion.w===s.w)stopCompanion(true);unmark('sdoor');
     for(const w of [s.w,s.w2]){if(!w)continue;w.sitBy=null;const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);}s.actors=[];}});   // ушли насовсем
+// официант и охранник у двери — для story-ui (образы waiter и guard); в баре клофелинщиков охраны нет
+function storyStaff(it,id){const st=it.npcs.find(n=>n.role==='staff');if(st&&id==='plates')st.p.story='waiter';
+  if(id==='plates'&&!it.npcs.some(n=>n.p&&n.p.story==='guard')){const p=makePersona('guard');p.story='guard';p.name='Охранник';it.npcs.push({p,x:it.w-1.3,y:it.h-1.4,hx:-1,hy:0,seated:false,phase:0,role:'guard',isInterior:true,state:'idle',memory:p.memory});}}
 function storyAbort(s){endSit(s);}   // не случилось (уехал, ушёл) — история придёт позже
 function storyRefuse(s){const w=s.w;say(w,storyLine(s.id,'refused'),5);storyStep(s.id,'refused');
   const P=PROG.story;if(P&&P.out==='refused')storySave({st:'done'});else storySave({id:s.id,st:'later',out:'refused',at:Date.now()+20*60e3});
@@ -126,7 +129,7 @@ function storyGo(s){const id=s.id,w=s.w,v=s.v;w.sitBy=null;w.mv=null;if(s.w2){s.
 function storyOut(s,out,text,extra){if(s.ending)return;s.ending=true;const id=s.id;player.busy=false;if(text)addEvent(text,out==='caught'?'alert':'say');
   if(out==='avoided'){storyStep(id,'avoided');storySave({id,st:'done',out:'avoided',v:s.v});cityTrack('story_dodge');if(typeof sitRep==='function')sitRep(2,'не повелись на «знакомство»');}
   if(out==='called'){storyStep(id,'called');storySave({id,st:'done',out:'called',v:s.v});cityTrack('story_win');if(typeof memNote==='function')memNote(id+'_win',{place:s.v&&s.v.n});if(typeof sitRep==='function')sitRep(5,'вызвали полицию в кафе-ловушке');}
-  if(out==='caught'){storyStep(id,'caught');storySave(Object.assign({id,st:id==='clofelin'?'bank':'police',out:'caught',v:s.v,day:clock.day},extra||{}));if(typeof memNote==='function')memNote(id,{place:s.v&&s.v.n});}
+  if(out==='caught'){storyStep(id,'caught');storySave(Object.assign({id,st:id==='clofelin'?'bank':'police',out:'caught',v:s.v,day:clock.day,who:s.w&&s.w.p.name},extra||{}));if(typeof memNote==='function')memNote(id,{place:s.v&&s.v.n});}
   if(scene==='interior'&&interior&&interior.key===s.key)exitInterior();
   endSit(s);if(out==='caught')storyAfterStart();}
 
@@ -148,7 +151,7 @@ function platesBill(s){if(s.ending)return;const id='plates',w=s.w;const o=s.orde
   const pre=`Проходит час. ${w.p.name} заказывает ещё: «${storyLine(id,'order')}» — и «на минутку отходит». Не возвращается.`;
   const line=storyLine(id,'bill',{sum:o.sum}),money=Math.max(0,Math.round(player.money||0));
   const choices=[money>=o.sum?{t:`Оплатить ${fmtMoney(o.sum)}`,run:()=>platesPay(s,o.sum)}:{t:`Отдать всё, что есть (${fmtMoney(money)})`,run:()=>platesPay(s,money)},
-    {t:'Не буду платить',run:()=>platesGuard(s)},{t:'Позвонить 112',primary:true,run:()=>platesCall(s)}];
+    {t:'Не буду платить',tone:'alert',run:()=>platesGuard(s)},{t:'Позвонить 112',primary:true,run:()=>platesCall(s)}];
   sitCard(storyCard({s,icon:'🍽',title:s.v.n,text:pre,choices:[{t:'Дальше',primary:true,run:()=>storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,choices},
     storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» ${o.items.map(m=>`${m.name} — ${fmtMoney(m.price)}`).join(' · ')}. Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}))}],dflt:()=>platesBill2(s,choices,line)}));}
 function platesBill2(s,choices,line){const o=s.order;storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,choices},storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}));}
@@ -193,6 +196,8 @@ function clofWake(){const id='clofelin';let q=null;const sq=(world.squares||[]).
   storyShow('wake',{kind:'bench',lines,onDone:done},storyCard({icon:'🌅',title:'Утро',text:lines.join(' '),choices:[{t:'Встать',primary:true,run:done}],dflt:done}));}
 
 // ---------- возмездие: банк (клофелин), полиция, свидетель, прокурор (тарелочница), решение ----------
+// телефон: переписка (kind 'story' — одна цепочка на отправителя) и карточка статуса заявления ('story-status')
+function storyPhone(from,text,kind){if(window.cityPhone&&typeof window.cityPhone.push==='function'){try{window.cityPhone.push({from,text,kind});}catch(e){}}}
 function storyAfterStart(){if(!sitActive('storyafter'))startSit('storyafter');}
 function storyNearest(t){let best=null,bd=1e9;for(const p of world.pois){if(p.t!==t)continue;const d=dist(p.x,p.y,player.x,player.y);if(d<bd){bd=d;best=p;}}return best;}
 defSit('storyafter',{title:'Дело о мошенниках',quiet:true,multi:false,cool:1,
@@ -212,9 +217,9 @@ defSit('storyafter',{title:'Дело о мошенниках',quiet:true,multi:f
   actionInside(s){const P=PROG.story;if(!P||scene!=='interior'||!interior)return null;const k=interior.kind,place=P.v&&P.v.n||'';
     if(P.st==='bank'&&k==='bank')return {label:'Заблокировать карту и написать заявление',run:()=>{spendTime(20);const t=storyLine(P.id,'bank');storyStep(P.id,'bank');storySave({st:'police'});unmark('safter');
       sitCard(storyCard({icon:'🏦',title:'Банк',text:`«${t}» ${storyLine(P.id,'phone')}`,choices:[{t:'Дальше — в полицию',primary:true,run:()=>{}}]}));storyAfterMarks(s);}};
-    if(P.st==='police'&&k==='police')return {label:`Заявление: ${qName(place)}`,run:()=>{spendTime(40);const t=storyLine(P.id,'police',{sum:P.bill});storyStep(P.id,'police');storySave({st:'witness'});unmark('safter');
+    if(P.st==='police'&&k==='police')return {label:`Заявление: ${qName(place)}`,run:()=>{spendTime(40);const t=storyLine(P.id,'police',{sum:P.bill});storyStep(P.id,'police');storySave({st:'witness'});unmark('safter');storyPhone('Полиция',`Заявление о ${place} принято. КУСП № ${1000+Math.floor(Math.random()*8999)}. Нужен свидетель.`,'story-status');
       sitCard(storyCard({icon:'👮',title:'Дежурный',text:`«${t}»`,choices:[{t:'Найти свидетеля',primary:true,run:()=>{}}]}));setHint(`Найдите свидетеля у ${qName(place)} — место отмечено на карте`);storyAfterMarks(s);}};
-    if(P.st==='prosecutor'&&k==='prosecutor')return {label:`Передать материалы о ${qName(place)}`,run:()=>{spendTime(30);const t=storyLine(P.id,'prosecutor',{sum:P.bill});storyStep(P.id,'prosecutor');storySave({st:'wait',at:Date.now()+90e3});unmark('safter');
+    if(P.st==='prosecutor'&&k==='prosecutor')return {label:`Передать материалы о ${qName(place)}`,run:()=>{spendTime(30);const t=storyLine(P.id,'prosecutor',{sum:P.bill});storyStep(P.id,'prosecutor');storySave({st:'wait',at:Date.now()+90e3});unmark('safter');storyPhone('Прокуратура',`Материалы о ${place} переданы в суд. Решение придёт сюда.`,'story-status');
       sitCard(storyCard({icon:'⚖️',title:'Прокурор',text:`«${t}»`,choices:[{t:'Ждать решения',primary:true,run:()=>{}}]}));setHint('Дело ушло в суд. Новости придут в телефон');}};
     return null;}});
 function storyAfterMarks(s){const P=PROG.story;if(!P)return;let p=null,icon='📍',lbl='';
@@ -224,7 +229,7 @@ function storyAfterMarks(s){const P=PROG.story;if(!P)return;let p=null,icon='�
   else if(P.st==='prosecutor'){if(typeof prosPlace==='function')prosPlace();p=storyNearest('prosecutor');icon='⚖️';lbl='Приёмная прокурора';}
   if(p)mark(s,'safter',p.x,p.y,icon,lbl,{arrow:true,color:'#2D4A9E'});else unmark('safter');}
 function storyFinale(){const P=PROG.story;if(!P||P.st!=='wait')return;const id=P.id;const back=Math.max(0,P.lost||0)+(P.how==='beaten'?5000:2000);const text=storyLine(id,'finale',{sum:back});storySave({st:'done',out:'won'});storyStep(id,'done');
-  if(window.cityPhone&&typeof window.cityPhone.push==='function'){try{window.cityPhone.push({from:id==='plates'?'Прокуратура':'Полиция',text,kind:'story'});}catch(e){}}
+  storyPhone(id==='plates'?'Прокуратура':'Полиция',text,'story-status');
   addEvent(`⚖️ ${text}`,'say');if(back)sitMoney(back,'Возврат по делу о мошенниках');cityTrack('story_win');if(typeof memNote==='function')memNote(id+'_win',{place:P.v&&P.v.n});
   if(typeof sitRep==='function')sitRep(5,'довели дело мошенников до конца');sitMood(15);}
 
@@ -232,7 +237,7 @@ function storyFinale(){const P=PROG.story;if(!P||P.st!=='wait')return;const id=P
 defWatch(dt=>{const P=PROG.story;
   if(P&&STORY_AFTER.includes(P.st)){if(!sitActive('storyafter')&&world&&world.meta)storyAfterStart();
     if(P.id==='plates'&&P.st==='police'&&!P.sms&&Date.now()-(STORY.smsT||(STORY.smsT=Date.now()))>60000){storySave({sms:1});
-      if(window.cityPhone&&typeof window.cityPhone.push==='function'){try{window.cityPhone.push({from:'Незнакомка',text:storyLine('plates','sms'),kind:'story'});}catch(e){}}}return;}
+      storyPhone(P.who||'Незнакомка',storyLine('plates','sms'),'story');}return;}
   if(P&&!(P.st==='later'&&Date.now()>=(P.at||0)))return;
   if(scene==='city'&&!player.busy)STORY.t+=dt||0;if(STORY.t<360)return;
   STORY.try-=dt||0;if(STORY.try>0)return;STORY.try=5;if(!storyFree())return;

@@ -45,6 +45,7 @@
     paper.append(list);
     if(bill){const total=el('div','story-total');total.append(el('span','','ИТОГО'),el('strong','',rub(o.total)));paper.append(total,el('p','story-paper-note','Проверьте позиции перед оплатой.'));}
     else paper.append(el('p','story-menu-note','Официант ждёт вашего решения.'));
+    if(o.line)s.body.append(el('p','story-say','«'+o.line+'»'));   // слова официанта (story.js)
     s.body.append(paper);buttons(s,o.choices);return s.root;
   }
   // Две небольшие векторные сцены; никаких изображений, сети или покадрового JS.
