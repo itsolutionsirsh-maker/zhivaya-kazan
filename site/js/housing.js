@@ -50,7 +50,7 @@ function housingMove(f,how){
 function housingHomeName(){const f=housingFlat();return f?f.title:'Ваша квартира';}
 function housingHomeKey(){return player.flat?'home:'+player.flat:'home';}
 const HOUSING_FLOOR={soviet:'wood',old:'dark',modern:'tiles',loft:'granite'};
-{const _mk=makeInterior;makeInterior=function(kind,name,key){const it=_mk(kind,name,key);
+{const _mk=makeInterior;makeInterior=function(kind,name,key,...rest){const it=_mk(kind,name,key,...rest);   // rest: общая комната заведения (shared-venues.js)
   if(kind==='home'&&typeof key==='string'&&key.startsWith('home:')){const f=flatById(key.slice(5));if(f){it.floor=HOUSING_FLOOR[f.style]||it.floor;it.flat=f.id;}}
   return it;};}
 // вид из окна: раз в игровой день при входе домой — короткая карточка и приятная минута (+2 настроения)
