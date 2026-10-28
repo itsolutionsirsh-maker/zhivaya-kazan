@@ -102,13 +102,17 @@ function setRev(u){syncRev=+u||0;try{localStorage.setItem('zk.syncRev',String(sy
 function acctServerNewer(j){if(syncRev)return (j.updated||0)>syncRev+0.001;return !!(j.state&&(j.state.t||0)>bootLocalT+5000);}   // старым сохранениям без zk.syncRev — по времени до первого кадра
 // решение при запуске (сайт — acctSyncOnBoot, Телега — tgAfter): true — берём серверную копию и перезапускаемся
 function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
-async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store'});return r.json();}
-function acctSnapshot(){if(window.zkNoSave)return null;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city};}
-async function acctSave(){if(!acct||window.zkNoSave)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
-  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},snap));if(j.ok){if(j.updated)setRev(j.updated);return;}
-    if(j.err==='conflict'){acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
+// тайм-аут: зависший запрос (переключилась мобильная сеть) не держит сохранения минутами — обрыв, следующее через 30 с
+async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store',signal:typeof AbortSignal!=='undefined'&&AbortSignal.timeout?AbortSignal.timeout(20000):undefined});return r.json();}
+// снимок для сервера; wallet — изменения денег операциями (wallet.js), проводятся только вместе с этим сохранением
+function acctSnapshot(){if(window.zkNoSave)return null;const wo=typeof walletOut==='function'?walletOut():undefined;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(state)delete state.wal;if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city,wallet:wo?{who:wo.who,ops:wo.ops}:undefined,wsnap:wo?wo.snap:undefined};}
+// одно сохранение за раз: второе с той же base, пока первое в пути, сервер счёл бы чужим (конфликт)
+async function acctSave(){if(!acct||window.zkNoSave||Net.saving)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
+  Net.saving=true;const {wsnap,...body}=snap;
+  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},body));if(j.ok){if(j.updated)setRev(j.updated);if(typeof walletAfter==='function')walletAfter(j.wallet,wsnap);return;}
+    if(j.err==='conflict'){if(typeof walletDrop==='function')walletDrop();acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
     if(j.err==='too_big'&&!Net.bigTold){Net.bigTold=true;setHint('Сохранение слишком большое — на сервер не уходит. Напишите нам');}
-    if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}}
+    if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}finally{Net.saving=false;}}
 async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).catch(()=>({err:'net'}));
   const E={name:'Имя — от 2 букв',pin:'PIN — от 4 до 8 цифр',wrong_pin:'Неверный PIN для этого имени',locked:'Слишком много попыток. Подождите 15 минут',rate_limited:'Слишком часто. Попробуйте через минуту',net:'Нет связи с сервером'};
   if(j.err){$('#acctMsg').textContent=E[j.err]||'Не получилось';return;}
@@ -156,6 +160,7 @@ function acctApply(j){
   const keepLocal=typeof journeyKeepLocal==='function'&&journeyKeepLocal(j.state);
   window.zkNoSave=true;
   try{setRev(j.updated||0);if(!keepLocal){
+    if(j.state&&j.state.wal)delete j.state.wal;   // состояние кошелька — только своё (wallet.js); загруженная игра начинает с баланса сервера
     localStorage.setItem('zk.state',JSON.stringify(j.state));
     if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));
     if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));
@@ -181,5 +186,5 @@ async function netInit(){
     if(r){roomNs=r;Net.mode='room';r.onPeers(()=>{const list=roomPeers();Net.peers=list;syncPeers(list);readRoomMsgs(list);setNetStatus(true);},()=>{roomNs=null;Net.mode='off';peerRender.clear();setNetStatus(false);});pushPresence();setNetStatus(true);return;}}
   if(location.protocol.startsWith('http')&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
     try{const t0=Date.now();const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){if(j.now>1e12){const off=j.now-(t0+Date.now())/2;if(Math.abs(off)>2000)clockOff=off;}   // часы игры у всех по серверу, даже если на телефоне время сбито
-      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
+      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
   Net.mode='off';setNetStatus(false);}
