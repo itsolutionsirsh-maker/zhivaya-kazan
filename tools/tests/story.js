@@ -22,13 +22,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(2000);
     await ev(() => { window.zkNoStory = true; let k = 0; while (SIT.card && k++ < 8) { const c = SIT.card; pickChoice(c, c.choices[c.choices.length - 1]); } });
     // выбрать вариант в текущей карточке по тексту кнопки
-    const choose = async re => { for (let i = 0; i < 40; i++) { const t = await ev(r => { const c = SIT.card; if (!c) return null; const x = (c.choices || []).find(o => new RegExp(r).test(o.t)); if (!x) return 'нет: ' + c.choices.map(o => o.t).join(' | '); pickChoice(c, x); return x.t; }, re); if (t && !/^нет: /.test(t)) return t; if (i === 39) throw new Error('нет кнопки ' + re + ' — ' + t); await sleep(250); } };
-    const card = () => ev(() => SIT.card && {title: SIT.card.title, text: SIT.card.text, choices: SIT.card.choices.map(c => c.t)});
+    // выбрать вариант по тексту кнопки: окно истории (story-ui.js: счёт, меню, пробуждение) или карточка sitCard
+    const choose = async re => { for (let k = 0; k < 40; k++) { const t = await ev(r => {
+      const d = document.getElementById('storyDialog'); if (d) { const b = [...d.querySelectorAll('.story-button')].find(x => new RegExp(r).test(x.textContent)); if (!b) return 'нет: ' + [...d.querySelectorAll('.story-button')].map(x => x.textContent).join(' | '); const t = b.textContent; b.click(); return t; }
+      const c = SIT.card; if (!c) return null; const x = (c.choices || []).find(o => new RegExp(r).test(o.t)); if (!x) return 'нет: ' + c.choices.map(o => o.t).join(' | '); pickChoice(c, x); return x.t; }, re);
+      if (t && !/^нет: /.test(t)) return t; if (k === 39) throw new Error('нет кнопки ' + re + ' — ' + t); await sleep(250); } };
+    // пробуждение (story-ui.js): строки по нажатию, в конце — «Подняться»; без окна — карточка «Встать»
+    const wakeUp = async () => { for (let k = 0; k < 20; k++) { const r = await ev(() => { const d = document.getElementById('storyDialog'); if (d) { d.querySelector('.story-button').click(); return 'ui'; } const c = SIT.card; if (c && c.choices.some(o => /Встать/.test(o.t))) { pickChoice(c, c.choices.find(o => /Встать/.test(o.t))); return 'card'; } return 'done'; }); if (r === 'done') return; await sleep(300); } throw new Error('пробуждение не закончилось'); };
+    const card = () => ev(() => { const d = document.getElementById('storyDialog'); if (d) return {title: d.querySelector('h2').textContent, text: d.querySelector('.story-body').textContent, choices: [...d.querySelectorAll('.story-button')].map(b => b.textContent), ui: true}; return SIT.card && {title: SIT.card.title, text: SIT.card.text, choices: SIT.card.choices.map(c => c.t)}; });
     const at = h => ev(h => { zkSetTime((clock.day - 1) * 1440 + h * 60); }, h);
     // начать историю: человек подходит (подтягиваем поближе), карточка-приглашение, «Пойдём», дошли, зашли
     const begin = async id => {
-      await ev(id => { delete PROG.story; const n = nearestNode(0, 0, world.pedAdj, 400); const q = sidewalkPos(n); player.x = q[0]; player.y = q[1]; cam.x = q[0]; cam.y = q[1]; player.money = 10000; storyStart(id); const s = sitActive('story'); s.w.x = player.x + 3; s.w.y = player.y; }, id);
-      for (let i = 0; i < 40 && !(await ev(() => !!SIT.card)); i++) await sleep(250);
+      await ev(id => { delete PROG.story; const n = nearestNode(0, 0, world.pedAdj, 400); const q = sidewalkPos(n); player.x = q[0]; player.y = q[1]; cam.x = q[0]; cam.y = q[1]; player.money = 10000; let s = null; for (let k = 0; k < 8 && !s; k++) s = storyStart(id); s.w.x = player.x + 3; s.w.y = player.y; }, id);
+      // чужие карточки (недельная сводка, звонки) закрываем — ждём именно приглашение
+      for (let i = 0; i < 60 && !(await ev(() => !!SIT.card && SIT.card.choices.some(o => /Пойдём/.test(o.t)))); i++) { await ev(() => { const c = SIT.card; if (c && !c.choices.some(o => /Пойдём/.test(o.t))) pickChoice(c, c.choices[c.choices.length - 1]); }); await sleep(250); }
+      await ev(() => { player.money = 10000; ECON.dep = 0; });   // чужие карточки могли тронуть деньги
       const c = await card(); console.log(`  ${id}: подходит —`, JSON.stringify(c).slice(0, 220)); assert.ok(c && /Пойдём/.test(c.choices.join()));
       return c;
     };
@@ -73,10 +81,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     if (SHOTS) await pg.screenshot({path: SHOTS + '/story_table.png'});
     await choose('гуляем'); await choose('Дальше');
     if (SHOTS) await pg.screenshot({path: SHOTS + '/story_bill.png'});
-    c = await card(); console.log('  счёт:', JSON.stringify(c).slice(0, 260)); assert.ok(/Итого/.test(c.text)); const sum = +c.text.match(/Итого: ([\d\s ]+)/)[1].replace(/\D/g, ''); assert.ok(sum >= 35000 && sum <= 46000, 'счёт 35–46 тыс.: ' + sum);
+    c = await card(); console.log('  счёт:', JSON.stringify(c).slice(0, 260)); assert.ok(/итого/i.test(c.text)); const sum = +c.text.match(/итого:?\s*([\d\s  ]+)/i)[1].replace(/\D/g, ''); assert.ok(sum >= 35000 && sum <= 46000, 'счёт 35–46 тыс.: ' + sum);
     await choose('Не буду платить'); await choose('^Не буду$'); await choose('…');
     let s = await st(); console.log('  очнулся:', JSON.stringify(s)); assert.equal(s.key, 'story:ward'); assert.equal(s.money, 0); assert.equal(s.lost, 10000); assert.equal(s.st, 'police');
-    await choose('Встать'); await ev(() => exitInterior());
+    await wakeUp(); await ev(() => exitInterior());
     await revenge('plates');
 
     // B) настоял на меню и ушёл
@@ -94,7 +102,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await at(21); console.log('D) клофелинщики');
     await begin('clofelin'); const v = await goInside(); assert.ok(/бар|паб|рюмочн/i.test(v.n), 'бар: ' + v.n);
     c = await card(); console.log('  тост:', JSON.stringify(c).slice(0, 220)); await choose('Выпить'); await choose('…');
-    s = await st(); console.log('  утро:', JSON.stringify(s)); assert.equal(s.scene, 'city'); assert.equal(s.money, 0); assert.equal(s.st, 'bank'); await choose('Встать');
+    s = await st(); console.log('  утро:', JSON.stringify(s)); assert.equal(s.scene, 'city'); assert.equal(s.money, 0); assert.equal(s.st, 'bank'); await wakeUp();
     await revenge('clofelin');
 
     // E) отказался — позже другая история

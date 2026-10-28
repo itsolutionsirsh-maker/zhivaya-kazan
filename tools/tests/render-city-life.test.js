@@ -28,6 +28,25 @@ function setup() {
 }
 const building=()=>({p:[0,0,20,0,20,20,0,20],sgn:1,hm:10,h:0,wall:'#aaa',roof:'#ddd',i:2,dash:0});
 
+test('story costumes preserve personas, leave stranger and distant drawing unchanged',()=>{
+  const {s,calls,run}=setup();const p=Object.freeze({clothes:'#648278',skin:'#D8AD8B',hair:'#493B32',hairStyle:1});
+  const draw=(persona,lod)=>{run('LOD='+lod);calls.length=0;s.drawPerson(0,0,1,0,persona,0,{});return JSON.stringify(calls);};
+  assert.equal(draw(p,2),draw(Object.freeze({...p,story:'stranger'}),2));
+  for(const story of ['charmer','guard','waiter']){
+    const tagged=Object.freeze({...p,story});assert.notEqual(draw(p,2),draw(tagged,2),story);
+    assert.equal(draw(p,0),draw(tagged,0),story+' at distant LOD');assert.equal(tagged.clothes,p.clothes);
+  }
+});
+
+test('story costumes reuse a weakly held look while inheriting current persona details',()=>{
+  const {s,run}=setup();s.persona={story:'charmer',clothes:'#648278',skin:'#D8AD8B',hair:'#493B32'};
+  s.drawPerson(0,0,1,0,s.persona,0,{});const look=run('storyPersonLooks.get(persona).look');
+  for(let i=0;i<120;i++)s.drawPerson(0,0,1,0,s.persona,i,{});
+  assert.equal(run('storyPersonLooks.get(persona).look'),look);assert.equal(look.story,null);
+  s.persona.hair='#123456';assert.equal(look.hair,'#123456');assert.equal(s.persona.clothes,'#648278');
+  s.persona.story='guard';s.drawPerson(0,0,1,0,s.persona,0,{});assert.notEqual(run('storyPersonLooks.get(persona).look'),look);
+});
+
 test('sun shadows stay finite, reverse during the day, fade at night and repeat daily',()=>{
   const {s}=setup(),morning=s.citySun(8*60,0),evening=s.citySun(18*60,0);
   assert.ok(morning.x<0&&evening.x>0);assert.ok(s.citySun(23*60,1).alpha<morning.alpha/4);

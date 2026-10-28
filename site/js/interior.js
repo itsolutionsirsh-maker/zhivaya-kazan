@@ -9,6 +9,16 @@ function makeInterior(kind,name,key,room){
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
   const NPC=(x,y,o)=>{const p=makePersona((o&&o.role)||'resident');if(o&&o.job)p.job=o.job;const n=Object.assign({p,x,y,hx:0,hy:1,seated:false,phase:rng()*6,role:'resident',isInterior:true,state:'idle',memory:p.memory},o||{});it.npcs.push(n);return n;};
   const plant=(x,y)=>F('plant',x,y,0.8,0.8);
+  if(kind==='hospital'&&key==='story:ward'){
+    it.floor='tiles';it.spawn={x:3,y:3,hx:0,hy:-1};
+    for(const [x,y] of [[3,3],[10.8,3],[10.8,6.1]]){
+      F('bed',x,y,2.6,1.4,{walkable:x===3});
+      F('wardCabinet',x-1.55,y-1,.65,.65);
+    }
+    F('drip',4.5,2.2,.45,.5);F('window',7,.15,4,.3);
+    const doctor=NPC(5.5,h-1.3,{role:'staff',job:'врач'});doctor.p.clothes='#E9F1E7';doctor.p.pants='#557D76';doctor.hx=0;doctor.hy=-1;
+    return it;
+  }
   const chairsAround=(x,y)=>{[[x,y-1.05],[x,y+1.05],[x-1.05,y],[x+1.05,y]].forEach(s=>F('chair',s[0],s[1],0.5,0.5,{ang:Math.atan2(y-s[1],x-s[0])}));};
   switch(kind){
     case 'cafe':case 'bar':{it.floor=kind==='bar'?'dark':'wood';F('counter',w/2,1.1,w-2,1.3,{spot:'counter'});F('board',w/2,0.25,4,0.4);F('machine',w/2+3,0.9,0.9,0.6);NPC(w/2-1,0.55,{role:'staff',job:kind==='bar'?'бармен':'бариста'});
@@ -40,13 +50,13 @@ function makeInterior(kind,name,key,room){
   }
   return it;}
 function enterInterior(src){insideShot(src);const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
-  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.w/2;player.iy=it.h-1.1;player.ihx=0;player.ihy=-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
+  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
   addEvent(`Вы зашли в ${qName(src.name)}`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
   if(y>it.h-0.35-r){if(Math.abs(x-it.door.x)<0.85)return y>it.h+0.8;return true;}
-  for(const f of it.furn){if(f.t==='rug'||f.t==='painting'||f.t==='board'||f.t==='scheme'||f.t==='tv'||f.t==='chair'||f.t==='window'||f.t==='seat'||f.t==='pew')continue;const hw=f.w/2+r,hh=f.h/2+r;if(Math.abs(x-f.x)<hw&&Math.abs(y-f.y)<hh)return true;}return false;}
+  for(const f of it.furn){if(f.walkable||f.t==='rug'||f.t==='painting'||f.t==='board'||f.t==='scheme'||f.t==='tv'||f.t==='chair'||f.t==='window'||f.t==='seat'||f.t==='pew')continue;const hw=f.w/2+r,hh=f.h/2+r;if(Math.abs(x-f.x)<hw&&Math.abs(y-f.y)<hh)return true;}return false;}
 function moveInside(dx,dy){const r=0.3;let ok=false;if(!blockedInside(player.ix+dx,player.iy+dy,r)){player.ix+=dx;player.iy+=dy;ok=true;}else if(!blockedInside(player.ix+dx,player.iy,r)){player.ix+=dx;ok=true;}else if(!blockedInside(player.ix,player.iy+dy,r)){player.iy+=dy;ok=true;}
   if(player.iy>interior.h+0.4){exitInterior();return false;}return ok;}
 function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
@@ -162,7 +172,7 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   // люди
   for(const n of it.npcs)drawPerson(n.x,n.y,n.hx,n.hy,n.p,n.phase,{scale:0.55,seated:n.seated});
   drawSharedPeople();
-  drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true});
+  drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true,lying:it.key==='story:ward'&&it.spawn&&dist(player.ix,player.iy,it.spawn.x,it.spawn.y)<.55});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';

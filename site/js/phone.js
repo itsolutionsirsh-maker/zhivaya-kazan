@@ -90,7 +90,7 @@
   fit.textContent='@media (max-width:640px){#zkToday{top:148px!important}#zkTodayPanel{top:204px!important}}';
   let tab='feed';
   function mount(){if(!document.body||btn.parentNode) return; document.head.append(fit); document.body.append(btn,panel);}
-  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&','<':'<','>':'>','"':'"'}[c];});}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function tabBtn(id,label){
     const on=tab===id;
     return '<button type="button" data-tab="'+id+'" style="min-height:44px;min-width:44px;padding:10px 14px;border-radius:999px;border:1px solid rgba(0,0,0,.12);font:600 14px/1.2 inherit;cursor:pointer;background:'+(on?'#132019':'transparent')+';color:'+(on?'#f6f1e6':'#1c241f')+'">'+label+'</button>';
@@ -100,7 +100,8 @@
     const t=when(), L=life();
     const sky=typeof weather!=='undefined'?(weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно'):'ясно';
     const head=t.date.getUTCDate()+' '+MONTH[t.date.getUTCMonth()+1]+', '+WD[t.date.getUTCDay()]+' · '+pad(t.h)+':'+pad(t.m);
-    const inbox=(L.inbox||[]).slice(-6).reverse().map(function(m){return (m.from?m.from+': ':'')+m.text;});
+    const richInbox=window.storyUI&&typeof storyUI.inbox==='function';
+    const inbox=(richInbox?[]:(L.inbox||[]).slice(-6).reverse()).map(function(m){return (m.from?m.from+': ':'')+m.text;});
     let folk=[];
     if(typeof cityFolkAll==='function'){
       try{folk=cityFolkAll().filter(function(f){return f&&f.known&&f.text;}).slice(0,4).map(function(f){return f.text;});}catch(e){folk=[];}
@@ -114,7 +115,8 @@
       +'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:14px">'+esc(head)+'</span></div>'
       +'<div style="margin:6px 0 10px;color:#3d5c4a;font-size:15px">'+esc(sky)+'</div>'
       +(tab==='badges'?'':('<div style="font-size:15px;margin-bottom:8px">'+esc(memory(L))+'</div>'))
-      +body;
+      +(tab==='feed'&&richInbox?'<div id="storyPhoneInbox"></div>':'')+body;
+    if(tab==='feed'&&richInbox)panel.querySelector('#storyPhoneInbox').append(storyUI.inbox(L.inbox||[]));
     panel.querySelectorAll('[data-tab]').forEach(function(b){
       b.addEventListener('click',function(){tab=b.getAttribute('data-tab'); draw();});
     });

@@ -320,7 +320,9 @@ function drawJourneyHints(now,x0,y0,x1,y1){
   }
 }
 // ---------- спрайты ----------
-function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD>=2&&!o.lying;ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx)+(o.lying?Math.PI/2:0));ctx.scale(S,S);
+function drawPerson(x,y,hx,hy,p,phase,o){
+  if(LOD>0&&p.story&&p.story!=='stranger'&&!(o&&o.lying))return drawStoryPerson(x,y,hx,hy,p,phase,o);
+  o=o||{};const S=o.scale||1;const hi=LOD>=2&&!o.lying;ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx)+(o.lying?Math.PI/2:0));ctx.scale(S,S);
   const hv=p.build==='heavy',bw=hv?0.54:0.42,bl=hv?0.78:0.56,ha=hv?0.88:0.66;   // грузный: шире плечи и живот
   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(0.1,0.15,o.lying?1.1:hv?0.95:0.75,hv?0.75:0.55,0,0,TAU);ctx.fill();
   if(o.ring){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.12;ctx.beginPath();ctx.arc(0,0,0.82,0,TAU);ctx.stroke();}
@@ -353,6 +355,38 @@ function drawPerson(x,y,hx,hy,p,phase,o){o=o||{};const S=o.scale||1;const hi=LOD
   // LOD 0 и лежащий человек — прежнее рисование, без предметов и вспышки.
   if(LOD>0&&p.item&&!o.lying)drawPersonItem(p.item,hi,handX,handY,filming,o.time);
   ctx.restore();}
+// Обычная толпа проходит прежнее рисование; подготовленный костюм есть только у сюжетных людей.
+const storyPersonLooks=new WeakMap();
+function drawStoryPerson(x,y,hx,hy,p,phase,o){
+  o=o||{};const story=p.story,guard=story==='guard';
+  let cached=storyPersonLooks.get(p);
+  if(!cached||cached.story!==story){
+    const look=Object.create(p),props={story:{value:null},clothes:{value:story==='charmer'?'#B73861':guard?'#20282B':story==='waiter'?'#EEE8D8':p.clothes}};
+    if(guard)props.build={value:'heavy'};
+    Object.defineProperties(look,props);cached={story,look};storyPersonLooks.set(p,cached);
+  }
+  ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx));ctx.scale(o.scale||1,o.scale||1);
+  ctx.save();
+  // Руки обычного спрайта скрыты за плечами; сложенные руки добавляются поверх тела.
+  if(guard){ctx.beginPath();ctx.rect(-1,-.78,2,1.56);ctx.clip();}
+  drawPerson(0,0,1,0,cached.look,guard?0:phase,{...o,scale:1});ctx.restore();
+  if(LOD>=2)drawStoryCostume(story,p);ctx.restore();
+}
+function drawStoryCostume(story,p){
+  if(story==='charmer'){
+    ctx.fillStyle='#D78A9E';ctx.fillRect(.23,-.49,.07,.98);
+    ctx.fillStyle='#65364A';rrect(ctx,-.24,.52,.45,.31,.06);ctx.fill();
+    ctx.strokeStyle='#E2C790';ctx.lineWidth=.035;ctx.beginPath();ctx.arc(-.02,.55,.14,Math.PI,TAU);ctx.stroke();
+    ctx.fillStyle='#E2C790';ctx.fillRect(-.06,.63,.1,.045);
+  }else if(story==='guard'){
+    ctx.strokeStyle='#111C20';ctx.lineWidth=.24;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(.05,-.65);ctx.lineTo(.65,.38);ctx.moveTo(.05,.65);ctx.lineTo(.6,-.38);ctx.stroke();
+    ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(.6,-.38,.12,0,TAU);ctx.arc(.65,.38,.12,0,TAU);ctx.fill();
+  }else if(story==='waiter'){
+    ctx.fillStyle='#273B38';ctx.fillRect(-.35,-.42,.16,.84);
+    ctx.fillStyle='#FAF5E7';rrect(ctx,-.16,-.86,.45,.31,.04);ctx.fill();
+    ctx.strokeStyle='#B6AA91';ctx.lineWidth=.025;ctx.beginPath();ctx.moveTo(-.1,-.63);ctx.lineTo(.24,-.63);ctx.stroke();
+  }
+}
 let phoneFlashSprite=null;
 function drawPersonItem(item,hi,handX,handY,filming,time){
   if(item==='keys'&&!hi)return;
