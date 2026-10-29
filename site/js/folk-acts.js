@@ -3,7 +3,7 @@
 // первая реплика — от ИИ в его манере (если ИИ подключён), иначе — его фраза. Дальше — карточка с выбором.
 // Каждый подходит не чаще раза в игровые сутки. Пока блогер снимает — w.filming (рисует render.js).
 const FA={t:30,cool:{},s:null};
-const FA_W={offer_ride:3,sell:2,ask_food:2.5,ask_change:1.5,film:3,challenge:1.5,drink_invite:1.5,complain:1.2,sing:2,gossip:0.8,tip:0.8,help_ask:1.2};
+const FA_W={offer_ride:3,sell:2,ask_food:2.5,ask_change:1.5,film:3,challenge:1.5,drink_invite:1.5,complain:1.2,sing:2,gossip:0.8,tip:0.8,help_ask:1.2,yard_ask:2.4};
 function faFolkOf(w){return w&&w.folk?FOLK.list.find(f=>f.id===w.folk):null;}
 function faHour(){return gHour();}
 // куда «поедем»: домой, если дом далеко, иначе в известное место за 1–5 км
@@ -34,6 +34,7 @@ function faActsFor(f){const h=faHour(),out=[];const at=f.at,day=h>=8&&h<22;
     if((a==='film'||a==='challenge')&&!(h>=10&&h<22))continue;
     if(a==='drink_invite'&&!((h>=17||h<1)&&(player.drunk||0)<45))continue;
     if(a==='sing'&&!(at==='work'&&h>=10&&h<22))continue;
+    if(a==='yard_ask'&&!(at==='work'&&h>=14&&h<23))continue;
     out.push(a);}
   return out;}
 function faPickAct(acts){let s=0;for(const a of acts)s+=FA_W[a]||1;let r=Math.random()*s;for(const a of acts){r-=FA_W[a]||1;if(r<=0)return a;}return acts[0];}
@@ -94,6 +95,14 @@ function faOpen(s){const w=s.w,f=s.f,a=s.act,nm=w.p.name;
     case 'help_ask':{const b=faHelpTarget(hashStr(f.id+clock.day));if(!b){s.act='gossip';faOpen(s);return;}
       faSay(s,'просишь помочь донести тяжёлую сумку до подъезда тут недалеко','Не поможете донести до подъезда? Тут рядом.');
       faCard(s,{icon:'👜',text:`${nm} просит помочь донести сумку до подъезда — метров ${Math.round(dist(b.x,b.y,player.x,player.y)/10)*10}.`,choices:[{t:'Помочь',primary:true,run:()=>{s.phase='help';s.help={x:b.x,y:b.y,left:240};s.mvT=0;mark(s,'fa:go',b.x,b.y,'👜','Подъезд',{arrow:true,color:'#2BB062'});setHint('Идите к подъезду — сумку несёте вместе');}},{t:'Извините, спешу',run:()=>endSit(s)}]});return;}
+    case 'yard_ask':{const ask=100,take=300;
+      faSay(s,'вежливо, без крика и без угроз, просишь ровно 100 рублей «на район». Если откажут — ты не дерёшься, просто говоришь, что тогда триста, и забираешь','Земляк, сотку на район. По-хорошему.');
+      faCard(s,{icon:'🧢',text:`${nm} вежливо просит ${fmtMoney(ask)} «на район». Если не отдать — забирает ${fmtMoney(take)} и уходит. Без драки.`,
+        choices:[
+          {t:`Отдать ${fmtMoney(ask)}`,primary:true,run:()=>spend(ask,()=>{sitMood(-2);say(w,pick(['Вот и хорошо. Иди.','Нормально. Мы квиты.','Сотка есть — вопросов нет.']),4);addEvent(`${nm}: отдали ${fmtMoney(ask)}, разошлись`,'say');endSit(s);})},
+          {t:'Не отдавать',run:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);sitRep(-1,'не отдал сотку во дворе');say(w,pick(['Ладно. Тогда триста.','По-хорошему не вышло. Триста.','Сказали сразу. Триста — и мы ушли.']),4);endSit(s);}}
+        ],
+        onTimeout:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);say(w,'Молчишь — значит, триста.',4);endSit(s);}});return;}
     default:{faSay(s,'рассказываешь свежий слух района, коротко',null);
       faCard(s,{icon:'🗣',text:`${nm} делится новостью района.`,ttl:14,choices:[{t:'Интересно',primary:true,run:()=>{sitMood(1);endSit(s);}}]});}}}
 function faThanks(s){const w=s.w;say(w,pick(['Рәхмәт, добрый человек.','Спасибо. Хорошему человеку — хороший день.','Спасибо. А на Кабане сегодня утки — сходи.']),5);endSit(s);}
