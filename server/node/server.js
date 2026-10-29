@@ -581,7 +581,7 @@ wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws
     if(d.t==='m'){setPresence(me,d.m);return;}         // имя, одежда, фраза, аватар — только когда изменились
     if(d.t==='msg'){const e=postMsg(me,d.to,d.text);if(e)wsSend(me,{t:'err',e});return;}
     // своё ДТП: сервер проверяет, что игрок у места, и раздаёт всем (с одного адреса — не больше SEV_PER_IP, по умолчанию 6, за 10 минут)
-    if(d.t==='sev'){if(modBlocked(me)||!allow('sev:'+me.ip,+ENV.SEV_PER_IP||6,600))return;const r=sev.report(me,d);if(r.ok&&!r.merged)sevBroadcast();return;}});
+    if(d.t==='sev'){if(modBlocked(me)||!allow('sev:'+me.ip,+ENV.SEV_PER_IP||6,600))return;const r=sev.report(me,d);if(r.ok)sevBroadcast();return;}});   // слитая тоже: у всех продлится срок
   ws.on('close',()=>{if(me&&me.ws===ws){me.ws=null;delPlayer(me);}});});
 
 // рассылка мира: каждые 200 мс; ближние (до 120 м) — каждый раз, дальние — через раз; только сдвинувшиеся
