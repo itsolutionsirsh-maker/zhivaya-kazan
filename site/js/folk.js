@@ -74,6 +74,9 @@ function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   if(k==='taxi'&&/^(taxi|bombila)$/.test(f.type||'')&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
   if(OPEN_KIND.test(k)&&f.type&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
   if(k==='taxi')return {x:a[0],y:a[1],inside:true,key:'taxi',name:'за рулём такси',kind:'taxi'};
+  // водитель автобуса на перерыве — у ближайшей к его району остановки (folk3: work.kind 'bus')
+  if(k==='bus'){const c=hintAnchor(sp.hints,A,a);let best=null,bd=2500;for(const s of world.stops||[]){const d=Math.hypot(s.x-c[0],s.y-c[1]);if(d<bd){bd=d;best=s;}}
+    if(best)return spotPlace(best.x+3,best.y+2,sp.label||'на остановке','street');}
   if(k==='home')return role==='work'?P.home:P.yard;
   if(k==='yard')return P.yard;
   const c=hintAnchor(sp.hints,A,a);
