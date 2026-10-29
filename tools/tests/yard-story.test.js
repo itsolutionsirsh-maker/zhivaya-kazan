@@ -48,6 +48,20 @@ for(const kind of Object.keys(factories)){
     }
     assert.equal(Object.keys(f.status().story.visits).length,4);assert.equal(f.status().standing,0);
   });
+  for(const ending of ['home','away','bridge'])test(kind+': reunion persists, rejects repeats, validates place and records one event: '+ending,t=>{
+    const f=setup(t,kind);f.uptoFinal(ending);f.choose(ending==='bridge'?'independent':'guest');
+    const r=D.reunion(f.status().story),pose=f.pose(r.place),rev=f.status().rev,request='c'.repeat(24);
+    assert.equal(D.objective(f.status().story).person,r.who);
+    assert.equal(f.call('story',{step:'reunion',choice:'pairs'},null).err,'story_place');
+    assert.equal(f.call('story',{step:'reunion',choice:'invalid'},pose).err,'choice');
+    const body={step:'reunion',choice:'pairs',request,rev};assert.equal(f.call('story',body,pose).ok,1);
+    f.reload();assert.equal(f.call('story',body,null).ok,1,'same request is safe after reconnect');
+    assert.equal(f.status().story.reunion.choice,'pairs');assert.equal(D.objective(f.status().story),null);
+    assert.match(D.reunion(f.status().story).result,/Ильдар/);
+    assert.equal(f.call('story',{step:'reunion',choice:'warmup'},pose).err,'story_stage');
+    assert.equal(f.status().rev,rev+1);assert.equal(f.events.filter(e=>e[1]==='reunion').length,1);
+    assert.equal(f.status().standing,0);assert.equal(f.status('other').story,null);
+  });
   test(kind+': presence, stage, active encounter and choice guards cannot be bypassed',t=>{
     const f=setup(t,kind);assert.equal(f.choose('home',{step:'call'}).err,'story_stage');f.choose('accept');
     const rev=f.status().rev;

@@ -14,18 +14,27 @@ async function move(p,person){
 }
 async function fit(p){return p.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,controls:[...document.querySelectorAll('#yardModal .ui-sheet-close,#yardModal .ui-sheet-foot button')].filter(e=>e.getClientRects().length).map(e=>{const r=e.getBoundingClientRect();return {text:e.textContent,h:r.height,inside:r.x>=-1&&r.y>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1};})}));}
 (async()=>{
-  const b=await chromium.launch(),checks=[];if(out)fs.mkdirSync(out,{recursive:true});
+  const b=await chromium.launch(process.env.ZK_BROWSER_PATH?{executablePath:process.env.ZK_BROWSER_PATH}:{}),checks=[];if(out)fs.mkdirSync(out,{recursive:true});
   try{for(const ending of ['home','away','bridge']){
-    const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),p=await ctx.newPage(),errors=[];p.on('pageerror',e=>errors.push(String(e)));
-    await p.goto(url.href);await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await p.fill('#pName','Тест двора');await p.click('#startBtn');await p.click('#howtoClose');
+    const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),p=await ctx.newPage(),errors=[];p.on('pageerror',e=>{errors.push(String(e));console.error(String(e));});
+    await p.goto(url.href);await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await p.fill('#pName','Тест двора');await p.click('#startBtn');await p.click('#howtoClose');await p.waitForSelector('#nextGoal:not([hidden])');assert.match(await p.textContent('#goalContext'),/Первые шаги/);
     await p.click('#menuBtn');await p.fill('#acctName','yard-ui-'+ending+'-'+Date.now().toString(36));await p.fill('#acctPin','763819');await p.click('#acctGo');await p.waitForSelector('#acctOut:not([hidden])');
+    await p.click('#menuClose');await p.waitForSelector('#nextGoal:not([hidden])');
+    for(const [width,height] of [[360,640],[390,844],[412,915],[844,390],[1280,800]]){
+      await p.setViewportSize({width,height});await p.waitForTimeout(600);
+      const g=await p.evaluate(()=>{const a=document.getElementById('nextGoal').getBoundingClientRect(),b=document.getElementById('joy').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth+1,inside:a.x>=0&&a.right<=innerWidth+1&&a.bottom<=innerHeight,above:a.bottom<=b.y,buttons:[...document.querySelectorAll('#nextGoal button')].map(e=>e.getBoundingClientRect().height)};});
+      assert.ok(!g.overflow&&g.inside&&g.above&&g.buttons.every(h=>h>=44),JSON.stringify(g));
+      if(out)await p.screenshot({path:out+'/'+ending+'-goal-'+width+'.png'});
+    }
+    await p.click('#goalFold');assert.equal(await p.locator('#goalGo').isVisible(),false);await p.click('#goalFold');
+    await p.setViewportSize({width:390,height:844});await p.click('#menuBtn');
     await p.click('#yardStoryBtn');await p.getByRole('button',{name:'Откликнуться и найти Тимура',exact:true}).click();
     await p.waitForFunction(()=>cityYardStory.snapshot()?.stage==='promise');
     assert.equal(await p.getByRole('button',{name:'Помогу турниру. Сторону пока не выбираю',exact:true}).isEnabled(),false,'must visit location');
     for(const label of ['Помогу турниру. Сторону пока не выбираю','Смешать опытных с новичками','Выслушать и самому помочь с площадкой','Помочь Руслану закрепить сетку']){
       await move(p);const stage=await p.evaluate(()=>cityYardStory.snapshot().stage);await p.getByRole('button',{name:label,exact:true}).click();await p.waitForFunction(stage=>cityYardStory.snapshot()?.stage!==stage,stage);
     }
-    await p.reload();await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await open(p);assert.match(await p.textContent('#yardTitle'),/Ты теперь с ними/);
+    await p.reload();await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await p.waitForFunction(()=>document.getElementById('goalContext')?.textContent==='Продолжить историю',null,{timeout:90000});assert.match(await p.textContent('#goalContext'),/Продолжить историю/);await open(p);assert.match(await p.textContent('#yardTitle'),/Ты теперь с ними/);
     for(const [width,height] of [[360,640],[390,844],[844,390],[1280,800]]){await p.setViewportSize({width,height});await p.waitForTimeout(400);const g=await fit(p);assert.equal(g.overflow,false);assert.ok(g.controls.every(c=>c.inside&&c.h>=43),JSON.stringify(g));if(out)await p.screenshot({path:out+'/'+ending+'-choice-'+width+'.png'});}
     await p.getByRole('button',{name:{home:'Вернуться и выступить за двор Тимура',away:'Остаться и выступить с Артуром',bridge:'Собрать общую игру как независимый организатор'}[ending],exact:true}).click();
     await p.waitForFunction(()=>cityYardStory.snapshot()?.stage==='finale');await move(p);
@@ -35,6 +44,15 @@ async function fit(p){return p.evaluate(()=>({overflow:document.documentElement.
     await p.locator('#yardContacts summary').click();await p.getByRole('button',{name:'Найти: Руслан',exact:true}).click();await move(p,'ruslan');
     await p.getByRole('button',{name:'Поговорить после турнира',exact:true}).click();await p.waitForFunction(()=>cityYardStory.snapshot()?.visits.ruslan);
     await p.reload();await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await open(p);assert.ok(await p.evaluate(()=>cityYardStory.snapshot().visits.ruslan));
+    const who=await p.evaluate(()=>YardStory.reunion(cityYardStory.snapshot()).who);
+    await p.evaluate(who=>cityYardStory.open(who),who);await move(p,who);
+    await p.getByRole('button',{name:'Составить пары: опытный и новичок',exact:true}).click();
+    await p.waitForFunction(()=>cityYardStory.snapshot()?.reunion?.choice==='pairs');
+    assert.match(await p.textContent('#yardText'),/Ильдар объясняет/);
+    await p.reload();await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await open(p);
+    assert.equal(await p.evaluate(()=>cityYardStory.snapshot().reunion.choice),'pairs');
+    await p.click('#yardClose');
+    assert.notEqual(await p.textContent('#goalTitle'),'Место для новичков');
     assert.deepEqual(errors,[]);checks.push(ending+': UI choices, reload, four viewport sizes, ending, reunion');await ctx.close();
   }}finally{await b.close();}
   console.log(JSON.stringify({checks,ok:true},null,2));

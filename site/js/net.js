@@ -103,7 +103,10 @@ const bootLocalT=(()=>{try{return (JSON.parse(localStorage.getItem('zk.state')||
 function setRev(u){syncRev=+u||0;try{localStorage.setItem('zk.syncRev',String(syncRev));}catch(e){}}
 function acctServerNewer(j){if(syncRev)return (j.updated||0)>syncRev+0.001;return !!(j.state&&(j.state.t||0)>bootLocalT+5000);}   // старым сохранениям без zk.syncRev — по времени до первого кадра
 // решение при запуске (сайт — acctSyncOnBoot, Телега — tgAfter): true — берём серверную копию и перезапускаемся
-function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
+// На сервере новее, но это наше же сохранение при закрытии страницы (sendBeacon: ответа нет, версию не записали) —
+// в браузере ровно то же самое (то же время снимка). Тогда не перезапускаемся: раньше каждый вход с аккаунтом грузил игру дважды.
+function acctOwnBeacon(j){return !!(syncRev&&j.state&&bootLocalT&&j.state.t===bootLocalT);}
+function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)&&!acctOwnBeacon(j)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
 // тайм-аут: зависший запрос (переключилась мобильная сеть) не держит сохранения минутами — обрыв, следующее через 30 с
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store',signal:typeof AbortSignal!=='undefined'&&AbortSignal.timeout?AbortSignal.timeout(20000):undefined});return r.json();}
 // снимок для сервера; wallet — изменения денег операциями (wallet.js), проводятся только вместе с этим сохранением
@@ -188,5 +191,5 @@ async function netInit(){
     if(r){roomNs=r;Net.mode='room';r.onPeers(()=>{const list=roomPeers();Net.peers=list;syncPeers(list);readRoomMsgs(list);setNetStatus(true);},()=>{roomNs=null;Net.mode='off';peerRender.clear();setNetStatus(false);});pushPresence();setNetStatus(true);return;}}
   if(location.protocol.startsWith('http')&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
     try{const t0=Date.now();const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){if(j.now>1e12){const off=j.now-(t0+Date.now())/2;if(Math.abs(off)>2000)clockOff=off;}   // часы игры у всех по серверу, даже если на телефоне время сбито
-      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;Net.territories=!!j.territories;Net.yardStory=!!j.yardStory;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
+      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;Net.territories=!!j.territories;Net.yardStory=!!j.yardStory;Net.yardReunion=!!j.yardReunion;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
   Net.mode='off';setNetStatus(false);}

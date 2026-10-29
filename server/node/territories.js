@@ -80,7 +80,7 @@ function Territories(backend,{now=Date.now,random=Math.random,uid=()=>crypto.ran
       else finish(s,e.roll<e.power.chance?'won':'lost',t);
     }
     s.rev++;s.requests.push({id:body.request,signature});s.requests=s.requests.slice(-16);backend.put(key,s);
-    if(op==='story')try{onStory(key,body.step==='visit'?'return':s.story.stage==='done'?'end'+s.story.ending:s.story.stage);}catch(_){}
+    if(op==='story')try{onStory(key,body.step==='reunion'?'reunion':body.step==='visit'?'return':s.story.stage==='done'?'end'+s.story.ending:s.story.stage);}catch(_){}
     return view(s,loc);
   }
   // Called inside the account/wallet reset transaction on SQLite. Keep revision monotonic.

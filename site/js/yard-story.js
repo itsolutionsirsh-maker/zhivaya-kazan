@@ -41,6 +41,12 @@
     $('yardText').textContent=s&&s.stage==='done'&&person?D.greeting(s,person):page.text;
     $('yardPlace').textContent=place?(near(place)?'Вы у места встречи.':D.places[place].name+'. '+(sidewalk(place)?'Доберитесь любым способом; к собеседнику подойдите пешком.':'Дорожка появится после загрузки района. Маршрут ведёт к месту встречи.')):'Историю можно начать здесь. Членство изменится только по вашему явному выбору.';
     const choices=$('yardChoices');choices.replaceChildren();
+    const reunion=s&&s.stage==='done'&&D.reunion(s);
+    if(reunion&&person===reunion.who){
+      $('yardText').textContent=reunion.result||reunion.text;
+      $('yardTitle').textContent='После турнира · '+reunion.title;
+      if(!s.reunion&&Net.yardReunion)for(const c of reunion.choices)choices.append(button(c.label,()=>cityTerritories.story({step:'reunion',choice:c.id}),!ready||!!state.active||!near(reunion.place)));
+    }
     if(!s||s.stage!=='done')for(const c of page.choices){
       const blocked=c.id==='join'&&s&&(state.member&&state.member!==D.endings[s.ending].district||!state.member&&Date.now()<state.switchAt);
       const label=c.id==='join'&&s?'Вступить в «'+TerritoryRules.factions[D.endings[s.ending].district].name+'» и завершить':c.label;
@@ -80,7 +86,18 @@
   defSit('yardCast',{start(s){for(const id of s.ids){const p=D.people[id],step=story(),place=step.stage==='done'?p.place:D.step(step).place,q=sidewalk(place);if(!q)continue;
       const w=new Walker('resident',q.node);w.temp=true;w.x=q.x;w.y=q.y;Object.assign(w.p,{name:p.name,job:'Чужой двор',female:p.female,clothes:p.color,item:p.item,hat:p.hat||null});w.yardPerson=id;
       walkers.push(w);takeActor(s,w);faceTo(w,player.x,player.y);
-    }return s.actors.length>0;},action(s){if(player.busy||SIT.card||player.vehicle||player.bus||scene!=='city')return null;
+    }
+    const current=story(),r=D.reunion(current);
+    if(r&&s.ids.includes(r.who)){
+      const q=sidewalk(r.place);
+      for(let i=0;i<3;i++){
+        const x=q.x+2+i*1.2,y=q.y+2;if(inBuilding(x,y))continue;
+        const w=new Walker('resident',q.node);w.temp=true;w.x=x;w.y=y;
+        Object.assign(w.p,{name:['Ильдар','Алия','Марат'][i],job:'Следующая дворовая игра',clothes:['#d5b777','#7baea0','#ac95ba'][i],female:i===1});
+        w.yardPerson=r.who;walkers.push(w);takeActor(s,w);faceTo(w,q.x,q.y);
+      }
+    }
+    return s.actors.length>0;},action(s){if(player.busy||SIT.card||player.vehicle||player.bus||scene!=='city')return null;
       const w=s.actors.find(w=>dist(player.x,player.y,w.x,w.y)<5);return w?{label:'Чужой двор · '+w.p.name,at:w,run:()=>{const current=story();if(current)open(current.stage==='done'?w.yardPerson:null);}}:null;}});
   window.addEventListener('territorychange',()=>{
     syncAccount();const s=story();if(s&&seenStage&&seenStage!==s.stage)addEvent('🏀 Чужой двор: '+(s.stage==='done'?D.endings[s.ending].title:D.step(s).title),'say');
@@ -88,9 +105,9 @@
   });
   defWatch(dt=>{tick+=dt;if(tick<1)return;tick=0;syncAccount();updateWorld();
     if(!modal.hidden)render();
-    if(!invited&&account()&&Net.yardStory&&snapshot()&&!story()&&scene==='city'&&!player.busy&&!SIT.card){invited=true;addEvent('🏀 Тимур зовёт собрать дворовый турнир. Откройте меню → «Чужой двор». Можно остаться независимым.','say');}
+    if(!window.cityObjectives&&!invited&&account()&&Net.yardStory&&snapshot()&&!story()&&scene==='city'&&!player.busy&&!SIT.card){invited=true;addEvent('🏀 Тимур зовёт собрать дворовый турнир. Откройте меню → «Чужой двор». Можно остаться независимым.','say');}
   });
   $('yardStoryBtn').addEventListener('click',()=>open());$('territoryStoryBtn').addEventListener('click',()=>open());
   $('yardClose').addEventListener('click',close);$('yardRoute').addEventListener('click',route);$('yardRetry').addEventListener('click',()=>cityTerritories.retry());
-  window.cityYardStory={open,snapshot:()=>story()};
+  window.cityYardStory={open,route:()=>route(),near,snapshot:()=>story()};
 })();
