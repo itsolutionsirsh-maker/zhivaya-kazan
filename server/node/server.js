@@ -14,6 +14,7 @@ const VenueRoom=require('../../site/js/venue-room.js');
 const WalletLib=require('./wallet.js');
 const TerritoryLib=require('./territories.js');
 const RealWorldLib=require('./realworld.js');
+const SharedEventsLib=require('./shared-events.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -146,6 +147,9 @@ function getTerritoryMeta(){const file=mapDir()?path.join(MAP_DIR,'base.json'):p
   if(file!==territoryMapFile||!territoryMeta){try{territoryMeta=JSON.parse(fs.readFileSync(file,'utf8')).meta;territoryMapFile=file;}catch(e){return null;}}return territoryMeta;}
 // настоящая Казань: погода MET Norway и тревоги ГУ МЧС по РТ (server/node/realworld.js); RW_OFF=1 — выключить (проверки без сети)
 const realworld=RealWorldLib.RealWorld({fs,file:path.join(DATA,'realworld.json'),log,off:ENV.RW_OFF==='1',weatherUrl:ENV.RW_WEATHER_URL,alertUrl:ENV.RW_ALERT_URL,alertEvery:+ENV.RW_ALERT_EVERY_MS||0});
+// общие события рядом: ДТП с участием игрока видят все, у кого оно в радиусе (server/node/shared-events.js)
+const sev=SharedEventsLib.SharedEvents();
+function sevBroadcast(){const list=sev.snapshot();for(const p of players.values())wsSend(p,{t:'sev',list});}
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
@@ -333,6 +337,7 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
   const t=now();const target=idstr(body.target||'');const act=String(body.do||'list');
   if(act==='stats')return statsOut(Math.min(60,Math.max(7,+body.days||14)));
   if(act==='city')return body.mode?realworld.moderate(body):Object.assign({ok:1},realworld.status(),realworld.snapshot());
+  if(act==='sev'){if(body.clear){const n=sev.clear(typeof body.id==='string'?body.id.slice(0,24):'');if(n)sevBroadcast();return {ok:1,cleared:n};}return {ok:1,list:sev.snapshot()};}
   if(act==='ban'&&target.length>=8){const h=Math.max(0,+body.hours||0);const until=h?t+h*3600:0;const pl=players.get(target);modState.bans[target]={until,why:clean(body.why,120),t:Math.floor(t)};
     if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
   if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
@@ -503,7 +508,7 @@ async function handleReq(req,res){
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
-    if(a==='city')return send(res,200,realworld.snapshot());
+    if(a==='city')return send(res,200,Object.assign({},realworld.snapshot(),{sev:sev.snapshot()}));
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod')return send(res,200,modAdmin(req,body));
@@ -522,7 +527,7 @@ async function handleReq(req,res){
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
-  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length};})()});}
+  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})()});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
   // карта всей Казани кусками собирается на сервере (tools/citymap.sh) в MAP_DIR и отдаётся по /map/…
   let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
@@ -569,11 +574,14 @@ wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws
     if(d.t==='hello'){const priv=idstr(d.id);if(priv.length<8)return ws.close(1008,'bad_id');const id=pubOf(priv);
       if(me&&me.id!==id)return ws.close(1008,'one_player');   // одно соединение — один игрок (иначе плодились «призраки», которых никто не убирал)
       me=addPlayer(id,ws);me.priv=priv;me.ip=ip;me.view.clear();setPresence(me,d.p);visit(priv,d.src,ip);notePeak();
+      {const sl=sev.snapshot();if(sl.length)wsSend(me,{t:'sev',list:sl});}
       wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid,pid:id});return;}
     if(!me)return;
     if(d.t==='p'){setPresence(me,d);return;}           // координаты: {t:'p',x,y,hx,hy,b} — часто
     if(d.t==='m'){setPresence(me,d.m);return;}         // имя, одежда, фраза, аватар — только когда изменились
-    if(d.t==='msg'){const e=postMsg(me,d.to,d.text);if(e)wsSend(me,{t:'err',e});return;}});
+    if(d.t==='msg'){const e=postMsg(me,d.to,d.text);if(e)wsSend(me,{t:'err',e});return;}
+    // своё ДТП: сервер проверяет, что игрок у места, и раздаёт всем (с одного адреса — не больше SEV_PER_IP, по умолчанию 6, за 10 минут)
+    if(d.t==='sev'){if(modBlocked(me)||!allow('sev:'+me.ip,+ENV.SEV_PER_IP||6,600))return;const r=sev.report(me,d);if(r.ok&&!r.merged)sevBroadcast();return;}});
   ws.on('close',()=>{if(me&&me.ws===ws){me.ws=null;delPlayer(me);}});});
 
 // рассылка мира: каждые 200 мс; ближние (до 120 м) — каждый раз, дальние — через раз; только сдвинувшиеся

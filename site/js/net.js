@@ -76,6 +76,7 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
   wsSock.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.t==='w')wsApply(d);
     else if(d.t==='city'){if(typeof rwApply==='function')rwApply(d);}
+    else if(d.t==='sev'){if(typeof sevApply==='function')sevApply(d.list);}
     else if(d.t==='msg'){const m=d.m;if(m.from===myPid())return;if(m.to&&m.to!==myPid())return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
     else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};

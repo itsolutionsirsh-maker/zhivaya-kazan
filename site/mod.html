@@ -33,6 +33,9 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <div id="cOut" class="msg"></div>
 <div class="row"><button id="cOff" class="bad">Снять тревогу сейчас</button><button id="cAuto">Вернуть автоматически</button><button id="cRefresh">Обновить</button></div>
 <div class="row"><select id="cKind"><option value="drone">Беспилотная опасность</option><option value="missile">Ракетная опасность</option></select><input id="cText" placeholder="Текст МЧС слово в слово" autocomplete="off"><button id="cOn" class="go">Включить вручную</button></div>
+<h2>Аварии игроков</h2><p class="msg">Когда игрок попадает в ДТП, его браузер сообщает место. Сервер проверяет, что игрок там, не чаще раза в 10 минут, и показывает аварию всем, кто рядом: метку, машины на дороге, строки из <code>shared-events.js</code>. Авария живёт 10 минут. Текста от игрока нет — только место.</p>
+<div id="sOut" class="msg"></div>
+<div class="row"><button id="sRefresh">Обновить</button><button id="sAll" class="bad">Снять все</button></div>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -91,12 +94,18 @@ async function city(body){const j=await call(Object.assign({do:'city'},body||{})
   if(j.override)O.append(el('div',null,j.override.mode==='off'?`Снята модератором в ${mskT(j.override.at)} (до нового сообщения МЧС)`:`Включена вручную в ${mskT(j.override.at)}`));
   O.append(el('div',null,`Источник тревог: ответ ${j.alertSourceOk}${j.alertErrors?', ошибок подряд: '+j.alertErrors:''}`));
   for(const p of j.posts){O.append(el('div','meta',`${mskT(p.at)} · ${p.kind?(p.kind.on?'ВВЕДЁН ':'СНЯТ ')+p.kind.kind:'—'} · ${p.text}`));}}
+async function sev(body){const j=await call(Object.assign({do:'sev'},body||{})).catch(()=>({err:'нет связи'}));const O=$('#sOut');O.innerHTML='';
+  if(!j.ok){O.textContent='Ошибка: '+(j.err||'?');return;}if(body&&body.clear)return sev();
+  if(!j.list.length){O.textContent='Аварий сейчас нет';return;}
+  for(const e of j.list){const r=el('div','row');r.append(el('span',null,`${e.ped?'Сбили человека':'Столкновение'} · точка ${Math.round(e.x)}, ${Math.round(e.y)} · ${Math.round(e.age/60)} мин назад, ещё ${Math.round(e.left/60)} мин`));
+    const b=el('button','bad','Снять');b.onclick=()=>sev({clear:1,id:e.id});r.append(b);O.append(r);}}
+$('#sRefresh').onclick=()=>sev();$('#sAll').onclick=()=>{if(confirm('Снять все аварии игроков?'))sev({clear:1});};
 $('#cRefresh').onclick=()=>city();$('#cAuto').onclick=()=>city({mode:'auto'});
 $('#cOff').onclick=()=>{if(confirm('Снять тревогу в игре до нового сообщения МЧС?'))city({mode:'off'});};
 $('#cOn').onclick=()=>{const text=$('#cText').value.trim();if(!text){alert('Вставьте текст сообщения МЧС');return;}if(confirm('Включить тревогу у всех игроков?'))city({mode:'on',kind:$('#cKind').value,text});};
 $('#wGo').onclick=()=>{const n=$('#wName').value.trim();if(n)wallet(n);};
 $('#load').onclick=()=>{load();loadStats();city();};
-$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();city();}
+$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();city();sev();}
 </script>
 </body>
 </html>
