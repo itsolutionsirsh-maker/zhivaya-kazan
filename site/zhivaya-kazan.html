@@ -281,6 +281,29 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 @media(max-height:500px){.story-modal.modal{padding-top:calc(var(--ui-top,0px) + 4px);padding-bottom:calc(var(--ui-bottom,0px) + 4px)}.story-head{padding:4px}.story-eyebrow{display:none}.story-head h2{font-size:23px!important;margin:4px 0}.story-actions{display:flex;padding:8px 4px 0}.story-actions>*{flex:1}.story-wake .story-wake-art{top:-20%;left:45%}.story-wake .story-body{min-height:0}.story-wake .story-head{padding:8px 12px}.story-wake .story-wake-line{font-size:19px;min-height:0}.story-wake .story-actions{padding:4px 12px}}
 .story-inbox{display:grid;gap:12px;margin:14px 0}.story-thread{border:1px solid #9eac9d;border-radius:12px;overflow:hidden;background:#1c312b;color:#eff0df}.story-thread-head{display:flex;align-items:center;gap:10px;min-height:48px;padding:8px 12px;cursor:pointer;list-style:none;box-sizing:border-box}.story-thread-head::-webkit-details-marker{display:none}.story-thread-head strong{flex:1;min-width:0;overflow-wrap:anywhere}.story-thread-count{font:12px var(--font-mono,monospace);color:#b8c9b8}.story-avatar{width:32px;height:32px;border-radius:50%;background:#be735f;color:#fff2df;display:grid;place-items:center;font:20px Georgia,serif;flex:none}.story-messages{list-style:none;margin:0;padding:4px 12px 14px;display:grid;gap:10px}.story-message{background:#f1e9d4;color:#2e352b;border-radius:2px 12px 12px 12px;padding:10px 12px;margin-right:16px;overflow-wrap:anywhere}.story-message p,.story-phone-note p,.story-police-card p{margin:4px 0!important;color:inherit!important;font-size:14px!important;line-height:1.45}.story-message small{font-size:10px;color:#6a725f}.story-police-card{padding:14px;background:#dce8de;color:#203e37;border:1px solid #8da99a;border-left:4px solid #426e5a;border-radius:8px}.story-status-label{display:block;font:600 10px/1.5 var(--font-mono,monospace);letter-spacing:.08em;margin-bottom:8px}.story-phone-note{border-top:1px solid #7b8f7b66;padding:8px 0}
 #zkTodayPanel .story-thread{color:#eff0df!important}#zkTodayPanel .story-message,#zkTodayPanel .story-police-card{color:#2e352b!important}#zkTodayPanel .story-message small{color:#6a725f!important}#zkTodayPanel .story-avatar{color:#fff2df!important}
+/* Районы: отдельный лист, удобный для телефона и клавиатуры. */
+#territoryModal .box{width:min(900px,calc(100vw - 32px));max-width:900px}
+.territory-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(240px,1fr);gap:18px}
+#territoryMap{display:block;width:100%;max-height:45vh;background:#172738;border-radius:18px}
+#territoryMap path{cursor:pointer;opacity:.68;transition:opacity .15s}
+#territoryMap path.home{stroke:white;stroke-width:3;stroke-dasharray:8 4}
+#territoryMap path.selected{opacity:1;stroke:white;stroke-width:4}
+#territoryList{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-top:10px}
+#territoryList .btn{min-width:0;overflow-wrap:anywhere;min-height:44px;padding:8px;text-align:left;display:flex;align-items:center;gap:7px;font-size:12px;white-space:normal}
+#territoryList .selected{outline:2px solid #63d4ce;outline-offset:-2px}
+.territory-dot{width:10px;height:10px;flex:none;border-radius:50%}
+.territory-intro{color:var(--muted);font-size:12px;line-height:1.5}
+#territoryStatus{padding:12px;border-radius:12px;background:rgba(99,212,206,.12)}
+#territorySelected{margin-top:0}
+#territoryNotice,#territoryMeetingNotice{min-height:1.5em;color:#ffce88}
+#territoryChoices{display:grid;gap:10px;margin:16px 0}
+#territoryJoin:disabled{opacity:.5}
+#territoryChoices .btn,#territoryJoin{white-space:normal;min-height:48px}
+#territoryPower{font-size:12px;color:var(--muted);line-height:1.5}
+#territoryMeetingText{font-size:16px;line-height:1.6}
+#territoryHistory{font-size:13px;line-height:1.5;border-top:1px solid #ffffff22;padding-top:12px}
+@media(min-width:681px){#territoryModal .ui-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none}#territoryModal .ui-sheet-close{display:grid;place-items:center;width:44px;height:44px}#territoryModal .ui-sheet-body{display:block;min-height:0;overflow-y:auto}#territoryModal .ui-sheet-foot{display:block;flex:none}#territoryModal .box{overflow:hidden;max-height:calc(100dvh - 32px)}}
+@media(max-width:680px){#territoryModal .box{width:100%}.territory-layout{grid-template-columns:1fr;gap:14px}#territoryMap{max-height:260px}#territoryList{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#territoryModal .ui-sheet-body{padding-bottom:16px}}
 </style>
 
 <canvas id="map"></canvas>
@@ -476,7 +499,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <div class="modal" id="menuModal" hidden>
   <div class="box">
     <h2>Живая Казань</h2>
-    <div class="row"><button class="btn primary" id="neighbourStoryBtn">📚 История соседки</button></div>
+    <div class="row"><button class="btn primary" id="neighbourStoryBtn">📚 История соседки</button><button class="btn" id="territoryBtn">🗺 Районы и группировки</button></div>
     <p>Прототип городской симуляции: реальные улицы, дома и маршруты центра Казани из OpenStreetMap, жители-боты, транспорт, происшествия и интерьеры.</p>
     <div class="legend">
       <kbd>WASD</kbd><span>идти (Shift — бежать), клик по карте — пойти туда</span>
@@ -500,6 +523,31 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button></div>
   </div>
 </div>
+
+<div class="modal" id="territoryModal" hidden><div class="box">
+  <h2>Районы и группировки</h2>
+  <p id="territoryLocation"></p><p id="territoryStatus"></p>
+  <div class="territory-layout"><div>
+    <svg id="territoryMap" viewBox="0 0 840 620" role="img" aria-label="Границы семи районов Казани. Белая точка — вы. Выберите район кнопкой под картой."></svg>
+    <div id="territoryList" aria-label="Выбор района"></div>
+    <p class="territory-intro">Белая точка — вы. Пунктир — ваша территория. Цвет обозначает район. Границы: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>. Одна группировка на район — условность игрового мира.</p>
+  </div><div><h3 id="territorySelected"></h3><p id="territoryDetail"></p>
+    <p class="territory-intro">Вступление открывает районные встречи. Домашний бонус действует только в этих стычках. Выйти можно всегда; до следующего вступления — 30 минут. Уважение при выходе обнуляется.</p>
+    <button class="btn primary" id="territoryJoin">Вступить</button>
+    <p id="territoryCooldown"></p><p id="territoryNotice" role="status" aria-live="polite"></p>
+    <button class="btn" id="territoryRetry" hidden>Повторить действие</button>
+    <button class="btn" id="territoryTrain" hidden>Учебный спарринг дома · без потерь</button>
+    <button class="btn" id="territoryResume" hidden>Продолжить встречу</button>
+    <p id="territoryHistory"></p>
+  </div></div>
+  <div class="row"><button class="btn" id="territoryClose">Закрыть</button><button class="btn" id="territoryRefresh">Обновить</button><button class="btn" id="territoryLeave" hidden>Выйти из группировки</button></div>
+</div></div>
+<div class="modal" id="territoryMeeting" hidden><div class="box">
+  <h2 id="territoryMeetingTitle">Чужой двор</h2><p id="territoryMeetingText"></p><p id="territoryPower"></p>
+  <div id="territoryChoices"></div><p id="territoryMeetingNotice" role="status" aria-live="polite"></p>
+  <button class="btn" id="territoryMeetingRetry" hidden>Повторить действие</button>
+  <div class="row"><button class="btn" id="territoryMeetingClose">Уйти без конфликта</button></div>
+</div></div>
 
 <script src="js/util.js"></script><script src="js/platform.js"></script>
 <script src="js/world.js"></script><script src="js/chunks.js"></script>
@@ -532,7 +580,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/daily.js"></script>
 <script src="js/quests.js"></script>
 <script src="js/shop.js"></script>
-<script src="js/districts.js"></script>
+<script src="js/districts.js"></script><script src="js/district-bounds.js"></script><script src="js/territory-core.js"></script>
 <script src="js/events.js"></script>
 <script src="js/people.js"></script>
 <script src="js/story-ui.js"></script><script src="js/phone.js"></script>
@@ -540,4 +588,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
-<script src="js/main.js"></script><script src="js/ui.js"></script>
+<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/ui.js"></script>

@@ -12,6 +12,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),crypto=require(
 const {WebSocketServer}=require('ws');
 const VenueRoom=require('../../site/js/venue-room.js');
 const WalletLib=require('./wallet.js');
+const TerritoryLib=require('./territories.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -137,6 +138,11 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
 // Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
 const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
 setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
+const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sqliteBackend(store.db):TerritoryLib.jsonBackend(path.join(DATA,'territories.json'),fs));
+// Resolve the same projection served to the client. A missing map disables territory actions.
+let territoryMeta=null,territoryMapFile='';
+function getTerritoryMeta(){const file=mapDir()?path.join(MAP_DIR,'base.json'):path.join(ROOT,'kazan.json');
+  if(file!==territoryMapFile||!territoryMeta){try{territoryMeta=JSON.parse(fs.readFileSync(file,'utf8')).meta;territoryMapFile=file;}catch(e){return null;}}return territoryMeta;}
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
@@ -238,7 +244,7 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
   body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>store.save(a.k,null,a.profile,null));}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -279,7 +285,7 @@ function crowdCells(p,R){const res=[];const c0=Math.floor((p.x-R)/CELL),c1=Math.
   for(let cx=c0;cx<=c1;cx++)for(let cy=r0;cy<=r1;cy++){const c=coarse.get(gkey(cx,cy));if(!c)continue;for(const [fk,n] of c.fine){res.push([Math.floor(fk/20000)-5000,fk%20000-5000,n]);if(res.length>=800)return res;}}return res;}
 const META_KEYS=['n','r','c','v','vc','sy','g','a','w'];
 function setPresence(p,d){if(!d||typeof d!=='object')return;
-  if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-5000,Math.min(5000,d.x));p.y=Math.max(-5000,Math.min(5000,d.y));p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;venueMove(p,d);if(p.room)gridDel(p);else gridMove(p);}
+  if(typeof d.x==='number'&&typeof d.y==='number'&&isFinite(d.x)&&isFinite(d.y)){p.x=Math.max(-45000,Math.min(45000,d.x));p.y=Math.max(-45000,Math.min(45000,d.y));p.positionAt=now();p.hx=+d.hx||0;p.hy=+d.hy||0;p.b=d.b?1:0;venueMove(p,d);if(p.room)gridDel(p);else gridMove(p);}
   const m={};let has=false;for(const k of META_KEYS)if(k in d){m[k]=d[k];has=true;}
   if(has){if(typeof m.n==='string')m.n=Mod.name(clean(m.n,24),'Игрок');
     if('sy' in m){const sy=m.sy;if(!sy||typeof sy!=='object'||typeof sy.t!=='string'||!Number.isSafeInteger(sy.i)||modBlocked(p)||modMuted(p)||(p.b&&!p.room)||(sy.room||null)!==(p.room||null))m.sy=null;
@@ -370,6 +376,15 @@ function apiSync(body,ip){const priv=idstr(body.id);if(priv.length<8)return {err
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const nearby=[];nearest(p,VIEW_R,VIEW_K,nearby);const list=nearby.map(([,o])=>({id:o.id,p:Object.assign(visibleMeta(o),{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b,room:o.room,ix:o.ix,iy:o.iy,ihx:o.ihx,ihy:o.ihy})}));
   return {players:list,msgs:mine,seq,online:players.size,pid:id};}
+
+// Territory state is separate from client saves; position still uses the game's client movement protocol.
+function apiTerritory(body,ip){
+  const a=accByToken(body.token);if(!a)return {ok:0,err:'auth'};
+  if(!allow('territory:'+a.k,40,60))return {ok:0,err:'rate_limited'};
+  const cid=idstr(body.id),p=cid.length>=8?players.get(pubOf(cid)):null;
+  const pose=p&&p.priv===cid&&p.ip===ip&&!modBlocked(p)?{x:p.x,y:p.y,t:p.positionAt*1000,b:p.b,room:p.room,vehicle:p.meta.v}:null;
+  try{return territories.call(a.k,body,pose,getTerritoryMeta());}catch(e){log('районы: запись не удалась',e.message);return {ok:0,err:'busy'};}
+}
 
 // ---------- ИИ: лимит на игрока в день и общий лимит в день ----------
 const llmDay={d:day(),total:0,per:new Map()};
@@ -481,8 +496,9 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
+    if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod')return send(res,200,modAdmin(req,body));
@@ -575,7 +591,7 @@ async function sendAdminFile(file,caption){if(!TG_TOKEN||!ADMIN_TG)return;
     const fd=new FormData();fd.append('chat_id',ADMIN_TG);fd.append('caption',caption);fd.append('document',new Blob([gz]),path.basename(file)+'.gz');
     const r=await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendDocument`,{method:'POST',body:fd,signal:AbortSignal.timeout(120000)}).then(r=>r.json());if(!r.ok)log('копия в Телегу:',r.description);}catch(e){log('копия в Телегу:',e.message);}}
 function doBackup(){const d=mskDay();fs.mkdirSync(BK,{recursive:true});const file=path.join(BK,'game-'+d+'.db');
-  try{if(fs.existsSync(file))fs.unlinkSync(file);store.backup(file);for(const x of ['mod.json','reports.jsonl','wallet.json'])if(fs.existsSync(path.join(DATA,x)))fs.copyFileSync(path.join(DATA,x),path.join(BK,x.replace('.',`-${d}.`)));
+  try{if(fs.existsSync(file))fs.unlinkSync(file);store.backup(file);for(const x of ['mod.json','reports.jsonl','wallet.json','territories.json'])if(fs.existsSync(path.join(DATA,x)))fs.copyFileSync(path.join(DATA,x),path.join(BK,x.replace('.',`-${d}.`)));
     const old=fs.readdirSync(BK).filter(f=>{const m=/(\d{4}-\d\d-\d\d)/.exec(f);return m&&m[1]<mskDay(-7);});for(const f of old)fs.unlinkSync(path.join(BK,f));
     daily.backup=d;log('копия базы:',file,Math.round(fs.statSync(file).size/1024)+' КБ');if(ENV.BACKUP_TO_TG==='1')sendAdminFile(file,'Копия базы «Живой Казани» за '+d);}
   catch(e){log('копия базы не вышла:',e.message);sendAdmin('⚠️ Копия базы не сделалась: '+e.message);}}
