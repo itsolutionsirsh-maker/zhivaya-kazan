@@ -2,6 +2,12 @@
 (function(){
   'use strict';
   const R=TerritoryRules,$id=id=>document.getElementById(id),modal=$id('territoryModal'),meeting=$id('territoryMeeting');
+  // названия и голоса группировок — второй программист (gangs.js, window.cityGangs, задача 52); без файла — временные тексты ниже
+  const GD=window.cityGangs||null;if(GD&&GD.factions)for(const [id,f] of Object.entries(GD.factions))if(R.factions[id]&&f&&f.name)R.factions[id].name=f.name;
+  const gPick=(list,seed,k)=>list&&list.length?list[hashStr(String(seed)+':'+(k||''))%list.length]:null;   // одна и та же встреча — те же слова и после перезагрузки
+  const gLine=(key,seed)=>gPick(GD&&GD.lines&&GD.lines[key],seed,key);
+  function gNames(seed){const N=GD&&GD.names;if(!N||N.length<2)return ['Глеб','Денис'];const a=hashStr(seed+':a')%N.length;let b=hashStr(seed+':b')%(N.length-1);if(b>=a)b++;return [N[a],N[b]];}
+  function gGreet(district,seed){const loc=(GD&&GD.local&&GD.local[district]&&GD.local[district].greet)||[];return gPick(loc.concat((GD&&GD.lines&&GD.lines.greet)||[]),seed,'greet');}
   let state=null,identity='',pending=false,selected='vahitovsky',local=null,timer=0,poll=0,dwell=0,lastDistrict=null;
   let actorSit=null,meetingId=null,busyBefore=false,mapBuilt=false,retry=null,lastHistory=null;
   const messages={auth:'Войдите в аккаунт через меню, чтобы вступить и сохранить членство.',conflict:'Состояние изменилось на другом устройстве. Проверьте выбор ещё раз.',
@@ -13,7 +19,9 @@
     won:'Вы приняли вызов и выстояли. Местные прекращают стычку и дают пройти. Уважение +2.',
     lost:'Местные оказались сильнее. Вы отступили: уважение −1, минимум 0. Деньги и вещи остались при вас.',
     left:'Вы ушли без конфликта. Членство сохранилось, деньги и вещи при вас.',expired:'Разговор так и не состоялся. Местные разошлись; наказания нет.'};
-  const ending=h=>h.training?({won:'В учебном спарринге вы выстояли против двоих гостей. Дома ваша сила 84 вместо 70. Уважение не меняется.',lost:'В учебном спарринге гости оказались сильнее. Домашний бонус не гарантирует победу. Уважение не меняется.',peace:'Вы обсудили правила и разошлись без спарринга.',left:'Тренировку отменили. Никаких потерь.',expired:'Время тренировки вышло. Никаких потерь.'}[h.result]):endings[h.result];
+  const endingBase=h=>h.training?({won:'В учебном спарринге вы выстояли против двоих гостей. Дома ваша сила 84 вместо 70. Уважение не меняется.',lost:'В учебном спарринге гости оказались сильнее. Домашний бонус не гарантирует победу. Уважение не меняется.',peace:'Вы обсудили правила и разошлись без спарринга.',left:'Тренировку отменили. Никаких потерь.',expired:'Время тренировки вышло. Никаких потерь.'}[h.result]):endings[h.result];
+  const END_TAIL={peace:'Уважение +1.',won:'Уважение +2.',lost:'Вы отступили: уважение −1, минимум 0. Деньги и вещи остались при вас.',left:'Членство сохранилось, деньги и вещи при вас.'};
+  const ending=h=>{const q=!h.training&&END_TAIL[h.result]&&gLine(h.result,h.id);return q?(h.result==='won'?'Вы выстояли. ':'')+'«'+q+'» '+END_TAIL[h.result]:endingBase(h);};
   const token=()=>typeof acct!=='undefined'&&acct?acct.token:'';
   const available=()=>!!(token()&&Net.territories&&Net.syncReady&&(Net.mode==='ws'||Net.mode==='http'));
   function emit(){window.dispatchEvent(new Event('territorychange'));}
@@ -30,7 +38,9 @@
       if(!response.ok)throw Error('http');const result=await response.json();
       if(token()!==who){changedAccount();return null;}
       retry=null;
-      if(result.state){state=result.state;poll=0;
+      if(result.state){const was=state&&state.member;state=result.state;poll=0;
+        if(state.member!==was&&lastHistory!==null){const nm=id=>R.factions[id]?R.factions[id].name:'';const q=state.member?gLine('joined',state.member+state.rev):gLine('leave',was+state.rev);
+          addEvent(state.member?'Районы: вы в «'+nm(state.member)+'».'+(q?' «'+q+'»':''):'Районы: вы вышли из «'+nm(was)+'».'+(q?' «'+q+'»':''),'say');}
         const h=state.history[0];if(h&&lastHistory&&h.id!==lastHistory)addEvent('Районы: '+ending(h),'say');lastHistory=h?h.id:'none';}
       if(!result.ok)notice(messages[result.err]||'Действие не выполнено. Обновите состояние и попробуйте снова.');
       if(!meeting.hidden)renderMeeting();renderMap();return result;
@@ -66,6 +76,7 @@
     $id('territoryLocation').textContent=local?'Вы сейчас: '+local.name:'Вы за пределами районов Казани';
     $id('territoryStatus').textContent=!token()?'Нейтральный гость':!state?'Загружаем членство…':member?'Вы в «'+R.factions[member].name+'» · уважение '+state.standing+' / 100':'Нейтральный: районные конфликты вас не затрагивают';
     $id('territorySelected').textContent=d.name+' · «'+R.factions[selected].name+'»';
+    const about=GD&&GD.factions&&GD.factions[selected]&&GD.factions[selected].about;$id('territoryAbout').textContent=about||'';$id('territoryAbout').hidden=!about;
     $id('territoryDetail').textContent=member===selected?'Ваша территория. Сила в районных стычках +20%.':member?'Чужая территория: ваша сила обычная, у местных +20%. Здесь возможна встреча; всегда можно уйти.':'Чтобы вступить, придите пешком в этот район. Вступление добровольное; выйти можно в любое время.';
     $id('territoryCooldown').textContent=state?[[state.switchAt,'Смена группировки'],[state.nextAt,'Следующая встреча'],[state.practiceAt,'Следующая тренировка']].filter(([at])=>Date.now()<at).map(([at,label])=>label+' — через '+Math.ceil((at-Date.now())/60000)+' мин.').join(' '):'';
     const h=state&&state.history[0];$id('territoryHistory').textContent=h?'Последняя встреча · '+R.get(h.district).name+': '+ending(h):'';
@@ -80,7 +91,7 @@
     $id('territoryMeetingClose').textContent=e?'Уйти без конфликта':'Продолжить прогулку';
     if(!e){const h=state&&state.history[0];$id('territoryMeetingText').textContent=h?ending(h):'Встреча завершена.';$id('territoryPower').textContent='';renderButtons();return;}
     $id('territoryMeetingTitle').textContent=(e.training?'Спарринг дома · ':'Чужой двор · ')+R.get(e.district).name;
-    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». Глеб останавливается: «Ты к кому? Здесь наши дворы».':'«Если по делу — скажи спокойно. Или хочешь что-то доказать?» За спиной Глеба второй парень молча ждёт вашего ответа.';
+    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». '+(gLine('spar',e.id)?'«'+gLine('spar',e.id)+'» ':'')+'Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». '+gNames(e.id)[0]+' останавливается: «'+(gGreet(e.district,e.id)||'Ты к кому? Здесь наши дворы.')+'»':'«'+(gLine('talk',e.id)||'Если по делу — скажи спокойно. Или хочешь что-то доказать?')+'» '+gNames(e.id)[1]+' молча ждёт вашего ответа.';
     $id('territoryPower').textContent='Ваша сила: '+e.power.player+' · двое соперников: '+e.power.locals+(e.training?' (домашний бонус +20% у вас).':' (домашний бонус +20% у местных).')+' Шанс выстоять: '+Math.round(e.power.chance*100)+'%. Бонус закреплён до конца встречи.';
     const friend=!e.training&&typeof YardStory!=='undefined'&&YardStory.passage(state.story,e.district);
     if(friend){const b=document.createElement('button');b.type='button';b.className='btn primary';b.textContent='Назвать знакомого с турнира · пройти мирно';b.addEventListener('click',()=>request('choice',{encounter:e.id,choice:'friend'}));choices.append(b);}
@@ -96,7 +107,7 @@
   function nearFree(i){for(let k=0;k<8;k++){const a=i*2.4+k*0.8,x=player.x+Math.cos(a)*4,y=player.y+Math.sin(a)*4;if(!inBuilding(x,y))return [x,y];}return null;}
   defSit('territoryActors',{start(s){const e=s.encounter;for(let i=0;i<2;i++){
       const q=spotNear(3,14)||spotNear(8,40)||nearFree(i);if(!q)continue;const n=nearestNode(q[0],q[1],world.pedAdj,300);if(n<0)continue;
-      const w=new Walker('resident',n);w.temp=true;w.x=q[0];w.y=q[1];w.p.name=i?'Денис':'Глеб';w.p.female=false;w.p.job=R.factions[e.opponent].name;w.p.clothes=R.factions[e.opponent].color;
+      const w=new Walker('resident',n);w.temp=true;w.x=q[0];w.y=q[1];w.p.name=gNames(e.id)[i];w.p.female=false;w.p.job=R.factions[e.opponent].name;w.p.clothes=R.factions[e.opponent].color;
       walkers.push(w);takeActor(s,w);faceTo(w,player.x,player.y);
     }return true;}});
   $id('territoryBtn').addEventListener('click',openMap);$id('territoryClose').addEventListener('click',closeMap);
@@ -118,6 +129,17 @@
     dwell+=elapsed;if(dwell<12)return;dwell=0;
     const ll=R.lonLat(player.x,player.y,world.meta);if(R.borderDistance(local,...ll)<20)return;
     request('start').then(result=>{if(result&&result.ok&&state&&state.active&&!player.busy&&scene==='city')showMeeting();});
+  });
+  // на улице района зовут вступить (реплика recruit из gangs.js): нейтральному, пешком, после двух минут в районе, не чаще раза в 10 минут
+  let recruitT=0,recruitAt=-1e9,recruitDistrict=null,recruitDwell=0;
+  defWatch(dt=>{if(!GD||!GD.lines||!GD.lines.recruit)return;recruitT+=dt||0;if(recruitT<5)return;const el=recruitT;recruitT=0;
+    if(scene!=='city'||player.busy||player.inside||player.vehicle||player.bus||player.state!=='ok'||SIT.card)return;
+    if(state&&(state.member||state.active||(state.story&&state.story.stage!=='done'&&state.story.stage!=='invite')))return;
+    const d=world&&R.at(player.x,player.y,world.meta);if(!d){recruitDistrict=null;return;}
+    if(d.id!==recruitDistrict){recruitDistrict=d.id;recruitDwell=0;}recruitDwell+=el;if(recruitDwell<(window.zkRecruitDwell||120)||Date.now()-recruitAt<10*60e3)return;
+    let best=null,bd=25;for(const w of walkers){if(w.bus||w.inside||w.state==='hurt'||w.sitBy||w.temp||w.folk||w===chatNpc)continue;const dd=dist(w.x,w.y,player.x,player.y);if(dd<bd){bd=dd;best=w;}}
+    if(!best)return;recruitAt=Date.now();say(best,gLine('recruit',recruitAt),7);
+    addEvent('Районы: «'+R.factions[d.id].name+'» зовут к себе. Вступить — меню → «Районы и группировки»'+(token()?'':' (нужен аккаунт)'),'say');
   });
   // Snapshot reads and validated chapter requests. No client state setter.
   window.cityTerritories={open:openMap,refresh:()=>request(),snapshot:()=>state?JSON.parse(JSON.stringify(state)):null,openMeeting:showMeeting,story:extra=>request('story',extra),retry:()=>request(retry?retry.op:'status',{},true),connection:()=>({pending,ready:available(),retry:!!retry,message:$id('territoryNotice').textContent})};

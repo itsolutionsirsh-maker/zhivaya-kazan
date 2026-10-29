@@ -11,7 +11,8 @@ function rwLines(path){let o=window.cityRealLines;for(const k of path){if(!o)ret
 // погода для реплик и ленты: гололёд, мороз, жара, ветер — от настоящей температуры и ветра
 function rwWeatherKey(){if(!weather.real)return null;const t=weather.t;
   if(weather.ice)return 'ice';if(weather.kind==='snow')return 'snow';if(weather.kind==='fog')return 'fog';if(t!=null&&t<=-15)return 'frost';
-  if(t!=null&&t>=28)return 'heat';if(weather.kind==='rain')return 'rain';if((weather.wind||0)>=10)return 'wind';return null;}
+  if(t!=null&&t>=28)return 'heat';if(weather.kind==='rain')return 'rain';if((weather.wind||0)>=10)return 'wind';
+  if(weather.kind==='clear'&&!(typeof isNight==='function'&&isNight()))return 'clear';return null;}
 const RW_FEED={rain:'Пошёл дождь{t}',snow:'Пошёл снег{t}',ice:'На улицах гололёд{t} — осторожнее',frost:'Мороз{t}',heat:'Жара{t}',fog:'Город в тумане{t}',clear:'Распогодилось{t}',cloudy:'Небо затянуло{t}'};
 function rwWeather(w){
   if(!w){if(weather.real){weather.real=false;weather.t=null;weather.ice=false;weather.wind=null;weather.ttl=rnd(120,300);}return;}
@@ -54,3 +55,12 @@ $('#alertTitle')&&$('#alertTitle').addEventListener('click',()=>{if(RW.min){RW.m
 if(/^https?:/.test(location.protocol)){setTimeout(rwPoll,3000);setInterval(rwPoll,120000);}
 // во время тревоги прохожие рядом время от времени говорят спокойные фразы (если они есть в данных)
 if(typeof defWatch==='function')defWatch(dt=>{rwFirst();if(!rwAlertOn()||scene!=='city')return;RW.sayT-=dt||0;if(RW.sayT>0)return;RW.sayT=rnd(40,80);rwSay(['alert','during']);});
+// таксист, водитель автобуса и прохожие у большой улицы — о пробке и погоде (realworld-lines.js второго программиста), раз в минуту-полторы;
+// начало часа пик — строка в ленте (пробки по модели: rushHour и roadSlow)
+RW.tT=40;RW.rush=false;
+if(typeof defWatch==='function')defWatch(dt=>{RW.tT-=dt||0;if(RW.tT>0)return;RW.tT=rnd(60,100);
+  const jam=typeof rushHour==='function'&&rushHour(),w=weather.kind,slick=w==='snow'||weather.ice;
+  if(jam&&!RW.rush&&scene==='city'){const f=rwLines(['feed','jam']);if(f)addEvent(pick(f));}RW.rush=jam;
+  if(player.vehicle&&player.vehicle.kind==='taxi'){const k=jam?'jam':slick?'snow':w==='rain'?'rain':null;const L=k&&rwLines(['taxi',k]);if(L)nearLine(player.vehicle.driver||'Таксист',pick(L),false);return;}
+  if(player.bus){const k=jam?'jam':slick?'snow':null;const L=k&&rwLines(['bus',k]);if(L)nearLine('Водитель автобуса',pick(L),false);return;}
+  if(scene==='city'&&jam&&!player.vehicle){const ns=nearestRoadSeg(player.x,player.y,40);if(ns&&ns.seg.r.c<=4)rwSay(['walker','jam']);}});
