@@ -554,7 +554,15 @@ function gzLater(file,gzf){if(GZ_BUSY.has(file)||GZ_BUSY.size>=2||(GZ_FAIL.get(f
 const wss=new WebSocketServer({server,path:'/ws',maxPayload:16*1024,perMessageDeflate:false});
 function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmount>256*1024)return;const s=JSON.stringify(obj);stats.bytesOut+=s.length;stats.msgsOut++;ws.send(s);}
 // тревога МЧС, отбой или новая погода — сразу всем, кто в игре (остальные узнают при опросе a=city раз в 2 минуты)
-realworld.onChange=snap=>{for(const p of players.values())wsSend(p,Object.assign({t:'city'},snap));};
+let rwAlertKey='',rwDownTold=false;
+realworld.onChange=snap=>{for(const p of players.values())wsSend(p,Object.assign({t:'city'},snap));
+  // админу в Телегу: в игре включилась или снялась тревога — чтобы проверить и при ошибке снять в /mod.html
+  const key=snap.alerts.map(a=>a.kind+':'+a.at).join('|');if(key!==rwAlertKey){const was=rwAlertKey;rwAlertKey=key;
+    if(key)sendAdmin('⚠️ В игре плашка тревоги: '+snap.alerts.map(a=>a.title+' — «'+a.text+'» ('+a.src+')').join('; ')+'. Если ошибка — /mod.html, «Снять тревогу».');
+    else if(was)sendAdmin('✅ Плашка тревоги в игре снята'+(snap.ended.length?': отбой от МЧС.':' (отбоя в канале не было — прошло 3 часа или снял модератор).'));}};
+// источник тревог молчит полчаса — сказать админу один раз (зеркало канала могло поменять вёрстку)
+setInterval(()=>{const st=realworld.status();if(st.alertErrors>=20&&!rwDownTold){rwDownTold=true;sendAdmin('⚠️ Источник тревог МЧС (зеркало канала ГУ МЧС по РТ) не отвечает или не разбирается уже ~30 минут. Тревоги в игре сейчас не придут сами; включить вручную — /mod.html.');}
+  if(st.alertErrors===0)rwDownTold=false;},5*60e3).unref();
 wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
