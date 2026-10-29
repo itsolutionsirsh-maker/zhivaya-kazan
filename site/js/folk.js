@@ -35,7 +35,7 @@ function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Mat
   const lk=f.look;if(lk){if(/^#[0-9a-f]{6}$/i.test(lk.coat||''))p.clothes=lk.coat;if(lk.hat==='cap')p.hat={k:'cap',c:shade(p.clothes,0.7)};else if(lk.hat==='beanie')p.hat={k:'knit',c:P(['#5A6B8C','#8C3A32','#3F6B4A','#6E7378'])};if(lk.item&&lk.item!=='none')p.item=lk.item;}
   return p;}
 // ---------- места ----------
-function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){if(!test(p))continue;const d=dist(p.x,p.y,x,y);if(d<bd){bd=d;best=p;}}return best;}
+function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){const dx=p.x-x,dy=p.y-y;if(dx>bd||dx<-bd||dy>bd||dy<-bd||!test(p))continue;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=p;}}return best;}
 function poiPlace(p,kind){return p?{x:p.x,y:p.y,inside:true,key:poiKey(p),poi:p,name:p.n||KIND_RU[p.t]||'',kind}:null;}
 function spotPlace(x,y,name,kind){const n=nearestNode(x,y,world.pedAdj,150);if(n<0)return null;const sp=sidewalkPos(n);return {x:sp[0],y:sp[1],inside:false,node:n,name,kind};}
 // опорные точки центра считаем один раз на карту (раньше — перебор тысяч мест на каждого жителя); вызывающие правят копию
@@ -45,7 +45,7 @@ function folkAnchors(){const key=world.roads.length+':'+world.pois.length;
     const sq=(world.squares||[]).find(s=>/свобод/i.test(s.n));A.freedom=sq?[sq.x,sq.y]:[player.x,player.y];
     const kr=world.pois.find(p=>/кремл/i.test(p.n||''));A.kremlin=kr?[kr.x,kr.y]:[A.freedom[0]-1200,A.freedom[1]-250];
     // Баумана пешеходная — её нет в сетке «ближайшей улицы»; середина — по точкам самой улицы рядом с площадью Свободы
-    let sx=0,sy=0,n=0;for(const r of world.roads){if(!r||!/Баумана/.test(r.n||'')||!r.p)continue;for(const i of r.p){const q=world.nodes[i];if(!q||dist(q[0],q[1],A.freedom[0],A.freedom[1])>2000)continue;sx+=q[0];sy+=q[1];n++;}}
+    let sx=0,sy=0,n=0;const F=A.freedom;roadsIn(F[0]-2000,F[1]-2000,F[0]+2000,F[1]+2000,r=>{if(!/Баумана/.test(r.n||'')||!r.p)return;for(const i of r.p){const q=world.nodes[i];if(!q||dist(q[0],q[1],F[0],F[1])>2000)continue;sx+=q[0];sy+=q[1];n++;}});
     A.bauman=n?[sx/n,sy/n]:[(A.freedom[0]+A.kremlin[0])/2,(A.freedom[1]+A.kremlin[1])/2];
     const sb=world.pois.find(p=>p.t==='bar'&&/спорт|sport|футбол|паб|pub/i.test(p.n||''));A.stadium=sb?[sb.x,sb.y]:A.freedom;
     FOLK_ANCH={w:world,key,A};}
@@ -62,10 +62,10 @@ const KIND_TEST={bar:p=>p.t==='bar',cafe:p=>p.t==='cafe',restaurant:p=>p.t==='ca
 // из landmarks.js или по названию улицы рядом с районом, и ставим человека на тротуар неподалёку (не все в одну точку)
 const OPEN_KIND=/^(park|square|embankment|station|metro|street)$/;
 function folkOpenSpot(sp,f,c,role){const norm=s=>String(s||'').toLowerCase().replace(/ё/g,'е');const hs=(sp.hints||[]).map(norm).filter(Boolean);let at=null,label='';
-  if(hs.length){let bs=0,bd=4500;for(const l of [...(window.cityLandmarks||[]),...(window.cityPlaces||[])]){if(!Array.isArray(l.ll))continue;const ns=[l.name].concat(l.alias||[]).map(norm);   // ориентиры и места для праздников и постов (city-people.js)
+  if(hs.length){let bs=0,bd=4500;for(const l of [...(window.cityLandmarks||[]),...(window.cityPlaces||[])]){if(!Array.isArray(l.ll))continue;const ns=l.nn||(l.nn=[l.name].concat(l.alias||[]).map(norm));   // ориентиры и места для праздников и постов (city-people.js)
     let sc=0;for(const h of hs)sc+=ns.some(n=>n===h)?2:ns.some(n=>n.includes(h))?1:0;if(!sc)continue;   // точное совпадение с названием важнее «вокзал» внутри «автовокзал»
     const q=llToXY(l.ll);const d=dist(q[0],q[1],c[0],c[1]);if(d>4500)continue;if(sc>bs||(sc===bs&&d<bd)){bs=sc;bd=d;at=q;label=l.name;}}
-    if(!at){let bd2=3000;for(const r of world.roads){if(!r||!r.n||!r.p)continue;const rn=norm(r.n);if(!hs.some(h=>rn.includes(h)))continue;for(const i of r.p){const q=world.nodes[i];if(!q)continue;const d=dist(q[0],q[1],c[0],c[1]);if(d<bd2){bd2=d;at=[q[0],q[1]];label=r.n;}}}}}
+    if(!at){let bd2=3000;roadsIn(c[0]-3000,c[1]-3000,c[0]+3000,c[1]+3000,r=>{if(!r.n||!r.p)return;const rn=r.nl||(r.nl=norm(r.n));if(!hs.some(h=>rn.includes(h)))return;for(const i of r.p){const q=world.nodes[i];if(!q)continue;const d=dist(q[0],q[1],c[0],c[1]);if(d<bd2){bd2=d;at=[q[0],q[1]];label=r.n;}}});}}
   if(!at)return null;const sd=hashStr(f.id+role);const jx=((sd%41)-20),jy=(((sd>>>6)%41)-20);   // ±20 м, у каждого своё место
   const n=nearestNode(at[0]+jx,at[1]+jy,world.pedAdj,600);if(n<0)return null;const q=sidewalkPos(n);   // озеро или парк: ближайшая дорожка может быть далеко от центра
   return {x:q[0],y:q[1],inside:false,node:n,open:true,kind:sp.kind,name:label?(role==='work'&&/^(taxi|bombila)$/.test(f.type)?'у машины, '+label:label):'на улице'};}
@@ -82,10 +82,10 @@ function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   const taken=new Set(Object.values(P).filter(Boolean).map(q=>q.key));
   const use=FOLK.use||(FOLK.use={});const named=p=>!!p.n&&!taken.has(poiKey(p))&&(use[poiKey(p)]||0)<(role==='work'?1:2);   // на работе по одному, «своё место» — не больше двоих
   // кандидаты рядом с подсказкой: совпадение по названию или улице, иначе просто ближайшие
-  const cand=[];for(const p of world.pois){if(!test(p)||!named(p))continue;const d=dist(p.x,p.y,c[0],c[1]);if(d<900)cand.push([d,p]);}
+  const cand=[];for(const p of world.pois){const dx=p.x-c[0],dy=p.y-c[1];if(dx>900||dx<-900||dy>900||dy<-900||!test(p)||!named(p))continue;const d=Math.hypot(dx,dy);if(d<900)cand.push([d,p]);}
   cand.sort((u,v)=>u[0]-v[0]);
   const want=k==='restaurant'?/ресторан|чайхан|столов|кухн|кафе/i:null;
-  const hit=(p)=>{if(!sp.hints.length)return true;const n=(p.n||'').toLowerCase();if(sp.hints.some(h=>n.includes(h)))return true;const r=(nearestRoadName(p.x,p.y)||'').toLowerCase();return sp.hints.some(h=>r.includes(h))||dist(p.x,p.y,c[0],c[1])<160;};
+  const hit=(p)=>{if(!sp.hints.length)return true;const n=(p.n||'').toLowerCase();if(sp.hints.some(h=>n.includes(h)))return true;const r=p.rn!==undefined?p.rn:(p.rn=(nearestRoadName(p.x,p.y)||'').toLowerCase());return sp.hints.some(h=>r.includes(h))||dist(p.x,p.y,c[0],c[1])<160;};
   let best=null;for(const [d,p] of cand.slice(0,40)){if(want&&!want.test(p.n))continue;if(hit(p)){best=p;break;}}
   if(!best)for(const [d,p] of cand.slice(0,40)){if(hit(p)){best=p;break;}}
   if(!best&&cand.length)best=cand[0][1];
@@ -157,12 +157,12 @@ const FOLK_HI=['Привет, {n}!','О, {n}! Как сам?','{n}, здравс
 const FOLK_HI_F={fidania:['Улым, здравствуй! Покушал сегодня?','Ой, сосед! Как дела?'],lenar:['{n}! Послушай, новую выучил ♪','Братан, привет!'],marat:['Э, {n}! Куда едем?','Салям, {n}! Опять пробки…'],alsu:['Зай, привет. Заходи вечером','{n}, живой? Привет'],zulfiya:['Здравствуйте, {n}!'],gulnara:['Здравствуйте, {n}. Как самочувствие?'],ildar:['{n}! Наши сегодня играют, ты в курсе?'],rinat:['{n}! Голодный? Заходи']};
 const BUSK=['♪ Казан, Казан, син минем җаным… ♪','♪ (перебирает струны) ♪','♪ Ещё одну для хороших людей ♪','Спасибо, люди добрые!'];
 // жители районов (folk2.js → window.cityFolk2): появляются, когда игрок впервые оказывается рядом с их районом (там уже подгружены дома и места)
-function folkDistrictTick(){const ext=[...(window.cityFolk2||[]),...(window.cityFolk3||[])];if(!ext.length||!FOLK.ready)return;let added=0;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;let A0=null;
+function folkDistrictTick(){const t0=performance.now();const ext=[...(window.cityFolk2||[]),...(window.cityFolk3||[])];if(!ext.length||!FOLK.ready)return;let added=0;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;let A0=null;
   for(const src of ext){if(have.has(src.id))continue;const d=ds.find(x=>x.id===src.district);if(!d||!Array.isArray(d.center))continue;
     const c=[(d.center[1]-m.lon0)*m.mlon,-(d.center[0]-m.lat0)*m.mlat];if(dist(c[0],c[1],player.x,player.y)>2200)continue;
     A0=A0||folkAnchors();const A=src.district==='vahitovsky'?A0:{freedom:c,kremlin:c,bauman:c,stadium:c,yard:[c[0]+40,c[1]+30]};A[src.district]=c;
     const f=Object.assign({ward:src.district},src);f.ward=src.district;f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
-    f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);if(++added>=3)break;}}   // по трое за раз — не тормозить
+    f.places=folkPlaces(f,A);f.at=folkWant(f);f.w=null;f.trip=null;FOLK.list.push(f);if(++added>=3||performance.now()-t0>3)break;}}   // до троих за раз и не дольше ~3 мс — не тормозить
 function updateFolk(rdt){if(!world)return;if(!FOLK.ready){folkInit();if(!FOLK.ready)return;}
   FOLK.t-=rdt;if(FOLK.t>0)return;FOLK.t=0.5;FOLK.dt=(FOLK.dt||0)+1;if(FOLK.dt%10===0)folkDistrictTick();
   for(const f of FOLK.list){
