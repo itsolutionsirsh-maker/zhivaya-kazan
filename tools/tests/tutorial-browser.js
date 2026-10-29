@@ -21,8 +21,13 @@ let fails=0;const check=(ok,msg)=>{console.log((ok?'OK  ':'FAIL')+' '+msg);if(!o
     await ev("window.zkNoStory=true;PROG.q={day:mskDate(),ids:[],p:{},done:[]};progSave();");
     const L=await ev('cityTutorial.length');
     check(L===12,`шагов в обучении: ${L}`);
+    // шаг показывает карточка ближайшей цели (objectives.js), у гостя — первые шаги
+    const goal=()=>ev(`(()=>{let k=0;while(SIT.card&&k++<6){const c=SIT.card;pickChoice(c,c.choices[c.choices.length-1]);}player.busy=false;cityObjectives.refresh();
+      const b=document.querySelector('#nextGoal');return {shown:!b.hidden,ctx:document.querySelector('#goalContext').textContent,title:document.querySelector('#goalTitle').textContent,btn:document.querySelector('#questBtn').textContent};})()`);
     await ev('tutShow()');
-    check(await ev('/Шаг 1 из 12/.test(document.querySelector("#hint").textContent)&&document.querySelector("#questBtn").textContent==="👣1"'),'подсказка «Шаг 1 из 12» и кнопка 👣1');
+    const g1=await goal();
+    check(g1.shown&&g1.ctx==='Первые шаги · 1 из 12'&&g1.title==='Выйди на улицу'&&g1.btn==='👣1',`карточка цели: ${JSON.stringify(g1)}`);
+    check(await ev('PROG.tut.started===true'),'обучение отмечено начатым (иначе на третий день выключится само)');
     await ev('openQuests()');await sleep(200);
     const modal=await ev('({cards:document.querySelectorAll("#qList .rt-card").length,sub:document.querySelector("#qSub").textContent,title:document.querySelector("#qTitle").textContent})');
     check(modal.cards===12&&/^12 коротких шагов/.test(modal.sub)&&modal.title==='Первые шаги',`окно «Первые шаги»: ${JSON.stringify(modal)}`);
@@ -43,7 +48,7 @@ let fails=0;const check=(ok,msg)=>{console.log((ok?'OK  ':'FAIL')+' '+msg);if(!o
     await step(5,null,"cityTrack('visit',{name:'Аптека',kind:'pharmacy',street:''})",'магазин или аптека');
     await step(6,null,"cityTrack('atm')",'банкомат');
     await step(7,null,"cityTrack('walk',{n:400})",'ещё квартал');
-    check(await ev('/Шаг 9 из 12: Под землю/.test((tutShow(),document.querySelector("#hint").textContent))'),'шаг 9 — «Под землю»');
+    const g9=await goal();check(g9.ctx==='Первые шаги · 9 из 12'&&g9.title==='Под землю',`шаг 9 — «Под землю»: ${JSON.stringify(g9)}`);
     await step(8,"cityTrack('bus')","cityTrack('metro',{to:'Кремлёвская'})",'метро');
     // Кремль: здание далеко от Кремля не в счёт; дойти пешком до Кремля — в счёт
     const kr=await ev(`(()=>{const k=world.kremlin;if(!k)return null;loadChunksAround([[k.x,k.y]],1500);let best=-1,bd=1e9;

@@ -36,7 +36,7 @@
       run(){cityYardStory.open(g.person||null);if(g.place&&!cityYardStory.near(g.place))cityYardStory.route();}};
   }});
   root.cityObjectives.register({priority:10,read(){
-    const t=tutStep();return t?{id:t.id,title:t.title,text:t.text,context:'Первые шаги',label:'Посмотреть шаг',run:openQuests}:null;
+    const t=tutStep();return t?{id:t.id,title:t.title,text:t.text,context:`Первые шаги · ${PROG.tut.i+1} из ${tutList().length}`,label:'Посмотреть шаг',run:openQuests}:null;
   }});
   window.addEventListener('territorychange',refresh);
   setInterval(()=>{if(!document.hidden)refresh();},500);

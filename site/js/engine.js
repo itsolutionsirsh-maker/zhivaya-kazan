@@ -23,7 +23,8 @@ function tutActive(){const L=tutList();if(!L.length)return false;PROG.tut=PROG.t
   if(!PROG.tut.started&&(PROG.days.total||1)>2){PROG.tut.end=true;}   // давно играет — обучение не навязываем
   return !PROG.tut.end&&PROG.tut.i<L.length;}
 function tutStep(){return tutActive()?tutList()[PROG.tut.i]:null;}
-function tutShow(){if(window.cityObjectives)return;const t=tutStep();if(!t)return;PROG.tut.started=true;setHint(`👣 Шаг ${PROG.tut.i+1} из ${tutList().length}: ${t.title}. ${t.text||''}`);updateQuestBtn();}
+// с карточкой ближайшей цели (objectives.js) шаг показывает она; «начал обучение» отмечаем всё равно — иначе на третий день оно выключится само
+function tutShow(){const t=tutStep();if(!t)return;PROG.tut.started=true;if(window.cityObjectives){updateQuestBtn();return;}setHint(`👣 Шаг ${PROG.tut.i+1} из ${tutList().length}: ${t.title}. ${t.text||''}`);updateQuestBtn();}
 function tutOn(kind,info,add){const t=tutStep();if(!t||t.check!==kind||!targetOk(t,info))return;PROG.tut.p+=add;if(PROG.tut.p<(t.n||1))return;
   player.money+=50;addEvent(`👣 Готово: «${t.title}» +${fmtMoney(50)}`,'say');tutNext();}
 // шаг «вечер» ждёт, только если сбор уже идёт или начнётся в ближайший игровой час (≈15 минут);
