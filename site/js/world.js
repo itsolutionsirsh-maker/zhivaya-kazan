@@ -141,16 +141,31 @@ function sidewalkPos(node){const p=world.nodes[node];let best=null;for(const e o
 function nodeNear(list,center,R){const adj=list===world.carNodes?world.carAdj:world.pedAdj;const cx=center[0],cy=center[1];const c=[];world.ngrid.query(cx-R,cy-R,cx+R,cy+R,i=>{if(!hasAdj(adj,i))return;const p=world.nodes[i];if((p[0]-cx)**2+(p[1]-cy)**2<R*R)c.push(i);});return c.length?pick(c):pick(list);}
 
 // ---------- A* ----------
-let gArr,stampArr,cameArr,gen=0;
-function astar(adj,start,goal,costFn){
-  if(start<0||goal<0)return null;if(start===goal)return [start];
-  if(!gArr||gArr.length<world.N){const n=Math.ceil(world.N*1.25)+1024;gArr=new Float64Array(n);stampArr=new Int32Array(n);cameArr=new Int32Array(n);gen=0;}   // узлов становится больше, когда подгружаются куски
-  gen++;const nodes=world.nodes,gx=nodes[goal][0],gy=nodes[goal][1];const G=world.g,eh=G.eh,en=G.en,et=G.et,el=G.el,er=G.er,ef=G.ef,m=adj.m,roads=world.roads;
-  const h=new Heap();gArr[start]=0;stampArr[start]=gen;cameArr[start]=-1;h.push(0,start);let iter=0;
-  while(h.size){const [,u]=h.pop();if(u===goal){const path=[];let c=u;while(c!==-1){path.push(c);c=cameArr[c];}return path.reverse();}
-    if(++iter>30000)return null;const gu=gArr[u];
-    for(let e=eh[u];e>=0;e=en[e]){if(!(ef[e]&m))continue;const v=et[e];const ng=gu+el[e]*costFn(roads[er[e]]);if(stampArr[v]!==gen||ng<gArr[v]){stampArr[v]=gen;gArr[v]=ng;cameArr[v]=u;const p=nodes[v];h.push(ng+Math.hypot(p[0]-gx,p[1]-gy)*0.95,v);}}}
-  return null;}
+// Поиск — объект со своими массивами и кучей: обычный (жители, машины, короткий путь игрока) идёт сразу целиком,
+// дальний маршрут игрока — по частям, несколько миллисекунд за кадр (между частями город может подгрузить кусок: граф только растёт, массивы дорастают).
+// Куча — на типизированных массивах (раньше на каждый шаг — маленький массив [f,v]); устаревшие записи (узел уже нашли дешевле) пропускаются,
+// а не разворачиваются заново. Предел — число развёрнутых узлов: 30 000 для жителей и машин, маршрут игрока передаёт свой — по расстоянию.
+class Search{
+  constructor(){this.g=new Float64Array(0);this.st=new Int32Array(0);this.came=new Int32Array(0);this.gen=0;this.hF=new Float64Array(4096);this.hV=new Int32Array(4096);this.hN=0;
+    this.adj=null;this.goal=-1;this.costFn=null;this.cap=0;this.iter=0;}
+  fit(){const N=world.N;if(this.g.length<N){const n=Math.ceil(N*1.25)+1024;const g=new Float64Array(n),st=new Int32Array(n),c=new Int32Array(n);g.set(this.g);st.set(this.st);c.set(this.came);this.g=g;this.st=st;this.came=c;}}
+  push(f,v){if(this.hN>=this.hF.length){const nf=new Float64Array(this.hF.length*2);nf.set(this.hF);this.hF=nf;const nv=new Int32Array(this.hV.length*2);nv.set(this.hV);this.hV=nv;}
+    const F=this.hF,V=this.hV;let i=this.hN++;while(i>0){const p=(i-1)>>1;if(F[p]<=f)break;F[i]=F[p];V[i]=V[p];i=p;}F[i]=f;V[i]=v;}
+  pop(){const F=this.hF,V=this.hV,n=--this.hN,f=F[n],v=V[n];let i=0;for(;;){const l=2*i+1;if(l>=n)break;const m=(l+1<n&&F[l+1]<F[l])?l+1:l;if(F[m]>=f)break;F[i]=F[m];V[i]=V[m];i=m;}F[i]=f;V[i]=v;}
+  begin(adj,start,goal,costFn,maxIter){this.fit();this.gen++;this.adj=adj;this.goal=goal;this.costFn=costFn;this.cap=maxIter||30000;this.iter=0;this.hN=0;
+    this.g[start]=0;this.st[start]=this.gen;this.came[start]=-1;this.push(0,start);}
+  // до steps развёрнутых узлов: путь (узлы) | null — пути нет или предел | undefined — ещё ищем
+  run(steps){this.fit();const nodes=world.nodes,goal=this.goal,gx=nodes[goal][0],gy=nodes[goal][1];const G=world.g,eh=G.eh,en=G.en,et=G.et,el=G.el,er=G.er,ef=G.ef,m=this.adj.m,roads=world.roads;
+    const gA=this.g,st=this.st,came=this.came,gen=this.gen,costFn=this.costFn,cap=this.cap;let n=0;
+    while(this.hN){const u=this.hV[0],f=this.hF[0];this.pop();if(u===goal){const path=[];let c=u;while(c!==-1){path.push(c);c=came[c];}return path.reverse();}
+      const gu=gA[u],pu=nodes[u];if(f>gu+Math.hypot(pu[0]-gx,pu[1]-gy)*0.95)continue;   // устаревшая запись
+      if(++this.iter>cap)return null;
+      for(let e=eh[u];e>=0;e=en[e]){if(!(ef[e]&m))continue;const v=et[e];const ng=gu+el[e]*costFn(roads[er[e]]);if(st[v]!==gen||ng<gA[v]){st[v]=gen;gA[v]=ng;came[v]=u;const p=nodes[v];this.push(ng+Math.hypot(p[0]-gx,p[1]-gy)*0.95,v);}}
+      if(++n>=steps)return undefined;}
+    return null;}
+}
+const SEARCH=new Search();
+function astar(adj,start,goal,costFn,maxIter){if(start<0||goal<0)return null;if(start===goal)return [start];SEARCH.begin(adj,start,goal,costFn,maxIter);return SEARCH.run(Infinity)||null;}
 const pedCost=r=>r.c<=4?1.6:(r.c>=9?0.85:1);
 const carCost=r=>(world.blockedRoads&&world.blockedRoads.has(r.i)?40:1)*(r.c<=4?0.8:(r.c>=7?1.5:1));
 const pathQueue=[];

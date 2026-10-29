@@ -14,7 +14,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await pg.goto(`http://127.0.0.1:${PORT}/index.html`); await pg.waitForFunction('document.querySelector("#loading").hidden === true', null, {timeout: 60000});
     await pg.fill('#pName', 'Тест'); await pg.click('#startBtn'); await sleep(300); await pg.click('#howtoClose'); await sleep(2000);
     const closeCards = () => ev('(()=>{let k=0;while(SIT.card&&k++<6){const c=SIT.card;pickChoice(c,c.choices[c.choices.length-1]);}})()');
-    await ev(`zkSetTime((clock.day-1)*1440+13*60);player.money=20000;FA.t=9999;SIT.timer=1e9;for(let i=0;i<30;i++)folkDistrictTick();`); await closeCards();
+    // история новичка (подходит сама после 6 минут в городе) может перебить карточку соседа; у неё свой набор story.js
+    await ev(`window.zkNoStory=true;zkSetTime((clock.day-1)*1440+13*60);player.money=20000;FA.t=9999;SIT.timer=1e9;for(let i=0;i<30;i++)folkDistrictTick();`); await closeCards();
     console.log('1) места под открытым небом:', await ev(`(()=>{const ids=new Set(cityFolk3.map(f=>f.id));const L=FOLK.list.filter(f=>ids.has(f.id));const o={};for(const f of L){const pl=f.places.work;const k=pl&&pl.open?'на улице':pl&&pl.inside?'внутри':'?';o[k]=(o[k]||0)+1;}
       const ex=['gabbas','bari','hamit','sariya','arslan'].map(id=>{const f=L.find(q=>q.id===id);return f?id+': '+(f.places.work&&f.places.work.name):id+': нет';});return JSON.stringify({работа:o,пример:ex});})()`));
     // подготовить человека: игрок у его места, дождаться, пока появится, поставить в 8 м
@@ -48,6 +49,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     console.log('   дошли вовремя: деньги', st, '→', await ev('player.money'), '|', await ev('feed[0].text'));
     // позвать выпить — вечером; отказ
     await ev(`zkSetTime((clock.day-1)*1440+19*60)`);
+    // в игровое воскресенье (events.js, сезон хоккея) в 19:00 приходит карточка «Матч «Ак Барса»» и занимает место карточки соседа — закрываем её до начала
+    await sleep(800); await closeCards();
     console.log('7) любитель выпить:', JSON.stringify(await go('boris', 'drink_invite')));
     st = await ev('player.drunk||0'); await pickN(1); await sleep(200); console.log('   отказались: опьянение', st, '→', await ev('player.drunk||0'), '(ждём то же)');
     await ev(`zkSetTime(clock.day*1440+13*60)`);

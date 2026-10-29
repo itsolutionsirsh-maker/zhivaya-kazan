@@ -246,8 +246,22 @@ function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.nav
   const smart=!(player.replans>0);   // застряли и ищем путь заново — только по дорожкам
   if(smart&&Math.hypot(wx-player.x,wy-player.y)<450&&clearLine(player.x,player.y,wx,wy)){player.waitingStop=null;player.waypoints=[[wx,wy]];return true;}
   const s=nearestNode(player.x,player.y,world.pedAdj,120),g=nearestNode(wx,wy,world.pedAdj,120);if(s<0||g<0){player.waypoints=null;setHint('Пеший маршрут не найден');return false;}player.waitingStop=null;
-  const path=astar(world.pedAdj,s,g,pedCost);if(!path||!path.length||(path.length===1&&!clearLine(player.x,player.y,wx,wy))){player.waypoints=null;setHint('Пеший маршрут не найден');return false;}
-  const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=smart?cutCorners(wps,player.x,player.y):wps;return true;}
+  // предел шагов поиска — по расстоянию (раньше 30 000 на любой путь: дальше ~8 км маршрут не находился)
+  const ps=world.nodes[s],pg=world.nodes[g],D=dist(ps[0],ps[1],pg[0],pg[1]),cap=Math.max(30000,Math.min(400000,Math.round(D*8)));player.route=null;
+  // далеко — ищем по частям, несколько миллисекунд за кадр (routeTick). Пока ищем, waypoints — пустой список этого поиска:
+  // всё, что останавливает игрока (waypoints=null или новый путь), заодно отменяет и поиск
+  if(D>ROUTE_NEAR){const job=new Search();job.begin(world.pedAdj,s,g,pedCost,cap);player.waypoints=[];player.route={job,wps:player.waypoints,wx,wy,smart};setHint('Прокладываем маршрут…');return true;}
+  const path=astar(world.pedAdj,s,g,pedCost,cap);if(!path||!path.length||(path.length===1&&!clearLine(player.x,player.y,wx,wy))){player.waypoints=null;setHint('Пеший маршрут не найден');return false;}
+  setWalkPath(path,wx,wy,smart);return true;}
+const ROUTE_NEAR=2500;
+function setWalkPath(path,wx,wy,smart){const wps=pathToWaypoints(path,world.pedAdj,'ped');wps.push([wx,wy]);player.waypoints=smart?cutCorners(wps,player.x,player.y):wps;}
+// дальний маршрут: до 4 мс поиска за кадр; не нашли — как раньше, «не найден» (а идущий по навигатору встаёт на паузу)
+function routeTick(){const r=player.route;if(!r)return;
+  if(player.waypoints!==r.wps||player.vehicle||player.bus||player.state==='hurt'||scene!=='city'){player.route=null;return;}
+  const t0=performance.now();let res;do res=r.job.run(1000);while(res===undefined&&performance.now()-t0<4);
+  if(res===undefined)return;player.route=null;
+  if(!res){player.waypoints=null;setHint('Пеший маршрут не найден');navPause();return;}
+  setWalkPath(res,r.wx,r.wy,r.smart);if($('#hint').textContent==='Прокладываем маршрут…')$('#hint').hidden=true;}
 // по прямой можно пройти: нет домов, стен, воды и проезжей части больших улиц (маленькую улицу перейти можно — подождём машины)
 let _water=null;
 function inWater(x,y){if(!_water||_water.src!==world.areas){_water=world.areas.filter(a=>a.k==='water');_water.src=world.areas;}for(const a of _water){if(x<a.bb[0]||x>a.bb[2]||y<a.bb[1]||y>a.bb[3])continue;if(pointInPoly(a.p,x,y))return true;}return false;}
@@ -266,7 +280,7 @@ joy.addEventListener('pointermove',e=>{if(e.pointerId!==joyId)return;let dx=e.cl
 const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyVec=[0,0];joyKnob.style.transform='';};joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
 
 // ---------- обновление игрока ----------
-function updatePlayer(dt){
+function updatePlayer(dt){routeTick();
   if(player.state==='hurt'){player.hurtT+=dt;if(player.hurtT>60&&!cine){addEvent('Скорая доставила вас в больницу');playerToHospital(null);}return;}
   if(player.bus){player.x=player.bus.x;player.y=player.bus.y;return;}
   if(player.vehicle){updateVehicle(dt);return;}

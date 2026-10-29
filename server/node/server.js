@@ -8,7 +8,7 @@
 // остальная толпа — счётчиками по клеткам 10 м (клиент рисует её точками). Поэтому трафик растёт
 // с числом соседей, а не с числом игроков на сервере.
 'use strict';
-const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
+const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto'),os=require('os');
 const {WebSocketServer}=require('ws');
 const VenueRoom=require('../../site/js/venue-room.js');
 const WalletLib=require('./wallet.js');
@@ -465,6 +465,15 @@ function ipOf(req){const peer=String(req.socket&&req.socket.remoteAddress||'x');
   // X-Forwarded-For верим только от Caddy с этой же машины и берём последний адрес — его дописал сам Caddy; первый мог подставить кто угодно
   if(xf&&/^(127\.|::1$|::ffff:127\.)/.test(peer)){const l=String(xf).split(',');return l[l.length-1].trim()||peer;}return peer;}
 const stats={bytesOut:0,msgsOut:0,tickMs:0,since:now()};
+// нагрузка машины для /health: средняя загрузка процессора (1, 5, 15 мин), память (доступно — с учётом кэша), диск под базой, сама игра
+function sysStats(){const o={load:os.loadavg().map(v=>+v.toFixed(2)),cpus:os.cpus().length};
+  try{const mi=fs.readFileSync('/proc/meminfo','utf8');const g=k=>{const m=mi.match(new RegExp('^'+k+':\\s+(\\d+)','m'));return m?Math.round(+m[1]/1024):null;};
+    o.memMB={total:g('MemTotal'),avail:g('MemAvailable'),swap:g('SwapTotal'),swapFree:g('SwapFree')};}
+  catch(e){o.memMB={total:Math.round(os.totalmem()/1048576),avail:Math.round(os.freemem()/1048576)};}
+  const mu=process.memoryUsage(),cu=process.cpuUsage();o.gameMB={rss:Math.round(mu.rss/1048576),heap:Math.round(mu.heapUsed/1048576)};
+  o.gameCpuPct=+((cu.user+cu.system)/1e6/Math.max(1,process.uptime())*100).toFixed(1);   // в среднем с запуска, от одного ядра
+  try{const st=fs.statfsSync(DATA);o.diskMB={free:Math.round(st.bavail*st.bsize/1048576),total:Math.round(st.blocks*st.bsize/1048576)};}catch(e){}
+  return o;}
 const server=http.createServer((req,res)=>{handleReq(req,res).catch(e=>{log('ошибка запроса',req.method,String(req.url).slice(0,80),e&&e.stack||e);
   try{if(!res.headersSent){res.writeHead(500,{'Content-Type':'application/json; charset=utf-8'});res.end('{"err":"server"}');}else res.destroy();}catch(_){}});});
 async function handleReq(req,res){
@@ -492,7 +501,7 @@ async function handleReq(req,res){
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
-  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),llmToday:llmDay.total,uptime:Math.round(process.uptime())});}
+  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats()});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
   // карта всей Казани кусками собирается на сервере (tools/citymap.sh) в MAP_DIR и отдаётся по /map/…
   let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
@@ -551,7 +560,7 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
     const msg={t:'w'};let any=false;if(pos.length){msg.p=pos;any=true;}if(meta.length){msg.m=meta;any=true;}if(gone.length){msg.g=gone;any=true;}
     if(tick%10===p.sid%10){msg.n=players.size;any=true;if(!p.room&&total>VIEW_K){msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=!p.room&&total>VIEW_K;}
     if(any)wsSend(p,msg);}
-  stats.tickMs=stats.tickMs*0.9+Number(process.hrtime.bigint()-t0)/1e6*0.1;},200).unref();
+  stats.tickMs=stats.tickMs*0.9+Number(process.hrtime.bigint()-t0)/1e6*0.1;if(players.size>(stats.peak||0))stats.peak=players.size;},200).unref();
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();
 setInterval(()=>{stats.bytesOut=0;stats.msgsOut=0;stats.since=now();},60000).unref();
 
