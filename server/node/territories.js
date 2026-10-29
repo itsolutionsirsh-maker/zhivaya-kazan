@@ -1,8 +1,9 @@
 'use strict';
 const Rules=require('../../site/js/territory-core.js');
 const crypto=require('crypto');
+const Yard=require('./yard-story'),Story=require('../../site/js/yard-story-data');
 const SWITCH_MS=30*60e3,ENCOUNTER_MS=10*60e3,EXPIRE_MS=5*60e3;
-const fresh=()=>({rev:0,member:null,standing:0,switchAt:0,nextAt:0,practiceAt:0,active:null,history:[],requests:[]});
+const fresh=()=>({rev:0,member:null,standing:0,switchAt:0,nextAt:0,practiceAt:0,active:null,story:null,history:[],requests:[]});
 const copy=x=>JSON.parse(JSON.stringify(x));
 
 function sqliteBackend(db){
@@ -18,7 +19,7 @@ function jsonBackend(file,fs){
     fs.writeFileSync(file+'.tmp',JSON.stringify(next),{mode:0o600});fs.renameSync(file+'.tmp',file);rows=next;
   }};
 }
-function Territories(backend,{now=Date.now,random=Math.random,uid=()=>crypto.randomBytes(12).toString('hex')}={}){
+function Territories(backend,{now=Date.now,random=Math.random,uid=()=>crypto.randomBytes(12).toString('hex'),onStory=()=>{}}={}){
   function view(s,loc){const out=copy(s);delete out.requests;if(out.active)delete out.active.roll;
     return {ok:1,state:out,location:loc?loc.id:null,homeBonus:Rules.multiplier(s.member,loc&&loc.id)};
   }
@@ -35,13 +36,17 @@ function Territories(backend,{now=Date.now,random=Math.random,uid=()=>crypto.ran
     if(s.active&&t>=s.active.expires){finish(s,'expired',t);s.rev++;backend.put(key,s);}
     const op=body.op||'status',fail=err=>Object.assign(view(s,loc),{ok:0,err});
     if(op==='status')return view(s,loc);
-    if(!['join','leave','start','choice'].includes(op))return fail('operation');
+    if(!['join','leave','start','choice','story'].includes(op))return fail('operation');
     if(typeof body.request!=='string'||!/^[a-f0-9]{24,40}$/.test(body.request))return fail('request');
-    const signature=JSON.stringify([op,body.member||null,body.encounter||null,body.choice||null,body.mode||null]);
+    const parts=[op,body.member||null,body.encounter||null,body.choice||null,body.mode||null];
+    if(op==='story')parts.push(body.step||null,body.person||null);
+    const signature=JSON.stringify(parts);
     const prior=s.requests.find(r=>r.id===body.request);
     if(prior)return prior.signature===signature?view(s,loc):fail('request_reused');
     if(body.rev!==s.rev)return fail('conflict');
-    if(op==='join'){
+    if(op==='story'){
+      const err=Yard.apply(s,body,valid?pose:null,meta,loc,t);if(err)return fail(err);
+    }else if(op==='join'){
       if(!Rules.get(body.member))return fail('faction');
       if(s.member||s.active)return fail('already_member');
       if(t<s.switchAt)return fail('switch_cooldown');
@@ -65,14 +70,17 @@ function Territories(backend,{now=Date.now,random=Math.random,uid=()=>crypto.ran
         power:Rules.encounterPower(s.member,loc.id,opponent),roll:random(),expires:t+EXPIRE_MS};
     }else{
       const e=s.active;if(!e||e.id!==body.encounter)return fail('encounter');
-      if(!['talk','pass','stand','leave'].includes(body.choice)||(body.choice==='pass'&&e.phase!=='talk')||(body.choice==='talk'&&e.phase!=='greeting'))return fail('choice');
+      if(!['talk','pass','stand','leave','friend'].includes(body.choice)||(body.choice==='pass'&&e.phase!=='talk')||(body.choice==='talk'&&e.phase!=='greeting'))return fail('choice');
+      if(body.choice==='friend'&&(e.training||!Story.passage(s.story,e.district)))return fail('choice');
       if(body.choice==='leave')finish(s,'left',t);
       else if(!loc||loc.id!==e.district||Math.hypot(pose.x-e.x,pose.y-e.y)>80)return fail('return_to_meeting');
       else if(body.choice==='talk')e.phase='talk';
+      else if(body.choice==='friend')finish(s,'vouched',t);
       else if(body.choice==='pass')finish(s,'peace',t);
       else finish(s,e.roll<e.power.chance?'won':'lost',t);
     }
     s.rev++;s.requests.push({id:body.request,signature});s.requests=s.requests.slice(-16);backend.put(key,s);
+    if(op==='story')try{onStory(key,body.step==='visit'?'return':s.story.stage==='done'?'end'+s.story.ending:s.story.stage);}catch(_){}
     return view(s,loc);
   }
   // Called inside the account/wallet reset transaction on SQLite. Keep revision monotonic.

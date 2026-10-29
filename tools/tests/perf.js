@@ -9,6 +9,7 @@ const {stageCityLook} = require('./city-look-fixtures');
 const {stageVenueLook} = require('./venue-look-fixtures');
 const {stageSharedVenue} = require('./shared-venues-fixtures');
 const {stageTerritoryScene} = require('./territory-fixtures');
+const {stageYardStory} = require('./yard-story-fixtures');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function measure(dir, port) {
   const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
@@ -63,6 +64,12 @@ async function measure(dir, port) {
       const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
       if(result.completed_frames<2)throw new Error('No completed territory frames');
       out.scenes['районы, '+kind]={...result,fixtures};
+    }
+    for(const kind of ['choice','ending']){
+      const fixtures=await pg.evaluate(stageYardStory,{kind});await sleep(1500);
+      const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
+      if(result.completed_frames<2)throw new Error('No completed chapter frames');
+      out.scenes['чужой двор, '+kind]={...result,fixtures};
     }
     if (errors.length) throw new Error(errors.join('\n'));
     return out;

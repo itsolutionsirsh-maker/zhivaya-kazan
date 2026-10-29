@@ -314,6 +314,24 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 #alertMin{grid-row:1;grid-column:2;min-height:36px;padding:4px 12px;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:10px;font:inherit;font-size:13px;cursor:pointer}
 #alertBar.min{right:auto;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);padding:6px 8px 6px 12px}
 #alertBar.min #alertText,#alertBar.min #alertSrc{display:none}
+/* Chapter journal: readable dialogue, visible close/route controls on small phones. */
+#yardModal .box{width:min(620px,calc(100vw - 24px));max-width:620px;max-height:calc(100dvh - 24px);overflow:hidden}
+#yardModal .ui-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}
+#yardModal .ui-sheet-close{width:44px;height:44px;flex:none;display:grid;place-items:center}
+#yardModal .ui-sheet-body{display:block;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#yardModal .ui-sheet-foot{display:block;flex:none}
+#yardText{white-space:pre-line;font-size:16px;line-height:1.65}
+#yardSpeaker{color:#e6ba77;font-weight:700}
+#yardPlace{font-size:13px;line-height:1.5;color:var(--muted)}
+#yardChoices{display:grid;gap:10px;margin:16px 0}
+#yardModal .btn{white-space:normal;min-height:44px;overflow-wrap:anywhere}
+#yardChoices .btn{text-align:left;padding:12px}
+#yardChoices .btn:disabled{opacity:.5}
+#yardNotice{color:#ffce88;line-height:1.5}
+#yardContacts summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
+.yard-person{border-left:3px solid var(--person-color);padding:8px 12px;margin:10px 0;background:#ffffff08;border-radius:0 10px 10px 0}
+.yard-person p{font-size:13px;line-height:1.5}
+@media(max-width:680px){#yardModal .box{width:100%;max-height:var(--ui-visible-height,100dvh)}#yardModal .ui-sheet-foot .row{display:flex;flex-wrap:wrap;gap:8px}#yardModal .ui-sheet-foot .btn{flex:1;min-width:115px}#yardModal h2{font-size:19px}}
 </style>
 
 <canvas id="map"></canvas>
@@ -511,6 +529,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
   <div class="box">
     <h2>Живая Казань</h2>
     <div class="row"><button class="btn primary" id="neighbourStoryBtn">📚 История соседки</button><button class="btn" id="territoryBtn">🗺 Районы и группировки</button></div>
+    <div class="row"><button class="btn primary" id="yardStoryBtn">🏀 Чужой двор · история двух районов</button></div>
     <p>Прототип городской симуляции: реальные улицы, дома и маршруты центра Казани из OpenStreetMap, жители-боты, транспорт, происшествия и интерьеры.</p>
     <div class="legend">
       <kbd>WASD</kbd><span>идти (Shift — бежать), клик по карте — пойти туда</span>
@@ -549,9 +568,18 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <button class="btn" id="territoryRetry" hidden>Повторить действие</button>
     <button class="btn" id="territoryTrain" hidden>Учебный спарринг дома · без потерь</button>
     <button class="btn" id="territoryResume" hidden>Продолжить встречу</button>
-    <p id="territoryHistory"></p>
+    <p id="territoryHistory"></p><button class="btn" id="territoryStoryBtn">🏀 История «Чужой двор»</button>
   </div></div>
   <div class="row"><button class="btn" id="territoryClose">Закрыть</button><button class="btn" id="territoryRefresh">Обновить</button><button class="btn" id="territoryLeave" hidden>Выйти из группировки</button></div>
+</div></div>
+<div class="modal" id="yardModal" hidden><div class="box">
+  <h2 id="yardTitle">Чужой двор</h2>
+  <p id="yardProgress" class="territory-intro"></p><p id="yardSpeaker"></p>
+  <p id="yardText"></p><p id="yardPlace"></p>
+  <div id="yardChoices"></div><p id="yardNotice" role="status" aria-live="polite"></p>
+  <button class="btn" id="yardRetry" hidden>Повторить действие</button>
+  <details id="yardContacts"><summary>Знакомые и их отношение</summary><div id="yardPeople"></div></details>
+  <div class="row"><button class="btn" id="yardClose">Продолжить позже</button><button class="btn primary" id="yardRoute">Маршрут</button></div>
 </div></div>
 <div class="modal" id="territoryMeeting" hidden><div class="box">
   <h2 id="territoryMeetingTitle">Чужой двор</h2><p id="territoryMeetingText"></p><p id="territoryPower"></p>
@@ -591,7 +619,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/daily.js"></script>
 <script src="js/quests.js"></script>
 <script src="js/shop.js"></script>
-<script src="js/districts.js"></script><script src="js/district-bounds.js"></script><script src="js/territory-core.js"></script>
+<script src="js/districts.js"></script><script src="js/district-bounds.js"></script><script src="js/territory-core.js"></script><script src="js/yard-story-data.js"></script>
 <script src="js/events.js"></script>
 <script src="js/people.js"></script>
 <script src="js/story-ui.js"></script><script src="js/phone.js"></script>
@@ -599,4 +627,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
-<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/realworld.js"></script><script src="js/ui.js"></script>
+<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/realworld.js"></script><script src="js/ui.js"></script>

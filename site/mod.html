@@ -22,7 +22,7 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <div class="row"><input id="tok" type="password" placeholder="Ключ модератора" autocomplete="off"><button class="go" id="load">Обновить</button></div>
 <p class="msg" id="st"></p>
 <h2>Цифры по дням (время московское)</h2><p class="msg" id="sum"></p><p class="msg" id="boot"></p><p class="msg" id="llm"></p><div class="wrap"><table id="days"></table></div><p class="msg" id="srcs"></p>
-<h2>Истории новичка (сколько устройств дошло до шага, за 3 недели)</h2><div class="wrap"><table id="funnel"></table></div>
+<h2>Истории (за 3 недели; новичок — устройства, «Чужой двор» — аккаунты)</h2><div class="wrap"><table id="funnel"></table></div>
 <h2>Жалобы (новые сверху)</h2><div id="reps"></div>
 <h2>Отключён чат (после жалоб)</h2><div id="mutes"></div>
 <h2>Баны</h2><div id="bans"></div>
@@ -66,12 +66,12 @@ async function loadStats(){let j;try{j=await call({do:'stats',days:21});}catch(e
     `Загрузка игры за сутки, ${b.n} заходов (из Телеги ${b.tg}, медленный интернет ${b.slow}), от открытия страницы: скрипты — ${pair('scripts')}; карта улиц пришла — ${pair('base')}; построена — ${pair('build')}; дома вокруг — ${pair('chunks')}; игра на экране — ${pair('shown')}.`;
   const T=$('#days');T.innerHTML='';const h=el('tr');for(const t of ['День','Игроков','Новых','Вернулись на 2-й день','Вернулись через неделю'])h.append(el('th',null,t));T.append(h);
   for(const r of j.rows){const tr=el('tr');tr.append(el('td',null,r.d.slice(8)+'.'+r.d.slice(5,7)),el('td',null,String(r.dau)),el('td',null,String(r.nu)),el('td',null,pc(r.r1,r.nu,r.r1ready)),el('td',null,pc(r.r7,r.nu,r.r7ready)));T.append(tr);}
-  {const F=$('#funnel');F.innerHTML='';const NAMES={plates:'Тарелочница',clofelin:'Клофелинщики'};
+  {const F=$('#funnel');F.innerHTML='';const NAMES={plates:'Тарелочница',clofelin:'Клофелинщики',foreignyard:'Чужой двор (аккаунты)'};
     const ORDER=['offer','refused','go','inside','asked','menu','nodrink','bartender','bill','guard','drink','avoided','called','caught','bank','police','witness','prosecutor','done'];
     const RU={offer:'подошли',refused:'отказался',go:'пошёл',inside:'внутри',asked:'спросил цены',menu:'настоял на меню',nodrink:'не стал пить',bartender:'отошёл к стойке',bill:'дошло до счёта',guard:'охрана',drink:'выпил',avoided:'ушёл вовремя',called:'вызвал 112',caught:'попался',bank:'банк',police:'заявление',witness:'свидетель',prosecutor:'прокурор',done:'дело закрыто'};
     const by={};for(const r of j.funnel||[]){(by[r.s]=by[r.s]||{})[r.st]=r.n;}
     if(!Object.keys(by).length){const tr=el('tr');tr.append(el('td','msg','Пока никто не дошёл до историй'));F.append(tr);}
-    for(const s of Object.keys(by)){const h=el('tr');h.append(el('th',null,NAMES[s]||s),el('th',null,''));F.append(h);for(const st of ORDER)if(by[s][st]){const tr=el('tr');tr.append(el('td',null,RU[st]||st),el('td',null,String(by[s][st])));F.append(tr);}}}
+    for(const s of Object.keys(by)){const h=el('tr');h.append(el('th',null,NAMES[s]||s),el('th',null,''));F.append(h);for(const st of (s==='foreignyard'?['promise','kit','welcome','repair','call','finale','endhome','endaway','endbridge','return']:ORDER))if(by[s][st]){const tr=el('tr');tr.append(el('td',null,(s==='foreignyard'?{promise:'принял приглашение',kit:'поговорил с Тимуром',welcome:'подготовил составы',repair:'встретил Артура',call:'помог на площадке',finale:'выбрал сторону',endhome:'финал: двор Тимура',endaway:'финал: компания Артура',endbridge:'финал: независимый',return:'вернулся к знакомым'}[st]:RU[st])||st),el('td',null,String(by[s][st])));F.append(tr);}}}
   $('#srcs').textContent=j.src.length?'Откуда пришли (3 недели): '+j.src.map(s=>`${s.src||'—'} ${s.n}`).join(' · '):'';}
 // кошелёк: баланс, журнал, начислить/списать (номер операции на форму — повторный клик не начислит дважды)
 const KIND={init:'начало',local:'игра',xfer:'перевод',mod:'модератор',grant:'начисление',reset:'заново'};

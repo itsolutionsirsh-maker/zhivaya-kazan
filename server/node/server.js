@@ -139,7 +139,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
 // Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
 const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
 setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
-const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sqliteBackend(store.db):TerritoryLib.jsonBackend(path.join(DATA,'territories.json'),fs));
+const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sqliteBackend(store.db):TerritoryLib.jsonBackend(path.join(DATA,'territories.json'),fs),{onStory:(key,stage)=>store.funnel('foreignyard',stage,sha('yard:'+key).slice(0,16),mskDay())});
 // Resolve the same projection served to the client. A missing map disables territory actions.
 let territoryMeta=null,territoryMapFile='';
 function getTerritoryMeta(){const file=mapDir()?path.join(MAP_DIR,'base.json'):path.join(ROOT,'kazan.json');
@@ -500,7 +500,7 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
     if(a==='city')return send(res,200,realworld.snapshot());
