@@ -139,9 +139,13 @@ function memContext(){const S=memState();const ds=S.deeds.filter(x=>clock.day-x.
   return ds.length?` Что в городе говорят о собеседнике: ${ds.map(memSummary).join('; ')}. Можешь мимоходом вспомнить, если к слову, но не допрашивай.`:'';}
 
 // ---------- погода в репликах жителей (weather-lines.js) ----------
-function memWeatherKind(){const m=(typeof mskDate==='function'?Number(mskDate().slice(5,7)):0)||0;const winter=m===12||m<=2,cold=m===11||m===3;
+function memWeatherKind(){if(weather.real&&typeof rwWeatherKey==='function'){const k=rwWeatherKey();if(k==='snow'&&memFirstSnow())return 'firstsnow';return k;}
+  const m=(typeof mskDate==='function'?Number(mskDate().slice(5,7)):0)||0;const winter=m===12||m<=2,cold=m===11||m===3;
   if(weather.kind==='rain')return cold||winter?'ice':'rain';if(winter)return weather.kind==='cloudy'?'snow':'frost';if(cold)return weather.kind==='cloudy'?'wind':'frost';
   if(m>=6&&m<=8&&weather.kind==='clear'&&cityHour()>11&&cityHour()<18)return 'heat';return weather.kind==='cloudy'?'wind':null;}
+// первый снег за зиму — один раз на устройство и зиму
+function memFirstSnow(){const d=typeof mskDate==='function'?mskDate():'';const y=+d.slice(0,4),m=+d.slice(5,7);const winter=String(m>=7?y:y-1);   // зима 2026/27 — «2026»let seen='';try{seen=localStorage.getItem('zk.firstSnow')||'';}catch(e){}
+  if(seen===winter)return false;try{localStorage.setItem('zk.firstSnow',winter);}catch(e){}return true;}
 function memWeatherLine(){const k=memWeatherKind();if(!k)return null;const W=(window.cityWeatherLines||[]).find(x=>x&&x.when===k);return W&&W.lines&&W.lines.length?pick(W.lines):null;}
 
 // ---------- подключение ----------

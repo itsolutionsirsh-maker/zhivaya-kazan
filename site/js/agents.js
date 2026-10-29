@@ -44,7 +44,7 @@ class Walker{
       case 'approach':{const sl=this.rallySlot;if(!sl){this.state='idle';this.ttl=1;return;}const d=dist(this.x,this.y,sl[0],sl[1]);const st=this.spd*dt;if(d<=st){this.x=sl[0];this.y=sl[1];this.state='rally';rallyFace(this);return;}this.hx=(sl[0]-this.x)/d;this.hy=(sl[1]-this.y)/d;this.x+=this.hx*st;this.y+=this.hy*st;this.phase+=dt*8;return;}
       case 'walk':if(this.rallySlot){this.losT=(this.losT||0)-dt;if(this.losT<=0){this.losT=0.6;const sl=this.rallySlot;const d=dist(this.x,this.y,sl[0],sl[1]);if(d<35||(d<110&&clearLine(this.x,this.y,sl[0],sl[1]))){this.path=null;this.state='approach';return;}}}break;
       default:return;}
-    let step=this.spd*dt*(weather.kind==='rain'?1.2:1);this.phase+=dt*7*(this.spd/2.4);
+    let step=this.spd*dt*(weather.kind==='rain'?1.2:weather.ice?0.8:weather.kind==='snow'?0.9:1);this.phase+=dt*7*(this.spd/2.4);
     while(step>0){const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1]);
       if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
@@ -86,7 +86,7 @@ class Car{
     if(this.state!=='drive')return;
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
     const r=edgeRoad(this.siren()?world.emAdj:world.carAdj,a,b);
-    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(weather.kind==='rain')vlim*=0.85;if(r&&r.jam&&!this.siren())vlim=Math.min(vlim,2.5);   // день матча: подъезды к арене стоят (matchday.js)
+    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(!this.siren())vlim*=typeof roadSlow==='function'?roadSlow(r):(weather.kind==='rain'?0.85:1);if(r&&r.jam&&!this.siren())vlim=Math.min(vlim,2.5);   // день матча: подъезды к арене стоят (matchday.js)
     const rem=L-this.t;if(rem<14&&this.seg+2<this.path.length){const pc=world.nodes[this.path[this.seg+2]];const L2=dist(pb[0],pb[1],pc[0],pc[1])||1;const d2x=(pc[0]-pb[0])/L2,d2y=(pc[1]-pb[1])/L2;const cos=dx*d2x+dy*d2y;if(cos<0.85)vlim=Math.min(vlim,(this.siren()?6.5:4)+cos*3);}
     // спецмашина у места ДТП: встаёт рядом, даже если впереди зеваки или сам пострадавший
     if(this.siren()&&this.sceneXY&&dist(this.x,this.y,this.sceneXY[0],this.sceneXY[1])<16){this.speed=0;this.path=null;this.onArrive();return;}
@@ -170,7 +170,7 @@ function updateRoadPeds(){roadPeds=[];activeCrossings=[];
   if(typeof companion!=='undefined'&&companion&&!companion.w.inside&&onCarriageway(companion.w.x,companion.w.y))roadPeds.push({x:companion.w.x,y:companion.w.y,ref:companion.w});
   for(const w of walkers){if(w.bus)continue;if(w.state==='cross'||w.state==='hurt'){roadPeds.push({x:w.x,y:w.y,ref:w,hurt:w.state==='hurt'});}
     else if(w.state==='walk'&&dist(w.x,w.y,player.x,player.y)<320){world.cgrid.query(w.x-5,w.y-5,w.x+5,w.y+5,c=>{if(onZebra(c,w.x,w.y)&&!activeCrossings.includes(c))activeCrossings.push(c);});}}
-  const h=(clock.minutes/60)%24;carSee=(h<6||h>=21)?11:16;if(weather.kind==='rain')carSee-=3;}
+  const h=(clock.minutes/60)%24;carSee=(h<6||h>=21)?11:16;if(weather.kind==='rain'||weather.kind==='snow')carSee-=3;else if(weather.kind==='fog')carSee-=6;}
 
 // ---------- происшествия ----------
 let accidentTimer=rnd(40,80);

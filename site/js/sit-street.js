@@ -139,7 +139,7 @@ defSit('dog',{title:'Пропала собака',auto:true,weight:1.5,cool:900,
 // ---------- уличный музыкант ----------
 const BUSK_NOTES=['♪ ♫ ♪','♫ (играет Цоя) ♫','♪ (что-то татарское, душевное) ♪','♫ ♪ ♫','♪ (перебор на гитаре) ♪'];
 defSit('busker',{title:'Уличный музыкант',auto:true,weight:2,cool:500,quiet:true,
-  when(){const h=(clock.minutes/60)%24;return onFootCity()&&h>=10&&h<23&&weather.kind!=='rain';},
+  when(){const h=(clock.minutes/60)%24;return onFootCity()&&h>=10&&h<23&&weather.kind!=='rain'&&weather.kind!=='snow'&&!(weather.t!=null&&weather.t<-10);},
   start(s){const m=findWalker(15,70);if(!m)return false;takeActor(s,m);s.m=m;m.p.job='уличный музыкант, играет на гитаре';s.notesT=0;s.maxT=200;
     let k=0;for(const w of walkers){if(k>=6)break;if(w===m||w.bus||w.inside||w.sitBy||w.companion||w.rally||w.role!=='resident'||w.state==='hurt'||w===chatNpc)continue;if(w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,m.x,m.y)>45)continue;
       takeActor(s,w);const an=Math.atan2(player.y-m.y,player.x-m.x)+(k-2.5)*0.45;const R=rnd(2.6,3.8);let tx=m.x+Math.cos(an)*R,ty=m.y+Math.sin(an)*R;if(inBuilding(tx,ty)){tx=m.x-Math.cos(an)*R;ty=m.y-Math.sin(an)*R;}moveActor(w,tx,ty,1.8);k++;}

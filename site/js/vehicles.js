@@ -86,7 +86,7 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   const ns=nearestRoadSeg(v.x,v.y,16);const onRoad=!!(ns&&ns.d<ns.seg.r.hw+1.8);let vmax=s.vmax;if(v.kind==='own'&&typeof carSpeedMul==='function')vmax*=carSpeedMul();
   const boost=(keys.shift||keys.ShiftLeft)&&!v.auto;   // Shift — «газ в пол»: можно превысить, а камеры это заметят
   if(!isLightVehicle(v.kind)){vmax=onRoad?(boost?Math.min(vmax*1.45,(ns.seg.r.speed||8)*1.75+3):Math.min(vmax,(ns.seg.r.speed||8)*1.3+2)):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
-  if(weather.kind==='rain')vmax*=0.85;v.onRoad=onRoad;
+  vmax*=weather.ice?0.65:weather.kind==='snow'?0.75:(weather.kind==='rain'||weather.kind==='fog')?0.85:1;v.onRoad=onRoad;
   if(v.auto){const a=v.auto;const look=s.len>3?5:3;while(a.i<a.wps.length-1&&dist(a.wps[a.i][0],a.wps[a.i][1],v.x,v.y)<look)a.i++;
     const tp=a.wps[a.i];const dT=dist(tp[0],tp[1],v.x,v.y);
     if(a.i>=a.wps.length-1&&dT<2.5){v.auto=null;v.speed=0;if(v.kind==='taxi'){exitVehicle();return;}setHint('Приехали. E — выйти');}

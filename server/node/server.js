@@ -13,6 +13,7 @@ const {WebSocketServer}=require('ws');
 const VenueRoom=require('../../site/js/venue-room.js');
 const WalletLib=require('./wallet.js');
 const TerritoryLib=require('./territories.js');
+const RealWorldLib=require('./realworld.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -143,6 +144,8 @@ const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sq
 let territoryMeta=null,territoryMapFile='';
 function getTerritoryMeta(){const file=mapDir()?path.join(MAP_DIR,'base.json'):path.join(ROOT,'kazan.json');
   if(file!==territoryMapFile||!territoryMeta){try{territoryMeta=JSON.parse(fs.readFileSync(file,'utf8')).meta;territoryMapFile=file;}catch(e){return null;}}return territoryMeta;}
+// настоящая Казань: погода MET Norway и тревоги ГУ МЧС по РТ (server/node/realworld.js); RW_OFF=1 — выключить (проверки без сети)
+const realworld=RealWorldLib.RealWorld({fs,file:path.join(DATA,'realworld.json'),log,off:ENV.RW_OFF==='1',weatherUrl:ENV.RW_WEATHER_URL,alertUrl:ENV.RW_ALERT_URL,alertEvery:+ENV.RW_ALERT_EVERY_MS||0});
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
@@ -329,6 +332,7 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
   if(key.length<16||!safeEq(got,key))return {err:'forbidden'};
   const t=now();const target=idstr(body.target||'');const act=String(body.do||'list');
   if(act==='stats')return statsOut(Math.min(60,Math.max(7,+body.days||14)));
+  if(act==='city')return body.mode?realworld.moderate(body):Object.assign({ok:1},realworld.status(),realworld.snapshot());
   if(act==='ban'&&target.length>=8){const h=Math.max(0,+body.hours||0);const until=h?t+h*3600:0;const pl=players.get(target);modState.bans[target]={until,why:clean(body.why,120),t:Math.floor(t)};
     if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
   if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
@@ -499,6 +503,7 @@ async function handleReq(req,res){
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
+    if(a==='city')return send(res,200,realworld.snapshot());
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod')return send(res,200,modAdmin(req,body));
@@ -548,6 +553,8 @@ function gzLater(file,gzf){if(GZ_BUSY.has(file)||GZ_BUSY.size>=2||(GZ_FAIL.get(f
 // ---------- WebSocket ----------
 const wss=new WebSocketServer({server,path:'/ws',maxPayload:16*1024,perMessageDeflate:false});
 function wsSend(p,obj){const ws=p.ws;if(!ws||ws.readyState!==1||ws.bufferedAmount>256*1024)return;const s=JSON.stringify(obj);stats.bytesOut+=s.length;stats.msgsOut++;ws.send(s);}
+// тревога МЧС, отбой или новая погода — сразу всем, кто в игре (остальные узнают при опросе a=city раз в 2 минуты)
+realworld.onChange=snap=>{for(const p of players.values())wsSend(p,Object.assign({t:'city'},snap));};
 wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws.on('pong',()=>{ws.isAlive=true;});
   if(!allow('wsconn:'+ip,ENV.WS_CONN_PER_MIN?+ENV.WS_CONN_PER_MIN:20,60)){ws.close(1008,'rate');return;}
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
@@ -600,6 +607,7 @@ function summary(){const st=statsOut(9);if(!st.ok)return;const y=st.rows[1],w=st
 function dailyTick(){const d=mskDay(),h=mskHour();if(h>=4&&daily.backup!==d)doBackup();if(h>=9&&daily.summary!==d){daily.summary=d;try{fs.writeFileSync(DAILYF,JSON.stringify({summary:d}));}catch(e){}summary();}}
 setInterval(dailyTick,300000).unref();setTimeout(dailyTick,60000).unref();
 
+realworld.start();
 server.listen(PORT,()=>{log(`Живая Казань: http://localhost:${PORT} · игра из ${ROOT} · аккаунты: ${store.kind} · ИИ: ${!LLM.key?'выключен (нет ключа Claude на /setup)':!AnthropicSDK?'выключен (не установлен пакет @anthropic-ai/sdk — npm ci в server/node)':LLM.model+' (лимит '+LLM.perPlayerDay+'/игрок/день, '+LLM.perDay+'/день)'} · Телега: ${TG_TOKEN?'да':'нет'}`);tgSetup();});
 // остановка: JSON-хранилища (если без SQLite) дописать на диск — подтверждённые игрокам деньги не теряются
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>{try{wallet.flush();}catch(e){}try{if(store.flush)store.flush();}catch(e){}process.exit(0);});
