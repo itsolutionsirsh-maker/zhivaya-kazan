@@ -79,7 +79,7 @@
     $id('territoryMeetingClose').textContent=e?'Уйти без конфликта':'Продолжить прогулку';
     if(!e){const h=state&&state.history[0];$id('territoryMeetingText').textContent=h?ending(h):'Встреча завершена.';$id('territoryPower').textContent='';renderButtons();return;}
     $id('territoryMeetingTitle').textContent=(e.training?'Спарринг дома · ':'Чужой двор · ')+R.get(e.district).name;
-    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». Артур останавливается: «Ты к кому? Здесь наши дворы».':'«По делу пришёл — скажи спокойно. Или хочешь что-то доказать?» За спиной Артура второй парень молча ждёт вашего ответа.';
+    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». Артур останавливается: «Ты к кому? Здесь наши дворы».':'«Если по делу — скажи спокойно. Или хочешь что-то доказать?» За спиной Артура второй парень молча ждёт вашего ответа.';
     $id('territoryPower').textContent='Ваша сила: '+e.power.player+' · двое соперников: '+e.power.locals+(e.training?' (домашний бонус +20% у вас).':' (домашний бонус +20% у местных).')+' Шанс выстоять: '+Math.round(e.power.chance*100)+'%. Бонус закреплён до конца встречи.';
     for(const [choice,label] of (e.training?[['stand','Начать учебный спарринг']]:e.phase==='greeting'?[['talk','Поговорить спокойно'],['stand','Принять вызов · риск потерять уважение']]:[['pass','Объяснить: я здесь по своим делам'],['stand','Всё же принять вызов']])){
       const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.addEventListener('click',()=>request('choice',{encounter:e.id,choice}));choices.append(b);
@@ -89,8 +89,10 @@
     if(!modal.hidden)closeMap();busyBefore=player.busy;meetingId=state.active.id;player.busy=true;meeting.hidden=false;notice('');renderMeeting();
     actorSit=startSit('territoryActors',{encounter:state.active});
   }
+  // площадь или парк без дорожек рядом: ставим местных просто в паре шагов, где нет дома (иначе встреча шла без людей)
+  function nearFree(i){for(let k=0;k<8;k++){const a=i*2.4+k*0.8,x=player.x+Math.cos(a)*4,y=player.y+Math.sin(a)*4;if(!inBuilding(x,y))return [x,y];}return null;}
   defSit('territoryActors',{start(s){const e=s.encounter;for(let i=0;i<2;i++){
-      const q=spotNear(3,14);if(!q)continue;const n=nearestNode(q[0],q[1],world.pedAdj,60);if(n<0)continue;
+      const q=spotNear(3,14)||spotNear(8,40)||nearFree(i);if(!q)continue;const n=nearestNode(q[0],q[1],world.pedAdj,300);if(n<0)continue;
       const w=new Walker('resident',n);w.temp=true;w.x=q[0];w.y=q[1];w.p.name=i?'Руслан':'Артур';w.p.female=false;w.p.job=R.factions[e.opponent].name;w.p.clothes=R.factions[e.opponent].color;
       walkers.push(w);takeActor(s,w);faceTo(w,player.x,player.y);
     }return true;}});
