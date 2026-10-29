@@ -47,7 +47,15 @@ window.cityQuests=[
   {id:'winter-atm', lvl:1, season:'2026-12', xp:40, title:'Наличные на варежки', text:'Зайди к банкомату.', check:'atm', n:1, reward:{money:40}},
   {id:'winter-evening', lvl:3, season:'2026-12', xp:40, title:'Зимний вечер', text:'Приди на вечернее событие.', check:'event', n:1, reward:{money:100, mood:8}},
   {id:'winter-taxi', lvl:2, season:'2026-12', xp:40, title:'Такси по гололёду', text:'Доедь на такси.', check:'taxi', n:1, reward:{money:70}},
-  {id:'winter-two-teas', lvl:2, season:'2026-12', xp:40, title:'Два горячих чая', text:'Два раза поешь горячего в кафе.', check:'eat', n:2, reward:{money:90, mood:5}}
+  {id:'winter-two-teas', lvl:2, season:'2026-12', xp:40, title:'Два горячих чая', text:'Два раза поешь горячего в кафе.', check:'eat', n:2, reward:{money:90, mood:5}},
+  {id:'help-neighbors', lvl:2, title:'Помог соседям', text:'Помоги соседям: донести сумку, угостить или не пройти мимо.', check:'help', n:1, reward:{money:100, mood:6}},
+  {id:'district-vahitovsky', lvl:2, title:'Освоил Вахитовский', text:'Зайди в три места на Баумана, Кремлёвской, Хади Такташа или Петербургской.', check:'visit', target:{hints:['бауман','кремл','такташ','петербург']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-privolzhsky', lvl:2, title:'Освоил Приволжский', text:'Зайди в три места на Павлюхина, Оренбургском тракте или Даурской.', check:'visit', target:{hints:['павлюхин','оренбург','даурск']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-sovetsky', lvl:2, title:'Освоил Советский', text:'Зайди в три места на Рихарда Зорге или Гаврилова.', check:'visit', target:{hints:['зорге','гаврилов']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-novosavinovsky', lvl:2, title:'Освоил Ново-Савиновский', text:'Зайди в три места на Ямашева, Чистопольской, Адоратского или Чехова.', check:'visit', target:{hints:['ямашев','чистополь','адорат','чехов']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-moskovsky', lvl:2, title:'Освоил Московский', text:'Зайди в три места на Декабристов или Восстания.', check:'visit', target:{hints:['декабрист','восстан']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-kirovsky', lvl:2, title:'Освоил Кировский', text:'Зайди в три места на Краснококшайской или Гвардейской.', check:'visit', target:{hints:['краснококш','гвардей']}, n:3, reward:{money:110, mood:4}},
+  {id:'district-aviastroitelny', lvl:2, title:'Освоил Авиастроительный', text:'Зайди в три места на Пилотской, Черноморской, Комсомольской, Ленской или Енисейской.', check:'visit', target:{hints:['пилотск','черномор','комсомольск','ленск','енисей']}, n:3, reward:{money:110, mood:4}}
 ];
 
 window.cityAchievements=[
@@ -76,5 +84,8 @@ window.cityAchievements=[
   {id:'chat-30', icon:'✉️', title:'Город на связи', text:'Написал тридцати игрокам.', check:'chat', n:30},
   {id:'atm-5', icon:'🏧', title:'У банкомата', text:'Пять раз был у банкомата.', check:'atm', n:5},
   {id:'visit-10', icon:'🚪', title:'Десять дверей', text:'Десять раз заходил в места города.', check:'visit', n:10},
-  {id:'days-30', icon:'🗓', title:'Месяц в городе', text:'Заходил 30 дней подряд.', check:'days', n:30}
+  {id:'days-30', icon:'🗓', title:'Месяц в городе', text:'Заходил 30 дней подряд.', check:'days', n:30},
+  {id:'event-week', icon:'🌙', title:'Неделя вечеров', text:'Побывал на семи вечерних событиях.', check:'event', n:7},
+  {id:'district-three', icon:'🏙', title:'Три района', text:'Побывал в трёх районах города.', check:'districts', n:3},
+  {id:'district-all', icon:'🏙', title:'Весь город', text:'Обошёл все семь районов.', check:'districts', all:true}
 ];
