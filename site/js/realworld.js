@@ -39,12 +39,24 @@ function rwAlerts(j){const list=j.alerts||[];const key=list.map(a=>a.kind+':'+a.
 function rwRender(){const bar=$('#alertBar');if(!bar)return;const list=(RW.snap&&RW.snap.alerts)||[];
   document.body.classList.toggle('rw-alert',list.length>0);if(!list.length){bar.hidden=true;return;}
   bar.hidden=false;bar.classList.toggle('min',RW.min);const a=list[0];
-  $('#alertTitle').textContent='⚠️ '+list.map(x=>x.title).join(' · ');
+  $('#alertTitle').textContent='⚠️ '+list.map(x=>x.title).join(' · ')+(RW.lost?' · нет связи':'');
   $('#alertText').textContent=list.map(x=>x.text).join('\n');
-  $('#alertSrc').textContent=`${a.src}, ${rwTime(a.at)} по Москве. Это настоящее оповещение, игра его не заменяет: следите за приложением «МЧС России» и сигналами в городе.`;
+  $('#alertSrc').textContent=`${a.src}, ${rwTime(a.at)} по Москве. Это настоящее оповещение, игра его не заменяет: следите за приложением «МЧС России» и сигналами в городе.`+(RW.lost?` Связи с сервером игры нет с ${rwTime(RW.t)} — сведения могли устареть.`:'');
+  bar.classList.toggle('stale',!!RW.lost);
   $('#alertMin').textContent=RW.min?'Подробнее':'Свернуть';$('#alertMin').setAttribute('aria-expanded',String(!RW.min));}
-function rwApply(j){if(!j||!j.ok)return;RW.snap=j;RW.t=Date.now();rwWeather(j.weather);rwAlerts(j);
+function rwApply(j){if(!j||!j.ok)return;RW.snap=j;RW.t=Date.now();RW.lost=false;rwWeather(j.weather);rwAlerts(j);
   if(Array.isArray(j.sev)&&typeof sevApply==='function')sevApply(j.sev);}   // опрос a=city несёт и общие события рядом (shared-layer.js)
+// связь с сервером пропала (телефон без сети, сервер недоступен): сведения не должны выглядеть свежими.
+// Через 10 минут без ответа — на плашке «связи нет с …»; тревога и погода старше трёх часов (как на сервере) — убираются.
+// Возраст считаем по часам сервера (at в ответе) плюс сколько прошло у нас: часы телефона могут врать.
+const RW_LOST_MS=10*60e3,RW_OLD_MS=3*3600e3;
+function rwAge(at){const s=RW.snap;return s&&Number.isFinite(s.at)&&Number.isFinite(at)?s.at-at+(Date.now()-RW.t):0;}
+function rwCheckStale(){const s=RW.snap;if(!s||!RW.t)return;const lost=Date.now()-RW.t>RW_LOST_MS;
+  if(lost!==!!RW.lost){RW.lost=lost;rwRender();}if(!lost)return;
+  const was=s.alerts||[],keep=was.filter(a=>rwAge(a.at)<RW_OLD_MS);
+  if(keep.length!==was.length){s.alerts=keep;RW.key=keep.map(a=>a.kind+':'+a.at).join('|');rwRender();
+    addEvent('Связи с сервером игры нет больше трёх часов — старую плашку тревоги убрали. Проверьте приложение «МЧС России»');}
+  if(s.weather&&rwAge(s.weather.at)>=RW_OLD_MS){s.weather=null;rwWeather(null);}}
 async function rwPoll(){try{const r=await fetch('api.php?a=city',{cache:'no-store'});if(!r.ok)return;rwApply(await r.json());}catch(e){}}
 // скорость машин: погода и пробки по модели — час пик на больших улицах, снег и гололёд сильнее (настоящих данных о пробках нет)
 function roadSlow(r){let k=1;const w=weather.kind;
@@ -53,7 +65,7 @@ function roadSlow(r){let k=1;const w=weather.kind;
   return k;}
 $('#alertMin')&&$('#alertMin').addEventListener('click',()=>{RW.min=!RW.min;rwRender();});
 $('#alertTitle')&&$('#alertTitle').addEventListener('click',()=>{if(RW.min){RW.min=false;rwRender();}});
-if(/^https?:/.test(location.protocol)){setTimeout(rwPoll,3000);setInterval(rwPoll,120000);}
+if(/^https?:/.test(location.protocol)){setTimeout(rwPoll,3000);setInterval(rwPoll,120000);setInterval(rwCheckStale,15000);}
 // во время тревоги прохожие рядом время от времени говорят спокойные фразы (если они есть в данных)
 if(typeof defWatch==='function')defWatch(dt=>{rwFirst();if(!rwAlertOn()||scene!=='city')return;RW.sayT-=dt||0;if(RW.sayT>0)return;RW.sayT=rnd(40,80);rwSay(['alert','during']);});
 // таксист, водитель автобуса и прохожие у большой улицы — о пробке и погоде (realworld-lines.js второго программиста), раз в минуту-полторы;

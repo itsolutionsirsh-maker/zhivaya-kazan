@@ -55,6 +55,16 @@ const fix=http.createServer((q,r)=>{if(q.url==='/met'){uaSeen=q.headers['user-ag
     if(OUT){fs.mkdirSync(OUT,{recursive:true});await pg.screenshot({path:path.join(OUT,'alert-phone.png')});}
     await pg.click('#alertMin');const mini=await ev(`({min:document.querySelector('#alertBar').classList.contains('min'),h:document.querySelector('#alertBar').getBoundingClientRect().height})`);
     check(mini.min&&mini.h<60,'сворачивается в плашку: '+Math.round(mini.h)+' px');if(OUT)await pg.screenshot({path:path.join(OUT,'alert-min.png')});
+    // 2б) связь пропала: через 10 минут без ответа — «нет связи» на плашке; тревога и погода старше трёх часов — убираются;
+    // сервер снова ответил — всё как было
+    await pg.click('#alertMin');
+    const lost=await ev(`(()=>{RW.t=Date.now()-11*60e3;rwCheckStale();const b=document.querySelector('#alertBar');return {shown:!b.hidden,stale:b.classList.contains('stale'),title:document.querySelector('#alertTitle').textContent,src:document.querySelector('#alertSrc').textContent,real:weather.real};})()`);
+    check(lost.shown&&lost.stale&&/нет связи/.test(lost.title)&&/Связи с сервером игры нет с \d\d:\d\d/.test(lost.src)&&lost.real,`10 минут без связи — плашка с пометкой: «${lost.title}»`);
+    const old=await ev(`(()=>{RW.t=Date.now()-3.1*3600e3;rwCheckStale();return {hidden:document.querySelector('#alertBar').hidden,on:rwAlertOn(),real:weather.real,feed:feed.slice(0,3).map(f=>f.text)};})()`);
+    check(old.hidden&&!old.on&&!old.real&&old.feed.some(t=>/Связи с сервером игры нет больше трёх часов/.test(t)),`три часа без связи — старая тревога и погода убраны: ${JSON.stringify(old)}`);
+    await ev('rwPoll()');await sleep(500);
+    const back=await ev(`({shown:!document.querySelector('#alertBar').hidden,stale:document.querySelector('#alertBar').classList.contains('stale'),real:weather.real,lost:RW.lost})`);
+    check(back.shown&&!back.stale&&back.real&&!back.lost,`связь вернулась — тревога и погода снова с сервера: ${JSON.stringify(back)}`);
     // 3) отбой
     posts.unshift({at:Date.now()-10e3,text:'Внимание! На территории Республики Татарстан режим «Беспилотная опасность» снят.'});
     await pg.waitForSelector('#alertBar',{state:'hidden',timeout:15000}).catch(()=>{});

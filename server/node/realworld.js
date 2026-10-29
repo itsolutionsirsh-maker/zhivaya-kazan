@@ -21,6 +21,12 @@ const WEATHER_STALE_MS=3*3600e3;  // погода старше трёх часо
 const TITLES={drone:'Беспилотная опасность',missile:'Ракетная опасность'};
 
 // ---------- погода ----------
+// прогноз почасовой: храним сам ряд (только нужные поля), чтобы каждый час брать новую запись,
+// даже если MET отвечает «не изменилось» (304) — иначе погода застревала на часе последнего полного ответа
+function compactMet(j){const ts=j&&j.properties&&j.properties.timeseries;if(!Array.isArray(ts)||!ts.length)return null;
+  return ts.slice(0,72).map(e=>{const d=(e&&e.data)||{},i=(d.instant&&d.instant.details)||{};
+    const sum=k=>d[k]&&d[k].summary&&d[k].summary.symbol_code?{summary:{symbol_code:String(d[k].summary.symbol_code)}}:undefined;
+    return {time:e&&e.time,data:{instant:{details:{air_temperature:i.air_temperature,wind_speed:i.wind_speed,cloud_area_fraction:i.cloud_area_fraction}},next_1_hours:sum('next_1_hours'),next_6_hours:sum('next_6_hours')}};});}
 function weatherFromMet(j,now){
   const ts=j&&j.properties&&j.properties.timeseries;if(!Array.isArray(ts)||!ts.length)return null;
   let cur=ts[0];for(const e of ts){const t=Date.parse(e.time);if(t<=now)cur=e;else break;}   // прогноз почасовой: запись на текущий час
@@ -71,21 +77,24 @@ function alertsFrom(posts,now,override){
 function RealWorld(o={}){
   const fetchFn=o.fetch||globalThis.fetch,now=o.now||Date.now,log=o.log||(()=>{}),fs=o.fs,file=o.file;
   const wURL=o.weatherUrl||WEATHER_URL,aURL=o.alertUrl||ALERT_URL;
-  let st={weather:null,wMod:'',posts:[],override:null,aOk:0,aErr:0,wErr:0};
+  let st={weather:null,wMod:'',wSeries:null,wAt:0,posts:[],override:null,aOk:0,aErr:0,wErr:0};
   try{if(fs&&file)st=Object.assign(st,JSON.parse(fs.readFileSync(file,'utf8')));}catch(e){}
   let ver=1,lastKey='',timers=[],nextW=0,onChange=o.onChange||(()=>{});
-  const save=()=>{if(!fs||!file)return;try{fs.writeFileSync(file+'.tmp',JSON.stringify({weather:st.weather,wMod:st.wMod,posts:st.posts.slice(0,20),override:st.override}));fs.renameSync(file+'.tmp',file);}catch(e){}};
+  const save=()=>{if(!fs||!file)return;try{fs.writeFileSync(file+'.tmp',JSON.stringify({weather:st.weather,wMod:st.wMod,wSeries:st.wSeries,wAt:st.wAt,posts:st.posts.slice(0,20),override:st.override}));fs.renameSync(file+'.tmp',file);}catch(e){}};
   function snapshot(){const t=now();const w=st.weather&&t-st.weather.at<WEATHER_STALE_MS?Object.assign({src:'MET Norway'},st.weather):null;
     const a=alertsFrom(st.posts,t,st.override);return {ok:1,v:ver,weather:w,alerts:a.alerts,ended:a.ended,source:SOURCE.channel,at:t};}
   function changed(){const s=snapshot();const key=JSON.stringify([s.weather&&[s.weather.kind,s.weather.t,s.weather.ice],s.alerts.map(a=>[a.kind,a.at]),s.ended.map(a=>[a.kind,a.at])]);
     if(key!==lastKey){lastKey=key;ver++;onChange(snapshot());}}
-  async function pullWeather(){const t=now();if(t<nextW)return;
-    try{const h={'User-Agent':UA,Accept:'application/json'};if(st.wMod)h['If-Modified-Since']=st.wMod;
+  // погода на текущий час из сохранённого ряда; at — когда MET отвечал последний раз (от него — «старше трёх часов»)
+  function fromSeries(t){if(!Array.isArray(st.wSeries))return false;const w=weatherFromMet({properties:{timeseries:st.wSeries}},t);if(!w)return false;w.at=st.wAt||t;st.weather=w;return true;}
+  async function pullWeather(){const t=now();if(t<nextW){if(fromSeries(t))changed();return;}
+    // без сохранённого ряда (файл от прошлой версии) — полный запрос: по 304 нечего было бы пересчитать
+    try{const h={'User-Agent':UA,Accept:'application/json'};if(st.wMod&&Array.isArray(st.wSeries))h['If-Modified-Since']=st.wMod;
       const r=await fetchFn(wURL,{headers:h,signal:AbortSignal.timeout(15000)});
       const exp=Date.parse(r.headers.get('expires')||'');nextW=Math.min(t+3600e3,Math.max(t+10*60e3,Number.isFinite(exp)?exp:0));
-      if(r.status===304){if(st.weather)st.weather.at=t;st.wErr=0;save();changed();return;}
+      if(r.status===304){st.wAt=t;if(!fromSeries(t)&&st.weather)st.weather.at=t;st.wErr=0;save();changed();return;}
       if(!r.ok)throw new Error('HTTP '+r.status);
-      const w=weatherFromMet(await r.json(),t);if(!w)throw new Error('нет данных');st.weather=w;st.wMod=r.headers.get('last-modified')||'';st.wErr=0;save();changed();}
+      const j=await r.json(),w=weatherFromMet(j,t);if(!w)throw new Error('нет данных');st.weather=w;st.wSeries=compactMet(j);st.wAt=t;st.wMod=r.headers.get('last-modified')||'';st.wErr=0;save();changed();}
     catch(e){nextW=t+10*60e3;if(!st.wErr++)log('погода: не получил',e.message);}}
   async function pullAlerts(){const t=now();
     try{const r=await fetchFn(aURL,{headers:{'User-Agent':UA,Accept:'text/html'},signal:AbortSignal.timeout(15000)});if(!r.ok)throw new Error('HTTP '+r.status);

@@ -308,6 +308,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 #alertBar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);z-index:400;max-width:640px;margin:0 auto;
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;background:#9E1C1C;color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}
 #alertBar[hidden]{display:none}
+#alertBar.stale{filter:saturate(.45)}
 #alertTitle{font-size:15px;cursor:pointer}
 #alertText{grid-column:1/-1;white-space:pre-line;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
 #alertSrc{grid-column:1/-1;font-size:11.5px;line-height:1.35;opacity:.88}
