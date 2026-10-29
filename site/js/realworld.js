@@ -43,7 +43,8 @@ function rwRender(){const bar=$('#alertBar');if(!bar)return;const list=(RW.snap&
   $('#alertText').textContent=list.map(x=>x.text).join('\n');
   $('#alertSrc').textContent=`${a.src}, ${rwTime(a.at)} по Москве. Это настоящее оповещение, игра его не заменяет: следите за приложением «МЧС России» и сигналами в городе.`;
   $('#alertMin').textContent=RW.min?'Подробнее':'Свернуть';$('#alertMin').setAttribute('aria-expanded',String(!RW.min));}
-function rwApply(j){if(!j||!j.ok)return;RW.snap=j;RW.t=Date.now();rwWeather(j.weather);rwAlerts(j);}
+function rwApply(j){if(!j||!j.ok)return;RW.snap=j;RW.t=Date.now();rwWeather(j.weather);rwAlerts(j);
+  if(Array.isArray(j.sev)&&typeof sevApply==='function')sevApply(j.sev);}   // опрос a=city несёт и общие события рядом (shared-layer.js)
 async function rwPoll(){try{const r=await fetch('api.php?a=city',{cache:'no-store'});if(!r.ok)return;rwApply(await r.json());}catch(e){}}
 // скорость машин: погода и пробки по модели — час пик на больших улицах, снег и гололёд сильнее (настоящих данных о пробках нет)
 function roadSlow(r){let k=1;const w=weather.kind;
