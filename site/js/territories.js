@@ -8,16 +8,17 @@
     visit_home:'Для вступления нужно прийти пешком в выбранный район.',street_only:'Встреча доступна пешком на улице.',home:'Это ваш район — чужого патруля здесь нет.',
     switch_cooldown:'После выхода или вступления сменить группировку можно через 30 минут.',encounter_cooldown:'Следующая встреча будет позже.',border:'Отойдите от границы района хотя бы на 20 метров.',
     return_to_meeting:'Вернитесь к месту встречи или выберите «Уйти».',busy:'Сервер не смог сохранить действие. Повторите его.',rate_limited:'Слишком много действий. Подождите минуту.',
-    encounter:'Встреча уже завершена. Состояние обновлено.',active:'У вас уже есть незаконченная встреча.',neutral:'Нейтрального игрока районные встречи не затрагивают.'};
-  const endings={peace:'Вы объяснили, что идёте по своим делам. Местные уступили дорогу: «Ладно, проходи. Без шума». Уважение +1.',
+    encounter:'Встреча уже завершена. Состояние обновлено.',active:'У вас уже есть незаконченная встреча.',neutral:'Нейтрального игрока районные встречи не затрагивают.',story_place:'Подойдите пешком к отмеченному месту встречи.',story_stage:'Шаг истории уже изменился. Показано сохранённое состояние.',story_membership:'Вы уже в другой группировке. Можно сыграть гостем, сохранив свой статус.',story_visited:'Знакомый уже помнит ваше возвращение.'};
+  const endings={vouched:'Вы назвали знакомого с турнира. Местные узнали историю: «К нему? Проходи». Встреча завершилась мирно, уважение не меняется.',peace:'Вы объяснили, что идёте по своим делам. Местные уступили дорогу: «Ладно, проходи. Без шума». Уважение +1.',
     won:'Вы приняли вызов и выстояли. Местные прекращают стычку и дают пройти. Уважение +2.',
     lost:'Местные оказались сильнее. Вы отступили: уважение −1, минимум 0. Деньги и вещи остались при вас.',
     left:'Вы ушли без конфликта. Членство сохранилось, деньги и вещи при вас.',expired:'Разговор так и не состоялся. Местные разошлись; наказания нет.'};
   const ending=h=>h.training?({won:'В учебном спарринге вы выстояли против двоих гостей. Дома ваша сила 84 вместо 70. Уважение не меняется.',lost:'В учебном спарринге гости оказались сильнее. Домашний бонус не гарантирует победу. Уважение не меняется.',peace:'Вы обсудили правила и разошлись без спарринга.',left:'Тренировку отменили. Никаких потерь.',expired:'Время тренировки вышло. Никаких потерь.'}[h.result]):endings[h.result];
   const token=()=>typeof acct!=='undefined'&&acct?acct.token:'';
   const available=()=>!!(token()&&Net.territories&&Net.syncReady&&(Net.mode==='ws'||Net.mode==='http'));
-  function notice(text){$id('territoryNotice').textContent=text;$id('territoryMeetingNotice').textContent=text;}
-  function changedAccount(){const current=token();if(current===identity)return false;identity=current;state=null;retry=null;lastHistory=null;dwell=0;poll=0;closeMeeting();return true;}
+  function emit(){window.dispatchEvent(new Event('territorychange'));}
+  function notice(text){$id('territoryNotice').textContent=text;$id('territoryMeetingNotice').textContent=text;emit();}
+  function changedAccount(){const current=token();if(current===identity)return false;identity=current;state=null;retry=null;lastHistory=null;dwell=0;poll=0;closeMeeting();emit();return true;}
   function requestId(){return Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');}
   async function request(op='status',extra={},repeat=false){
     changedAccount();if(pending)return null;if(!available()){notice(token()?'Подключаемся к серверу города…':messages.auth);renderMap();return null;}
@@ -34,7 +35,7 @@
       if(!result.ok)notice(messages[result.err]||'Действие не выполнено. Обновите состояние и попробуйте снова.');
       if(!meeting.hidden)renderMeeting();renderMap();return result;
     }catch(e){if(token()===who)notice('Связь прервалась. '+(retry?'Нажмите «Повторить действие» — результат не начислится дважды.':'Карта доступна; членство обновится после подключения.'));return null;
-    }finally{pending=false;renderButtons();}
+    }finally{pending=false;renderButtons();emit();}
   }
   function updateLocal(){local=world&&R.at(player.x,player.y,world.meta);}
   const projection=(()=>{const ds=R.data.districts,x0=Math.min(...ds.map(d=>d.bbox[0])),y0=Math.min(...ds.map(d=>d.bbox[1])),x1=Math.max(...ds.map(d=>d.bbox[2])),y1=Math.max(...ds.map(d=>d.bbox[3]));
@@ -79,8 +80,10 @@
     $id('territoryMeetingClose').textContent=e?'Уйти без конфликта':'Продолжить прогулку';
     if(!e){const h=state&&state.history[0];$id('territoryMeetingText').textContent=h?ending(h):'Встреча завершена.';$id('territoryPower').textContent='';renderButtons();return;}
     $id('territoryMeetingTitle').textContent=(e.training?'Спарринг дома · ':'Чужой двор · ')+R.get(e.district).name;
-    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». Артур останавливается: «Ты к кому? Здесь наши дворы».':'«Если по делу — скажи спокойно. Или хочешь что-то доказать?» За спиной Артура второй парень молча ждёт вашего ответа.';
+    $id('territoryMeetingText').textContent=e.training?'Во дворе согласились на учебный спарринг с двумя гостями из «'+R.factions[e.opponent].name+'». Здесь вы лучше знаете место: сила +20%. Это тренировка, без потери вещей и уважения.':e.phase==='greeting'?'Двое местных заметили, что вы из «'+R.factions[e.member].name+'». Глеб останавливается: «Ты к кому? Здесь наши дворы».':'«Если по делу — скажи спокойно. Или хочешь что-то доказать?» За спиной Глеба второй парень молча ждёт вашего ответа.';
     $id('territoryPower').textContent='Ваша сила: '+e.power.player+' · двое соперников: '+e.power.locals+(e.training?' (домашний бонус +20% у вас).':' (домашний бонус +20% у местных).')+' Шанс выстоять: '+Math.round(e.power.chance*100)+'%. Бонус закреплён до конца встречи.';
+    const friend=!e.training&&typeof YardStory!=='undefined'&&YardStory.passage(state.story,e.district);
+    if(friend){const b=document.createElement('button');b.type='button';b.className='btn primary';b.textContent='Назвать знакомого с турнира · пройти мирно';b.addEventListener('click',()=>request('choice',{encounter:e.id,choice:'friend'}));choices.append(b);}
     for(const [choice,label] of (e.training?[['stand','Начать учебный спарринг']]:e.phase==='greeting'?[['talk','Поговорить спокойно'],['stand','Принять вызов · риск потерять уважение']]:[['pass','Объяснить: я здесь по своим делам'],['stand','Всё же принять вызов']])){
       const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.addEventListener('click',()=>request('choice',{encounter:e.id,choice}));choices.append(b);
     }renderButtons();
@@ -93,7 +96,7 @@
   function nearFree(i){for(let k=0;k<8;k++){const a=i*2.4+k*0.8,x=player.x+Math.cos(a)*4,y=player.y+Math.sin(a)*4;if(!inBuilding(x,y))return [x,y];}return null;}
   defSit('territoryActors',{start(s){const e=s.encounter;for(let i=0;i<2;i++){
       const q=spotNear(3,14)||spotNear(8,40)||nearFree(i);if(!q)continue;const n=nearestNode(q[0],q[1],world.pedAdj,300);if(n<0)continue;
-      const w=new Walker('resident',n);w.temp=true;w.x=q[0];w.y=q[1];w.p.name=i?'Руслан':'Артур';w.p.female=false;w.p.job=R.factions[e.opponent].name;w.p.clothes=R.factions[e.opponent].color;
+      const w=new Walker('resident',n);w.temp=true;w.x=q[0];w.y=q[1];w.p.name=i?'Денис':'Глеб';w.p.female=false;w.p.job=R.factions[e.opponent].name;w.p.clothes=R.factions[e.opponent].color;
       walkers.push(w);takeActor(s,w);faceTo(w,player.x,player.y);
     }return true;}});
   $id('territoryBtn').addEventListener('click',openMap);$id('territoryClose').addEventListener('click',closeMap);
@@ -111,11 +114,11 @@
     const free=scene==='city'&&!player.busy&&!player.inside&&!player.vehicle&&!player.bus&&player.state==='ok'&&!SIT.card;
     if(!free){dwell=0;return;}
     if(state.active){showMeeting();return;}
-    if(!state.member||!local||local.id===state.member||Date.now()<state.nextAt){dwell=0;return;}
+    if((state.story&&state.story.stage!=='done')||!state.member||!local||local.id===state.member||Date.now()<state.nextAt){dwell=0;return;}
     dwell+=elapsed;if(dwell<12)return;dwell=0;
     const ll=R.lonLat(player.x,player.y,world.meta);if(R.borderDistance(local,...ll)<20)return;
     request('start').then(result=>{if(result&&result.ok&&state&&state.active&&!player.busy&&scene==='city')showMeeting();});
   });
-  // Read-only integration API for UI fixtures and future story entry points. No client state setter.
-  window.cityTerritories={open:openMap,refresh:()=>request(),snapshot:()=>state?JSON.parse(JSON.stringify(state)):null,openMeeting:showMeeting};
+  // Snapshot reads and validated chapter requests. No client state setter.
+  window.cityTerritories={open:openMap,refresh:()=>request(),snapshot:()=>state?JSON.parse(JSON.stringify(state)):null,openMeeting:showMeeting,story:extra=>request('story',extra),retry:()=>request(retry?retry.op:'status',{},true),connection:()=>({pending,ready:available(),retry:!!retry,message:$id('territoryNotice').textContent})};
 })();
