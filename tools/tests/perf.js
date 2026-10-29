@@ -45,7 +45,7 @@ async function measure(dir, port) {
       out.scenes[label]={...result,fixtures};
     }
     await pg.addScriptTag({content:stageCityLook.toString()});
-    for(const [label,options] of [['татарское кафе',{kind:'cafe',name:'Тюбетей'}],['рынок',{kind:'market',name:'Рынок'}],['аптека',{kind:'pharmacy',name:'Аптека'}],['театр',{kind:'theatre',name:'Театр',hour:23}]]){
+    for(const [label,options] of [['татарское кафе',{kind:'cafe',name:'Тюбетей'}],['пекарня',{kind:'cafe',name:'Пекарня'}],['вечерний бар',{kind:'bar',name:'Вечерний бар',hour:23}],['рынок',{kind:'market',name:'Рынок'}],['аптека',{kind:'pharmacy',name:'Аптека'}],['театр',{kind:'theatre',name:'Театр',hour:23}]]){
       const fixtures=await pg.evaluate(stageVenueLook,options);await sleep(1500);
       const result=await pg.evaluate(measureCompletedFrames,{durationMs:5000,maxSamples:600});
       if(result.completed_frames<2)throw new Error('No completed game frames: '+label);

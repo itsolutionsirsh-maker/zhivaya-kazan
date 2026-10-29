@@ -63,3 +63,19 @@ test('only story:ward receives beds, spawn, drip and doctor; its static layer is
   const before=JSON.stringify(ward);for(let i=0;i<120;i++)assert.equal(s.drawVenueLayer(ward,30),true);
   assert.equal(created.length,1);assert.equal(JSON.stringify(ward),before);
 });
+
+test('hospitality lighting rebuilds once at dusk, not for each clock update',()=>{
+  const {s,created}=setup(),it=s.makeInterior('cafe','Кофейня','coffee');
+  for(let i=0;i<40;i++)s.drawVenueLayer(it,30,i/100);assert.equal(created.length,1);
+  for(let i=50;i<=100;i++)s.drawVenueLayer(it,30,i/100);assert.equal(created.length,2);
+  s.drawVenueLayer(it,30,0);assert.equal(created.length,3);
+  const shop=s.makeInterior('shop','Продукты','shop');s.drawVenueLayer(shop,30,0);s.drawVenueLayer(shop,30,1);assert.equal(created.length,4);
+});
+
+test('taller hospitality walls stay within the existing canvas budget, including HiDPI',()=>{
+  const {s,created}=setup();
+  for(const [kind,name] of [['cafe','Кофейня'],['cafe','Дом чая'],['cafe','Пекарня'],['bar','Бар']]){
+    const it=s.makeInterior(kind,name,name);for(const f of it.furn)Object.freeze(f);Object.freeze(it.furn);Object.freeze(it);
+    for(const dpr of [1,2,3]){s.DPR=dpr;s.drawVenueLayer(it,200,1);const c=created.at(-1);assert.ok(c.width<=1536&&c.height<=1536);}
+  }
+});
