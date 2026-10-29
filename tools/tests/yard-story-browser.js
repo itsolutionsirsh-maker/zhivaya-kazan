@@ -4,7 +4,7 @@
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
 const url=new URL(process.argv[2]||'http://127.0.0.1:8807'),out=process.argv[3];
 if(url.protocol!=='http:'||url.hostname!=='127.0.0.1')throw Error('Disposable loopback DATA_DIR required');
-async function open(p){await p.waitForFunction(()=>Net.syncReady&&!player.busy);await p.click('#menuBtn');await p.click('#yardStoryBtn');await p.waitForFunction(()=>!cityTerritories.connection().pending&&cityTerritories.snapshot());}
+async function open(p){await p.waitForFunction(()=>typeof Net!=='undefined'&&Net.syncReady&&!player.busy,null,{timeout:90000});await p.click('#menuBtn');await p.click('#yardStoryBtn');await p.waitForFunction(()=>!cityTerritories.connection().pending&&cityTerritories.snapshot());}
 async function move(p,person){
   const place=await p.evaluate(person=>{const s=cityYardStory.snapshot(),id=person?YardStory.people[person].place:YardStory.step(s).place,q=YardStory.point(id,world.meta);
     Object.assign(player,q,{waypoints:null,vehicle:null,bus:null,inside:false,state:'ok',waitingStop:null});cam.x=q.x;cam.y=q.y;return id;},person);
@@ -26,7 +26,7 @@ async function fit(p){return p.evaluate(()=>({overflow:document.documentElement.
       await move(p);const stage=await p.evaluate(()=>cityYardStory.snapshot().stage);await p.getByRole('button',{name:label,exact:true}).click();await p.waitForFunction(stage=>cityYardStory.snapshot()?.stage!==stage,stage);
     }
     await p.reload();await p.waitForSelector('#loading',{state:'hidden',timeout:90000});await open(p);assert.match(await p.textContent('#yardTitle'),/Ты теперь с ними/);
-    for(const [width,height] of [[360,640],[390,844],[844,390],[1280,800]]){await p.setViewportSize({width,height});const g=await fit(p);assert.equal(g.overflow,false);assert.ok(g.controls.every(c=>c.inside&&c.h>=43),JSON.stringify(g));if(out)await p.screenshot({path:out+'/'+ending+'-choice-'+width+'.png'});}
+    for(const [width,height] of [[360,640],[390,844],[844,390],[1280,800]]){await p.setViewportSize({width,height});await p.waitForTimeout(400);const g=await fit(p);assert.equal(g.overflow,false);assert.ok(g.controls.every(c=>c.inside&&c.h>=43),JSON.stringify(g));if(out)await p.screenshot({path:out+'/'+ending+'-choice-'+width+'.png'});}
     await p.getByRole('button',{name:{home:'Вернуться и выступить за двор Тимура',away:'Остаться и выступить с Артуром',bridge:'Собрать общую игру как независимый организатор'}[ending],exact:true}).click();
     await p.waitForFunction(()=>cityYardStory.snapshot()?.stage==='finale');await move(p);
     const label=ending==='bridge'?'Завершить независимо · выйти из группировки, если состою':ending==='home'?'Вступить в «Хади Такташ» и завершить':'Вступить в «Киноплёнка» и завершить';
