@@ -15,6 +15,7 @@ const WalletLib=require('./wallet.js');
 const TerritoryLib=require('./territories.js');
 const RealWorldLib=require('./realworld.js');
 const SharedEventsLib=require('./shared-events.js');
+const RolesLib=require('./roles.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -150,6 +151,13 @@ const realworld=RealWorldLib.RealWorld({fs,file:path.join(DATA,'realworld.json')
 // общие события рядом: ДТП с участием игрока видят все, у кого оно в радиусе (server/node/shared-events.js)
 const sev=SharedEventsLib.SharedEvents();
 function sevBroadcast(){const list=sev.snapshot();for(const p of players.values())wsSend(p,{t:'sev',list});}
+// роли между игроками (server/node/roles.js): бариста — заказ, цена, оплата через кошелёк; счётчики — DATA_DIR/roles.json
+const roles=RolesLib.Roles({wallet,fs,file:path.join(DATA,'roles.json'),limits:/^\d+$/.test(ENV.ROLE_AGE_MS||'')?{age:+ENV.ROLE_AGE_MS}:undefined});   // ROLE_AGE_MS — только для проверок (по умолчанию сутки)
+function rolePl(p){return p?{id:p.id,name:p.meta&&typeof p.meta.n==='string'?p.meta.n:'Игрок',room:p.room||null,acc:p.acc||null}:null;}
+function barSend(list){for(const e of list||[]){const p=players.get(e.to);if(p)wsSend(p,e.m);}}
+setInterval(()=>barSend(roles.tick()),5000).unref();   // заказ без ответа минуту — отмена
+// WebSocket знает аккаунт игрока: деньги между игроками — только с аккаунтом (created в базе — секунды)
+function bindAcc(p,tok){const a=accByToken(tok);p.acc=a?{k:a.k,created:(+a.created||0)*1000}:null;return !!p.acc;}
 const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
@@ -259,12 +267,13 @@ const players=new Map();let nextSid=1;const bySid=new Map();
 // Separate membership prevents street crowds from evicting room guests from the nearby limit.
 const venueMembers=new Map();
 function venueLeave(p){if(!p.room)return;const members=venueMembers.get(p.room);if(members){members.delete(p);if(!members.size)venueMembers.delete(p.room);}p.room=null;}
-function venueMove(p,d){const v=VenueRoom.read(d),id=v?v.room:null;
+function venueMove(p,d){const v=VenueRoom.read(d),id=v?v.room:null,was=p.room;
   if(p.room!==id){venueLeave(p);p.meta.sy=null;p.metaS='';p.sayAt=0;p.metaV++;p.dense=false;
     if(id){let members=venueMembers.get(id);if(!members){members=new Set();venueMembers.set(id,members);}members.add(p);}}
   p.room=id;p.ix=v?v.ix:0;p.iy=v?v.iy:0;p.ihx=v?v.ihx:0;p.ihy=v?v.ihy:0;
+  if(was!==id)barSend(roles.moved(rolePl(p)));   // вышел из кафе — его заказы отменяются, смена у стойки кончается
 }
-function visibleMeta(p){return Object.assign({},p.meta,{sy:p.meta.sy&&now()-(p.sayAt||0)<6?p.meta.sy:null});}
+function visibleMeta(p){return Object.assign({},p.meta,{sy:p.meta.sy&&now()-(p.sayAt||0)<6?p.meta.sy:null,rl:roles.onShift(rolePl(p))?'barista':null});}
 function venueStamp(p){return p.room?[p.room,p.ix,p.iy,p.ihx,p.ihy].join('|'):'';}
 function positionPacket(p){return [p.sid,Math.round(p.x*10),Math.round(p.y*10),Math.round(p.hx*100),Math.round(p.hy*100),p.b,p.room||null,Math.round((p.ix||0)*100),Math.round((p.iy||0)*100),Math.round((p.ihx||0)*100),Math.round((p.ihy||0)*100)];}
 // две сетки: крупная (50 м) — быстро понять, сколько людей вокруг; мелкая (10 м) — найти ближайших в толпе и посчитать её по клеткам
@@ -303,7 +312,7 @@ function setPresence(p,d){if(!d||typeof d!=='object')return;
   p.t=now();}
 function addPlayer(id,ws){let p=players.get(id);if(p){if(p.ws&&ws&&p.ws!==ws)try{p.ws.close(4000,'replaced');}catch(e){}p.ws=ws||p.ws;return p;}
   p={sid:nextSid++,id,x:0,y:0,hx:0,hy:1,b:0,room:null,ix:0,iy:0,ihx:0,ihy:0,meta:{n:'Игрок'},metaS:'',metaV:1,ws,t:now(),cell:null,view:new Map(),crowdT:0};players.set(id,p);bySid.set(p.sid,p);return p;}
-function delPlayer(p){players.delete(p.id);bySid.delete(p.sid);venueLeave(p);gridDel(p);}
+function delPlayer(p){players.delete(p.id);bySid.delete(p.sid);venueLeave(p);gridDel(p);barSend(roles.gone(p.id));}
 setInterval(()=>{const t=now();for(const p of players.values())if(!p.ws&&t-p.t>15)delPlayer(p);},5000).unref();
 
 // ---------- чат ----------
@@ -505,10 +514,11 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,roles:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
     if(a==='city')return send(res,200,Object.assign({},realworld.snapshot(),{sev:sev.snapshot()}));
+    if(a==='ratings')return send(res,200,{ok:1,coffeeWeek:roles.top()});   // «Бариста недели»: имя в игре и чашки за неделю
     if(a==='sync')return send(res,200,apiSync(body,ip));
     if(a==='report')return send(res,200,modReport(body,ip));
     if(a==='mod')return send(res,200,modAdmin(req,body));
@@ -527,7 +537,7 @@ async function handleReq(req,res){
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
-  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})()});}
+  if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})(),roles:{baristas:roles.onDuty(),orders:roles.count()}});}
   let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
   // карта всей Казани кусками собирается на сервере (tools/citymap.sh) в MAP_DIR и отдаётся по /map/…
   let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
@@ -573,7 +583,7 @@ wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws
   ws.on('message',raw=>{let d;try{d=JSON.parse(raw);}catch(e){return;}if(!d||typeof d!=='object')return;
     if(d.t==='hello'){const priv=idstr(d.id);if(priv.length<8)return ws.close(1008,'bad_id');const id=pubOf(priv);
       if(me&&me.id!==id)return ws.close(1008,'one_player');   // одно соединение — один игрок (иначе плодились «призраки», которых никто не убирал)
-      me=addPlayer(id,ws);me.priv=priv;me.ip=ip;me.view.clear();setPresence(me,d.p);visit(priv,d.src,ip);notePeak();
+      me=addPlayer(id,ws);me.priv=priv;me.ip=ip;me.view.clear();if(typeof d.tok==='string')bindAcc(me,d.tok);setPresence(me,d.p);visit(priv,d.src,ip);notePeak();
       {const sl=sev.snapshot();if(sl.length)wsSend(me,{t:'sev',list:sl});}
       wsSend(me,{t:'hist',msgs:msgs.filter(m=>m.to===id||m.from===id||(m.to===null&&(players.size<=1000||Math.hypot(me.x-m.x,me.y-m.y)<1500))).slice(-30).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t})),seq,you:me.sid,pid:id});return;}
     if(!me)return;
@@ -581,6 +591,16 @@ wss.on('connection',(ws,req)=>{const ip=ipOf(req);let me=null;ws.isAlive=true;ws
     if(d.t==='m'){setPresence(me,d.m);return;}         // имя, одежда, фраза, аватар — только когда изменились
     if(d.t==='msg'){const e=postMsg(me,d.to,d.text);if(e)wsSend(me,{t:'err',e});return;}
     // своё ДТП: сервер проверяет, что игрок у места, и раздаёт всем (с одного адреса — не больше SEV_PER_IP, по умолчанию 6, за 10 минут)
+    // вошёл в аккаунт или вышел — теперь сервер знает, чьи это деньги
+    if(d.t==='auth'){if(!allow('auth:'+ip,20,60))return;const was=me.acc&&me.acc.k;const ok=typeof d.tok==='string'&&bindAcc(me,d.tok);if(!ok)me.acc=null;
+      if(was&&was!==(me.acc&&me.acc.k)){barSend(roles.gone(me.id));me.metaV++;}wsSend(me,{t:'auth',ok});return;}
+    // бариста: встать за стойку, заказ гостя, цена, оплата (server/node/roles.js)
+    if(d.t==='bar'){if(modBlocked(me)||!allow('bar:'+me.id,30,10))return;const pl=rolePl(me),int=v=>Number.isInteger(v)?v:-1,id=typeof d.id==='string'?d.id.slice(0,64):'';
+      if(d.k==='duty'){const was=roles.onShift(pl);barSend(roles.duty(pl,!!d.on));if(was!==roles.onShift(pl))me.metaV++;}
+      else if(d.k==='order')barSend(roles.order(pl,rolePl(players.get(String(d.to||''))),int(d.item)));
+      else if(d.k==='price')barSend(roles.price(pl,id,int(d.price)));
+      else if(d.k==='pay'){const o=roles.peek(id);barSend(roles.pay(pl,o?rolePl(players.get(o.b)):null,id,!!d.yes));}
+      return;}
     if(d.t==='sev'){if(modBlocked(me)||!allow('sev:'+me.ip,+ENV.SEV_PER_IP||6,600))return;const r=sev.report(me,d);if(r.ok)sevBroadcast();return;}});   // слитая тоже: у всех продлится срок
   ws.on('close',()=>{if(me&&me.ws===ws){me.ws=null;delPlayer(me);}});});
 

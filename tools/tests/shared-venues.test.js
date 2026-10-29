@@ -7,7 +7,7 @@ const pose=(id=room,x=4,y=5)=>({x:101,y:201,b:1,room:id,ix:x,iy:y,ihx:0,ihy:-1})
 function server(){
   let time=100;const timers=[],sent=[];
   const s={VenueRoom,Map,Set,Math,JSON,Number,now:()=>time,setInterval:fn=>{timers.push(fn);return {unref(){}};},
-    VIEW_R:350,VIEW_K:80,VIEW_K_CROWD:50,NEAR_R:120,CELL:50,Mod:{clean:s=>s,name:s=>s},clean:(s,n)=>String(s).slice(0,n),modBlocked:()=>false,modMuted:()=>false,allow:()=>true,
+    VIEW_R:350,VIEW_K:80,VIEW_K_CROWD:50,NEAR_R:120,CELL:50,Mod:{clean:s=>s,name:s=>s},clean:(s,n)=>String(s).slice(0,n),modBlocked:()=>false,modMuted:()=>false,allow:()=>true,barSend:()=>{},rolePl:p=>p,roles:{moved:()=>[],gone:()=>[],onShift:()=>false},
     process:{hrtime:{bigint:()=>0n}},stats:{tickMs:0},wsSend:(p,m)=>sent.push({id:p.id,m:JSON.parse(JSON.stringify(m))})};
   vm.createContext(s);const source=read('server/node/server.js');
   vm.runInContext(source.slice(source.indexOf('const players=new Map()'),source.indexOf('// ---------- чат ----------')),s);
