@@ -26,6 +26,7 @@ async function bounds(p,selector){const result=await p.evaluate(selector=>({over
     checks.push('membership and map controls fit 360, 390, 1280');await p.setViewportSize({width:390,height:844});
     await p.click('#territoryClose');await p.click('#menuBtn');await p.click('#changeChar');await p.selectOption('#pDistrict',{label:'Адмиралтейская слобода'});await p.click('#startBtn');
     await waitMeeting(p);assert.match(await p.locator('#territoryMeetingTitle').textContent(),/Кировский/);
+    assert.ok(await p.evaluate(()=>{if(!window.cityGangs)return true;const t=document.getElementById('territoryMeetingText').textContent,G=cityGangs;const all=G.lines.greet.concat(...Object.values(G.local).map(x=>x.greet));return all.some(l=>t.includes(l))&&G.names.some(n=>t.includes(n));}),'реплика и имя местного — из gangs.js');
     assert.match(await p.locator('#territoryPower').textContent(),/70.*96/);checks.push('foreign encounter starts with frozen local advantage');
     const actors=await p.evaluate(()=>walkers.filter(w=>w.sitBy&&w.sitBy.def.id==='territoryActors').map(w=>({x:w.x,y:w.y,inBuilding:!!inBuilding(w.x,w.y)})));
     assert.equal(actors.length,2);assert.ok(actors.every(w=>!w.inBuilding));

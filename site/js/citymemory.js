@@ -146,7 +146,10 @@ function memWeatherKind(){if(weather.real&&typeof rwWeatherKey==='function'){con
 // первый снег за зиму — один раз на устройство и зиму
 function memFirstSnow(){const d=typeof mskDate==='function'?mskDate():'';const y=+d.slice(0,4),m=+d.slice(5,7);const winter=String(m>=7?y:y-1);/* зима 2026/27 — «2026» */let seen='';try{seen=localStorage.getItem('zk.firstSnow')||'';}catch(e){}
   if(seen===winter)return false;try{localStorage.setItem('zk.firstSnow',winter);}catch(e){}return true;}
-function memWeatherLine(){const k=memWeatherKind();if(!k)return null;const W=(window.cityWeatherLines||[]).find(x=>x&&x.when===k);return W&&W.lines&&W.lines.length?pick(W.lines):null;}
+// фразы из weather-lines.js и realworld-lines.js (cityRealLines.weather) вместе; {t} — настоящая температура, без неё такие фразы не берём
+function memWeatherLine(){const k=memWeatherKind();if(!k)return null;const W=(window.cityWeatherLines||[]).find(x=>x&&x.when===k);let L=W&&W.lines?W.lines.slice():[];
+  const RL=window.cityRealLines&&window.cityRealLines.weather,rk=k==='firstsnow'?'firstSnow':k;if(RL&&Array.isArray(RL[rk]))L=L.concat(RL[rk]);
+  const t=weather.t;L=L.filter(x=>!/\{t\}/.test(x)||t!=null).map(x=>x.replace('{t}',typeof rwT==='function'?rwT(t):String(t)));return L.length?pick(L):null;}
 
 // ---------- подключение ----------
 function memInit(){MEM.ready=true;
