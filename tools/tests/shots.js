@@ -8,6 +8,7 @@ const {stageCityLook} = require('./city-look-fixtures');
 const {venueScenes,stageVenueLook} = require('./venue-look-fixtures');
 const {stageSharedVenue} = require('./shared-venues-fixtures');
 const {stageStoryScene} = require('./story-ui-fixtures');
+const {stageTerritoryScene} = require('./territory-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -22,6 +23,10 @@ async function storyShots(browser){
       for(const kind of ['bill','menu','wake','ward','actors','phone']){
         const fixture=await pg.evaluate(stageStoryScene,{kind});await sleep(kind==='wake'?2800:220);
         await pg.screenshot({path:`${OUT}/${name}_story_${kind}.png`});console.log(name,'story_'+kind,JSON.stringify(fixture));
+      }
+      for(const kind of ['neutral','map','meeting']){
+        const fixture=await pg.evaluate(stageTerritoryScene,{kind});await sleep(220);
+        await pg.screenshot({path:`${OUT}/${name}_territory_${kind}.png`});console.log(name,'territory_'+kind,JSON.stringify(fixture));
       }
       if(errors.length)throw Error(errors.join('\n'));
     }finally{await context.close();}

@@ -107,14 +107,12 @@ function cityNewsForNpc(){const out=[];const S=typeof seasonData==='function'?se
 const DIST={t:0,cur:null,adm:null};
 function llToXY(ll){const m=world.meta;return [(ll[1]-m.lon0)*m.mlon,-(ll[0]-m.lat0)*m.mlat];}
 function districtsTick(dt){DIST.t-=dt;if(DIST.t>0||!world||player.inside||player.bus)return;DIST.t=4;const list=window.cityDistricts||[];if(!list.length)return;
-  let found=null,bd=1e9,adm=null,ad=1e9;
+  let found=null,bd=1e9;const exact=window.TerritoryRules?TerritoryRules.at(player.x,player.y,world.meta):null;const admin=exact?list.find(d=>d.id===exact.id):null;DIST.adm=admin?admin.id:null;
   for(const d of list){if(!Array.isArray(d.center))continue;const [x,y]=llToXY(d.center);const dd=dist(x,y,player.x,player.y);
-    if(d.kind==='admin'){if(dd<ad){ad=dd;adm=d;}}else if(dd<(d.r||1200)&&dd<bd){bd=dd;found=d;}}
+    if(d.kind!=='admin'&&(!d.parent||admin&&d.parent===admin.id)&&dd<(d.r||1200)&&dd<bd){bd=dd;found=d;}}
   if(!found){const street=(nearestRoadName(player.x,player.y)||'').toLowerCase();const near=placesNear(player.x,player.y,120,6).map(p=>p.n.toLowerCase()).join(' ');const hay=street+' '+near;
-    for(const d of list){if(d.kind==='admin'||Array.isArray(d.center))continue;if((d.hints||[]).some(h=>hay.includes(String(h).toLowerCase()))){found=d;break;}}}
-  if(adm&&ad>6000)adm=null;
-  const parent=found&&found.parent?list.find(x=>x.id===found.parent):null;const admin=parent||adm;
-  const cur=found||admin;if(!cur||cur.id===DIST.cur)return;DIST.cur=cur.id;
+    for(const d of list){if(d.kind==='admin'||Array.isArray(d.center)||(d.parent&&(!admin||d.parent!==admin.id)))continue;if((d.hints||[]).some(h=>hay.includes(String(h).toLowerCase()))){found=d;break;}}}
+  const cur=found||admin;if(!cur){DIST.cur=null;return;}if(cur.id===DIST.cur)return;DIST.cur=cur.id;
   const where=found?found.name+(admin&&admin!==found?' · '+admin.name:''):admin.name;
   if(!PROG.seenD.includes(cur.id)){PROG.seenD.push(cur.id);progSave();seasonXP(SEASON_XP.district,'новый район');const f=(cur.facts||[])[Math.floor(Math.random()*(cur.facts||[]).length)];
     addEvent(`📍 ${where}${f?'. '+f:''}`,'say');}
