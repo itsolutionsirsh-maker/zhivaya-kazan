@@ -110,6 +110,18 @@ const mod=body=>api('mod',body,{'x-mod-token':MOD});
     const pos2=await A.evaluate('({ix:player.ix,iy:player.iy})');await B.evaluate(p=>{player.ix=p.ix>5?1.5:p.ix+6;player.iy=p.iy;pushPresence();},pos2);await sleep(1500);   // Булат отходит: E — к ближнему игроку
     const c1=await C.evaluate(p=>{player.ix=p.ix+0.8;player.iy=p.iy;updateHud();const a=currentAction;if(a&&/Заказать/.test(a.label))a.run();return {label:a&&a.label,hint:document.querySelector('#hint').textContent,card:!!SIT.card&&/Бариста/.test(SIT.card.title)};},pos2);
     check(/Заказать у баристы/.test(c1.label||'')&&/только с аккаунтом/.test(c1.hint)&&!c1.card,`гость без аккаунта — подсказка: ${JSON.stringify(c1)}`);
+    // 9) «Начать заново» у гостя, пока заказ ждёт оплату: заказ отменён у обоих, оплата со старого устройства не проходит (найдено Codex)
+    await cards(A);
+    const bKey=await B.evaluate(()=>{const p=[...peerRender.values()].find(p=>sharedPeerHere(p)&&p.rl==='barista');return p&&p.key;});
+    await B.evaluate(k=>wsSock.send(JSON.stringify({t:'bar',k:'order',to:k,item:3})),bKey);
+    await waitCard(A,'Булат просит: Капучино');await pickCard(A,'Булат просит','120 ₽');await waitCard(B,'«Капучино» — 120');
+    const oid=await B.evaluate('BAR.cardId'),balR0=(await mod({do:'wallet',name:'bar-b-'+tag})).bal;
+    const rs=await api('reset',{token:await B.evaluate('acct.token')});
+    await A.waitForFunction(()=>__ev.some(t=>/Игру начали заново/.test(t)),null,{timeout:10000}).catch(()=>{});
+    const rB=await B.evaluate(()=>({card:!!(SIT.card&&/Капучино/.test(SIT.card.title)),ev:__ev.filter(t=>/начата заново/.test(t))}));
+    check(rs.ok&&(await evs(A,'Игру начали заново')).length===1&&rB.ev.length===1&&!rB.card,`«Начать заново» — заказ отменён у обоих: ${JSON.stringify(rB)}`);
+    await B.evaluate(id=>wsSock.send(JSON.stringify({t:'bar',k:'pay',id,yes:true})),oid);await sleep(1500);
+    const wR=await mod({do:'wallet',name:'bar-b-'+tag});check(wR.bal===3000&&wR.ops[0]&&wR.ops[0].kind==='reset',`оплата со старого устройства не прошла: баланс ${wR.bal} (стартовые после сброса, было ${balR0})`);
     check(!errors.length,'без ошибок в консоли'+(errors.length?': '+errors.slice(0,3).join(' | '):''));
   }catch(e){console.log('FAIL',e.message);fails++;}
   finally{await b.close();srv.kill();try{fs.rmSync(DATA,{recursive:true,force:true});}catch(e){}}

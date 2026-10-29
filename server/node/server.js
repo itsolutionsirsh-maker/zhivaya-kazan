@@ -259,7 +259,7 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
   body:JSON.stringify({chat_id:msg.chat.id,message_id:msg.message_id,text}),signal:AbortSignal.timeout(8000)}).catch(()=>{});}
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
-function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}barSend(roles.reset(a.k));/* заказы у баристы этого аккаунта — отмена */const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}

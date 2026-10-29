@@ -5,7 +5,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {Roles,mskWeek}=require('../../server/node/roles.js');
 const DAY=86400e3,CAFE='v1:cafe:100:200:0badc0de',CAFE2='v1:cafe:900:200:0badc0df';
-function fakeWallet(bal){const ops=new Set(),calls=[];return {bal,calls,transfer(from,to,amt,id,why,kind){calls.push({from,to,amt,id,why,kind});
+function fakeWallet(bal){const ops=new Set(),calls=[],gen={};return {bal,calls,gen,who:k=>k+':'+(gen[k]||0),transfer(from,to,amt,id,why,kind){calls.push({from,to,amt,id,why,kind});
   if(ops.has(id))return {ok:1,dup:1,bal:bal[from]};if((bal[from]||0)<amt)return {err:'funds',bal:bal[from]};ops.add(id);bal[from]-=amt;bal[to]=(bal[to]||0)+amt;return {ok:1,bal:bal[from],to:bal[to]};}};}
 function setup(o={}){let t=Date.UTC(2026,9,29,12,0);const files={};
   const fsFake={readFileSync:f=>{if(!(f in files))throw new Error('ENOENT');return files[f];},writeFileSync:(f,s)=>{files[f]=s;},renameSync:(a,b)=>{files[b]=files[a];delete files[a];}};
@@ -80,4 +80,41 @@ test('неделя — с понедельника по Москве; «Бари
   const f=setup();const b=f.P('b','bk',CAFE,2*DAY,'Алсу'),g=f.P('g','gk',CAFE);f.R.duty(b,true);
   const o=last(f.R.order(g,b,0),'b','order');f.R.price(b,o.id,60);f.R.pay(g,b,o.id,true);assert.equal(f.R.top().length,1);
   f.tick(7*DAY);assert.deepEqual(f.R.top(),[]);
+});
+
+test('лимит гостя считается по аккаунту: с трёх устройств после трёх чашек — одна, а не шесть (найдено Codex)',()=>{
+  const f=setup({bal:{gk:1e6}});const b=f.P('b','bk',CAFE);f.R.duty(b,true);
+  const buy=gg=>{const o=last(f.R.order(gg,b,0),'b','order');if(!o)return null;f.R.price(b,o.id,60);return last(f.R.pay(gg,b,o.id,true),gg.id,'done');};
+  const g=f.P('g','gk',CAFE);for(let i=0;i<3;i++)assert.ok(buy(g));
+  // три соединения одного аккаунта заказывают сразу
+  const d=['g1','g2','g3'].map(id=>f.P(id,'gk',CAFE));
+  const o1=last(f.R.order(d[0],b,0),'b','order');assert.ok(o1);
+  assert.equal(last(f.R.order(d[1],b,0),'g2','err').e,'busy');assert.equal(last(f.R.order(d[2],b,0),'g3','err').e,'busy');
+  f.R.price(b,o1.id,60);assert.ok(last(f.R.pay(d[0],b,o1.id,true),'g1','done'));
+  assert.equal(last(f.R.order(d[1],b,0),'g2','err').e,'limit-guest');
+  assert.equal(f.w.calls.filter(c=>c.from==='gk').length,4,'всего 4 перевода');
+});
+
+test('заказы в работе — в счёт 40 в день; перед переводом лимиты проверяются ещё раз',()=>{
+  const f=setup({bal:{gk:1e6}});const b=f.P('b','bk',CAFE);f.R.duty(b,true);
+  // 38 продано, 2 заказа в работе — третий уже нельзя
+  f.R.duty(b,true);for(let i=0;i<38;i++){const gi=f.P('x'+i,'xk'+i,CAFE);f.w.bal['xk'+i]=100;const o=last(f.R.order(gi,b,0),'b','order');f.R.price(b,o.id,60);f.R.pay(gi,b,o.id,true);}
+  const ga=f.P('ga','gak',CAFE),gb=f.P('gb','gbk',CAFE),gc=f.P('gc','gck',CAFE);f.w.bal.gak=f.w.bal.gbk=f.w.bal.gck=100;
+  const oa=last(f.R.order(ga,b,0),'b','order'),ob=last(f.R.order(gb,b,0),'b','order');assert.ok(oa&&ob);
+  assert.equal(last(f.R.order(gc,b,0),'gc','err').e,'limit-day');
+});
+
+test('«Начать заново» отменяет заказы аккаунта; заказ из прежнего поколения кошелька не оплачивается (найдено Codex)',()=>{
+  const f=setup();const b=f.P('b','bk',CAFE),g=f.P('g','gk',CAFE);f.R.duty(b,true);
+  let o=last(f.R.order(g,b,3),'b','order');f.R.price(b,o.id,120);
+  let ev=f.R.reset('gk');assert.equal(last(ev,'g','cancel').why,'reset');assert.equal(last(ev,'b','cancel').why,'reset');
+  assert.equal(f.R.pay(g,b,o.id,true).length,0,'отменённый — не оплатить');
+  // сброс прошёл мимо ролей (другой процесс, гонка) — поколение не совпало, перевода нет
+  o=last(f.R.order(g,b,3),'b','order');f.R.price(b,o.id,120);f.w.gen.gk=1;
+  ev=f.R.pay(g,b,o.id,true);assert.equal(last(ev,'g','cancel').why,'reset');
+  o=last(f.R.order(g,b,3),'b','order');f.R.price(b,o.id,120);f.w.gen.bk=1;
+  ev=f.R.pay(g,b,o.id,true);assert.equal(last(ev,'b','cancel').why,'reset','и у баристы тоже');
+  assert.equal(f.w.calls.length,0,'ни одного перевода');
+  // после сброса — новые заказы как обычно
+  o=last(f.R.order(g,b,3),'b','order');f.R.price(b,o.id,120);assert.ok(last(f.R.pay(g,b,o.id,true),'g','done'));
 });
