@@ -58,6 +58,21 @@
     if(id==='ruslan')return s.choices.repair==='net'?'«Сетка держится. Даже Ильдар остался после игры — помог убрать. Хорошо, что тогда мимо никто не прошёл».':'«Ильдар снова пришёл. Теперь сам зовёт новичков. Ты ему тогда очень помог». ';
     return s.choices.kit==='mix'?'«Новички теперь играют вместе со старшими. Твоя идея со смешанными парами прижилась».':'«Капитаны составы сохранили, но я попросила их взять новичков на следующий турнир. Список участников у меня». ';
   }
-  const api={places,people,steps,endings,step,point,passage,greeting};
+  // A small, finite sequel. Old completed saves qualify without a migration.
+  function reunion(s){
+    if(!s||s.stage!=='done')return null;
+    const who={home:'timur',away:'artur',bridge:'leysan'}[s.ending];if(!who)return null;
+    return {who,place:people[who].place,title:'Место для новичков',
+      invitation:people[who].name+': «После турнира пришли новые ребята. Поможешь включить их в следующую игру? Заходи, когда удобно».',
+      text:greeting(s,who)+'\n\nИльдар приводит двух новичков. Раньше он сам стоял в стороне, а теперь первым протягивает им манишки. «Можно с вами?» — спрашивает один из ребят. '+people[who].name+' кивает тебе: «Ты помог собрать первую игру. Как начнём эту?»',
+      choices:[{id:'pairs',label:'Составить пары: опытный и новичок'},{id:'warmup',label:'Провести общую разминку перед игрой'}],
+      result:s.reunion?(s.reunion.choice==='pairs'?'Ты распределяешь пары. Ильдар объясняет своему напарнику правила, а остальные повторяют за ними. Новички выходят на площадку вместе со всеми.':'Ты собираешь ребят в круг. Ильдар показывает передачу, каждый пробует её без спешки. К первой игре новички уже знают остальных по именам.')+'\n\n'+people[who].name+': «Спасибо. В следующий раз начнём так же».':null};
+  }
+  function objective(s){
+    if(!s)return {id:'invite',title:'Тимур зовёт собрать двор',text:'Четыре знакомых, два района. Можно остаться независимым.'};
+    if(s.stage==='done'){const r=reunion(s);return r&&!s.reunion?{id:'reunion',title:r.title,text:r.invitation,person:r.who,place:r.place}:null;}
+    const p=step(s);return {id:s.stage,title:{promise:'Поговорить с Тимуром',kit:'Помочь Лейсан с составами',welcome:'Встретиться с Артуром',repair:'Помочь на площадке',call:'Ответить Тимуру',finale:'Завершить первую игру'}[s.stage],text:places[p.place].name,place:p.place};
+  }
+  const api={places,people,steps,endings,step,point,passage,greeting,reunion,objective};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.YardStory=api;
 })(typeof globalThis==='object'?globalThis:this);

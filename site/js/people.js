@@ -156,7 +156,8 @@
         return true;}});
 
     defWatch(function(){
-      if(clock.day<8||life.recap||hour()<8||sitActive('week')) return;
+      if(clock.day<8||life.recap||hour()<8||sitActive('week')||!life.notes.length) return;
+      if(window.cityObjectives&&cityObjectives.active())return;
       startSit('week');
     });
 

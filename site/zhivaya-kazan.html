@@ -333,6 +333,15 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 .yard-person{border-left:3px solid var(--person-color);padding:8px 12px;margin:10px 0;background:#ffffff08;border-radius:0 10px 10px 0}
 .yard-person p{font-size:13px;line-height:1.5}
 @media(max-width:680px){#yardModal .box{width:100%;max-height:var(--ui-visible-height,100dvh)}#yardModal .ui-sheet-foot .row{display:flex;flex-wrap:wrap;gap:8px}#yardModal .ui-sheet-foot .btn{flex:1;min-width:115px}#yardModal h2{font-size:19px}}
+
+/* One optional next action; shares the HUD's safe areas and modal visibility. */
+#nextGoal{pointer-events:auto;box-sizing:border-box;width:min(350px,100%);padding:10px 12px;background:#172c27;border:1px solid #697759;border-radius:12px;color:#f8f2df;box-shadow:0 4px 16px #0003}
+#nextGoal small{display:block;color:#dbbd81;font-size:11px}#nextGoal strong{display:block;font-size:14px;line-height:1.35}#nextGoal p{margin:5px 0;font-size:12px;line-height:1.4}
+#nextGoal .goal-actions{display:flex;gap:8px}#nextGoal button{min-height:44px;font:inherit}#goalGo{flex:1}#goalFold{min-width:44px}#nextGoal[data-folded=true] p,#nextGoal[data-folded=true] #goalGo{display:none}
+.mid:has(#nextGoal:not([hidden])){flex-direction:column;justify-content:flex-start;align-items:flex-end;gap:6px}
+#nextGoal[data-folded=true]{display:flex;align-items:center;gap:8px}#nextGoal[data-folded=true] .goal-copy{flex:1}
+@media(max-width:640px),(pointer:coarse) and (max-height:500px){#nextGoal{width:100%;padding:7px 10px}#nextGoal p{max-height:3.0em;overflow:auto}#nextGoal strong{font-size:13px}}
+@media(max-height:500px){#nextGoal{max-width:350px}#nextGoal p{display:none}}
 </style>
 
 <canvas id="map"></canvas>
@@ -628,4 +637,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/gangs.js"></script><script src="js/realworld-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
-<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/ui.js"></script>
+<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/ui.js"></script>

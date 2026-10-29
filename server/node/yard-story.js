@@ -11,6 +11,13 @@ function apply(state,body,pose,meta,loc,t){
     state.story=fresh(t);return null;
   }
   if(!s)return 'story_stage';
+  if(body.step==='reunion'){
+    const r=D.reunion(s);if(!r||s.reunion)return 'story_stage';
+    if(state.active)return 'active';
+    if(!near(r.place,pose,meta,loc))return 'story_place';
+    if(!r.choices.some(c=>c.id===body.choice))return 'choice';
+    s.reunion={choice:body.choice,at:t};s.updatedAt=t;return null;
+  }
   if(body.step==='visit'){
     if(s.stage!=='done'||!Object.hasOwn(D.people,body.person))return 'story_stage';
     if(!near(D.people[body.person].place,pose,meta,loc))return 'story_place';
