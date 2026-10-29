@@ -29,6 +29,10 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <h2>Сейчас в игре</h2><div id="online"></div>
 <h2>Кошелёк игрока</h2><p class="msg">Деньги аккаунта хранятся на сервере. Имя для входа по PIN или номер Телеграма. Сверх потолков заработка сервер не засчитывает — это видно в журнале (запрошено → проведено).</p>
 <div class="row"><input id="wName" placeholder="Имя или номер Телеграма" autocomplete="off"><button id="wGo">Показать</button></div><div id="wOut"></div>
+<h2>Погода и тревоги МЧС</h2><p class="msg">Сервер сам берёт настоящую погоду (MET Norway) и сообщения официального канала ГУ МЧС по РТ в MAX. В игре текст МЧС показывается слово в слово. Отбой в канал приходит не всегда — тревога без отбоя гаснет сама через 3 часа. Если автоматика ошиблась — снимите тревогу или включите вручную, вставив текст МЧС как есть.</p>
+<div id="cOut" class="msg"></div>
+<div class="row"><button id="cOff" class="bad">Снять тревогу сейчас</button><button id="cAuto">Вернуть автоматически</button><button id="cRefresh">Обновить</button></div>
+<div class="row"><select id="cKind"><option value="drone">Беспилотная опасность</option><option value="missile">Ракетная опасность</option></select><input id="cText" placeholder="Текст МЧС слово в слово" autocomplete="off"><button id="cOn" class="go">Включить вручную</button></div>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -79,9 +83,20 @@ async function wallet(name,body){const O=$('#wOut');const j=await call(Object.as
   f.append(amt,why,go);c.append(f);const T=el('table','wj');const h=el('tr');for(const t of ['Когда','Что','Запрошено','Проведено','Баланс'])h.append(el('th',null,t));T.append(h);
   for(const o of j.ops){const tr=el('tr');tr.append(el('td',null,fmt(o.t)),el('td',null,(KIND[o.kind]||o.kind)+(o.why?' · '+o.why:'')+(o.peer?' · '+o.peer:'')),el('td',null,String(o.req)),el('td',null,String(o.amt)),el('td',null,String(o.bal)));T.append(tr);}
   const w=el('div','wrap');w.append(T);c.append(w);O.append(c);}
+const mskT=at=>new Date(at).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+async function city(body){const j=await call(Object.assign({do:'city'},body||{})).catch(()=>({err:'нет связи'}));const O=$('#cOut');O.innerHTML='';
+  if(!j.ok){O.textContent='Ошибка: '+(j.err==='text'?'нужен текст МЧС':j.err||'?');return;}
+  const w=j.weather;O.append(el('div',null,w?`Погода: ${w.kind}, ${w.t}°${w.ice?', гололёд':''} (обновлено ${j.weatherAt})`:'Погоды нет — игра показывает свою'));
+  O.append(el('div',null,j.alerts.length?'Сейчас в игре: '+j.alerts.map(a=>`${a.title} — ${mskT(a.at)} · ${a.src}`).join('; '):'Тревоги в игре нет'));
+  if(j.override)O.append(el('div',null,j.override.mode==='off'?`Снята модератором в ${mskT(j.override.at)} (до нового сообщения МЧС)`:`Включена вручную в ${mskT(j.override.at)}`));
+  O.append(el('div',null,`Источник тревог: ответ ${j.alertSourceOk}${j.alertErrors?', ошибок подряд: '+j.alertErrors:''}`));
+  for(const p of j.posts){O.append(el('div','meta',`${mskT(p.at)} · ${p.kind?(p.kind.on?'ВВЕДЁН ':'СНЯТ ')+p.kind.kind:'—'} · ${p.text}`));}}
+$('#cRefresh').onclick=()=>city();$('#cAuto').onclick=()=>city({mode:'auto'});
+$('#cOff').onclick=()=>{if(confirm('Снять тревогу в игре до нового сообщения МЧС?'))city({mode:'off'});};
+$('#cOn').onclick=()=>{const text=$('#cText').value.trim();if(!text){alert('Вставьте текст сообщения МЧС');return;}if(confirm('Включить тревогу у всех игроков?'))city({mode:'on',kind:$('#cKind').value,text});};
 $('#wGo').onclick=()=>{const n=$('#wName').value.trim();if(n)wallet(n);};
-$('#load').onclick=()=>{load();loadStats();};
-$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();}
+$('#load').onclick=()=>{load();loadStats();city();};
+$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();city();}
 </script>
 </body>
 </html>

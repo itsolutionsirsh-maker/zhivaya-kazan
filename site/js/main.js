@@ -9,7 +9,7 @@ function gameMinutesNow(){return (Date.now()+clockOff-GAME_T0)/60000*GAME_SCALE;
 function zkSetTime(min){clockOff+=(min-gameMinutesNow())*60000/GAME_SCALE;clock.minutes=gameMinutesNow();clock.day=Math.floor(clock.minutes/1440)+1;}
 const player={x:0,y:0,hx:0,hy:1,phase:0,name:'Гость',desc:'',role:'resident',avatar:null,avatarImg:null,thumb:null,clothes:'#2F9E6B',skin:'#F1D3B5',hair:'#2B1B12',energy:92,food:80,mood:70,money:3000,pantry:0,waypoints:null,home:null,bus:null,waitingStop:null,exitNext:false,busy:false,state:'ok',vehicle:null,talkTarget:null,inside:false,ix:0,iy:0,ihx:0,ihy:-1,iwp:null,hasCar:true,carColor:'#C62828',hurtT:0};
 const clock={minutes:gameMinutesNow(),scale:GAME_SCALE,day:Math.floor(gameMinutesNow()/1440)+1};
-const weather={kind:'clear',ttl:400,rain:[]};
+const weather={kind:'clear',ttl:400,rain:[],real:false,t:null,ice:false,wind:null,flakes:false};
 const cam={x:0,y:0,z:5.5,zt:5.5,free:false};let LOD=1;
 const keys={};const flags={};
 let roomNs=null,sampleFn=null,peers=[],peerRender=new Map();
@@ -161,7 +161,7 @@ function contextForNpc(w){let place;if(w.isInterior&&interior)place=`внутр�
   const rl=contextRallies(w.x||player.x,w.y||player.y);const ev=feed.slice(0,3).map(e=>e.text).join('; ')+(rl?'; '+rl:'');const pv=player.vehicle?(player.vehicle.kind==='scooter'?', подъехал на самокате':', подъехал на машине'):'';
   const sc=sitContextFor(w);
   return `Ты — житель Казани в городской игре-симуляции. Тебя зовут ${w.p.name}, ${w.p.age} лет, ${w.p.job}. Характер: ${w.p.trait}.${typeof folkContext==='function'?folkContext(w):''}${w.p.ctx?' '+w.p.ctx:''} Настроение: ${w.p.mood}. Сейчас ${fmtTime()}, день ${clock.day}, погода: ${weatherText()}. Ты находишься ${place}. Последние события в городе: ${ev||'ничего особенного'}.${(()=>{const n=typeof cityNewsForNpc==='function'?cityNewsForNpc():'';return n?' Новости города: '+n+'.':'';})()} С тобой заговорил ${player.name} (${player.role==='tourist'?'турист':player.role==='courier'?'курьер':player.role==='student'?'студент':'местный житель'}${pv}${(player.drunk||0)>=45?', собеседник заметно пьян: шатается, от него пахнет пивом, говорит громко и развязно':(player.drunk||0)>=20?', собеседник слегка навеселе':''})${player.desc?': «'+player.desc+'»':''}.${sc} Отвечай как живой человек, 1–2 коротких предложения, по-русски, можно татарское словечко. Не выходи из роли и не говори, что ты ИИ. Отвечай на реплику ниже.`;}
-function weatherText(){return weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно';}
+function weatherText(){return ({rain:'дождь',snow:'снег',fog:'туман',cloudy:'пасмурно'}[weather.kind]||'ясно')+(weather.t!=null?', '+(weather.t>0?'+':weather.t<0?'−':'')+Math.abs(weather.t)+'°':'')+(weather.ice?', гололёд':'');}
 
 // ---------- профиль ----------
 function loadProfile(){try{return JSON.parse(localStorage.getItem('zk.profile')||'null');}catch(e){return null;}}
@@ -306,8 +306,13 @@ function updateClock(dt){const before=clock.minutes;clock.minutes=gameMinutesNow
   const d=Math.floor(clock.minutes/1440)+1;if(d!==clock.day){clock.day=d;dayPhaseAnnounced={};}
   const h=(clock.minutes/60)%24;const key=Math.floor(h);const we=typeof isWeekend==='function'&&isWeekend();const marks=we?{7:'Выходной. Город просыпается не спеша',11:'Выходной: на Баумана и у Кремля всё больше гуляющих',14:'Кафе и набережная полны',20:'Зажглись фонари, бары заполняются',23:'Поздний вечер выходного: на Баумана ещё гуляют',2:'Ночь. Такси развозят из баров'}:{6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно, на остановках очереди',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Кафе закрываются, остались бары, таксисты и полиция'};
   if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}}
-function updateWeather(dt){weather.ttl-=dt;if(weather.ttl<=0){const r=Math.random();const k=r<0.5?'clear':r<0.8?'cloudy':'rain';if(k!==weather.kind){weather.kind=k;addEvent(k==='rain'?'Пошёл дождь. Пешеходы ускорились, водители — наоборот':k==='cloudy'?'Небо затянуло':'Распогодилось');}weather.ttl=rnd(180,420);}
-  if(weather.kind==='rain'&&!reduceMotion&&scene==='city'){while(weather.rain.length<160)weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);for(const r of weather.rain){r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
+// своя случайная погода — только пока нет настоящей (realworld.js: weather.real)
+function updateWeather(dt){weather.ttl-=dt;if(!weather.real&&weather.ttl<=0){const r=Math.random();const k=r<0.5?'clear':r<0.8?'cloudy':'rain';if(k!==weather.kind){weather.kind=k;addEvent(k==='rain'?'Пошёл дождь. Пешеходы ускорились, водители — наоборот':k==='cloudy'?'Небо затянуло':'Распогодилось');}weather.ttl=rnd(180,420);}
+  const fall=weather.kind==='rain'||weather.kind==='snow';
+  if(fall&&!reduceMotion&&scene==='city'){const snow=weather.kind==='snow';weather.flakes=snow;while(weather.rain.length<(snow?120:160))weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);if(weather.rain.length>(snow?120:160))weather.rain.length=snow?120:160;
+    for(const r of weather.rain){if(snow){r[1]+=dt*0.16*r[2];r[0]+=dt*0.03*Math.sin(r[1]*9+r[2]*20);}else{r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];}if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
+function weatherLabel(){const k=weather.kind,t=weather.t;const ic=k==='rain'?'🌧':k==='snow'?'❄️':k==='fog'?'🌫':k==='cloudy'?'☁️':isNight()?'🌙':'☀️';
+  return ic+' '+({rain:'дождь',snow:'снег',fog:'туман',cloudy:'пасмурно'}[k]||'ясно')+(t!=null?' '+(t>0?'+':t<0?'−':'')+Math.abs(t)+'°':'')+(weather.ice?' · гололёд':'');}
 
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   // не чаще ~60 кадров: на экранах 120 Гц вдвое меньше работы и батареи
@@ -328,7 +333,7 @@ function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   //
     if(hintTtl>0){hintTtl-=rdt;if(hintTtl<=0)$('#hint').hidden=true;}
     if(scene==='interior')renderInterior();else render();}
   requestAnimationFrame(frame);}
-function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;$('#weatherLbl').textContent=(weather.kind==='rain'?'🌧 дождь':weather.kind==='cloudy'?'☁️ пасмурно':isNight()?'🌙 ясно':'☀️ ясно');
+function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;{const wl=$('#weatherLbl'),txt=weatherLabel();if(wl.textContent!==txt){wl.textContent=txt;wl.title=weather.real?'Настоящая погода в Казани · MET Norway (CC BY 4.0)':'';}}
   setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){setBar('#bDrunk',dr);$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
   if(typeof window.uiUpdateHud==='function')window.uiUpdateHud();
   const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${journeyIcon(v.kind)} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&!isLightVehicle(v.kind)?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;

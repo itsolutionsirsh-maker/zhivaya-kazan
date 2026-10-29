@@ -98,7 +98,7 @@
 
   function draw(){
     const t=when(), L=life();
-    const sky=typeof weather!=='undefined'?(weather.kind==='rain'?'дождь':weather.kind==='cloudy'?'пасмурно':'ясно'):'ясно';
+    const sky=typeof weatherText==='function'?weatherText():'ясно';
     const head=t.date.getUTCDate()+' '+MONTH[t.date.getUTCMonth()+1]+', '+WD[t.date.getUTCDay()]+' · '+pad(t.h)+':'+pad(t.m);
     const richInbox=window.storyUI&&typeof storyUI.inbox==='function';
     const inbox=(richInbox?[]:(L.inbox||[]).slice(-6).reverse()).map(function(m){return (m.from?m.from+': ':'')+m.text;});

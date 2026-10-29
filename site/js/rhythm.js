@@ -11,8 +11,12 @@ function cityHour(){return ((clock.minutes/60)%24+24)%24;}
 function cityWeekday(day){const dt=new Date(Date.UTC(2026,5,20)+((day||clock.day)-1)*86400000);return dt.getUTCDay();}
 function isWeekend(day){const w=cityWeekday(day);return w===0||w===6;}
 function curveAt(arr,h){const a=Math.floor(h)%24,b=(a+1)%24,f=h-Math.floor(h);return arr[a]*(1-f)+arr[b]*f;}
-function pedFactor(h){h=h??cityHour();let f=curveAt(isWeekend()?PED_WE:PED_WD,h);if(weather.kind==='rain')f*=0.72;return f;}
-function carFactor(h){h=h??cityHour();let f=curveAt(isWeekend()?CAR_WE:CAR_WD,h);if(weather.kind==='rain')f=Math.min(1,f*1.05);return f;}
+function pedFactor(h){h=h??cityHour();let f=curveAt(isWeekend()?PED_WE:PED_WD,h);if(weather.kind==='rain')f*=0.72;else if(weather.kind==='snow')f*=0.85;
+  if(weather.t!=null&&weather.t<=-15)f*=0.65;else if(weather.t!=null&&weather.t>=30&&h>=12&&h<17)f*=0.8;
+  if(typeof rwAlertOn==='function'&&rwAlertOn())f*=0.12;   // настоящая тревога МЧС: люди уходят с улиц
+  return f;}
+function carFactor(h){h=h??cityHour();let f=curveAt(isWeekend()?CAR_WE:CAR_WD,h);if(weather.kind==='rain')f=Math.min(1,f*1.05);else if(weather.kind==='snow'||weather.ice)f=Math.min(1,f*1.1);
+  if(typeof rwAlertOn==='function'&&rwAlertOn())f*=0.5;return f;}
 function rushHour(){const h=cityHour();return !isWeekend()&&((h>=7.3&&h<9.5)||(h>=17&&h<19.3));}
 
 // ---------- часы работы ----------

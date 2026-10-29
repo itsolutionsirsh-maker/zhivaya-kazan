@@ -304,11 +304,22 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 #territoryHistory{font-size:13px;line-height:1.5;border-top:1px solid #ffffff22;padding-top:12px}
 @media(min-width:681px){#territoryModal .ui-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none}#territoryModal .ui-sheet-close{display:grid;place-items:center;width:44px;height:44px}#territoryModal .ui-sheet-body{display:block;min-height:0;overflow-y:auto}#territoryModal .ui-sheet-foot{display:block;flex:none}#territoryModal .box{overflow:hidden;max-height:calc(100dvh - 32px)}}
 @media(max-width:680px){#territoryModal .box{width:100%}.territory-layout{grid-template-columns:1fr;gap:14px}#territoryMap{max-height:260px}#territoryList{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#territoryModal .ui-sheet-body{padding-bottom:16px}}
+/* Настоящая тревога МЧС (realworld.js): поверх всего, сворачивается в плашку */
+#alertBar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);z-index:400;max-width:640px;margin:0 auto;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;background:#9E1C1C;color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}
+#alertBar[hidden]{display:none}
+#alertTitle{font-size:15px;cursor:pointer}
+#alertText{grid-column:1/-1;white-space:pre-line;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+#alertSrc{grid-column:1/-1;font-size:11.5px;line-height:1.35;opacity:.88}
+#alertMin{grid-row:1;grid-column:2;min-height:36px;padding:4px 12px;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:10px;font:inherit;font-size:13px;cursor:pointer}
+#alertBar.min{right:auto;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);padding:6px 8px 6px 12px}
+#alertBar.min #alertText,#alertBar.min #alertSrc{display:none}
 </style>
 
 <canvas id="map"></canvas>
 <div id="drunkFx" aria-hidden="true"></div>
 <div id="insideShot" hidden><b id="insideShotName"></b></div>
+<div id="alertBar" role="alert" hidden><b id="alertTitle"></b><button id="alertMin" type="button" aria-expanded="true">Свернуть</button><div id="alertText"></div><small id="alertSrc"></small></div>
 <div id="hud">
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1><small id="brandSub">центр города · © участники OpenStreetMap</small></div>
@@ -588,4 +599,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
-<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/ui.js"></script>
+<script src="js/main.js"></script><script src="js/territories.js"></script><script src="js/realworld.js"></script><script src="js/ui.js"></script>
