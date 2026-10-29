@@ -98,3 +98,23 @@ test('сервис: User-Agent и If-Modified-Since, разбор и измен�
   rw.moderate({mode:'auto'});assert.equal(rw.snapshot().alerts.length,1);
   t+=4*3600e3;assert.equal(rw.snapshot().weather,null,'погода старше трёх часов не отдаётся');
 });
+
+test('погода не застревает на прошлом часе: ответ «не изменилось» (304) и часы между запросами берут новую запись ряда',async()=>{
+  let t=Date.UTC(2026,9,29,2,20);const calls=[],files={};
+  const fsFake={readFileSync:f=>{if(!(f in files))throw new Error('ENOENT');return files[f];},writeFileSync:(f,s)=>{files[f]=s;},renameSync:(a,b)=>{files[b]=files[a];delete files[a];}};
+  const routes={W:o=>o.headers['If-Modified-Since']?{status:304,headers:{expires:new Date(t+30*60e3).toUTCString()}}:{status:200,body:met('snow',-6),headers:{'last-modified':'Thu, 29 Oct 2026 02:00:00 GMT',expires:new Date(t+50*60e3).toUTCString()}}};
+  const rw=RW.RealWorld({fetch:fakeFetch(routes,calls),now:()=>t,weatherUrl:'W',alertUrl:'A',fs:fsFake,file:'rw.json'});
+  await rw.pullWeather();assert.equal(rw.snapshot().weather.kind,'clear','02:20 — запись на 02:00');const at0=rw.snapshot().weather.at;
+  // между запросами (до Expires) наступил новый час — запись на 03:00, время ответа MET прежнее
+  t=Date.UTC(2026,9,29,3,5);await rw.pullWeather();assert.equal(calls.length,1);
+  let w=rw.snapshot().weather;assert.equal(w.kind,'snow');assert.equal(w.t,-6);assert.equal(w.at,at0,'«когда отвечал MET» не сдвигается без ответа');
+  // ответ 304 в 04:20 — запись на 04:00 (сильный дождь), время ответа новое
+  t=Date.UTC(2026,9,29,4,20);await rw.pullWeather();assert.equal(calls.length,2);assert.ok(calls[1].opt.headers['If-Modified-Since']);
+  w=rw.snapshot().weather;assert.equal(w.kind,'rain');assert.equal(w.t,20);assert.equal(w.at,t);
+  // после перезапуска ряд берётся из файла
+  const again=RW.RealWorld({fetch:fakeFetch({},[]),now:()=>t,fs:fsFake,file:'rw.json'});assert.equal(again.snapshot().weather.kind,'rain');
+  // файл прошлой версии без ряда — полный запрос, без If-Modified-Since
+  files['old.json']=JSON.stringify({weather:{kind:'clear',t:9,at:t},wMod:'Thu, 29 Oct 2026 02:00:00 GMT',posts:[]});
+  const calls2=[];const old=RW.RealWorld({fetch:fakeFetch(routes,calls2),now:()=>t,weatherUrl:'W',alertUrl:'A',fs:fsFake,file:'old.json'});
+  await old.pullWeather();assert.equal(calls2[0].opt.headers['If-Modified-Since'],undefined);assert.equal(old.snapshot().weather.kind,'rain');
+});
