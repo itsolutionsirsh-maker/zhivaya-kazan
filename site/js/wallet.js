@@ -10,7 +10,7 @@
 // Состояние кошелька (who, base, pend) лежит в zk.state рядом с деньгами — одним снимком: вкладки одного браузера
 // и перезагрузки не разводят деньги и базу. На сервер оно не уходит (acctSnapshot убирает wal).
 // Инвариант: (карта + вклад) − base = изменения, ещё не ставшие операцией.
-const WAL={who:null,base:null,pend:[],bal:null};
+const WAL={who:null,base:null,pend:[],bal:null,note:null};
 function walletLocal(){return Math.round((player.money||0)+(typeof ECON!=='undefined'&&ECON.dep>0?ECON.dep:0));}
 function walletOn(){return !!(typeof acct!=='undefined'&&acct&&!window.zkNoSave);}
 function walletDump(){return WAL.who||WAL.pend.length?{who:WAL.who,base:WAL.base,pend:WAL.pend}:undefined;}
@@ -39,8 +39,11 @@ function walletAfter(r,snap){if(!r||!walletOn()||typeof r.who!=='string')return;
   if(r.init)cut+=Math.max(0,(r.init.firstReq||0)-(r.init.first||0));
   const pendSum=WAL.pend.reduce((s,o)=>s+o.amt,0),unstaged=Number.isFinite(snap)?walletLocal()-snap:0;
   WAL.who=r.who;WAL.bal=r.bal;const d=walletSetTotal(r.bal+pendSum+unstaged);WAL.base=walletLocal()-unstaged;
+  // перевод между игроками (бариста, barista.js) уже показан своей строкой — та же сумма второй раз не пишется
+  if(WAL.note&&Date.now()>WAL.note.until)WAL.note=null;const noted=!!(WAL.note&&!fresh&&d===WAL.note.d);if(noted)WAL.note=null;
   if(r.init&&r.init.req>r.init.amt)addEvent(`🏦 Деньги теперь хранятся на сервере. Перенесено ${fmtMoney(r.init.amt)} — больше за раз не переносится`,'alert');
   else if(cut>0)addEvent(`🏦 Сервер не засчитал ${fmtMoney(cut)}: столько за несколько минут не заработать`,'alert');
+  else if(noted){}
   else if(d>0&&!fresh)addEvent(`🏦 Зачислено на карту: ${fmtMoney(d)}`,'say');
   else if(d<0&&!fresh)addEvent(`🏦 Списано по данным сервера: ${fmtMoney(-d)}`,'alert');
   if(typeof saveState==='function')saveState();}

@@ -59,7 +59,7 @@ defSit('job',{title:'Работа',quiet:true,
     return {label:`${WORK[j.id].verb}: ${j.task.text.replace(/[!.]$/,'')}`,run:()=>{const tip=/barista|bartender/.test(j.id)&&Math.random()<0.6?Math.round(rnd(30,120)/10)*10:0;j.tasksDone++;j.task=null;j.taskT=rnd(15,35);player.energy=clamp(player.energy-2,0,100);if(tip){player.money+=tip;setHint(`Готово! Чаевые +${tip} ₽`);}else setHint('Готово!');}};},
   drawInside(s,it){const j=player.job;if(!j||!j.task||it.key!==j.key)return;const f=j.task.f;const p=0.5+0.5*Math.sin(performance.now()/200);ctx.strokeStyle=`rgba(43,176,98,${0.5+0.5*p})`;ctx.lineWidth=3;rrect(ctx,it.ox+(f.x-f.w/2-0.15)*it.iz,it.oy+(f.y-f.h/2-0.15)*it.iz,(f.w+0.3)*it.iz,(f.h+0.3)*it.iz,6);ctx.stroke();}});
 function shiftEnd(j,missedDay){j.done=true;unmark('job');const need=j.len*60;const frac=Math.min(1,j.present/need);
-  if(frac>=0.7){const bonus=(j.tasksDone||0)*50;sitMoney(j.pay+bonus,`💼 Смена в «${j.name}» закрыта${bonus?' (премия за работу '+bonus+' ₽)':''}`);sitMood(4);sitRep(1);}
+  if(frac>=0.7){j.full=(j.full||0)+1;/* полных смен на этой работе: бариста для игроков — после первой */const bonus=(j.tasksDone||0)*50;sitMoney(j.pay+bonus,`💼 Смена в «${j.name}» закрыта${bonus?' (премия за работу '+bonus+' ₽)':''}`);sitMood(4);sitRep(1);}
   else if(frac>=0.25){sitMoney(Math.round(j.pay*frac/10)*10,`💼 Неполная смена в «${j.name}»`);}
   else if((j.inGame||0)>=need*0.5){addEvent(`💼 Вы не вышли на смену в «${j.name}»`,'alert');strike(j,'прогул');}
   else if(!missedDay)addEvent(`💼 Смена в «${j.name}» прошла без вас — вас почти не было в игре, выговора нет`);}

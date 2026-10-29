@@ -32,6 +32,7 @@ function sharedPeerAt(x,y,r){
 }
 function sharedPeerAction(){
   const pr=sharedPeerAt(player.ix,player.iy,1.8);if(!pr)return null;
+  const bar=typeof barPeerAction==='function'?barPeerAction(pr):null;if(bar)return bar;   // игрок за стойкой — заказ (barista.js); написать — нажатием на него
   return {label:`Написать игроку: ${pr.name}`,run:()=>{if(sharedPeerHere(pr))openChatPanel('dm',pr.key);}};
 }
 function drawSharedPeople(){
@@ -45,7 +46,7 @@ function drawSharedLabels(it){
   const placed=[box(it.ox+player.ix*it.iz,it.oy+(player.iy-.55)*it.iz,player.name,player.avatarImg)];
   const nearby=[...peerRender.values()].filter(sharedPeerHere).sort((a,b)=>Math.hypot(a.ix-player.ix,a.iy-player.iy)-Math.hypot(b.ix-player.ix,b.iy-player.iy));
   let count=0;for(const pr of nearby){if(count>=(W<=600?6:12))break;
-    const name=pr.name.length>20?pr.name.slice(0,19)+'…':pr.name,sy=it.oy+(pr.iy-.55)*it.iz;
+    const name=(pr.rl==='barista'?'☕ ':'')+(pr.name.length>20?pr.name.slice(0,19)+'…':pr.name),sy=it.oy+(pr.iy-.55)*it.iz;
     const b=box(it.ox+pr.ix*it.iz,sy,name,pr.img);b.x=clamp(b.x,b.w/2+4,W-b.w/2-4);
     if(placed.some(a=>Math.abs(a.x-b.x)<(a.w+b.w)/2+3&&Math.abs(a.y-b.y)<(a.h+b.h)/2+3))continue;
     placed.push(b);count++;labelPlayer(b.x,sy,name,false,pr.img,pr.look&&pr.look.frame);
