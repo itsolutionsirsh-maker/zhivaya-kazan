@@ -96,7 +96,7 @@ function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   const pl=poiPlace(best,role);if(pl){use[pl.key]=(use[pl.key]||0)+(role==='work'?2:1);if(sp.label)pl.label=sp.label;}return pl;}
 function folkPlaces(f,A){const a=A[f.ward]||A.freedom;const seed=hashStr(f.id);const P={};
   P.home=f.id==='fidania'&&player.home?{x:player.home.cx,y:player.home.bb[3]+3,inside:true,key:'home:player',name:'ваш дом',kind:'home'}:(homeNear(a[0]+((seed%7)-3)*60,a[1]+((seed%5)-2)*60,420,seed)||spotPlace(a[0],a[1],'дом','home'));
-  P.yard=spotPlace(A.yard[0]+6,A.yard[1]+8,'во дворе','yard');
+  {const s=hashStr(f.id+'yard');P.yard=spotPlace(A.yard[0]+6+((s%51)-25),A.yard[1]+8+(((s>>>6)%51)-25),'во дворе','yard');if(P.yard){P.yard.x+=((s>>>12)%5)-2;P.yard.y+=((s>>>15)%5)-2;}}   /* во дворе у каждого своё место: раньше весь район стоял в одной точке */
   P.work=resolveSpec(normSpec(f.work),f,A,a,'work',P);
   P.haunt=resolveSpec(normSpec(f.haunt),f,A,a,'haunt',P);
   for(const k of ['work','haunt'])if(!P[k])P[k]=P.home;return P;}

@@ -2,7 +2,8 @@
 // 1) у каждого из семи заданий на карте есть хотя бы три места, куда можно зайти и которые засчитаются;
 // 2) задание засчитывается за три захода с подсказкой района и не засчитывается за чужой район;
 // 3) значки «Три района» и «Весь город» — по административным районам;
-// 4) в дождь дворник, лоток на улице и пара во дворе уходят домой, кто под крышей — остаётся; без дождя — по расписанию.
+// 4) в дождь дворник, лоток на улице и пара во дворе уходят домой, кто под крышей — остаётся; без дождя — по расписанию;
+// 5) во дворе района люди стоят на разных местах.
 // node tools/tests/districts-quests-browser.js <сборка> [порт, 8975]
 const {chromium}=require('playwright');
 const {spawn}=require('child_process');
@@ -56,6 +57,10 @@ let fails=0;const check=(ok,msg)=>{console.log((ok?'OK  ':'FAIL')+' '+msg);if(!o
     check(rain['дворник']==='work → home','дворник в дождь — домой: '+rain['дворник']);
     check(rain['пара во дворе']==='work → home','пара во дворе в дождь — домой: '+rain['пара во дворе']);
     check(rain['под крышей']==='work → work','под крышей — остаётся: '+rain['под крышей']);
+    // 5) во дворе района у каждого своё место, а не все в одной точке (85435a5 перевёл гараж, завод и дальние кафе во двор)
+    const yd=await ev(`(()=>{const by={};for(const f of FOLK.list){const y=f.places&&f.places.yard;if(!y)continue;(by[f.ward]=by[f.ward]||[]).push(Math.round(y.x)+','+Math.round(y.y));}
+      let worst=null;for(const [d,L] of Object.entries(by)){if(L.length<4)continue;const u=new Set(L).size;if(!worst||u/L.length<worst.u/worst.n)worst={d,n:L.length,u};}return worst;})()`);
+    check(yd&&yd.u>=Math.ceil(yd.n*0.6),`двор района: ${yd&&yd.n} человек на ${yd&&yd.u} разных местах (${yd&&yd.d})`);
     check(!errors.length,'без ошибок в консоли'+(errors.length?': '+errors.slice(0,3).join(' | '):''));
   }catch(e){console.log('FAIL',e.message);fails++;}
   finally{await b.close();srv.kill();}
