@@ -68,7 +68,7 @@ function venueBusy(kind,h){h=h??cityHour();const we=isWeekend();
     case 'metro':return h<6?0:rushHour()?1:Math.max(0.2,pedFactor(h)*0.75);
     default:return Math.max(0.25,pedFactor(h));}}
 function extraPatron(x,y,hx){const p=makePersona('resident');return {p,x,y,hx,hy:0,seated:true,phase:Math.random()*6,role:'resident',isInterior:true,state:'idle',memory:p.memory,extra:true};}
-function refreshCrowd(it){if(!it||it.kind==='home')return;
+function refreshCrowd(it){if(!it||it.kind==='home'||it.kind==='guest')return;
   if(!it.patrons){it.patrons=it.npcs.filter(n=>n.role==='resident'&&!n.companionOf);it.extras=[];
     // в час пик за свободные столики подсаживаются ещё люди
     // (примерно каждый третий столик остаётся свободным — игроку всегда есть куда сесть)
