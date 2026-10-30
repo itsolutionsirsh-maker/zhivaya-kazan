@@ -72,3 +72,6 @@ async function tgLink(name,pin){if(!acct||!acct.tg)return;const j=await acctCall
   if(j.err){tgMsg(E[j.err]||'Не получилось');return;}
   acct={token:j.token,name:j.name,tg:true,tgId:acct.tgId};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
   if(j.state){acctApply(j);return;}tgMsg('Привязали. Теперь Телеграм открывает игрока «'+j.name+'»');renderAcct();}
+// в Телеграме «Правила и конфиденциальность» и бот — через сам Телеграм: из мини-приложения обычная ссылка может не открыться
+document.addEventListener('click',e=>{if(!TG.on||!TG.W)return;const a=e.target&&e.target.closest&&e.target.closest('.legal a');if(!a)return;e.preventDefault();
+  try{if(/^https:\/\/t\.me\//.test(a.href)&&TG.W.openTelegramLink)TG.W.openTelegramLink(a.href);else if(TG.W.openLink)TG.W.openLink(a.href);else location.href=a.href;}catch(err){location.href=a.href;}});

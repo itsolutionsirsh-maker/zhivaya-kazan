@@ -39,12 +39,12 @@ function sqliteBackend(db){
     ops:db.prepare('SELECT * FROM wops WHERE k=? ORDER BY t DESC LIMIT ?'),
     gained:db.prepare("SELECT COALESCE(SUM(amt),0) AS n FROM wops WHERE k=? AND kind='local' AND amt>0 AND t>?"),
     count:db.prepare("SELECT COUNT(*) AS n FROM wops WHERE k=? AND kind='local' AND t>?"),
-    prune:db.prepare("DELETE FROM wops WHERE t<? AND kind='local'"),del:db.prepare('DELETE FROM wallet WHERE k=?'),
+    prune:db.prepare("DELETE FROM wops WHERE t<? AND kind='local'"),del:db.prepare('DELETE FROM wallet WHERE k=?'),delOps:db.prepare('DELETE FROM wops WHERE k=?'),
     sum:db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(bal),0) AS total FROM wallet')};
   let depth=0;
   return {kind:'sqlite',get:k=>q.get.get(k)||null,put:w=>q.put.run(w.k,w.bal,w.gen||0,w.day,w.dayIn,w.created,w.updated),op:(k,id)=>q.op.get(k,id)||null,
     add:o=>q.add.run(o.k,o.id,o.amt,o.req,o.kind,o.why,o.peer||null,o.bal,o.t),ops:(k,n)=>q.ops.all(k,n),gained:(k,since)=>q.gained.get(k,since).n,count:(k,since)=>q.count.get(k,since).n,
-    prune:before=>Number(q.prune.run(before).changes),del:k=>q.del.run(k),summary:()=>q.sum.get(),flush:()=>{},
+    prune:before=>Number(q.prune.run(before).changes),del:k=>q.del.run(k),erase:k=>{q.del.run(k);q.delOps.run(k);},summary:()=>q.sum.get(),flush:()=>{},
     // одна запись — одна транзакция: сохранение и его деньги, перевод — у обоих сразу; ошибка посреди — откат всего
     tx:fn=>{if(depth)return fn();depth++;db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){try{db.exec('ROLLBACK');}catch(_){}throw e;}finally{depth--;}}};}
 // запасное хранилище: журнал по аккаунтам в порядке времени; чистится только по сроку (номера помнятся keepDays),
@@ -60,7 +60,7 @@ function jsonBackend(file,fs){let S={w:{},ops:{}};if(file&&fs){try{S=JSON.parse(
     gained:(k,since)=>{const l=list(k);let s=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local'&&l[i].amt>0)s+=l[i].amt;return s;},
     count:(k,since)=>{const l=list(k);let n=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local')n++;return n;},
     prune:before=>{let n=0;for(const k in S.ops){const l=S.ops[k],m=l.filter(o=>o.t>=before||o.kind!=='local');n+=l.length-m.length;S.ops[k]=m;}if(n)dirty=true;return n;},
-    del:k=>{delete S.w[k];dirty=true;},summary:()=>{const v=Object.values(S.w);return {n:v.length,total:v.reduce((s,w)=>s+w.bal,0)};},tx:fn=>fn(),flush};}
+    del:k=>{delete S.w[k];dirty=true;},erase:k=>{delete S.w[k];delete S.ops[k];dirty=true;},summary:()=>{const v=Object.values(S.w);return {n:v.length,total:v.reduce((s,w)=>s+w.bal,0)};},tx:fn=>fn(),flush};}
 
 // ---------- сам кошелёк ----------
 // opt.now() — секунды (тесты подменяют); opt.limits — свои потолки
@@ -117,6 +117,8 @@ function Wallet(be,opt){opt=opt||{};const L=Object.assign({},LIM,opt.limits||{})
     ops:w?be.ops(k,Math.max(1,Math.min(200,n||30))).map(o=>({id:o.id,amt:o.amt,req:o.req,kind:o.kind,why:o.why,peer:o.peer,bal:o.bal,t:o.t})):[]};}
   // старые операции с устройств больше не нужны для повторов; начальные, переводы и начисления храним
   function prune(){return be.prune(now()-L.keepDays*86400);}
-  return {commit,transfer,grant,reset,info,prune,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
+  // удалить аккаунт по просьбе игрока (privacy.html): баланс и весь журнал
+  function erase(k){return be.tx(()=>{be.erase(k);return {ok:1};});}
+  return {commit,transfer,grant,reset,erase,info,prune,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
 
 module.exports={Wallet,sqliteBackend,jsonBackend,LIM,mskDay,stateTotal};
