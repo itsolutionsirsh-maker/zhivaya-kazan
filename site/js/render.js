@@ -87,6 +87,7 @@ function render(){
   for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;drawCarSprite(c.x,c.y,c.hx,c.hy,c.len,c.wid,c.color,c.kind,t,{crashed:c.crashed,flash:c.flash&&!c.crashed&&(c.target!=null||c.state==='scene')});}
   for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBusSprite(b);}
   drawRallyWorld(z,t);
+  if(window.cityCourtyard)cityCourtyard.draw(z,vx0,vy0,vx1,vy1,night);
   // ---- люди
   if(z>1.5){for(const w of walkers){if(w.bus||w.inside||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;if(w.state==='hurt')continue;drawPerson(w.x,w.y,w.hx,w.hy,w.p,w.phase,{moving:w.state==='walk'||w.state==='cross'||!!w.mv||!!w.walking,scale:1.5,filming:w.filming,time:t});}
     for(const w of walkers){if(w.state==='hurt'&&w.x>vx0&&w.x<vx1&&w.y>vy0&&w.y<vy1)drawPerson(w.x,w.y,w.hx,w.hy,w.p,0,{lying:true,scale:1.5});}}
@@ -102,6 +103,7 @@ function render(){
   // ---- ночь
   if(night>0.02){if(!lampSprite)makeLightSprites();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='screen';setWorld();ctx.globalAlpha=night;
     world.lgrid.query(vx0,vy0,vx1,vy1,l=>{if(l[0]<vx0||l[0]>vx1||l[1]<vy0||l[1]>vy1)return;ctx.drawImage(lampSprite,l[0]-13,l[1]-13,26,26);});
+    if(window.cityCourtyard)cityCourtyard.draw(z,vx0,vy0,vx1,vy1,night,true);
     const allv=cars.concat(buses);if(player.vehicle)allv.push(vehProxy(player.vehicle));for(const v of allv){if(v.crashed||v.x<vx0||v.x>vx1||v.y<vy0||v.y>vy1)continue;ctx.save();ctx.translate(v.x+v.hx*(v.len/2-0.5),v.y+v.hy*(v.len/2-0.5));ctx.rotate(Math.atan2(v.hy,v.hx));ctx.drawImage(beamSprite,0,-6,20,12);ctx.restore();}
     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     if(winLit.length&&night>0.3){ctx.fillStyle=`rgba(255,214,130,${0.5+0.45*night})`;ctx.beginPath();for(const q of winLit){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}}

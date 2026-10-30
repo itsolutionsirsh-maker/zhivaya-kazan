@@ -10,6 +10,7 @@ const {stageSharedVenue} = require('./shared-venues-fixtures');
 const {stageStoryScene} = require('./story-ui-fixtures');
 const {stageTerritoryScene} = require('./territory-fixtures');
 const {stageYardStory} = require('./yard-story-fixtures');
+const {stageCourtyard} = require('./courtyard-fixtures');
 const fs = require('fs');
 const DEV = process.argv[2], PORT = +process.argv[3] || 8790, OUT = process.argv[4] || '/tmp/shots';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -32,6 +33,20 @@ async function storyShots(browser){
       for(const kind of ['invite','choice','ending']){
         const fixture=await pg.evaluate(stageYardStory,{kind});await sleep(220);
         await pg.screenshot({path:`${OUT}/${name}_yard_${kind}.png`});console.log(name,'yard_'+kind,JSON.stringify(fixture));
+      }
+      if(errors.length)throw Error(errors.join('\n'));
+    }finally{await context.close();}
+  }
+}
+async function courtyardShots(browser){
+  for(const [width,height] of [[360,640],[390,844],[844,390],[1280,800]]){
+    const context=await browser.newContext({viewport:{width,height}}),pg=await context.newPage(),errors=[];pg.on('pageerror',e=>errors.push(String(e)));
+    try{
+      await pg.goto(`http://127.0.0.1:${PORT}/index.html`);await pg.waitForFunction(()=>document.getElementById('loading').hidden,null,{timeout:90000});
+      await pg.fill('#pName','Сосед');await pg.click('#startBtn');await pg.click('#howtoClose');await sleep(3500);
+      for(const [label,options] of [['before',{}],['done',{complete:true}],['night',{complete:true,night:true}],['journal',{complete:true,journal:true}]]){
+        const fixture=await pg.evaluate(stageCourtyard,options);await sleep(350);await pg.screenshot({path:`${OUT}/${width}_courtyard_${label}.png`});console.log(width,'courtyard_'+label,JSON.stringify(fixture));
+        if(options.journal&&fixture.supported){const box=await pg.locator('#courtyardModal .ui-sheet-close').boundingBox();if(!box||box.x<0||box.y<0||box.x+box.width>width+1||box.y+box.height>height+1)throw Error('Courtyard close outside viewport');}
       }
       if(errors.length)throw Error(errors.join('\n'));
     }finally{await context.close();}
@@ -238,6 +253,7 @@ async function phoneUIShots(browser){
     }
     await phoneUIShots(b);
     await storyShots(b);
+    await courtyardShots(b);
   } finally { if(b)await b.close(); srv.kill(); }
   console.log('снимки в', OUT);
   console.log(errors.length ? errors.join('\n') : 'no page errors');

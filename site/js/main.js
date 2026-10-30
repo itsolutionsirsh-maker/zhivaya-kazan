@@ -92,6 +92,7 @@ function findAction(){
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
     return {label:isLightVehicle(v.kind)?`Оставить ${v.spec.label} здесь`:'Припарковать и выйти',run:exitVehicle};}
   {const sa=sitAction();if(sa)return sa;}
+  {const ca=window.cityCourtyard&&cityCourtyard.action();if(ca)return ca;}
   if(player.waitingStop)return {label:`Ждём транспорт на «${player.waitingStop.n}» · отменить`,run:()=>{player.waitingStop=null;if(player.busPlan)cancelTrip(true);setHint('Вы передумали ехать');}};
   // пришли с жителем к месту, о котором договорились — E заводит внутрь обоих (а не открывает разговор с ним)
   if(companion&&companion.dest&&companion.dest.poi&&poiDist(companion.dest.poi,player.x,player.y)<(companion.arrived?32:16)){const a=poiAction(companion.dest.poi);if(a)return actTarget({label:`${a.label} (${companion.w.p.name} с вами)`,run:a.run},companion.dest.poi,'poi',poiBuilding(companion.dest.poi));}

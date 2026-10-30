@@ -13,6 +13,7 @@ const {WebSocketServer}=require('ws');
 const VenueRoom=require('../../site/js/venue-room.js');
 const WalletLib=require('./wallet.js');
 const TerritoryLib=require('./territories.js');
+const CourtyardLib=require('./courtyard.js');
 const RealWorldLib=require('./realworld.js');
 const SharedEventsLib=require('./shared-events.js');
 const RolesLib=require('./roles.js');
@@ -143,6 +144,9 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
 const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
 setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
 const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sqliteBackend(store.db):TerritoryLib.jsonBackend(path.join(DATA,'territories.json'),fs),{onStory:(key,stage)=>store.funnel('foreignyard',stage,sha('yard:'+key).slice(0,16),mskDay())});
+const courtyard=CourtyardLib.create({db:store.db,fs,file:path.join(DATA,'courtyard.json'),auth:token=>accByToken(token),
+  presence:cid=>players.get(pubOf(cid)),blocked:p=>modBlocked(p),meta:getTerritoryMeta,allow,modToken:()=>ENV.MOD_TOKEN,log,
+  name:(a,p)=>Mod.name(clean(p.meta&&p.meta.n||a.name,24),'Сосед')});
 // Resolve the same projection served to the client. A missing map disables territory actions.
 let territoryMeta=null,territoryMapFile='';
 function getTerritoryMeta(){const file=mapDir()?path.join(MAP_DIR,'base.json'):path.join(ROOT,'kazan.json');
@@ -273,7 +277,7 @@ function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)
 function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}barSend(roles.reset(a.k));/* заказы у баристы этого аккаунта — отмена */const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 // удалить аккаунт по просьбе игрока (privacy.html, бот /delete): вход, прогресс, кошелёк, районы; заказы у баристы — отмена
 function deleteAccount(k){const a=store.get(k);if(!a)return {err:'no_account'};barSend(roles.reset(k));
-  try{wallet.erase(k);territories.reset(k);store.remove(k);}catch(e){log('удаление аккаунта не прошло:',e.message);return {err:'busy'};}
+  try{wallet.erase(k);territories.reset(k);courtyard.forget(k);store.remove(k);}catch(e){log('удаление аккаунта не прошло:',e.message);return {err:'busy'};}
   for(const p of players.values())if(p.acc&&p.acc.k===k)p.acc=null;return {ok:1,deleted:k};}
 
 // ---------- игроки онлайн ----------
@@ -534,6 +538,7 @@ async function handleReq(req,res){
     const a=u.searchParams.get('a')||body.a||'';
     if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,roles:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
+    if(a==='courtyard'){const [status,result]=courtyard.handle(req,body,ip);return send(res,status,result);}
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
     if(a==='city')return send(res,200,Object.assign({},realworld.snapshot(),{sev:sev.snapshot()}));
     if(a==='ratings')return send(res,200,{ok:1,coffeeWeek:roles.top()});   // «Бариста недели»: имя в игре и чашки за неделю
