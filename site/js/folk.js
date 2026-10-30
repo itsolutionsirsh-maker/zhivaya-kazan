@@ -109,7 +109,14 @@ function folkReanchor(){if(!FOLK.ready)return;const A=folkAnchors();for(const f 
 // где должен быть по часам
 function folkWant(f){const h=cityHour();const off=f.dayOff&&isWeekend();const D=(off?f.dayOff:f.day)||[[0,'home'],[9,'work'],[18,'haunt'],[22,'home']];let at=D[D.length-1][1];for(const [hh,k] of D){if(h>=hh)at=k;}
   // закрытое место — значит не там
-  const pl=f.places[at];if(pl&&pl.poi&&at==='haunt'&&typeof poiOpen==='function'&&!poiOpen(pl.poi))return 'home';return at;}
+  const pl=f.places[at];if(pl&&pl.poi&&at==='haunt'&&typeof poiOpen==='function'&&!poiOpen(pl.poi))return 'home';
+  // дождь: кто стоит на улице без крыши, уходит домой. Как распогодится — расписание возвращает его назад.
+  if(typeof weather!=='undefined'&&weather.kind==='rain'&&pl&&!pl.inside){
+    const yard=(f.do||[]).includes('yard_ask');
+    const broom=f.type==='janitor'||/дворник/.test(f.job||'');
+    const tray=f.type==='seller'&&(pl.kind==='street'||pl.kind==='yard'||pl.kind==='market');
+    if(yard||broom||tray)return 'home';}
+  return at;}
 function folkWhere(id){const f=FOLK.list.find(q=>q.id===id);if(!f)return null;const pl=f.trip?f.places[f.trip.to]:f.places[f.at];
   if(f.driving)return {id,name:f.name,at:'road',place:'за рулём такси',x:f.driving.x,y:f.driving.y,known:f.met>0,text:`${f.name} везёт пассажира`};
   return {id,name:f.name,at:f.trip?'road':f.at,place:pl?pl.name:'',x:(f.w?f.w.x:pl&&pl.x),y:(f.w?f.w.y:pl&&pl.y),known:f.met>0,text:f.trip?`${f.name} идёт ${f.trip.to==='home'?'домой':'в «'+(pl&&pl.name)+'»'}`:f.at==='home'?`${f.name} дома`:f.at==='work'?`${f.name} на работе${pl&&pl.inside&&pl.key!=='taxi'?' в «'+pl.name+'»':pl?' · '+pl.name:''}`:`${f.name} ${pl&&pl.inside?'в «'+pl.name+'»':pl?pl.name:''}`};}
