@@ -115,6 +115,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
       tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
       tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setPin:db.prepare('UPDATE accounts SET salt=?,pin=? WHERE k=?'),
       imp:db.prepare('INSERT OR REPLACE INTO accounts(k,name,salt,pin,tok,state,profile,city,created,updated,fails,lock_until,tg,refBy,invites) VALUES(?,?,?,?,\'\',?,?,?,?,?,0,0,?,?,?)'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)'),
+      rmAcc:db.prepare('DELETE FROM accounts WHERE k=?'),rmTok:db.prepare('DELETE FROM tokens WHERE k=?'),rmTg:db.prepare('DELETE FROM tgmap WHERE k=?'),
       vis:db.prepare('INSERT OR IGNORE INTO visits(d,id) VALUES(?,?)'),first:db.prepare('INSERT OR IGNORE INTO firsts(id,d,src) VALUES(?,?,?)'),
       dau:db.prepare('SELECT d,COUNT(*) n FROM visits WHERE d>=? GROUP BY d'),nu:db.prepare('SELECT d,COUNT(*) n FROM firsts WHERE d>=? GROUP BY d'),
       ret:db.prepare("SELECT f.d,COUNT(*) n FROM firsts f JOIN visits v ON v.id=f.id AND v.d=date(f.d,'+'||?||' day') WHERE f.d>=? GROUP BY f.d"),
@@ -125,7 +126,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
       addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
       importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
       importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
-      setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n,
+      remove:k=>{q.rmAcc.run(k);q.rmTok.run(k);q.rmTg.run(k);},setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n,
       visit:(id,d,src)=>{q.vis.run(d,id);q.first.run(id,d,src||'');},funnel:(s,st,id,d)=>q.fun.run(s,st,id,d),funnelStats:from=>q.funStat.all(from),
       stats:from=>{const m=rows=>Object.fromEntries(rows.map(r=>[r.d,r.n]));return {dau:m(q.dau.all(from)),nu:m(q.nu.all(from)),r1:m(q.ret.all(1,from)),r7:m(q.ret.all(7,from)),src:q.src.all(from),everyone:q.everyone.get().n};},
       backup:file=>db.exec("VACUUM INTO '"+file.replace(/'/g,"''")+"'")};}
@@ -135,7 +136,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},setPin:(k,salt,pin)=>{acc[k].salt=salt;acc[k].pin=pin;dirty=true;},
     importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
-    setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
+    remove:k=>{delete acc[k];dirty=true;},setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
     visit:()=>{},funnel:()=>{},funnelStats:()=>[],stats:()=>null,backup:file=>fs.copyFileSync(F,file),flush};})();
 // ---------- кошелёк: деньги аккаунта на сервере (wallet.js) ----------
 // Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
@@ -221,6 +222,16 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
   // /key — ключ модератора, только админу (ADMIN_TG_ID) и только в личке с ботом
   if(msg&&msg.chat&&/^\/key\b/.test(text)){const admin=String(ENV.ADMIN_TG_ID||'');const isAdmin=admin&&msg.chat.type==='private'&&String(msg.from&&msg.from.id)===admin;
     return [200,{method:'sendMessage',chat_id:msg.chat.id,text:isAdmin?'Ключ модератора для '+(PUBLIC_URL||'')+'mod.html:\n'+String(ENV.MOD_TOKEN||'')+'\n\nНикому не пересылайте. Это сообщение можно удалить.':'Эта команда только для владельца игры.'}];}
+  // /support и /delete — сообщение команде (админу в Телегу); ответ — тут же, в чате с ботом (privacy.html)
+  const sm=msg&&msg.chat&&msg.chat.type==='private'&&/^\/(support|delete)(?:@\w+)?(?:\s+([\s\S]*))?$/.exec(text);
+  if(sm){const chat=msg.chat.id;if(!allow('sup:'+chat,5,3600))return [200,{method:'sendMessage',chat_id:chat,text:'Слишком много сообщений подряд. Попробуйте через час.'}];
+    const f=msg.from||{},who=clean([f.first_name,f.last_name].filter(Boolean).join(' '),60)||'без имени',acc=store.tgGet(String(f.id||''));
+    const body=clean(sm[2]||'',800);sendAdmin((sm[1]==='delete'?'🗑 Просьба удалить аккаунт':'📨 Обращение')+` от ${who}${f.username?' @'+clean(f.username,40):''} (Telegram ${f.id}${acc?', аккаунт '+acc:''}):\n${body||'—'}\n\nОтветить: /reply ${chat} текст`+(sm[1]==='delete'?`\nУдалить: /mod.html → «Кошелёк игрока» → ${acc||'имя для входа'} → «Удалить аккаунт»`:''));
+    return [200,{method:'sendMessage',chat_id:chat,text:sm[1]==='delete'?'Просьбу передали. Удалим аккаунт, прогресс и кошелёк в течение 30 дней и напишем сюда, когда готово. Если входили по имени и PIN, пришлите имя для входа: /delete имя':'Сообщение передали команде игры. Ответим здесь, в этом чате.'}];}
+  // ответ игроку от админа: /reply <chat id> <текст> — только из лички админа с ботом
+  const rm=msg&&msg.chat&&/^\/reply\s+(-?\d{3,15})\s+([\s\S]+)$/.exec(text);
+  if(rm){const admin=String(ENV.ADMIN_TG_ID||'');if(!admin||msg.chat.type!=='private'||String(msg.from&&msg.from.id)!==admin)return [200,{ok:1}];
+    return [200,{method:'sendMessage',chat_id:+rm[1],text:'Ответ команды «Живой Казани»:\n'+clean(rm[2],1500)}];}
   if(!msg||!msg.chat||msg.chat.id==null||!/^\/(start|play|help)\b/.test(text))return [200,{ok:1}];
   const url=PUBLIC_URL||('https://'+String(req.headers.host||'').replace(/[^a-z0-9.:-]/gi,'')+'/');const name=clean((msg.from&&msg.from.first_name)||'',40);
   return [200,{method:'sendMessage',chat_id:msg.chat.id,
@@ -260,6 +271,10 @@ function tgEditDone(cq,text){const msg=cq.message;if(!msg||!msg.chat)return;fetc
 function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)return {err:'auth'};name=clean(name,24);const k=name.toLowerCase();const a=store.get(k);if(!a)return {err:'no_account'};
   const r=login(name,pin,ip);if(r.err)return r;store.tgSet(cur.tg,k);return Object.assign(r,{linked:true});}
 function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}barSend(roles.reset(a.k));/* заказы у баристы этого аккаунта — отмена */const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
+// удалить аккаунт по просьбе игрока (privacy.html, бот /delete): вход, прогресс, кошелёк, районы; заказы у баристы — отмена
+function deleteAccount(k){const a=store.get(k);if(!a)return {err:'no_account'};barSend(roles.reset(k));
+  try{wallet.erase(k);territories.reset(k);store.remove(k);}catch(e){log('удаление аккаунта не прошло:',e.message);return {err:'busy'};}
+  for(const p of players.values())if(p.acc&&p.acc.k===k)p.acc=null;return {ok:1,deleted:k};}
 
 // ---------- игроки онлайн ----------
 // p = {sid,id,x,y,hx,hy,b,meta,metaV,ws,t,cell,view:Map(sid→{v,x,y}),http}
@@ -351,6 +366,9 @@ function modAdmin(req,body){const key=String(ENV.MOD_TOKEN||'');const got=String
     if(pl&&pl.ip&&body.ip!==false)modState.ipbans[pl.ip]={until,id:target};modSave();return {ok:1,banned:target,until};}
   if(act==='unban'&&target.length>=8){delete modState.bans[target];for(const [ip,b] of Object.entries(modState.ipbans))if(b.id===target)delete modState.ipbans[ip];mutes.delete(target);modSave();return {ok:1};}
   if(act==='mute'&&target.length>=8){mutes.set(target,t+Math.max(1,+body.minutes||60)*60);return {ok:1};}
+  // удалить аккаунт навсегда: сначала без confirm — ответ с ключом аккаунта, потом confirm равен ключу (защита от промаха)
+  if(act==='delete'){const k=modAccKey(body.name);if(!k||!store.get(k))return {err:'no_account'};if(body.confirm!==k)return {err:'confirm',k,name:store.get(k).name};
+    const r=deleteAccount(k);if(r.ok)log('аккаунт удалён модератором:',k);return r;}
   // кошелёк игрока: баланс и журнал; grant — начислить или списать с причиной (id из формы: двойной клик не начислит дважды)
   if(act==='wallet'||act==='grant'){const k=modAccKey(body.name);if(!k)return {err:'no_account'};
     if(act==='grant'){const why=clean(body.why,80);if(!why)return {err:'why'};const r=wallet.grant(k,body.amt,typeof body.id==='string'?body.id:undefined,why,'mod');if(r.err)return r;if(!r.dup)log('кошелёк: модератор',r.amt,'у',k,why);}
@@ -538,7 +556,7 @@ async function handleReq(req,res){
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})(),roles:{baristas:roles.onDuty(),orders:roles.count()}});}
-  let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';
+  let rel;try{rel=decodeURIComponent(u.pathname);}catch(e){return send(res,400,{err:'bad_path'});}if(rel.endsWith('/'))rel+='index.html';if(rel==='/privacy'||rel==='/rules')rel='/privacy.html';   /* правила и конфиденциальность — короткий адрес */
   // карта всей Казани кусками собирается на сервере (tools/citymap.sh) в MAP_DIR и отдаётся по /map/…
   let root=ROOT;if(rel.startsWith('/map/')&&mapDir()){root=MAP_DIR;rel=rel.slice(4);}
   const file=path.join(root,path.normalize(rel).replace(/^([/\\])+/,''));

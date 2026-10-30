@@ -342,6 +342,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 #nextGoal[data-folded=true]{display:flex;align-items:center;gap:8px}#nextGoal[data-folded=true] .goal-copy{flex:1}
 @media(max-width:640px),(pointer:coarse) and (max-height:500px){#nextGoal{width:100%;padding:7px 10px}#nextGoal p{max-height:3.0em;overflow:auto}#nextGoal strong{font-size:13px}}
 @media(max-height:500px){#nextGoal{max-width:350px}#nextGoal p{display:none}}
+.legal{font-size:12px;line-height:1.4;color:#8FA3AE;margin:10px 0 0}.legal a{color:#7FD1A8}
 </style>
 
 <canvas id="map"></canvas>
@@ -399,6 +400,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div class="row"><div class="field" style="flex:1"><label for="pRole">Роль</label><select id="pRole"><option value="resident">Житель</option><option value="tourist">Турист</option><option value="courier">Курьер</option><option value="student">Студент КФУ</option></select></div>
       <div class="field"><label for="pCar">Своя машина</label><div class="row" style="gap:8px"><input type="checkbox" id="pCar" checked><input type="color" id="pCarColor" value="#C62828" title="Цвет машины"></div></div></div>
     <div class="row"><button class="btn primary" id="startBtn">Выйти в город</button></div>
+    <p class="legal">Играя, вы соглашаетесь с <a href="privacy.html#rules" target="_blank" rel="noopener">правилами</a> и <a href="privacy.html#privacy" target="_blank" rel="noopener">политикой конфиденциальности</a>. 16+</p>
   </div>
 </div>
 
@@ -561,6 +563,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <p id="statsLbl"></p>
     <div class="row menu-options"><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button></div>
+    <p class="legal"><a href="privacy.html" target="_blank" rel="noopener">Правила и конфиденциальность</a> · помощь и удаление аккаунта — в боте <a href="https://t.me/zhivaya_kazan_bot" target="_blank" rel="noopener">@zhivaya_kazan_bot</a></p>
   </div>
 </div>
 

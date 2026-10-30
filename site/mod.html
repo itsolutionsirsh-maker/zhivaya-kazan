@@ -85,7 +85,11 @@ async function wallet(name,body){const O=$('#wOut');const j=await call(Object.as
   go.onclick=async()=>{const v=Math.trunc(+amt.value);if(!v){alert('Сумма — целое число, не ноль');return;}if(!confirm(`${v>0?'Начислить':'Списать'} ${Math.abs(v)} ₽ игроку «${j.name}»?`))return;go.disabled=true;await wallet(name,{do:'grant',amt:v,why:why.value,id:opid});};
   f.append(amt,why,go);c.append(f);const T=el('table','wj');const h=el('tr');for(const t of ['Когда','Что','Запрошено','Проведено','Баланс'])h.append(el('th',null,t));T.append(h);
   for(const o of j.ops){const tr=el('tr');tr.append(el('td',null,fmt(o.t)),el('td',null,(KIND[o.kind]||o.kind)+(o.why?' · '+o.why:'')+(o.peer?' · '+o.peer:'')),el('td',null,String(o.req)),el('td',null,String(o.amt)),el('td',null,String(o.bal)));T.append(tr);}
-  const w=el('div','wrap');w.append(T);c.append(w);O.append(c);}
+  const w=el('div','wrap');w.append(T);c.append(w);
+  // по просьбе игрока (бот /delete, privacy.html): навсегда — вход, прогресс, кошелёк
+  const del=el('button','bad','Удалить аккаунт');del.onclick=async()=>{if(!confirm(`Удалить аккаунт «${j.name}» (${j.k}) навсегда? Вход, прогресс и кошелёк пропадут, вернуть нельзя.`))return;
+    const r=await call({do:'delete',name,confirm:j.k}).catch(()=>({err:'нет связи'}));O.innerHTML='';O.append(el('p','msg',r.ok?`Аккаунт ${r.deleted} удалён. Напишите игроку в боте: /reply и номер чата из сообщения.`:'Ошибка: '+(r.err||'?')));};
+  const dr=el('div','row');dr.style.marginTop='10px';dr.append(del);c.append(dr);O.append(c);}
 const mskT=at=>new Date(at).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 async function city(body){const j=await call(Object.assign({do:'city'},body||{})).catch(()=>({err:'нет связи'}));const O=$('#cOut');O.innerHTML='';
   if(!j.ok){O.textContent='Ошибка: '+(j.err==='text'?'нужен текст МЧС':j.err||'?');return;}
