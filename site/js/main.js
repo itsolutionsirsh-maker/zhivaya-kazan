@@ -316,7 +316,11 @@ function weatherLabel(){const k=weather.kind,t=weather.t;const ic=k==='rain'?'�
   return ic+' '+({rain:'дождь',snow:'снег',fog:'туман',cloudy:'пасмурно'}[k]||'ясно')+(t!=null?' '+(t>0?'+':t<0?'−':'')+Math.abs(t)+'°':'')+(weather.ice?' · гололёд':'');}
 
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
-function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   // не чаще ~60 кадров: на экранах 120 Гц вдвое меньше работы и батареи
+// следующий кадр заказываем сразу: если в кадре что-то упадёт, игра не замрёт (раньше ошибка останавливала весь цикл — экран вставал)
+const FRAME_ERR=new Set();
+function frame(now){requestAnimationFrame(frame);if(now-last<15.5)return;   // не чаще ~60 кадров: на экранах 120 Гц вдвое меньше работы и батареи
+  try{frameBody(now);}catch(e){const k=String(e&&e.message);if(!FRAME_ERR.has(k)){FRAME_ERR.add(k);console.error('кадр:',e);}}}
+function frameBody(now){
   const rdt=Math.min(0.05,(now-last)/1000);last=now;
   if(world){const dt=cine?rdt*0.18:rdt;
     updateClock(dt);updateWeather(dt);processPaths(6);updateRoadPeds();chunkTick(rdt);populationFollow(rdt);populationCam(rdt);engineTick(rdt);
@@ -333,7 +337,7 @@ function frame(now){if(now-last<15.5){requestAnimationFrame(frame);return;}   //
     presTimer-=rdt;if(presTimer<=0){presTimer=0.12;pushPresence();}
     if(hintTtl>0){hintTtl-=rdt;if(hintTtl<=0)$('#hint').hidden=true;}
     if(scene==='interior')renderInterior();else render();}
-  requestAnimationFrame(frame);}
+}
 function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;{const wl=$('#weatherLbl'),txt=weatherLabel();if(wl.textContent!==txt){wl.textContent=txt;wl.title=weather.real?'Настоящая погода в Казани · MET Norway (CC BY 4.0)':'';}}
   setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){setBar('#bDrunk',dr);$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
   if(typeof window.uiUpdateHud==='function')window.uiUpdateHud();

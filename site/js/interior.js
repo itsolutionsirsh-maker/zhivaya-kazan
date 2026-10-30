@@ -52,7 +52,7 @@ function makeInterior(kind,name,key,room){
 function enterInterior(src){insideShot(src);const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
   interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
   addEvent(`Вы зашли в ${qName(src.name)}`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
-function exitInterior(){const it=interior;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
+function exitInterior(){const it=interior;if(!it)return;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
   if(y>it.h-0.35-r){if(Math.abs(x-it.door.x)<0.85)return y>it.h+0.8;return true;}
@@ -61,8 +61,8 @@ function moveInside(dx,dy){const r=0.3;let ok=false;if(!blockedInside(player.ix+
   if(player.iy>interior.h+0.4){exitInterior();return false;}return ok;}
 function updateInterior(dt){const it=interior;let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
   const m=Math.hypot(mx,my);
-  if(m>0.05){player.iwp=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=3.6*dt*Math.min(1,m)*dk;moveInside(mx*sp,my*sp);player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
-  else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(3.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
+  if(m>0.05){player.iwp=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const sp=3.6*dt*Math.min(1,m)*dk;moveInside(mx*sp,my*sp);if(interior!==it)return;player.ihx=mx;player.ihy=my;player.phase+=dt*7;}
+  else if(player.iwp){const w=player.iwp;const d=dist(w[0],w[1],player.ix,player.iy);if(d<0.15)player.iwp=null;else{const dx=(w[0]-player.ix)/d,dy=(w[1]-player.iy)/d;const st=Math.min(3.6*dt,d);if(!moveInside(dx*st,dy*st))player.iwp=null;if(interior!==it)return;player.ihx=dx;player.ihy=dy;player.phase+=dt*7;}}
   for(const n of it.npcs){if(!n.wander||n===chatNpc)continue;n.t=(n.t||0)-dt;if(n.t<=0){n.t=rnd(3,9);n.tx=clamp(n.x+rnd(-3,3),1,it.w-1);n.ty=clamp(n.y+rnd(-3,3),2.2,it.h-1.4);}
     const d=dist(n.tx,n.ty,n.x,n.y);if(d>0.1){const dx=(n.tx-n.x)/d,dy=(n.ty-n.y)/d;const st=Math.min(0.8*dt,d);const nx=n.x+dx*st,ny=n.y+dy*st;if(!blockedInside(nx,ny,0.3)){n.x=nx;n.y=ny;n.hx=dx;n.hy=dy;n.phase+=dt*5;}else n.t=0;}}}
 function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}const it=interior;const px=player.ix,py=player.iy;let best=null,bd=1e9;
