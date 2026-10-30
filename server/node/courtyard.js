@@ -68,8 +68,11 @@ function Courtyard(be,opt={}){
     s.claims={};s.rev++;s.audit.unshift({at:now(),stage:b.stage,reason,removed});s.audit=s.audit.slice(0,30);
     s.moderator.push({id:b.request,sig});s.moderator=s.moderator.slice(-64);be.save(s);return reply();
   });}
+  // аккаунт удалён по просьбе игрока (privacy.html): его вклад остаётся во дворе, но без имени и без связи с аккаунтом
+  function forget(k){return be.tx(()=>{const s=be.load(),h=key(k);let n=0;if(s.accounts[h]){delete s.accounts[h];n++;}if(s.claims[h]){delete s.claims[h];n++;}
+    for(const d of Object.values(s.done))if(d.by===h){d.by='deleted';d.name='Сосед';n++;}if(n){s.rev++;be.save(s);}return n;});}
   function restart(){be.tx(()=>{const s=be.load();if(Object.keys(s.claims).length){s.claims={};s.rev++;be.save(s);}});}
-  return {read,act,moderate,restart};
+  return {read,act,moderate,restart,forget};
 }
 // HTTP/auth/rate limiting stay here; server.js only supplies existing dependencies and routes.
 function create(o){
@@ -91,6 +94,6 @@ function create(o){
       return [200,yard.act(a,cid,ip,b)];
     }catch(e){o.log('общий двор: запись не выполнена',e.message);return [503,{err:'busy'}];}
   }
-  return {handle};
+  return {handle,forget:k=>yard.forget(k)};
 }
 module.exports={Courtyard,sqliteBackend,jsonBackend,create};

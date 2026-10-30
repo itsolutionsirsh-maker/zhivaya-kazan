@@ -277,7 +277,7 @@ function tgLink(token,name,pin,ip){const cur=accByToken(token);if(!cur||!cur.tg)
 function resetFor(token){const a=accByToken(token);if(!a)return {err:'auth'};try{wallet.reset(a.k,()=>{territories.reset(a.k);store.save(a.k,null,a.profile,null);});}catch(e){log('сброс не записался:',e.message);return {err:'busy'};}barSend(roles.reset(a.k));/* заказы у баристы этого аккаунта — отмена */const b=store.get(a.k);return {ok:1,updated:b?b.updated:now()};}
 // удалить аккаунт по просьбе игрока (privacy.html, бот /delete): вход, прогресс, кошелёк, районы; заказы у баристы — отмена
 function deleteAccount(k){const a=store.get(k);if(!a)return {err:'no_account'};barSend(roles.reset(k));
-  try{wallet.erase(k);territories.reset(k);store.remove(k);}catch(e){log('удаление аккаунта не прошло:',e.message);return {err:'busy'};}
+  try{wallet.erase(k);territories.reset(k);courtyard.forget(k);store.remove(k);}catch(e){log('удаление аккаунта не прошло:',e.message);return {err:'busy'};}
   for(const p of players.values())if(p.acc&&p.acc.k===k)p.acc=null;return {ok:1,deleted:k};}
 
 // ---------- игроки онлайн ----------

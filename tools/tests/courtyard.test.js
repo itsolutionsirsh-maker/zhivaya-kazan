@@ -88,3 +88,12 @@ test('courtyard footprint avoids buildings, traffic, parks and water on the ship
   for(const f of ['util.js','world.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../../site/js',f),'utf8'),ctx);vm.runInContext('buildWorld(input)',ctx);
   assert.equal(vm.runInContext(`(()=>{const p=D.point(world.meta);for(let x=-6;x<=6;x+=2)for(let y=-6;y<=6;y+=2){const a=p.x+x,b=p.y+y,r=nearestRoadSeg(a,b,14);if(inBuilding(a,b)||r&&r.d<r.seg.r.hw+1)return false;}if(world.areas.some(a=>['park','water','forest','pitch'].includes(a.k)&&pointInPoly(a.p,p.x,p.y)))return false;return nearestNode(p.x,p.y,world.pedAdj,30)>=0;})()`,ctx),true);
 });
+
+for(const kind of ['json','sqlite'])test(kind+': удалённый аккаунт (privacy.html) — вклад остаётся, имя и связь с аккаунтом убраны',t=>{
+  const f=setup(t,kind);f.finish('a','bench:0');f.finish('b','bench:1');
+  assert.ok(f.yard.read().contributors.some(c=>c.name==='a'));
+  assert.equal(f.yard.forget('a'),2,'аккаунт и одна работа');
+  const s=f.yard.read();assert.equal(Object.keys(s.done).length,2,'работы на месте');
+  assert.ok(!s.contributors.some(c=>c.name==='a'));assert.ok(s.contributors.some(c=>c.name==='Сосед'&&c.count===1));
+  assert.equal(f.yard.read('a','a').me.today,0,'счётчик аккаунта стёрт');assert.equal(f.yard.forget('a'),0,'второй раз — нечего');
+});
