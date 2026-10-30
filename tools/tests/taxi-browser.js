@@ -45,6 +45,8 @@ const mod=body=>api('mod',body,{'x-mod-token':MOD});
     const S=await D.evaluate(()=>{const n=nearestNode(0,0,world.carAdj,800);const q=world.nodes[n];return {x:q[0],y:q[1]};});
     await D.evaluate(s=>{player.x=s.x;player.y=s.y;player.hasCar=true;ownCar={kind:'own',x:s.x,y:s.y,hx:1,hy:0,color:'#C62828',parked:true};enterVehicle(ownCar);pushPresence();},S);
     check(await D.evaluate('player.vehicle&&player.vehicle.kind==="own"'),'Ильдар за рулём своей машины');
+    // сервер узнаёт, что игрок за рулём, со следующей отправкой «как выглядит» (не чаще раза в 140 мс) — подождать её
+    await D.waitForFunction(()=>typeof wsLastMeta==='string'&&JSON.parse(wsLastMeta).v==='own',null,{timeout:5000}).catch(()=>{});await sleep(300);
     await P.evaluate(s=>{player.x=s.x+10;player.y=s.y;player.waypoints=null;player.navDest={x:s.x+450,y:s.y,n:'Тестовая точка'};pushPresence();},S);
     await D.waitForFunction(()=>[...peerRender.values()].some(p=>p.name==='Лиля'&&!p.b&&dist(p.x,p.y,player.x,player.y)<25),null,{timeout:15000}).catch(()=>{});
     await clear(D);await clear(P);
@@ -91,10 +93,10 @@ const mod=body=>api('mod',body,{'x-mod-token':MOD});
     // 6) Марат садится и выходит раньше — без денег
     const M=await open('Марат','tx-m-'+tag);
     await M.evaluate(s=>{player.x=s.x+460;player.y=s.y;player.waypoints=null;player.navDest={x:s.x+460,y:s.y+600,n:'Север'};pushPresence();},S);
-    await P.evaluate(()=>{player.x+=300;pushPresence();});
+    await P.evaluate(()=>{player.x+=300;pushPresence();});await D.waitForFunction(n=>[...peerRender.values()].every(p=>p.name!==n||dist(p.x,p.y,player.x,player.y)>100),'Лиля',{timeout:8000}).catch(()=>{});   // водитель должен увидеть, что Лиля ушла: иначе E предложит снова ей
     await D.waitForFunction(()=>[...peerRender.values()].some(p=>p.name==='Марат'&&!p.b&&dist(p.x,p.y,player.x,player.y)<25),null,{timeout:15000}).catch(()=>{});
     await D.evaluate(()=>{TP.wait=null;});await clear(M);
-    check(/Предложить подвезти: Марат/.test(await act(D)||''),'Ильдар у Марата');await runAct(D);
+    {const a=await act(D);check(/Предложить подвезти: Марат/.test(a||''),'Ильдар у Марата: '+a+' '+await D.evaluate(()=>JSON.stringify([...peerRender.values()].map(p=>[p.name,p.b,!!p.veh,Math.round(dist(p.x,p.y,player.x,player.y))]))));}await runAct(D);
     check(await waitCard(M,'предлагает подвезти'),'Марату пришло предложение');await pickCard(M,'предлагает подвезти','^Север$');
     check(await waitCard(D,'Марат: до «Север»'),'Ильдару: Марат едет на «Север»');await pickCard(D,'Север','^250');
     check(await waitCard(M,'— 250'),'Марату: 250 ₽');const balM0=(await mod({do:'wallet',name:'tx-m-'+tag})).bal;await pickCard(M,'— 250','^Сесть');
@@ -108,7 +110,7 @@ const mod=body=>api('mod',body,{'x-mod-token':MOD});
     check(await D.evaluate(`[...peerRender.values()].some(p=>p.name==='Марат'&&!p.b)`),'Марата снова видно');
     // 7) Гузель отказывается — Ильдар отвечает строкой без обиды
     const G=await open('Гузель','tx-g-'+tag);const dpos=await D.evaluate('({x:player.x,y:player.y})');
-    await M.evaluate(()=>{player.x+=400;pushPresence();});
+    await M.evaluate(()=>{player.x+=400;pushPresence();});await D.waitForFunction(n=>[...peerRender.values()].every(p=>p.name!==n||dist(p.x,p.y,player.x,player.y)>100),'Марат',{timeout:8000}).catch(()=>{});
     await G.evaluate(s=>{player.x=s.x+6;player.y=s.y;player.waypoints=null;pushPresence();},dpos);
     await D.waitForFunction(()=>[...peerRender.values()].some(p=>p.name==='Гузель'&&!p.b&&dist(p.x,p.y,player.x,player.y)<25),null,{timeout:15000}).catch(()=>{});await clear(G);
     await D.evaluate(()=>{TP.wait=null;__say.length=0;});await runAct(D);check(await waitCard(G,'предлагает подвезти'),'Гузели пришло предложение');

@@ -19,8 +19,8 @@ const tg=(text,from,chat)=>fetch(`${BASE}/api.php?a=tgwebhook`,{method:'POST',he
   const srv=spawn(process.execPath,[path.join(__dirname,'../../server/node/server.js')],{env:Object.assign({},process.env,{GAME_DIR:DEV,DATA_DIR:DATA,PORT:String(PORT),MOD_TOKEN:MOD,TG_BOT_TOKEN:TOKEN,ADMIN_TG_ID:ADMIN,LLM_API_KEY:'',RW_OFF:'1',PUBLIC_URL:''}),stdio:['ignore','pipe','pipe']});
   let srvLog='';srv.stdout.on('data',d=>{srvLog+=d;});srv.stderr.on('data',d=>{srvLog+=d;});
   for(let i=0;i<40;i++){try{if((await api('ping',{})).ok)break;}catch(e){}await sleep(250);}
-  // страница — из репозитория в сборку (в отладочной сборке её нет)
-  fs.copyFileSync(path.join(__dirname,'../../site/privacy.html'),path.join(DEV,'privacy.html'));
+  // страница должна быть в самой сборке (tools/build_deploy.py, dev_build.py) — сюда не подкладываем
+  check(fs.existsSync(path.join(DEV,'privacy.html')),'privacy.html есть в сборке');
   const b=await chromium.launch();const errors=[];
   try{
     for(const p of ['/privacy','/rules','/privacy.html']){const r=await fetch(BASE+p);const t=await r.text();check(r.ok&&/Правила и конфиденциальность/.test(t)&&/ЛайфГород/.test(t),`${p} → страница правил`);}

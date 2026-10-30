@@ -21,4 +21,11 @@ if os.path.isdir(os.path.join(DST, 'img')):
     shutil.rmtree(os.path.join(DST, 'img'))
 if os.path.isdir(os.path.join(SRC, 'img')):
     shutil.copytree(os.path.join(SRC, 'img'), os.path.join(DST, 'img'))
+if os.path.isdir(os.path.join(DST, 'fonts')):
+    shutil.rmtree(os.path.join(DST, 'fonts'))
+if os.path.isdir(os.path.join(SRC, 'fonts')):
+    shutil.copytree(os.path.join(SRC, 'fonts'), os.path.join(DST, 'fonts'))
+for f in ('privacy.html',):   # правила и конфиденциальность — /privacy
+    if os.path.exists(os.path.join(SRC, f)):
+        shutil.copy(os.path.join(SRC, f), DST)
 print('dev build →', DST)

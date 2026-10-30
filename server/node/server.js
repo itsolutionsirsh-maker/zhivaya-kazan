@@ -519,7 +519,7 @@ go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.dis
 </script></body></html>`;
 
 // ---------- HTTP ----------
-const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};
+const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.txt':'text/plain; charset=utf-8','.woff2':'font/woff2'};
 function send(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(b);}
 function readBody(req,max){return new Promise((ok,bad)=>{let n=0;const ch=[];req.on('data',c=>{n+=c.length;if(n>max){bad(new Error('too_big'));req.destroy();}else ch.push(c);});req.on('end',()=>{try{const v=ch.length?JSON.parse(Buffer.concat(ch).toString('utf8')):{};ok(v&&typeof v==='object'&&!Array.isArray(v)?v:{});}catch(e){ok({});}});req.on('error',bad);});}
 function ipOf(req){const peer=String(req.socket&&req.socket.remoteAddress||'x');const xf=req.headers['x-forwarded-for'];
