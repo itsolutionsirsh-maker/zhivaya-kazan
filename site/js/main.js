@@ -358,12 +358,16 @@ setInterval(tickPeers,33);
 function initCaps(){netInit();}
 
 // ---------- старт ----------
+// скрипты, без которых город уже можно показать (350 жителей районов, ~100 КБ): качаем, когда игра на экране.
+// Они в <template id="zkLater"> — сборка дописывает им ?v= как всем, а браузер их не запускает, пока мы не скажем
+function loadLater(){const t=document.getElementById('zkLater');if(!t)return;for(const s of t.content.querySelectorAll('script[src]')){const e=document.createElement('script');e.src=s.getAttribute('src');e.async=false;document.body.append(e);}t.remove();}
 async function boot(){
   // замер загрузки (от открытия страницы, мс) — уходит на сервер без имён, на mod.html видно, что тормозит: сеть, телефон или сервер
   const BT={scripts:Math.round(performance.now())};const bt=k=>{BT[k]=Math.round(performance.now());};
   try{
     // карта всей Казани кусками (map/base.json + map/c_*.json); если её нет — старый цельный kazan.json
-    let res=await fetch('map/base.json',{cache:'no-cache'});if(!res.ok)res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
+    // base.json страница начала качать сразу (zhivaya-kazan.html), пока грузились скрипты — здесь берём готовый ответ
+    let res=window.zkBase?await window.zkBase:null;window.zkBase=null;if(!res||!res.ok)res=await fetch('map/base.json',{cache:'no-cache'});if(!res.ok)res=await fetch('kazan.json');if(!res.ok)throw new Error('нет данных карты ('+res.status+')');
     $('#loadMsg').textContent='Строим улицы…';const data=await res.json();bt('base');
     await new Promise(r=>setTimeout(r,30));buildWorld(data);bt('build');
     if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);if(s&&s.home&&isFinite(s.home.x)&&isFinite(s.home.y))pts.push([s.home.x,s.home.y]);}catch(e){}
@@ -371,7 +375,7 @@ async function boot(){
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
-    $('#loading').hidden=true;bt('shown');
+    $('#loading').hidden=true;bt('shown');loadLater();
     setTimeout(()=>{if(!Net.acct)return;try{fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({a:'boot',ms:BT,tg:!!(typeof TG!=='undefined'&&TG.on),conn:navigator.connection&&navigator.connection.effectiveType||''})}).catch(()=>{});}catch(e){}},4000);
     if(prof){addEvent(`${player.name} снова в городе`);if(!flags.howtoSeen)showHowto();}else showProfile();
     addEvent(world.meta.chunks?'Казань: '+Object.keys(world.meta.chunks).length+' кварталов по 2×2 км, '+world.crossings.length.toLocaleString('ru-RU')+' переходов. Дома вокруг подгружаются, пока вы идёте или едете':'Центр Казани: '+world.buildings.length.toLocaleString('ru-RU')+' зданий, '+world.roads.length.toLocaleString('ru-RU')+' улиц, '+world.crossings.length+' переходов');

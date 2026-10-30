@@ -27,4 +27,9 @@ if os.path.exists(os.path.join(SITE, 'mod.html')):
     shutil.copy(os.path.join(SITE, 'mod.html'), OUT)   # страница модератора
 if os.path.isdir(os.path.join(SITE, 'img')):
     shutil.copytree(os.path.join(SITE, 'img'), os.path.join(OUT, 'img'))
+if os.path.isdir(os.path.join(SITE, 'fonts')):
+    shutil.copytree(os.path.join(SITE, 'fonts'), os.path.join(OUT, 'fonts'))   # шрифты — свои, не с Google
+for f in ('privacy.html',):   # правила и конфиденциальность — /privacy (раньше в сборку не попадала, на сайте была 404)
+    if os.path.exists(os.path.join(SITE, f)):
+        shutil.copy(os.path.join(SITE, f), OUT)
 print('deploy →', OUT)
