@@ -21,8 +21,12 @@ let fails=0;const check=(ok,msg)=>{console.log((ok?'OK  ':'FAIL')+' '+msg);if(!o
     await pg.goto(`http://127.0.0.1:${PORT}/index.html`);await pg.waitForFunction('document.querySelector("#loading").hidden===true',null,{timeout:60000});
     const shown=Date.now()-t0;await sleep(3500);
     const ext=reqs.filter(r=>!r.u.startsWith(`http://127.0.0.1:${PORT}/`));check(!ext.length,'внешних запросов нет'+(ext.length?': '+ext.map(r=>r.u).slice(0,3).join(', '):''));
-    const base=reqs.filter(r=>/map\/base\.json/.test(r.u)),mainJs=reqs.find(r=>/js\/main\.js/.test(r.u)),lastJs=Math.max(...reqs.filter(r=>/\/js\/.*\.js/.test(r.u)&&!/folk3/.test(r.u)).map(r=>r.t));
-    check(base.length===1,'base.json запрошен один раз: '+base.length);check(base[0]&&mainJs&&base[0].t<=mainJs.t,`base.json просят до скриптов игры (${base[0]&&base[0].t} мс, main.js — ${mainJs&&mainJs.t} мс)`);
+    const base=reqs.filter(r=>/map\/base\.json/.test(r.u));
+    check(base.length===1,'base.json запрошен один раз: '+base.length);
+    // скрипты браузер начинает качать заранее (сканер страницы), поэтому сравниваем не с их запросом, а с концом их загрузки
+    const B=await pg.evaluate(()=>{const r=performance.getEntriesByType('resource');const b=r.find(x=>/map\/base\.json/.test(x.name));const js=r.filter(x=>/\/js\/.*\.js/.test(x.name)&&!/folk3/.test(x.name));
+      return {base:b&&Math.round(b.startTime),jsEnd:Math.round(Math.max(...js.map(x=>x.responseEnd))),dcl:Math.round(performance.getEntriesByType('navigation')[0].domContentLoadedEventStart)};});
+    check(B.base!=null&&B.base<B.jsEnd&&B.base<B.dcl,`base.json качается параллельно скриптам: начало ${B.base} мс, скрипты докачаны к ${B.jsEnd} мс, страница готова к ${B.dcl} мс`);
     const R=await pg.evaluate(()=>({shown:Math.round(window.__shown),ph:performance.getEntriesByType('resource').filter(r=>/img\/inside\//.test(r.name)).map(r=>Math.round(r.startTime)),
       f3:performance.getEntriesByType('resource').filter(r=>/js\/folk3\.js/.test(r.name)).map(r=>Math.round(r.startTime)),n3:(window.cityFolk3||[]).length,
       chunksEnd:Math.round(Math.max(0,...performance.getEntriesByType('resource').filter(r=>/map\/c_/.test(r.name)&&r.startTime<window.__shown).map(r=>r.responseEnd)))}));
