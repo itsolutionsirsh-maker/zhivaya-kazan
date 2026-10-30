@@ -107,7 +107,7 @@ function folkInit(){if(FOLK.ready||!world||!player.home)return;FOLK.ready=true;f
 // игрок переехал (свой район в анкете или дом из сохранения догрузился): соседи по двору (ward 'yard') живут и работают у нового дома
 function folkReanchor(){if(!FOLK.ready)return;const A=folkAnchors();for(const f of FOLK.list){if(f.ward!=='yard')continue;const held=folkPersonBusy(f);folkCancelRoute(f);f.retry=null;f.places=folkPlaces(f,A);if(held){f.away=true;continue;}folkDrop(f);f.at=folkWant(f);f.away=false;}}
 // где должен быть по часам
-function folkWant(f){const h=cityHour();const off=f.dayOff&&isWeekend();const D=(off?f.dayOff:f.day)||[[0,'home'],[9,'work'],[18,'haunt'],[22,'home']];let at=D[D.length-1][1];for(const [hh,k] of D){if(h>=hh)at=k;}
+function folkWant(f){if(f.homeUntil&&clock.minutes<f.homeUntil)return 'home';   /* после гостей (guests-play.js) хозяин час игры дома */const h=cityHour();const off=f.dayOff&&isWeekend();const D=(off?f.dayOff:f.day)||[[0,'home'],[9,'work'],[18,'haunt'],[22,'home']];let at=D[D.length-1][1];for(const [hh,k] of D){if(h>=hh)at=k;}
   // закрытое место — значит не там
   const pl=f.places[at];if(pl&&pl.poi&&at==='haunt'&&typeof poiOpen==='function'&&!poiOpen(pl.poi))return 'home';
   // дождь: кто стоит на улице без крыши, уходит домой. Как распогодится — расписание возвращает его назад.

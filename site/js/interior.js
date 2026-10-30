@@ -1,9 +1,9 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
-const KIND_RU={cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
+const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
 function makeInterior(kind,name,key,room){
   const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
-  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],default:[12,9]};
+  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],default:[12,9]};
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
@@ -43,6 +43,9 @@ function makeInterior(kind,name,key,room){
       F('desk',2.1,4.3,1.6,0.8,{});const a=NPC(2.1,5.2,{role:'staff',seated:true,job:'помощник прокурора'});a.hy=-1;for(let i=0;i<4;i++)F('chair',w/2-1.5+i*1.1,h-2.1,0.5,0.5,{ang:-Math.PI/2});const q=NPC(w/2-1.5,h-2.1,{seated:true});q.hy=-1;break;}
     case 'home':{it.floor='wood';F('bed',2.3,1.9,2.4,1.7,{spot:'bed'});F('wardrobe',5.2,0.7,1.8,0.7,{spot:'wardrobe'});F('kitchen',w-2.6,0.8,4.4,0.9,{spot:'kitchen'});F('fridge',w-0.7,2.3,0.8,0.9,{});F('table',w-3,3.8,1.2,1.2,{spot:'table',round:true});F('chair',w-3,2.8,0.5,0.5,{ang:Math.PI/2});F('chair',w-3,4.8,0.5,0.5,{ang:-Math.PI/2});
       F('rug',3.2,h-2.6,3.6,2.2,{});F('sofa',3.2,h-1.9,2.8,1.1,{spot:'sofa'});F('tv',3.2,h-3.7,1.8,0.3,{});F('desk',w-2.4,h-1.6,1.8,0.8,{spot:'pc'});F('chair',w-2.4,h-2.5,0.5,0.5,{ang:Math.PI/2});plant(0.8,h-0.8);F('window',2.5,0.15,2.5,0.3);break;}
+    // в гостях у жителя (guests-play.js): гостиная — стол с чаем посередине, диван, сервант, ковёр; ни кровати, ни шкафа игрока
+    case 'guest':{it.floor='wood';F('rug',w/2,h/2+0.4,5.2,3.4,{});F('window',3,0.15,3,0.3);F('painting',w-3,0.2,1.6,0.3,{});F('sofa',w-2.7,1.5,3.2,1,{});F('wardrobe',1.6,0.7,2.4,0.7,{});F('tv',w/2+0.6,0.4,1.4,0.3,{});
+      F('table',w/2-0.4,h/2+0.4,1.2,1.2,{spot:'table',round:true});F('chair',w/2-1.45,h/2+0.4,0.5,0.5,{ang:0});F('chair',w/2+0.65,h/2+0.4,0.5,0.5,{ang:Math.PI});plant(0.8,h-0.9);plant(w-0.8,h-0.9);break;}
     case 'metro':{it.floor='granite';F('rails',w/2,1.2,w,2.4,{});F('edge',w/2,2.62,w-0.6,0.25,{spot:'train'});
       for(let i=0;i<4;i++){const x=2.8+i*(w-5.6)/3;F('pillar',x,5.4,0.9,0.9,{});}F('scheme',w-2.2,h-0.5,3,0.35,{spot:'scheme'});F('scheme',2.2,h-0.5,3,0.35,{spot:'scheme'});
       NPC(w/2+2.4,h-1.4,{role:'staff',job:'дежурная по станции'});for(let i=0;i<9;i++)NPC(1.5+rng()*(w-3),3.4+rng()*(h-5),{wander:true});break;}
@@ -116,7 +119,7 @@ const ROOM_FINISH={
 };
 function interiorFinish(kind,name=''){
   if(typeof venueLook==='function')return venueLook({kind,name});
-  if(kind==='home')return ROOM_FINISH.home;
+  if(kind==='home'||kind==='guest')return ROOM_FINISH.home;
   if(kind==='cafe'||kind==='library'||kind==='hotel')return ROOM_FINISH.warm;
   if(kind==='bar'||kind==='theatre')return ROOM_FINISH.night;
   if(kind==='metro'||kind==='bank'||kind==='hospital'||kind==='pharmacy')return ROOM_FINISH.public;
