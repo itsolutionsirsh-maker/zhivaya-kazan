@@ -78,6 +78,7 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
     else if(d.t==='city'){if(typeof rwApply==='function')rwApply(d);}
     else if(d.t==='sev'){if(typeof sevApply==='function')sevApply(d.list);}
     else if(d.t==='bar'){if(typeof barApply==='function')barApply(d);}
+    else if(d.t==='taxi'){if(typeof tpApply==='function')tpApply(d);}
     else if(d.t==='msg'){const m=d.m;if(m.from===myPid())return;if(m.to&&m.to!==myPid())return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
     else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
@@ -192,5 +193,5 @@ async function netInit(){
     if(r){roomNs=r;Net.mode='room';r.onPeers(()=>{const list=roomPeers();Net.peers=list;syncPeers(list);readRoomMsgs(list);setNetStatus(true);},()=>{roomNs=null;Net.mode='off';peerRender.clear();setNetStatus(false);});pushPresence();setNetStatus(true);return;}}
   if(location.protocol.startsWith('http')&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
     try{const t0=Date.now();const r=await fetch('api.php?a=ping',{cache:'no-store'});if(r.ok){const j=await r.json();if(j&&j.ok){if(j.now>1e12){const off=j.now-(t0+Date.now())/2;if(Math.abs(off)>2000)clockOff=off;}   // часы игры у всех по серверу, даже если на телефоне время сбито
-      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;Net.territories=!!j.territories;Net.yardStory=!!j.yardStory;Net.yardReunion=!!j.yardReunion;Net.roles=!!j.roles;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
+      Net.llm=!!j.llm;Net.acct=!!j.acct;Net.tg=!!j.tg;Net.wallet=!!j.wallet;Net.territories=!!j.territories;Net.yardStory=!!j.yardStory;Net.yardReunion=!!j.yardReunion;Net.roles=!!j.roles;Net.taxi=!!j.taxi;renderAcct();if(Net.acct)acctSyncOnBoot();if(j.llm)sampleFn=makeHttpSample();if(j.ws&&'WebSocket' in window){Net.mode='ws';wsConnect();}else{Net.mode='http';setNetStatus(true);httpLoop();}return;}}}catch(e){}}
   Net.mode='off';setNetStatus(false);}
