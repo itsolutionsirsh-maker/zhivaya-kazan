@@ -91,7 +91,7 @@ function uiFeedRemaining(at,now){return Math.max(0,5500-(now-at));}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhanceToday,{once:true});else enhanceToday();
 
   // Не закрываем обязательную анкету и конфликт двух устройств без их штатного действия.
-  const closes={yardModal:'yardClose',territoryModal:'territoryClose',territoryMeeting:'territoryMeetingClose',howtoModal:'howtoClose',rallyModal:'rallyCancel',speechModal:'speechClose',questModal:'qClose',seasonModal:'seasonClose',routeModal:'rtClose',orderModal:'orderClose',jobsModal:'jobsClose',bankModal:'bankClose',logModal:'logClose',chatModal:'chatClose',menuModal:'menuClose',tgIntro:'tgIntroSkip'};
+  const closes={courtyardModal:'courtyardClose',yardModal:'yardClose',territoryModal:'territoryClose',territoryMeeting:'territoryMeetingClose',howtoModal:'howtoClose',rallyModal:'rallyCancel',speechModal:'speechClose',questModal:'qClose',seasonModal:'seasonClose',routeModal:'rtClose',orderModal:'orderClose',jobsModal:'jobsClose',bankModal:'bankClose',logModal:'logClose',chatModal:'chatClose',menuModal:'menuClose',tgIntro:'tgIntroSkip'};
   const modals=[...document.querySelectorAll('.modal')];
   for(const modal of modals){
     const box=modal.querySelector('.box');if(!box)continue;

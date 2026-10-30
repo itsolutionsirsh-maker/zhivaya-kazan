@@ -36,6 +36,11 @@ button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var
 <h2>Аварии игроков</h2><p class="msg">Когда игрок попадает в ДТП, его браузер сообщает место. Сервер проверяет, что игрок там, не чаще раза в 10 минут, и показывает аварию всем, кто рядом: метку, машины на дороге, строки из <code>shared-events.js</code>. Авария живёт 10 минут. Текста от игрока нет — только место.</p>
 <div id="sOut" class="msg"></div>
 <div class="row"><button id="sRefresh">Обновить</button><button id="sAll" class="bad">Снять все</button></div>
+<section aria-label="Общий двор"><h2>Общий двор · у Некрасова</h2>
+<p class="msg">Откат снимает выбранное улучшение и все следующие, прерывает текущие работы. Лимиты аккаунтов сохраняются.</p>
+<div class="row"><button id="cyRefresh">Обновить двор</button><button id="cyRetry" hidden>Повторить запрос</button></div>
+<p id="cyStatus" class="msg" role="status"></p><label for="cyReason">Причина отката</label><input id="cyReason" maxlength="160" placeholder="Что требуется исправить">
+<div class="row"><button class="bad" data-cy-stage="bench">Снять лавку и всё после</button><button class="bad" data-cy-stage="light">Снять свет и панно</button><button class="bad" data-cy-stage="mural">Снять панно</button></div><div id="cyAudit"></div></section>
 </main>
 <script>
 const $=s=>document.querySelector(s);
@@ -111,5 +116,6 @@ $('#wGo').onclick=()=>{const n=$('#wName').value.trim();if(n)wallet(n);};
 $('#load').onclick=()=>{load();loadStats();city();};
 $('#tok').addEventListener('keydown',e=>{if(e.key==='Enter'){load();loadStats();}});if($('#tok').value){load();loadStats();city();sev();}
 </script>
+<script src="js/courtyard-mod.js"></script>
 </body>
 </html>
