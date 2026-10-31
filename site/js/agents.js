@@ -34,7 +34,7 @@ class Walker{
   update(dt){
     if(this.bus)return;
     switch(this.state){
-      case 'idle':this.ttl-=dt;if(this.role==='guard'){const k=performance.now()/1000;this.x=this.gx+Math.sin(k*0.7+this.p.id)*0.5;this.y=this.gy+Math.cos(k*0.5+this.p.id)*0.4;}if(this.ttl<=0)this.newGoal();return;
+      case 'idle':this.ttl-=dt*(weather.kind==='rain'?1.6:1);if(this.role==='guard'){const k=performance.now()/1000;this.x=this.gx+Math.sin(k*0.7+this.p.id)*0.5;this.y=this.gy+Math.cos(k*0.5+this.p.id)*0.4;}if(this.ttl<=0)this.newGoal();return;
       case 'companion':return;
       case 'rally':rallyFace(this);this.phase+=dt*0.6;return;
       case 'gather':this.gatherTtl-=dt;if(this.gatherTtl<=0){this.state='idle';this.ttl=1;}return;

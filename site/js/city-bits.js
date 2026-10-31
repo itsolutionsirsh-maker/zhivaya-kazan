@@ -1,6 +1,7 @@
 // Дворовые мелочи в каждом районе рядом с игроком: несколько лавочек, ночные киоски, фотографы, голуби, кортеж.
 (function(){
-  let grans=[],kiosks=[],cams=[],flocks=[],wed=null,carry=null,placeT=0;
+  let grans=[],kiosks=[],cams=[],flocks=[],wed=null,carry=null,placeT=0,fair=null,noteT=0;
+  const notes=new Map();
   const still={x:0,y:0,t:0},bags=new Set();
   const NAMES=['Равиля','Насима','Зухра','Сания','Альфия','Фатыма','Гульсум'];
   function hour(){return typeof cityHour==='function'?cityHour():12;}
@@ -44,12 +45,15 @@
   function talkGran(g){
     const key=day()+':'+(g.b&&g.b.i!=null?g.b.i:g.name);
     const asked=bags.has(key)||!!carry;
-    const choices=[{t:'Потом',run:()=>reply('👵',g.name,granLine())}];
+    const note=notes.get(benchId(g));
+    const choices=[{t:'Потом',run:()=>reply('👵',g.name,granLine())},{t:'Оставить записку',run:()=>askNote(g)}];
     if(!asked)choices.unshift({t:'Донести пакет',primary:true,run:()=>{
       bags.add(key);const d=doorOf(g.b,g);carry={x:d[0],y:d[1],name:g.name};
+      saveShot('Бабушка с пакетом');
       reply('👜',g.name,'Там кефир и хлеб. До двери, не до соседа. Сосед и так всё видит.');
     }});
-    card('👵',g.name+' · лавочка',granLine()+(asked?'':' Донесите пакет до двери: спина уже не та.'),choices);
+    const extra=note?' На лавочке записка'+(note.name?' от '+note.name:'')+': «'+note.text+'».':'';
+    card('👵',g.name+' · лавочка',granLine()+(asked?'':' Донесите пакет до двери: спина уже не та.')+extra,choices);
   }
   function giveBag(){
     const name=carry&&carry.name||'Бабушка';carry=null;player.money+=80;mood(6);
@@ -57,7 +61,7 @@
   }
   function shawarma(kind){
     const joke=kind==='hot'?'Если заплачу, это от лука. Не расспрашивайте.':'Котлета смотрит на Казань. Так и задумано.';
-    spend(180,()=>{player.food=typeof clamp==='function'?clamp(player.food+22,0,100):Math.min(100,player.food+22);player.energy=typeof clamp==='function'?clamp(player.energy+6,0,100):Math.min(100,player.energy+6);mood(4);reply('🌯','Шаурма',joke);});
+    spend(180,()=>{player.food=typeof clamp==='function'?clamp(player.food+22,0,100):Math.min(100,player.food+22);player.energy=typeof clamp==='function'?clamp(player.energy+6,0,100):Math.min(100,player.energy+6);mood(4);saveShot('Ночная шаурма');reply('🌯','Шаурма',joke);});
   }
   function postcard(place){
     const c=document.createElement('canvas');c.width=280;c.height=160;const g=c.getContext('2d');
@@ -70,6 +74,37 @@
     g.font='12px sans-serif';g.fillText((typeof fmtTime==='function'?fmtTime():'')+' · день '+day()+' · '+(player.name||'гость'),16,48);
     g.font='11px sans-serif';g.fillStyle='#6B5B45';g.fillText('Живая Казань',16,146);
     try{return c.toDataURL('image/jpeg',0.72);}catch(e){return '';}
+  }
+  function wet(){return !!(weather&&(weather.kind==='rain'||weather.kind==='snow'||weather.ice));}
+  function saveShot(title){
+    const src=postcard(title);if(!src)return;
+    let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
+    if(list.some(p=>p&&p.title===title&&Date.now()-(p.at||0)<120000))return;
+    list.push({src,title,at:Date.now()});if(list.length>12)list=list.slice(-12);
+    try{localStorage.setItem('zk.photos',JSON.stringify(list));}catch(e){return;}
+    if(window.cityPhone&&cityPhone.push)cityPhone.push({from:'Телефон',text:'Снимок («'+title+'») во вкладке «Снимки».',kind:'photo'});
+  }
+  function benchId(g){return 'b:'+Math.round(g.x)+':'+Math.round(g.y);}
+  async function pullNotes(){
+    const ids=grans.map(benchId);if(!ids.length||typeof acctCall!=='function')return;
+    let j;try{j=await acctCall('bench',{list:ids});}catch(e){return;}
+    if(!j||!Array.isArray(j.notes))return;notes.clear();for(const n of j.notes)if(n&&n.id)notes.set(n.id,n);
+  }
+  function askNote(g){
+    if(typeof acct==='undefined'||!acct||!acct.token){setHint('Записку видят другие, поэтому сначала войдите');return;}
+    let m=document.getElementById('benchNote');
+    if(!m){m=document.createElement('div');m.className='modal';m.id='benchNote';
+      m.innerHTML='<div class="box"><h2>Записка на лавочке</h2><p class="hint">До 80 знаков. Её прочитают те, кто подойдёт. Мат и ссылки не проходят.</p><input id="benchText" maxlength="80" autocomplete="off"><div class="row"><button class="btn" id="benchOk" type="button">Оставить</button><button class="btn" id="benchNo" type="button">Отмена</button></div></div>';
+      document.body.append(m);}
+    m.hidden=false;player.busy=true;const inp=m.querySelector('#benchText');inp.value='';inp.focus();
+    const close=()=>{m.hidden=true;player.busy=false;};
+    m.querySelector('#benchNo').onclick=close;
+    m.querySelector('#benchOk').onclick=async()=>{
+      const text=inp.value.trim().slice(0,80);if(text.length<2){setHint('Слишком коротко');return;}
+      let j;try{j=await acctCall('bench',{token:acct.token,id:benchId(g),text});}catch(e){j={err:'net'};}
+      if(!j||!j.ok){setHint(j&&j.err==='mod'?'Так писать нельзя':j&&j.err==='rate'?'Не так часто. Подождите пару минут':j&&j.err==='auth'?'Сначала войдите':'Записка не сохранилась');return;}
+      if(j.note)notes.set(j.note.id,j.note);close();setHint('Записка осталась на лавочке');
+    };
   }
   function takePhoto(cam){
     const place=cam.place||'Казань';
@@ -95,9 +130,9 @@
     wed={day:day(),did:did,t:0,done:0,told:0,ph:0,cars:[0,1,2].map(i=>({x:ns.px-ux*(16+i*8),y:ns.py-uy*(16+i*8),hx:ux,hy:uy}))};
     addEvent('В этом районе сигналят: свадебный кортеж выехал');
   }
-  function yell(){mood(4);reply('💍','Кортеж','Молодожёны махнули. Кто-то уже ищет второй букет.');}
+  function yell(){mood(4);saveShot('Свадебный кортеж');reply('💍','Кортеж','Молодожёны махнули. Кто-то уже ищет второй букет.');}
   function tipCar(){spend(50,()=>{mood(6);reply('💍','Кортеж','На капот легло 50 ₽. Им на счастье, вам на настроение.');});}
-  function feedBirds(f){spend(20,()=>{f.fed=1;f.stolen=0;still.t=0;mood(3);reply('🐦','Голуби','Сели ближе. Стойте смирно: у них тут комитет.');});}
+  function feedBirds(f){if(wet()){reply('🐦','Голуби','В такую погоду они не садятся. Хлеб подождёт.');return;}spend(20,()=>{f.fed=1;f.stolen=0;still.t=0;mood(3);saveShot('Голуби на площади');reply('🐦','Голуби','Сели ближе. Стойте смирно: у них тут комитет.');});}
   function place(){
     const onFoot=!player.vehicle&&!player.bus;
     if(!onFoot||!world.bgrid){grans=[];kiosks=[];cams=[];flocks=[];return;}
@@ -149,11 +184,26 @@
     const nf=[];
     for(const s of sqs){
       let f=flocks.find(q=>q.sq===s);
-      if(!f){f={sq:s,fed:0,stolen:0,birds:[]};for(let i=0;i<5;i++){const q=spotOut(s.x,s.y,i);f.birds.push({x:q[0],y:q[1],ph:i});}}
+      if(!f){f={sq:s,fed:0,stolen:0,birds:[]};const n=wet()?2:5;for(let i=0;i<n;i++){const q=spotOut(s.x,s.y,i);f.birds.push({x:q[0],y:q[1],ph:i});}}
+      else if(wet()&&f.birds.length>2)f.birds.length=2;
       nf.push(f);
     }
     flocks=nf;
   }
+  function fairKind(did){
+    const h=hour();if(h<18||h>=21||!did||did==='город')return null;
+    const month=new Date(Date.now()+3*3600e3).getUTCMonth()+1,winter=month===12||month<=2;
+    let n=day()*13;for(const c of String(did))n=(Math.imul(n,33)+c.charCodeAt(0))>>>0;
+    const k=n%4;if(winter&&k===0)return 'ice';
+    return ['fair','music','kids','fair'][k];
+  }
+  function startFair(did,kind){
+    const q=spotOut(player.x,player.y,1.4);
+    fair={day:day(),did,kind,x:q[0],y:q[1],ph:0,told:0};
+    const name={fair:'ярмарка с эчпочмаками',music:'гармонь',kids:'дети с шарами',ice:'ледяной городок'}[kind];
+    addEvent('Вечер в районе: '+name);
+  }
+  function buyPie(){spend(90,()=>{player.food=typeof clamp==='function'?clamp(player.food+14,0,100):Math.min(100,player.food+14);mood(3);saveShot('Ярмарка, эчпочмак');reply('🥟','Ярмарка','Горячий. Руки потом в снег, если он есть.');});}
   function updateCityBits(dt){
     if(typeof player==='undefined'||!world||scene!=='city')return;
     if(bags.day!==day()){bags.clear();bags.day=day();}
@@ -167,14 +217,18 @@
       if(player.vehicle&&wed.cars[0]&&dist(wed.cars[0].x,wed.cars[0].y,player.x,player.y)<10&&player.vehicle.speed>1.2)player.vehicle.speed*=0.2;
       if(wed.t>58){wed.done=1;wed.cars=[];addEvent('Кортеж уехал. Улица снова обычная');}
     }
+    const fk=fairKind(did);
+    if(fk&&(!fair||fair.day!==day()||fair.did!==did))startFair(did,fk);
+    if(fair&&(fair.day!==day()||hour()<18||hour()>=21))fair=null;
+    noteT-=dt;if(noteT<=0){noteT=8;pullNotes();}
     for(const k of kiosks)k.ph+=dt;
     for(const c of cams)c.ph+=dt;
     for(const g of grans)g.ph+=dt;
     let anyFed=false;
     for(const f of flocks){
-      const tx=f.fed?player.x+0.8:f.sq.x,ty=f.fed?player.y:f.sq.y;
+      const tx=(f.fed&&!wet())?player.x+0.8:f.sq.x,ty=(f.fed&&!wet())?player.y:f.sq.y;
       for(const p of f.birds){p.ph+=dt*6;const dx=tx+Math.sin(p.ph)*1.6-p.x,dy=ty+Math.cos(p.ph)*1.6-p.y,dd=Math.hypot(dx,dy)||1;const st=Math.min(dd,(f.fed?2.2:0.7)*dt);const nx=p.x+dx/dd*st,ny=p.y+dy/dd*st;if(outside(nx,ny)){p.x=nx;p.y=ny;}}
-      if(f.fed)anyFed=true;
+      if(f.fed&&!wet())anyFed=true;
     }
     if(anyFed){
       if(Math.hypot(player.x-still.x,player.y-still.y)<0.35)still.t+=dt;else{still.x=player.x;still.y=player.y;still.t=0;}
@@ -186,6 +240,11 @@
     if(scene!=='city'||player.inside||player.busy)return null;
     if(carry&&dist(carry.x,carry.y,player.x,player.y)<3)return {d:dist(carry.x,carry.y,player.x,player.y),label:'Отдать пакет '+carry.name,run:giveBag};
     const g=nearest(grans,2.3);if(g&&!player.vehicle)return {d:g._d,label:'Поговорить: '+g.name+', лавочка',run:()=>talkGran(g)};
+    if(fair&&!player.vehicle&&dist(fair.x,fair.y,player.x,player.y)<3.2){
+      const titles={fair:'Ярмарка',music:'Гармонь',kids:'Шары',ice:'Ледяной городок'};
+      const texts={fair:'Эчпочмаки с пылу. Очередь из двоих и один уже ест на ходу.',music:'Гармонь тянет не спеша. Кто хочет — подпевает.',kids:'Двое с шарами. Один уже почти улетел.',ice:'Горка из снега. Съезжать можно, вставать — как получится.'};
+      return {d:dist(fair.x,fair.y,player.x,player.y),label:titles[fair.kind]||'Вечер',run:()=>card('🌆',titles[fair.kind],texts[fair.kind]||'',fair.kind==='fair'?[{t:'Эчпочмак · 90 ₽',primary:true,run:buyPie},{t:'Постоять',run:()=>{saveShot('Вечерняя ярмарка');}}]:[{t:'Посмотреть',primary:true,run:()=>saveShot(titles[fair.kind])},{t:'Дальше',run:()=>{}}])};
+    }
     const k=nearest(kiosks,2.4);if(k&&!player.vehicle)return {d:k._d,label:'Ночная шаурма · 180 ₽',run:()=>card('🌯','Шаурма у остановки','Ночь. Лаваш горячий. Лук спорит с жизнью, жизнь пока проигрывает.',[
       {t:'С курицей · 180 ₽',primary:true,run:()=>shawarma('chicken')},{t:'Острое · 180 ₽',run:()=>shawarma('hot')},{t:'Не надо',run:()=>{}}])};
     const c=nearest(cams,2.4);if(c&&!player.vehicle)return {d:c._d,label:'Фотограф · сняться за 100 ₽',run:()=>card('📷','Фотограф · '+c.place,c.place==='Улица Баумана'?'Чуть левее вывески. Подбородок выше. Баумана не любит, когда моргают.':'У «'+c.place+'» свет нормальный. Подбородок выше и не моргайте.',[
@@ -194,7 +253,7 @@
       {t:player.vehicle?'Посигналить':'Крикнуть «Горько!»',primary:true,run:yell},{t:'Кинуть 50 ₽ на капот',run:tipCar},{t:'Пропустить',run:()=>{}}]);}};
     let flock=null,bd=2.8;
     for(const f of flocks){if(f.fed)continue;for(const p of f.birds){const d=dist(p.x,p.y,player.x,player.y);if(d<bd){bd=d;flock=f;}}}
-    if(flock&&!player.vehicle)return {d:bd,label:'Бросить хлеб голубям · 20 ₽',run:()=>feedBirds(flock)};
+    if(flock&&!player.vehicle)return {d:bd,label:wet()?'Голуби не садятся: мокро':'Бросить хлеб голубям · 20 ₽',run:()=>feedBirds(flock)};
     return null;
   }
   function person(x,y,col,toS,z,bob){
@@ -215,13 +274,16 @@
       if(!p)continue;
       ctx.strokeStyle='#C4A574';ctx.lineWidth=Math.max(2,p[2]*2);ctx.beginPath();ctx.moveTo(p[0]-8*p[2],p[1]+4);ctx.lineTo(p[0]+8*p[2],p[1]+4);ctx.stroke();
       ctx.strokeStyle='#E7D2A8';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p[0]+2*p[2],p[1]-2);ctx.lineTo(p[0]+7*p[2]+Math.sin(t*6+g.ph)*4,p[1]-6);ctx.stroke();
-      if(z>2)label(p[0],p[1],'👵 '+g.name);
+      if(wet()){ctx.fillStyle='rgba(35,55,80,.9)';ctx.beginPath();ctx.ellipse(p[0],p[1]-18*p[2],9*p[2],3.2*p[2],0,Math.PI,0,true);ctx.fill();}
+      const note=notes.get(benchId(g));
+      if(z>2)label(p[0],p[1],(note?'📝 ':'')+'👵 '+g.name);
     }
     for(const k of kiosks){
       const [sx,sy]=toS(k.x,k.y);if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
       ctx.fillStyle='#C4512C';ctx.fillRect(sx-12,sy-10,24,16);ctx.fillStyle='#fff';ctx.font='700 8px sans-serif';ctx.textAlign='center';ctx.fillText('ШАУРМА',sx,sy+1);
       ctx.fillStyle='rgba(230,230,230,.8)';
-      for(let i=0;i<3;i++){const y=((t*28+i*10)%26);ctx.globalAlpha=1-y/26;ctx.beginPath();ctx.arc(sx-6+i*6,sy-12-y,2.2,0,TAU);ctx.fill();}
+      const puffs=(hour()>=22||wet())?6:3;
+      for(let i=0;i<puffs;i++){const y=((t*(wet()?40:28)+i*8)%30);ctx.globalAlpha=1-y/30;ctx.beginPath();ctx.arc(sx-8+(i%3)*8,sy-12-y,2.4,0,TAU);ctx.fill();}
       ctx.globalAlpha=1;
       const shift=Math.sin(t*1.4)*1.5;
       person(k.q1.x,k.q1.y+shift*0.05,'#3E6B8A',toS,z,shift);
@@ -245,10 +307,18 @@
       const [sx,sy]=toS(p.x,p.y);if(sx<-12||sx>W+12||sy<-12||sy>H+12)continue;
       const flap=Math.sin(p.ph)*4;ctx.strokeStyle='#6E757C';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-5,sy-flap);ctx.moveTo(sx,sy);ctx.lineTo(sx+5,sy-flap);ctx.stroke();
       ctx.fillStyle='#8E9398';ctx.beginPath();ctx.arc(sx,sy,z<1.4?1.8:2.8,0,TAU);ctx.fill();
-      if(f.fed&&!f.stolen)shoulder=true;
+      if(f.fed&&!f.stolen&&!wet())shoulder=true;
     }
     if(shoulder&&!player.inside){const [sx,sy]=toS(player.x,player.y);const flap=Math.sin(t*7)*3;ctx.fillStyle='#8E9398';ctx.beginPath();ctx.arc(sx+8,sy-18+Math.sin(t*3),3,0,TAU);ctx.fill();ctx.strokeStyle='#6E757C';ctx.beginPath();ctx.moveTo(sx+8,sy-18);ctx.lineTo(sx+3,sy-18-flap);ctx.moveTo(sx+8,sy-18);ctx.lineTo(sx+13,sy-18-flap);ctx.stroke();}
     if(carry){const [sx,sy]=toS(carry.x,carry.y);if(sx>-20&&sx<W+20&&sy>-20&&sy<H+20&&z>1.6){ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('🚪',sx,sy);}}
+    if(fair){
+      const [sx,sy]=toS(fair.x,fair.y);if(sx>-40&&sx<W+40&&sy>-40&&sy<H+40){
+        if(fair.kind==='fair'){ctx.fillStyle='#8C4A2F';ctx.fillRect(sx-14,sy-8,28,14);ctx.fillStyle='#F2C14E';ctx.font='700 8px sans-serif';ctx.textAlign='center';ctx.fillText('ЭЧПОЧМАК',sx,sy+1);}
+        else if(fair.kind==='music'){person(fair.x,fair.y,'#5C3A2E',toS,z,Math.sin(t*3)*1.2);ctx.fillStyle='#222';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('🎵',sx+12,sy-10+Math.sin(t*4)*2);}
+        else if(fair.kind==='kids'){person(fair.x-1.2,fair.y,'#3E6B8A',toS,z,0);person(fair.x+1.2,fair.y,'#C4512C',toS,z,0);ctx.fillStyle='#E24B4B';ctx.beginPath();ctx.arc(sx-8,sy-22+Math.sin(t*2)*2,4,0,TAU);ctx.fill();ctx.fillStyle='#3A7BD5';ctx.beginPath();ctx.arc(sx+10,sy-24+Math.cos(t*2)*2,4,0,TAU);ctx.fill();}
+        else{ctx.fillStyle='rgba(230,240,248,.9)';ctx.beginPath();ctx.ellipse(sx,sy,16,8,0,0,TAU);ctx.fill();ctx.fillStyle='#9BB7C9';ctx.fillRect(sx-6,sy-10,12,8);}
+      }
+    }
   }
   window.updateCityBits=updateCityBits;window.drawCityBits=drawCityBits;
   function boot(){

@@ -19,6 +19,7 @@ const SharedEventsLib=require('./shared-events.js');
 const RolesLib=require('./roles.js');
 const TaxiLib=require('./taxi.js');
 const PlategaLib=require('./platega.js');
+const BenchesLib=require('./benches.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -163,6 +164,7 @@ const roles=RolesLib.Roles({wallet,fs,file:path.join(DATA,'roles.json'),limits:/
 const taxi=TaxiLib.Taxi({wallet,fs,file:path.join(DATA,'taxi.json'),limits:/^\d+$/.test(ENV.ROLE_AGE_MS||'')?{age:+ENV.ROLE_AGE_MS}:undefined});   // такси между игроками
 let shopItems=[];try{shopItems=PlategaLib.readShop(fs.readFileSync(path.join(__dirname,'../../site/js/shop.js'),'utf8'));}catch(e){log('витрина магазина не прочиталась');}
 const platega=PlategaLib.Platega({merchantId:ENV.PLATEGA_MERCHANT_ID,secret:ENV.PLATEGA_SECRET,shop:shopItems,fs,file:path.join(DATA,'platega.json')});
+const benches=BenchesLib.Benches({fs,file:path.join(DATA,'benches.json'),bad:t=>Mod.bad(t)});
 function payOrigin(req){const pub=String(ENV.PUBLIC_URL||'https://kazan.lifegorod.com').replace(/\/$/,'');const host=String((req.headers&&(req.headers['x-forwarded-host']||req.headers.host))||'');
   if(!host||/localhost|127\.0\.0\.1/.test(host))return pub;const proto=String((req.headers['x-forwarded-proto']||'https')).split(',')[0].trim();return proto+'://'+host.split(',')[0].trim();}
 async function payFor(req,body){const a=accByToken(body.token);if(!a)return {err:'auth'};
@@ -591,6 +593,7 @@ async function handleReq(req,res){
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='courtyard'){const [status,result]=courtyard.handle(req,body,ip);return send(res,status,result);}
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
+    if(a==='bench'){if(body.list)return send(res,200,{ok:1,notes:benches.list(body.list)});const who=accByToken(body.token);if(!who)return send(res,200,{err:'auth'});return send(res,200,benches.put(who.k,who.name,body.id,body.text));}
     if(a==='city')return send(res,200,Object.assign({},realworld.snapshot(),{sev:sev.snapshot()}));
     if(a==='ratings')return send(res,200,{ok:1,coffeeWeek:roles.top(),taxiWeek:taxi.top()});   // «Бариста недели» и «Таксист недели»: имя в игре и сколько за неделю
     if(a==='sync')return send(res,200,apiSync(body,ip));

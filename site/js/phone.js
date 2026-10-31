@@ -121,12 +121,21 @@
     if(shots){
       const box=panel.querySelector('#shotList');
       let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
-      if(!list.length){const empty=document.createElement('div');empty.style.cssText='padding:8px 0;font-size:15px';empty.textContent='Пока пусто. Фотограф стоит на Баумана.';box.append(empty);}
+      if(!list.length){const empty=document.createElement('div');empty.style.cssText='padding:8px 0;font-size:15px';empty.textContent='Пока пусто. Снимки сами падают сюда: фотограф, голуби, шаурма, бабушка, кортеж, вечерняя ярмарка.';box.append(empty);}
       list.slice().reverse().forEach(function(p){
         if(!p||typeof p.src!=='string'||p.src.indexOf('data:image/')!==0)return;
         const img=document.createElement('img');img.src=p.src;img.alt=p.title||'снимок';img.style.cssText='width:100%;border-radius:12px;margin-top:8px;display:block';
         const cap=document.createElement('div');cap.textContent=p.title||'Баумана';cap.style.cssText='font-size:13px;opacity:.7;margin-top:2px';
-        box.append(img,cap);
+        const share=document.createElement('button');share.type='button';share.textContent='Показать рядом';
+        share.style.cssText='margin:4px 0 10px;min-height:44px;padding:8px 12px;border-radius:999px;border:1px solid rgba(0,0,0,.15);background:#fff;font:600 14px inherit;cursor:pointer';
+        share.addEventListener('click',function(){
+          const line='Смотрите снимок: '+(p.title||'Казань');
+          if(typeof sayAloud==='function')sayAloud(line);
+          const text='Живая Казань — '+(p.title||'снимок');
+          if(navigator.share)navigator.share({title:'Живая Казань',text:text}).catch(function(){});
+          else if(typeof setHint==='function')setHint('Фраза ушла тем, кто стоит рядом');
+        });
+        box.append(img,cap,share);
       });
     }
     panel.querySelectorAll('[data-tab]').forEach(function(b){
