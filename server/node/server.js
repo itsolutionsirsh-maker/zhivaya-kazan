@@ -300,6 +300,9 @@ function venueMove(p,d){const v=VenueRoom.read(d),id=v?v.room:null,was=p.room;
   p.room=id;p.ix=v?v.ix:0;p.iy=v?v.iy:0;p.ihx=v?v.ihx:0;p.ihy=v?v.ihy:0;
   if(was!==id){barSend(roles.moved(rolePl(p)));taxiSend(taxi.moved(taxiPl(p)));}   // вышел из кафе — его заказы отменяются, смена у стойки кончается; зашёл в помещение — поездка тоже
 }
+function venueNear(p){const near=[];if(!p||p.room)return near;
+  for(const [id,members] of venueMembers){const m=/^v1:[a-z]+:(-?\d+):(-?\d+):/.exec(id);if(!m)continue;const x=+m[1]/10,y=+m[2]/10,d=Math.hypot(x-p.x,y-p.y);if(d>90)continue;near.push([d,id,members.size]);}
+  near.sort((a,b)=>a[0]-b[0]);return near.slice(0,8).map(x=>[x[1],x[2]]);}
 function visibleMeta(p){return Object.assign({},p.meta,{sy:p.meta.sy&&now()-(p.sayAt||0)<6?p.meta.sy:null,rl:roles.onShift(rolePl(p))?'barista':null});}
 function venueStamp(p){return p.room?[p.room,p.ix,p.iy,p.ihx,p.ihy].join('|'):'';}
 function positionPacket(p){return [p.sid,Math.round(p.x*10),Math.round(p.y*10),Math.round(p.hx*100),Math.round(p.hy*100),p.b,p.room||null,Math.round((p.ix||0)*100),Math.round((p.iy||0)*100),Math.round((p.ihx||0)*100),Math.round((p.ihy||0)*100)];}
@@ -424,6 +427,7 @@ function apiSync(body,ip){const priv=idstr(body.id);if(priv.length<8)return {err
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const nearby=[];nearest(p,VIEW_R,VIEW_K,nearby);const list=nearby.map(([,o])=>({id:o.id,p:Object.assign(visibleMeta(o),{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b,room:o.room,ix:o.ix,iy:o.iy,ihx:o.ihx,ihy:o.ihy})}));
   const out={players:list,msgs:mine,seq,online:players.size,pid:id};
+  if(!p.room)out.rooms=venueNear(p);
   if(p.fullRoom&&now()-(p.fullAt||0)<3)out.full={room:p.fullRoom,cap:VenueRoom.capacity(p.fullRoom)};
   return out;}
 
@@ -660,7 +664,7 @@ setInterval(()=>{const t0=process.hrtime.bigint();tick++;
       if(!v||v.v!==o.metaV)p.view.set(o.sid,Object.assign(v||{x:NaN,y:NaN,b:-1},{v:o.metaV}));}
     for(const sid of p.view.keys())if(!shown.has(sid)){gone.push(sid);p.view.delete(sid);}
     const msg={t:'w'};let any=false;if(pos.length){msg.p=pos;any=true;}if(meta.length){msg.m=meta;any=true;}if(gone.length){msg.g=gone;any=true;}
-    if(tick%10===p.sid%10){msg.n=players.size;any=true;if(!p.room&&total>VIEW_K){msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=!p.room&&total>VIEW_K;}
+    if(tick%10===p.sid%10){msg.n=players.size;any=true;if(!p.room){msg.r=venueNear(p);if(!p.room&&total>VIEW_K)msg.c=crowdCells(p,200);}else if(p.hadCrowd){msg.c=[];}p.hadCrowd=!p.room&&total>VIEW_K;}
     if(any)wsSend(p,msg);}
   stats.tickMs=stats.tickMs*0.9+Number(process.hrtime.bigint()-t0)/1e6*0.1;if(players.size>(stats.peak||0))stats.peak=players.size;},200).unref();
 setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue;}ws.isAlive=false;try{ws.ping();}catch(e){}}},30000).unref();

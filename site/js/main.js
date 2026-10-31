@@ -114,7 +114,7 @@ function findAction(){
   if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return actTarget({label:'Зайти домой',run:()=>enterInterior({kind:'home',name:typeof housingHomeName==='function'?housingHomeName():'Ваша квартира',key:typeof housingHomeKey==='function'?housingHomeKey():'home',x:player.x,y:player.y})},{x:player.home.cx,y:player.home.cy},'home',player.home);}
   for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return actTarget({label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}},ac,'accident');}}
   if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return actTarget({label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)},companion.w,'person');
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n)return actTarget({label:`Зайти в «${b.n}»`,run:()=>enterInterior({kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y,venueAt:{x:b.cx,y:b.cy}})},{x:b.cx,y:b.cy},'building',b);
+  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n){const src={kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y,venueAt:{x:b.cx,y:b.cy}};return actTarget(venueDoor(`Зайти в «${b.n}»`,src),{x:b.cx,y:b.cy},'building',b);}
   return null;}
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}
@@ -126,12 +126,21 @@ function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school|prosecutor)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}return {label:`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,run:()=>enterInterior({kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y,venueAt:{x:poi.x,y:poi.y}})};}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}const src={kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y,venueAt:{x:poi.x,y:poi.y}};return venueDoor(`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,src);}
   switch(poi.t){
     case 'atm':return {label:`Банкомат ${n}: карта и вклад`,run:()=>openBank('atm')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{spendTime(30);player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
     case 'fuel':if(player.vehicle&&player.vehicle.kind==='own'&&typeof ECON!=='undefined'&&ECON.carCond<95)return repairAction(false);return player.vehicle&&player.vehicle.kind==='own'?{label:`Заправиться ${n} · 2 500 ₽`,run:()=>spend(2500,()=>addEvent('Полный бак'))}:null;
     default:return null;}}
+function venueDoor(label,src){
+  const id=typeof sharedVenueKey==='function'?sharedVenueKey(src):null;
+  const cap=id&&typeof VenueRoom!=='undefined'?VenueRoom.capacity(id):0;
+  if(!cap)return {label,run:()=>enterInterior(src)};
+  const n=typeof Net!=='undefined'&&Net.rooms?Net.rooms.get(id)||0:0;
+  const free=Math.max(0,cap-n);
+  if(free<=0)return {label:label+' · мест нет',run:()=>{const msg='Пока нет места: внутри уже '+cap+'. Подождите на улице.';addEvent(msg);setHint(msg);}};
+  return {label:label+' · свободно '+free,run:()=>enterInterior(src)};
+}
 function spend(amount,fn){if(player.money<amount){setHint(`Не хватает денег: нужно ${amount} ₽`);return;}player.money-=amount;fn();}
 // спать — вечером и ночью (с 21:00 до 7:00) или когда совсем устали; часы общие, поэтому сон не перематывает время, а возвращает силы
 function canSleep(){const h=(clock.minutes/60)%24;return h>=21||h<7||player.energy<35;}

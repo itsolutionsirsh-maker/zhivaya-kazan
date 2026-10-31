@@ -4,7 +4,7 @@ function netSrc(){try{if(typeof TG!=='undefined'&&TG.on)return /^ref_/.test(TG.s
   const r=document.referrer?new URL(document.referrer).hostname:'';return r&&r!==location.hostname?('web:'+r).slice(0,24):'web';}catch(e){return 'web';}}
 // ===== Сеть: комната claude.ai или свой сервер (api.php) =====
 // Режимы: 'room' — внутри claude.ai; 'http' — на своём сайте; 'off' — одиночная игра.
-const Net={mode:'off',me:null,peers:[],llm:false};
+const Net={mode:'off',me:null,peers:[],rooms:new Map(),llm:false};
 let myCid=null;try{myCid=localStorage.getItem('zk.cid');}catch(e){}
 // zk.cid — секрет игрока, уходит только серверу; в чате и в мире у игрока публичный номер (pid), его присылает сервер
 function myPid(){return (typeof Net!=='undefined'&&Net.pid)||myCid;}
@@ -40,6 +40,7 @@ async function httpLoop(){for(;;){
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
     if(j.pid)Net.pid=j.pid;if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myPid()){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myPid())continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
     if(typeof j.seq==='number')httpSince=j.seq;httpFirst=false;setNetStatus(true);
+    if(Array.isArray(j.rooms)){Net.rooms=new Map();for(const row of j.rooms)if(row&&typeof row[0]==='string')Net.rooms.set(row[0],row[1]|0);}
     if(j.full)venueFull(j.full);
   }catch(e){Net.peers=[];syncPeers([]);setNetStatus(false);}
   await new Promise(r=>setTimeout(r,document.hidden?3000:800));}}
@@ -70,6 +71,7 @@ function wsApply(d){
   if(d.p)for(const [sid,x,y,hx,hy,b,room,ix,iy,ihx,ihy] of d.p){const e=wsPeers.get(sid);if(!e)continue;e.presence.x=x/10;e.presence.y=y/10;e.presence.hx=hx/100;e.presence.hy=hy/100;e.presence.b=b;e.presence.room=room||null;e.presence.ix=ix/100;e.presence.iy=iy/100;e.presence.ihx=ihx/100;e.presence.ihy=ihy/100;}
   if(d.g)for(const sid of d.g)wsPeers.delete(sid);
   if(d.c){Net.crowd=d.c;}if(typeof d.n==='number')Net.online=d.n;
+  if(Array.isArray(d.r)){Net.rooms=new Map();for(const row of d.r)if(row&&typeof row[0]==='string')Net.rooms.set(row[0],row[1]|0);}
   Net.peers=[...wsPeers.values()];syncPeers(Net.peers);setNetStatus(true);}
 function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';let opened=false;
   try{wsSock=new WebSocket(url);}catch(e){wsFallback();return;}
@@ -84,7 +86,7 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
     else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
     else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');
     else if(d.t==='full')venueFull(d);};
-  wsSock.onclose=()=>{Net.peers=[];wsPeers.clear();Net.crowd=[];syncPeers([]);setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
+  wsSock.onclose=()=>{Net.peers=[];wsPeers.clear();Net.crowd=[];Net.rooms=new Map();syncPeers([]);setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
 function wsFallback(){if(Net.mode==='http')return;Net.mode='http';httpLoop();}
 function venueFull(d){
@@ -135,7 +137,7 @@ async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).ca
   acct={token:j.token,name:j.name};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
   if(!j.created&&j.state){acctApply(j);return;}
   setRev(j.updated||0);Net.syncReady=true;await acctSave();$('#acctMsg').textContent=j.created?'Аккаунт создан. Прогресс сохраняется на сервере':'Вошли. Прогресс сохраняется на сервере';renderAcct();}
-function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
+function renderAcct(){const hud=$('#acctHud');if(hud)hud.hidden=!!acct||!Net.acct;const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
   const tg=acct&&acct.tg;const p=inForm.querySelector('p');const go=$('#acctGo');const ob=$('#acctOutBtn');
   const inTg=typeof TG!=='undefined'&&TG.on;const tr=$('#acctTgRow');if(tr)tr.hidden=!Net.tg||inTg||!!acct;const pr=$('#pTgRow');if(pr)pr.hidden=!Net.tg||inTg||!!acct;
   if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=inTg;return;}
@@ -143,6 +145,7 @@ function renderAcct(){const box=$('#acctBox');if(!box)return;box.hidden=!Net.acc
   if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}}
 if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
+if($('#acctHud'))$('#acctHud').addEventListener('click',e=>{e.stopPropagation();$('#menuBtn').click();const box=$('#acctBox');if(box)box.scrollIntoView({block:'center'});if(!acct){const n=$('#acctName');if(n)n.focus();}});
 setInterval(acctSave,30000);
 window.addEventListener('pagehide',()=>{if(!acct||!navigator.sendBeacon||window.zkNoSave||!Net.syncReady)return;const snap=acctSnapshot();if(!snap||!snap.state)return;try{navigator.sendBeacon('api.php',new Blob([JSON.stringify(Object.assign({a:'save',token:acct.token,base:syncRev||undefined},snap))],{type:'application/json'}));}catch(e){}});
 // ---------- вход на сайте через Телеграм: тот же аккаунт и прогресс, что в мини-приложении ----------

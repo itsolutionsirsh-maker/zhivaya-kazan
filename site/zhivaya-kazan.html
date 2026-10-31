@@ -64,7 +64,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 @media (prefers-reduced-motion:no-preference){body.drunk #map{animation:zkSway 6s ease-in-out infinite}body.wasted #map{animation-duration:3.4s}}
 @keyframes zkSway{0%,100%{transform:rotate(-.5deg) scale(1.03)}50%{transform:rotate(.7deg) scale(1.035) translateX(8px)}}
-.needs .money{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;margin-top:2px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.needs .money{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+#acctHud{min-height:32px;height:32px;padding:0 10px;font-size:13px;line-height:1;border-radius:999px;flex:none}
 .needs .money b{color:var(--gold);font-size:15px;font-weight:500}
 .online{font-size:11px;color:var(--muted)}
 .mid{position:relative;display:flex;justify-content:flex-end;align-items:flex-start;gap:10px}
@@ -190,7 +191,7 @@ html.tg body{overscroll-behavior:none}:where(html.tg) .btn{min-height:40px}
   .needs{box-sizing:border-box;min-width:0;width:100%;min-height:44px;margin:0;padding:6px 8px;display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:10px;position:relative}
   .needs .need{display:flex;align-items:center;gap:3px;flex:none}.needs .need:has(.lbl[hidden]){display:none}
   .needs .lbl{font-size:0;line-height:1}.needs .lbl::before{content:attr(data-icon);font-size:13px}
-  .needs .bar{width:22px;height:5px}.needs .money{display:block;min-width:0;margin:0 0 0 auto;font-size:12px}
+  .needs .bar{width:22px;height:5px}.needs .money{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;margin:0 0 0 auto;font-size:12px}
   .needs .money b{font-size:12px;display:block;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .needs #nameLbl{display:none}.needs #debtLbl{font-size:10px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1}
   .needs[aria-expanded=true]{position:absolute;top:54px;left:0;z-index:21;display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;padding:14px;background:var(--panel-solid);box-shadow:var(--shadow)}
@@ -387,7 +388,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
       <div class="need"><span class="lbl" data-icon="🍲">Сытость</span><div class="bar" id="bFood" role="meter" aria-label="Сытость" aria-valuemin="0" aria-valuemax="100"><i style="width:100%"></i></div><span class="need-value"></span></div>
       <div class="need"><span class="lbl" data-icon="☺">Настроение</span><div class="bar" id="bMood" role="meter" aria-label="Настроение" aria-valuemin="0" aria-valuemax="100"><i style="width:70%"></i></div><span class="need-value"></span></div>
       <div class="need"><span class="lbl" id="lDrunk" data-icon="🍺" hidden>🍺 Хмель</span><div class="bar drunkbar" id="bDrunk" role="meter" aria-label="Хмель" aria-valuemin="0" aria-valuemax="100" hidden><i style="width:0%"></i></div><span class="need-value"></span></div>
-      <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">3 000 ₽</b></div>
+      <div class="money"><span id="nameLbl" class="online">—</span><b id="moneyLbl">3 000 ₽</b><button type="button" class="btn" id="acctHud" hidden>Войти</button></div>
       <span id="debtLbl" hidden></span><span class="needs-cue">Нажмите ещё раз, чтобы свернуть</span>
     </div>
   </div>
@@ -451,7 +452,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
       <div class="tile"><b><span class="ic">🚦</span>Дороги</b><span>Переходите по зебре — водители остановятся. Перебежите перед машиной — успеют затормозить не все. Приедет скорая, лечение платное.</span></div>
       <div class="tile"><b><span class="ic">💬</span>Общаться</b><span><kbd>Enter</kbd> или 💬 — чат. «Рядом» — сказать вслух (облачко, жители отвечают), «Город» — всем игрокам, «Личные» — одному игроку. Клик по жителю — разговор с ним, клик по игроку — личка.</span></div>
       <div class="tile"><b><span class="ic">🧭</span>Поездки</b><span>🧭 — выбрать место и способ: пешком, автобус, такси, самокат, велосипед, каршеринг или своя машина. 📦 — поручения: забрать и довезти, дорогу на это время платит город. Автобус — 40 ₽.</span></div>
-      <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>Зажмите мышь и тяните — карта двигается. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
+      <div class="tile"><b><span class="ic">🗺</span>Карта</b><span>На телефоне ведите пальцем по карте. На компьютере зажмите мышь и тяните. ◎ — вернуться к персонажу. Клик по мини-карте — посмотреть район.</span></div>
       <div class="tile"><b><span class="ic">📢</span>Площади</b><span>На площади Свободы, Тысячелетия, Тукая и 1 Мая можно собрать людей: митинг, встреча или концерт. Жители тоже устраивают свои.</span></div>
       <div class="tile"><b><span class="ic">☕</span>Заходить</b><span>Кафе, магазины, банки, театр, ваша квартира — всё с интерьером. Внутри: <kbd>E</kbd> у столика, стойки или человека. Выход внизу.</span></div>
     </div>

@@ -50,6 +50,10 @@ test('a full venue leaves the extra player on the street and tells them',()=>{
   assert.equal(extra.room,null);
   assert.equal(sent.some(x=>x.id==='extra'&&x.m.t==='full'&&x.m.cap===cap&&x.m.room===full),true);
   const out=[];s.nearest(extra,350,80,out);assert.equal(out.length,0);
+  const street=add('street',{x:6,y:7,b:0}),rows=s.venueNear(street);
+  assert.equal(rows.length,1);assert.equal(rows[0][0],full);assert.equal(rows[0][1],cap);
+  const away=VenueRoom.key('cafe',{x:800,y:800},'Далеко');add('away',pose(away));
+  assert.ok(!s.venueNear(street).some(r=>r[0]===away));
 });
 test('same venue has its own nearby set; another cafe, street and private interiors stay out',()=>{
   const {s,add}=server(),a=add('a',pose()),b=add('b',pose()),c=add('c',pose(other)),street=add('s',{x:101,y:201,b:0}),home=add('h',{x:101,y:201,b:1});
