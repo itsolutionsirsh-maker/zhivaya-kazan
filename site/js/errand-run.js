@@ -107,12 +107,11 @@
     return null;
   }
   function openNow(job){const h=hour(),hr=job.hours||[0,24];return h>=hr[0]&&h<hr[1];}
-  const btn=document.createElement('button');
-  btn.type='button';btn.textContent='Поручения';
-  btn.style.cssText='position:fixed;right:16px;top:78px;z-index:19;border:0;border-radius:999px;padding:12px 16px;min-height:44px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
+  const btn=document.getElementById('errandBtn')||document.createElement('button');
+  if(!btn.id){btn.type='button';btn.id='errandBtn';btn.className='btn';btn.title='Поручения';btn.textContent='📦';const q=document.getElementById('questBtn');if(q)q.after(btn);}
   const panel=document.createElement('section');
   panel.hidden=true;
-  panel.style.cssText='position:fixed;right:16px;top:132px;z-index:19;width:min(340px,calc(100vw - 32px));max-height:62vh;overflow:auto;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.4 "IBM Plex Sans",system-ui';
+  panel.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(360px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#f6f1e6;color:#1c241f;border-radius:18px;padding:14px;box-shadow:0 16px 40px rgba(0,0,0,.28);font:15px/1.4 "IBM Plex Sans",system-ui';
   function row(title,text){const d=document.createElement('div');d.style.cssText='padding:8px 0;border-top:1px solid rgba(0,0,0,.08)';const b=document.createElement('b');b.textContent=title;d.append(b);if(text){const s=document.createElement('div');s.textContent=text;s.style.opacity='.8';d.append(s);}return d;}
   function actBtn(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='min-height:44px;margin:6px 6px 0 0;padding:8px 12px;border-radius:999px;border:0;background:#132019;color:#f6f1e6;font:600 14px inherit;cursor:pointer';b.addEventListener('click',fn);return b;}
   function draw(){
@@ -137,7 +136,7 @@
   function boot(){
     load();rollDay();
     if(!document.body)return;
-    document.body.append(btn,panel);
+    document.body.append(panel);
     if(typeof findAction==='function'&&!findAction._errand){
       const prev=findAction;
       findAction=function(){const ea=errandAction();return ea||prev();};
