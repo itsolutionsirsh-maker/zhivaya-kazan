@@ -293,7 +293,9 @@ const players=new Map();let nextSid=1;const bySid=new Map();
 const venueMembers=new Map();
 function venueLeave(p){if(!p.room)return;const members=venueMembers.get(p.room);if(members){members.delete(p);if(!members.size)venueMembers.delete(p.room);}p.room=null;}
 function venueMove(p,d){const v=VenueRoom.read(d),id=v?v.room:null,was=p.room;
-  if(p.room!==id){venueLeave(p);p.meta.sy=null;p.metaS='';p.sayAt=0;p.metaV++;p.dense=false;
+  if(id&&id!==was){const members=venueMembers.get(id),n=members?members.size:0,cap=VenueRoom.capacity(id);
+    if(cap&&n>=cap){venueLeave(p);p.room=null;p.ix=p.iy=p.ihx=p.ihy=0;const t=now();if(p.fullRoom!==id||t-(p.fullAt||0)>2){p.fullRoom=id;p.fullAt=t;wsSend(p,{t:'full',room:id,cap});}if(was){barSend(roles.moved(rolePl(p)));taxiSend(taxi.moved(taxiPl(p)));}return;}}
+  if(p.room!==id){venueLeave(p);p.meta.sy=null;p.metaS='';p.sayAt=0;p.metaV++;p.dense=false;p.fullRoom=null;
     if(id){let members=venueMembers.get(id);if(!members){members=new Set();venueMembers.set(id,members);}members.add(p);}}
   p.room=id;p.ix=v?v.ix:0;p.iy=v?v.iy:0;p.ihx=v?v.ihx:0;p.ihy=v?v.ihy:0;
   if(was!==id){barSend(roles.moved(rolePl(p)));taxiSend(taxi.moved(taxiPl(p)));}   // вышел из кафе — его заказы отменяются, смена у стойки кончается; зашёл в помещение — поездка тоже
@@ -421,7 +423,9 @@ function apiSync(body,ip){const priv=idstr(body.id);if(priv.length<8)return {err
   for(const m of (Array.isArray(body.out)?body.out:[]).slice(0,6))postMsg(p,m&&m.to,m&&m.t);
   const since=parseInt(body.since,10)||0;let mine=msgs.filter(m=>m.i>since&&(m.to===null||m.to===id||m.from===id)).map(m=>({i:m.i,from:m.from,n:m.n,to:m.to,t:m.t,ts:m.ts}));if(since===0)mine=mine.slice(-30);
   const nearby=[];nearest(p,VIEW_R,VIEW_K,nearby);const list=nearby.map(([,o])=>({id:o.id,p:Object.assign(visibleMeta(o),{x:o.x,y:o.y,hx:o.hx,hy:o.hy,b:o.b,room:o.room,ix:o.ix,iy:o.iy,ihx:o.ihx,ihy:o.ihy})}));
-  return {players:list,msgs:mine,seq,online:players.size,pid:id};}
+  const out={players:list,msgs:mine,seq,online:players.size,pid:id};
+  if(p.fullRoom&&now()-(p.fullAt||0)<3)out.full={room:p.fullRoom,cap:VenueRoom.capacity(p.fullRoom)};
+  return out;}
 
 // Territory state is separate from client saves; position still uses the game's client movement protocol.
 function apiTerritory(body,ip){

@@ -38,6 +38,18 @@ test('untrusted room packets reject private rooms, oversized IDs, malformed and 
   assert.ok(VenueRoom.read(pose()));
   for(const d of [{...pose(),b:0},{...pose(),room:'home'},{...pose(),room:'x'.repeat(100)},{...pose(),ix:NaN},{...pose(),iy:Infinity},{...pose(),ix:-1},{...pose(),ix:17},{...pose(),iy:13},{...pose(),ihx:'1'}])assert.equal(VenueRoom.read(d),null);
   assert.equal(VenueRoom.read({...pose(),ihx:500}).ihx,1);
+  assert.equal(VenueRoom.capacity('cafe'),40);
+  assert.equal(VenueRoom.capacity(room),40);
+  assert.equal(VenueRoom.capacity('home'),0);
+});
+test('a full venue leaves the extra player on the street and tells them',()=>{
+  const {s,add,sent}=server(),full=VenueRoom.key('cafe',{x:5,y:6},'Полное'),cap=VenueRoom.capacity(full);
+  for(let i=0;i<cap;i++)add('p'+i,pose(full));
+  sent.length=0;
+  const extra=add('extra',pose(full));
+  assert.equal(extra.room,null);
+  assert.equal(sent.some(x=>x.id==='extra'&&x.m.t==='full'&&x.m.cap===cap&&x.m.room===full),true);
+  const out=[];s.nearest(extra,350,80,out);assert.equal(out.length,0);
 });
 test('same venue has its own nearby set; another cafe, street and private interiors stay out',()=>{
   const {s,add}=server(),a=add('a',pose()),b=add('b',pose()),c=add('c',pose(other)),street=add('s',{x:101,y:201,b:0}),home=add('h',{x:101,y:201,b:1});
@@ -75,9 +87,10 @@ test('an old client remains street-compatible and can leave a previously shared 
   const {s,add}=server(),a=add('a',pose());s.setPresence(a,{x:200,y:300,b:0,hx:1,hy:0});assert.equal(a.room,null);
   const packet=s.positionPacket(a);assert.deepEqual(Array.from(packet.slice(1,6)),[2000,3000,100,0,0]);
 });
-test('crowds inside a room are bounded by the configured view limit',()=>{
-  const {s,add}=server(),a=add('a',pose());for(let i=0;i<120;i++)add('b'+i,pose(room,1+i/20,2));
-  const out=[];assert.equal(s.nearest(a,350,80,out),120);assert.equal(out.length,80);
+test('a room never holds more than its capacity, and everyone inside stays visible',()=>{
+  const {s,add}=server(),a=add('a',pose()),cap=VenueRoom.capacity(room);
+  for(let i=0;i<120;i++)add('b'+i,pose(room,1+(i%20)/4,2));
+  const out=[];assert.equal(s.nearest(a,350,80,out),cap-1);assert.equal(out.length,cap-1);
 });
 test('client sends movement and speech without having to move outdoors',()=>{
   const {s,sent,advance}=client();s.wsPush();sent.length=0;advance(200);s.player.ix=6;s.wsPush();

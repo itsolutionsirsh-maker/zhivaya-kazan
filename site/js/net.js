@@ -40,6 +40,7 @@ async function httpLoop(){for(;;){
     if(Array.isArray(j.players)){Net.peers=j.players.filter(pl=>pl&&pl.p&&typeof pl.p.x==='number').map(pl=>({peer:pl.id,presence:pl.p}));syncPeers(Net.peers);}
     if(j.pid)Net.pid=j.pid;if(Array.isArray(j.msgs)){for(const m of j.msgs){if(m.from===myPid()){if(httpFirst)chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);continue;}if(m.to&&m.to!==myPid())continue;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,httpFirst);}}
     if(typeof j.seq==='number')httpSince=j.seq;httpFirst=false;setNetStatus(true);
+    if(j.full)venueFull(j.full);
   }catch(e){Net.peers=[];syncPeers([]);setNetStatus(false);}
   await new Promise(r=>setTimeout(r,document.hidden?3000:800));}}
 
@@ -81,10 +82,17 @@ function wsConnect(){const url=(location.protocol==='https:'?'wss://':'ws://')+l
     else if(d.t==='taxi'){if(typeof tpApply==='function')tpApply(d);}
     else if(d.t==='msg'){const m=d.m;if(m.from===myPid())return;if(m.to&&m.to!==myPid())return;chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,false);}
     else if(d.t==='hist'){if(d.pid)Net.pid=d.pid;for(const m of d.msgs||[]){if(m.from===myPid())chatDeliver('me',player.name,m.to?'dm':'city',m.t,true,m.to);else chatDeliver(m.from,m.n||'Игрок',m.to?'dm':'city',m.t,true);}}
-    else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');};
+    else if(d.t==='err')setHint({busy:'В общем чате сейчас слишком много сообщений — попробуйте через пару секунд',muted:'Общий чат для вас временно отключён: на ваши сообщения пожаловались',banned:'Модератор закрыл вам чат за нарушение правил',dup:'Это сообщение вы только что отправили'}[d.e]||'Не так часто: подождите пару секунд');
+    else if(d.t==='full')venueFull(d);};
   wsSock.onclose=()=>{Net.peers=[];wsPeers.clear();Net.crowd=[];syncPeers([]);setNetStatus(false);wsSock=null;if(!opened)wsFails++;if(wsFails>=3){wsFallback();return;}setTimeout(wsConnect,opened?1500:3000);};
   wsSock.onerror=()=>{};}
 function wsFallback(){if(Net.mode==='http')return;Net.mode='http';httpLoop();}
+function venueFull(d){
+  const msg='Пока нет места: внутри уже '+(d&&d.cap?d.cap:'все')+'. Подождите на улице.';
+  if(typeof scene!=='undefined'&&scene==='interior'&&interior&&(!d||!d.room||interior.room===d.room)&&typeof exitInterior==='function')exitInterior();
+  if(typeof addEvent==='function')addEvent(msg);
+  if(typeof setHint==='function')setHint(msg);
+}
 // толпа сверх показанных игроков: сервер шлёт только сколько человек в каждой клетке 10×10 м
 function drawCrowd(toS,z){const c=Net.crowd;if(!c||!c.length||scene!=='city')return;ctx.save();
   const seen=new Map();for(const e of wsPeers.values()){const k=Math.floor(e.presence.x/10)+','+Math.floor(e.presence.y/10);seen.set(k,(seen.get(k)||0)+1);}{const k=Math.floor(player.x/10)+','+Math.floor(player.y/10);seen.set(k,(seen.get(k)||0)+1);}
