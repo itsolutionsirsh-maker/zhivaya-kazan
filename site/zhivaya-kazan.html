@@ -369,6 +369,11 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 .courtyard-step.complete{border-color:#83d1b1}.courtyard-step h3{margin:0 0 8px}.courtyard-step .btn{display:block;width:100%;margin-top:8px;text-align:left}
 .courtyard-hint{font-size:13px;color:#bac9c2;line-height:1.5}.courtyard-summary{font-weight:650}#courtyardNotice{min-height:20px;overflow-wrap:anywhere}
 @media(max-width:680px){#courtyardModal .box{width:100%;max-height:var(--ui-visible-height,100dvh)}#courtyardModal .ui-sheet-foot .row{display:flex;flex-wrap:wrap;gap:8px}#courtyardModal .ui-sheet-foot .btn{flex:1;min-width:100px}#courtyardModal h2{font-size:19px}}
+
+/* The first encounter must keep all choices reachable on short screens. */
+#sitCard.first-neighbor-card{z-index:25}
+#sitCard.first-neighbor-card #scBtns .btn{min-height:44px}
+@media(max-height:500px){#sitCard.first-neighbor-card{position:fixed;left:50%;bottom:12px;translate:-50% 0;width:min(440px,calc(100vw - 16px));max-height:calc(100dvh - 24px);overflow-y:auto}#sitCard.first-neighbor-card #scX{min-width:44px;min-height:44px}}
 </style>
 
 <canvas id="map"></canvas>
@@ -444,7 +449,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
   <div class="box">
     <h2>Как тут жить</h2>
     <p>На телефоне ведите пальцем по кружку внизу слева. На компьютере нажмите на место на карте или идите клавишами. Подошли к человеку или двери — жёлтая кнопка <kbd>E</kbd>.</p>
-    <p>🧭 куда ехать, 🎯 задания, 📦 поручения. Деньги этого телефона на другом не откроются, пока не войдёте: ☰, внизу «Войти». Первая история: ☰ → «История соседки».</p>
+    <p>🧭 куда ехать, 🎯 задания, 📦 поручения. Деньги этого телефона на другом не откроются, пока не войдёте: ☰, внизу «Войти». Ближайшее дело появится сверху. Знакомства и истории можно продолжить позже через меню ☰.</p>
     <details><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">Все подсказки по управлению</summary>
     <div class="howto">
       <div class="tile"><b><span class="ic">🚶</span>Ходить</b><span>На телефоне — кружок внизу слева. На компьютере <kbd>WASD</kbd> или стрелки, <kbd>Shift</kbd> — бежать. Клик по карте — персонаж дойдёт сам. Клик по человеку — подойдёт и заговорит.</span></div>
@@ -673,4 +678,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
 <template id="zkLater"><script src="js/folk3.js"></script></template>
-<script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/guests-play.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script>
+<script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/guests-play.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script>

@@ -37,6 +37,7 @@ function ppReport(s){s.phase='report';s.chase=false;unmark('pp');for(const w of 
 // ---------- ссора: толкнул на бегу / задели вас ----------
 let bumpLast={x:0,y:0,cool:0};
 defWatch(dt=>{const sp=dist(player.x,player.y,bumpLast.x,bumpLast.y)/Math.max(dt,0.001);bumpLast.x=player.x;bumpLast.y=player.y;bumpLast.cool-=dt;
+  if(window.cityFirstNeighbor&&cityFirstNeighbor.active())return;
   if(bumpLast.cool>0||!onFootCity()||sp<4.2||sp>12||sitActive('quarrel'))return;
   for(const w of walkers){if(w.bus||w.inside||w.sitBy||w.companion||w.rally||w.role!=='resident'||w.state==='hurt')continue;if(Math.abs(w.x-player.x)>1||Math.abs(w.y-player.y)>1)continue;if(dist(w.x,w.y,player.x,player.y)<0.95){bumpLast.cool=45;startSit('quarrel',{w,bump:true});return;}}});
 defSit('quarrel',{title:'Ссора',auto:true,cool:420,get weight(){return (player.drunk||0)>=45?4:1;},

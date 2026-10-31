@@ -85,7 +85,7 @@ function storyVenue(id){const V=storyList(id,'venues').filter(v=>v&&v.name);cons
     if(world.pois.some(p=>Math.abs(p.x-q[0])<R0&&Math.abs(p.y-q[1])<R0&&dist(p.x,p.y,q[0],q[1])<R0))continue;if(!inBuildingNear(q[0],q[1]))continue;
     return {x:q[0],y:q[1],n:v.name,kind:v.kind==='bar'?'bar':'cafe'};}return null;}
 function storyPick(){if(typeof cityHour!=='function')return null;const h=cityHour();if(h>=11&&h<18)return 'plates';if(h>=19||h<2)return 'clofelin';if(h>=18&&h<19)return Math.random()<0.5?'plates':'clofelin';return null;}
-function storyFree(){return scene==='city'&&world&&world.meta&&!player.vehicle&&!player.bus&&!player.busy&&!player.inside&&!companion&&!SIT.card&&player.state==='ok'&&!player.waitingStop&&!sitActive('story')&&!window.zkNoStory;}
+function storyFree(){return !(window.cityFirstNeighbor&&cityFirstNeighbor.active())&&scene==='city'&&world&&world.meta&&!player.vehicle&&!player.bus&&!player.busy&&!player.inside&&!companion&&!SIT.card&&player.state==='ok'&&!player.waitingStop&&!sitActive('story')&&!window.zkNoStory;}
 
 // ---------- сама история: подходит, зовёт, ведёт, внутри — выборы ----------
 defSit('story',{title:'История новичка',quiet:true,
