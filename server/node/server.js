@@ -165,9 +165,11 @@ let shopItems=[];try{shopItems=PlategaLib.readShop(fs.readFileSync(path.join(__d
 const platega=PlategaLib.Platega({merchantId:ENV.PLATEGA_MERCHANT_ID,secret:ENV.PLATEGA_SECRET,shop:shopItems,fs,file:path.join(DATA,'platega.json')});
 function payOrigin(req){const pub=String(ENV.PUBLIC_URL||'https://kazan.lifegorod.com').replace(/\/$/,'');const host=String((req.headers&&(req.headers['x-forwarded-host']||req.headers.host))||'');
   if(!host||/localhost|127\.0\.0\.1/.test(host))return pub;const proto=String((req.headers['x-forwarded-proto']||'https')).split(',')[0].trim();return proto+'://'+host.split(',')[0].trim();}
-async function payFor(req,body){const a=accByToken(body.token);if(!a)return {err:'auth'};if(body.check)return {ok:1,items:platega.owned(a.k)};
-  if(!allow('pay:'+a.k,8,600))return {err:'rate_limited'};const origin=payOrigin(req);
-  try{return await platega.create(a.k,String(body.item||'').slice(0,40),{ok:origin+'/?pay=back',fail:origin+'/?pay=fail'},ipOf(req));}catch(e){log('platega: счёт не создался');return {err:'platega'};}}
+async function payFor(req,body){const a=accByToken(body.token);if(!a)return {err:'auth'};
+  if(body.check)return {ok:1,bal:platega.balance(a.k),items:platega.owned(a.k),tops:platega.tops()};
+  if(!allow('pay:'+a.k,8,600))return {err:'rate_limited'};
+  if(body.top){const origin=payOrigin(req);try{return await platega.create(a.k,'top-'+String(body.top),{ok:origin+'/?pay=back',fail:origin+'/?pay=fail'},ipOf(req));}catch(e){log('platega: счёт не создался');return {err:'platega'};}}
+  const r=platega.spend(a.k,String(body.item||'').slice(0,40));if(r&&r.ok)grantPaid(a.k);return r;}
 function grantPaid(k){const a=store.get(k);if(!a)return;const prev=a.state&&typeof a.state==='object'?a.state:{};const next=platega.apply(k,prev);if(next!==prev)store.save(k,next,a.profile,a.city);}
 function rolePl(p){return p?{id:p.id,name:p.meta&&typeof p.meta.n==='string'?p.meta.n:'Игрок',room:p.room||null,acc:p.acc||null}:null;}
 function barSend(list){for(const e of list||[]){const p=players.get(e.to);if(p)wsSend(p,e.m);}}
@@ -233,7 +235,7 @@ const PUBLIC_URL=ENV.PUBLIC_URL?ENV.PUBLIC_URL.replace(/\/*$/,'/'):'';
 const tgSecret=()=>sha('wh:'+TG_TOKEN).slice(0,40);
 function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-secret-token']||''),want=tgSecret();
   if(!TG_TOKEN||!safeEq(got,want))return [403,{err:'forbidden'}];
-  const cq=body&&body.callback_query;if(cq)return [200,tgWebConfirm(cq)];
+  const cq=body&&body.callback_query;if(cq)return tgPayCallback(cq,req);
   const msg=body&&body.message;const text=msg&&typeof msg.text==='string'?msg.text:'';
   const lm=msg&&msg.chat&&/^\/start\s+login_([A-Za-z0-9_-]{8,40})\s*$/.exec(text);
   if(lm){const e=tgwGet(lm[1]);if(!e||e.st!=='wait'||msg.chat.type!=='private')return [200,{method:'sendMessage',chat_id:msg.chat.id,text:'Ссылка для входа устарела. Нажмите «Войти через Телеграм» в игре ещё раз.'}];
@@ -253,11 +255,28 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
   const rm=msg&&msg.chat&&/^\/reply\s+(-?\d{3,15})\s+([\s\S]+)$/.exec(text);
   if(rm){const admin=String(ENV.ADMIN_TG_ID||'');if(!admin||msg.chat.type!=='private'||String(msg.from&&msg.from.id)!==admin)return [200,{ok:1}];
     return [200,{method:'sendMessage',chat_id:+rm[1],text:'Ответ команды «Живой Казани»:\n'+clean(rm[2],1500)}];}
+  if(msg&&msg.chat&&msg.chat.type==='private'&&/^\/pay\b/.test(text))return payMenu(msg.from,msg.chat.id);
   if(!msg||!msg.chat||msg.chat.id==null||!/^\/(start|play|help)\b/.test(text))return [200,{ok:1}];
   const url=PUBLIC_URL||('https://'+String(req.headers.host||'').replace(/[^a-z0-9.:-]/gi,'')+'/');const name=clean((msg.from&&msg.from.first_name)||'',40);
   return [200,{method:'sendMessage',chat_id:msg.chat.id,
     text:(name?name+', добро':'Добро')+' пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇',
-    reply_markup:{inline_keyboard:[[{text:'▶️ Играть',web_app:{url}}]]}}];}
+    reply_markup:{inline_keyboard:[[{text:'▶️ Играть',web_app:{url}}],[{text:'💳 Кошелёк',callback_data:'paymenu'}]]}}];}
+function payMenu(from,chat){const id=String(from&&from.id||'');const k=id?store.tgGet(id):null;
+  if(!k)return [200,{method:'sendMessage',chat_id:chat,text:'Сначала нажмите «Играть» и войдите. Кошелёк один на аккаунт: и в Телеге, и на сайте.'}];
+  if(!platega.on())return [200,{method:'sendMessage',chat_id:chat,text:'Пополнение ещё не включено.'}];
+  return [200,{method:'sendMessage',chat_id:chat,text:'Кошелёк: '+platega.balance(k)+' ₽.\nС него покупается одежда. Игровые рубли это не пополняет. Сумма одна и в Телеге, и на сайте.',
+    reply_markup:{inline_keyboard:[[{text:'100 ₽',callback_data:'top:100'},{text:'300 ₽',callback_data:'top:300'}],[{text:'500 ₽',callback_data:'top:500'},{text:'1000 ₽',callback_data:'top:1000'}]]}}];}
+async function tgPayCallback(cq,req){const data=String(cq.data||'');
+  if(data==='paymenu')return payMenu(cq.from,cq.message&&cq.message.chat&&cq.message.chat.id);
+  const top=/^top:(\d+)$/.exec(data);
+  if(!top)return [200,tgWebConfirm(cq)];
+  const id=String(cq.from&&cq.from.id||''),k=id?store.tgGet(id):null;
+  if(!k)return [200,{method:'answerCallbackQuery',callback_query_id:cq.id,text:'Сначала нажмите «Играть» и войдите',show_alert:true}];
+  if(!platega.on())return [200,{method:'answerCallbackQuery',callback_query_id:cq.id,text:'Пополнение ещё не включено',show_alert:true}];
+  if(!allow('pay:'+k,8,600))return [200,{method:'answerCallbackQuery',callback_query_id:cq.id,text:'Слишком часто. Подождите пару минут',show_alert:true}];
+  const origin=payOrigin(req);let r;try{r=await platega.create(k,'top-'+top[1],{ok:origin+'/?pay=back',fail:origin+'/?pay=fail'},'tg');}catch(e){r=null;}
+  if(!r||!r.url)return [200,{method:'answerCallbackQuery',callback_query_id:cq.id,text:'Не удалось открыть оплату',show_alert:true}];
+  return [200,{method:'answerCallbackQuery',callback_query_id:cq.id,url:r.url}];}
 // при запуске: вебхук на этот сервер и кнопка меню бота на эту игру; не вышло — повтор через 10 минут
 async function tgSetup(){if(!TG_TOKEN||!PUBLIC_URL)return;
   const call=(m,p)=>fetch(`https://api.telegram.org/bot${TG_TOKEN}/${m}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(10000)}).then(r=>r.json());
@@ -582,7 +601,7 @@ async function handleReq(req,res){
     if(a==='login')return send(res,200,login(body.name,body.pin,ip));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base,body.wallet));
     if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
-    if(a==='tgwebhook'){const [code,obj]=tgWebhook(req,body);return send(res,code,obj);}
+    if(a==='tgwebhook'){const pair=await tgWebhook(req,body);return send(res,pair[0],pair[1]);}
     if(a==='reset')return send(res,200,resetFor(body.token));
     if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
