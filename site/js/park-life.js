@@ -2,7 +2,31 @@
 (function(){
   const dogs=[],quads=[];
   const COATS=[{n:'Рыжик',c:'#C47A3A'},{n:'Шарик',c:'#E6D2A2'},{n:'Бобик',c:'#6B4632'},{n:'Серый',c:'#8E949B'}];
-  const MASKS=[{mask:'кот',c:'#E07A3D',line:'Мяу. Хвост не трогать: это парк, не цирк.'},{mask:'пёс',c:'#C9A227',line:'Гав. Я сегодня пёс. Настоящий вон бегает без маски.'},{mask:'кот',c:'#D4536A',line:'Не снимайте. В маске и так жарко.'},{mask:'лис',c:'#E36B2C',line:'На четырёх быстрее, чем кажется. Дорогу не загораживаю.'}];
+  const MASKS=[
+    {talk:'cat',mask:'кот',c:'#E07A3D'},
+    {talk:'dog',mask:'пёс',c:'#C9A227'},
+    {talk:'fox',mask:'лис',c:'#E36B2C'}
+  ];
+  const TALK={
+    cat:{title:'Квадробер · кот',text:'Мяу. Это моя тропа. Пошлина — 40 ₽. Миски нет, так что в карман маски.',
+      choices:[
+        {t:'Заплатить 40 ₽',primary:true,run:q=>{if(player.money<40){setHint('Сорока рублей нет. Кот вздыхает в маску.');return;}spend(40,()=>reply(q,'Печать ставлю лапой. Хвост не снимать: он на резинке, но принципиальный.','Мяу. Пускаю.',4));}},
+        {t:'Мяукнуть',run:q=>reply(q,'Акцент как у гостя. Пускаю. Только не гавкайте: сосед и так обиделся.','Свои. Мяу.',6)},
+        {t:'Я просто гуляю',run:q=>reply(q,'Гуляйте. Скамейка моя до заката. На ней я кот, не подушка.','Скамейка моя.',2)}
+      ]},
+    dog:{title:'Квадробер · пёс',text:'Гав. Я старший по скамейке. Настоящий пёс делает вид, что мы не знакомы.',
+      choices:[
+        {t:'Гавкнуть в ответ',primary:true,run:q=>reply(q,'В стаю. Кусты ваши, урна моя. Колбасу не носите: я на диете образа.','Гав. Свои.',5)},
+        {t:'Встаньте, вы человек',run:q=>reply(q,'Встану у кассы. Здесь служба. Корм сам себя не купит, а лапой карту не приложить.','Потом встану.',2)},
+        {t:'Позвать настоящего пса',run:q=>reply(q,dogs.length?'Он отвернулся. Карьера под вопросом, хвост при нём.':'Настоящий уже ушёл. Предательство породы засчитано.','Гав. Обидно.',3)}
+      ]},
+    fox:{title:'Квадробер · лис',text:'Я лис. Паспорт в хвосте. Хвост на резинке: дёрнете — и я без гражданства.',
+      choices:[
+        {t:'Хвост не трогаю',primary:true,run:q=>reply(q,'Верно. Резинка и так на честном слове. Вы не налоговая, проходите.','Хвост на месте.',3)},
+        {t:'А где прописка?',run:q=>reply(q,'Куст номер три. Штамп ставил голубь, с юристами лучше не спорить.','Куст номер три.',4)},
+        {t:'Это просто шапка',run:q=>reply(q,'Шапка не обижается. Я обижаюсь. Ухожу линять в кусты, не провожайте.','Я не шапка.',2)}
+      ]}
+  };
   function parkAt(){
     let best=null,bd=180;
     for(const l of window.cityLandmarks||[]){
@@ -28,7 +52,7 @@
   }
   function fill(p){
     while(dogs.length<3){const q=spot(p.x,p.y),c=COATS[dogs.length%COATS.length];dogs.push({x:q[0],y:q[1],tx:q[0],ty:q[1],hx:1,hy:0,ph:0,T:1,home:[p.x,p.y],name:c.n,c:c.c,pet:0});}
-    while(quads.length<2){const q=spot(p.x,p.y),m=MASKS[quads.length%MASKS.length];quads.push({x:q[0],y:q[1],tx:q[0],ty:q[1],hx:1,hy:0,ph:0,T:1,home:[p.x,p.y],mask:m.mask,c:m.c,line:m.line,said:0});}
+    while(quads.length<2){const used=new Set(quads.map(q=>q.talk));const pool=MASKS.filter(m=>!used.has(m.talk));const m=pool[Math.floor(Math.random()*pool.length)]||MASKS[0];const q=spot(p.x,p.y);quads.push({x:q[0],y:q[1],tx:q[0],ty:q[1],hx:1,hy:0,ph:0,T:1,home:[p.x,p.y],mask:m.mask,c:m.c,talk:m.talk,bubble:'',bubbleT:0});}
     for(const o of dogs.concat(quads))o.home=[p.x,p.y];
   }
   function updatePark(dt){
@@ -53,8 +77,21 @@
       addEvent(d.name+' вильнул хвостом');setHint('Шерсть тёплая. Настроение +3');
     }};
     const q=nearest(quads,2.2);
-    if(q)return {label:'Квадробер · '+q.mask,run:()=>{q.said=1;sayBubble(q);addEvent(q.line);setHint(q.line);}};
+    if(q)return {label:'Поговорить: квадробер · '+q.mask,run:()=>quadTalk(q)};
     return null;
+  }
+  function reply(q,text,bark,mood){
+    q.bubble=bark;q.bubbleT=4;
+    if(mood)player.mood=typeof clamp==='function'?clamp(player.mood+mood,0,100):Math.min(100,player.mood+mood);
+    addEvent(text);
+    if(typeof sitCard==='function')sitCard({icon:q.mask==='лис'?'🦊':q.mask==='пёс'?'🐕':'🐱',title:'Квадробер · '+q.mask,text:text,choices:[{t:'Ладно',primary:true,run:()=>{}}]});
+    else setHint(text);
+  }
+  function quadTalk(q){
+    const t=TALK[q.talk];if(!t)return;
+    if(typeof sitCard!=='function'){setHint(t.text);return;}
+    if(typeof SIT!=='undefined'&&SIT.card){setHint('Сначала договорите то, что уже на экране');return;}
+    sitCard({icon:q.mask==='лис'?'🦊':q.mask==='пёс'?'🐕':'🐱',title:t.title,text:t.text,choices:t.choices.map(c=>({t:c.t,primary:!!c.primary,run:()=>c.run(q)}))});
   }
   function sayBubble(q){q.bubble=q.line;q.bubbleT=3.2;}
   function drawDog(o,toS,z){
