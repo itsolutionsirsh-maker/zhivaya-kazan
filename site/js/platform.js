@@ -8,7 +8,7 @@ const PLATFORM=(()=>{const q=new URLSearchParams(location.search);const forced=q
   else if(q.has('vk_app_id')||/vk(play)?\.com/i.test(document.referrer))id='vk';
   if(forced&&/^(tg|yandex|vk|web)$/.test(forced))id=forced;
   return {id,
-    // true, когда подключена оплата этой платформы: tg — счёт в звёздах от бота (сервер), yandex — ysdk.getPayments(), vk — VK Bridge
+    // true после ответа сервера, если заданы ключи Platega и это сайт или Телега, не каталог
     canPay:false,
     async pay(item){return {ok:false,err:'no_payments',platform:id};}};})();
 window.cityPlatform=PLATFORM;

@@ -18,6 +18,7 @@ const RealWorldLib=require('./realworld.js');
 const SharedEventsLib=require('./shared-events.js');
 const RolesLib=require('./roles.js');
 const TaxiLib=require('./taxi.js');
+const PlategaLib=require('./platega.js');
 
 const ENV=process.env;
 const PORT=+ENV.PORT||8080;
@@ -74,7 +75,7 @@ function mapDir(){const t=Date.now();if(t-mapChk>30000){mapChk=t;try{MAP_DIR=fs.
 // ключи, введённые на странице /setup (не в /etc/zhivaya-kazan.env) — файл только для службы игры
 const SECRETS=path.join(DATA,'secrets.json');
 {let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}
-  for(const k of ['TG_BOT_TOKEN','ADMIN_TG_ID','LLM_API_KEY','MOD_TOKEN'])if(!ENV[k]&&typeof sec[k]==='string'&&sec[k])ENV[k]=sec[k];
+  for(const k of ['TG_BOT_TOKEN','ADMIN_TG_ID','LLM_API_KEY','MOD_TOKEN','PLATEGA_MERCHANT_ID','PLATEGA_SECRET'])if(!ENV[k]&&typeof sec[k]==='string'&&sec[k])ENV[k]=sec[k];
   // ключ модератора не задан в настройках — создаём свой и храним рядом с ключами
   if(!ENV.MOD_TOKEN||ENV.MOD_TOKEN.length<16){ENV.MOD_TOKEN=crypto.randomBytes(24).toString('hex');sec.MOD_TOKEN=ENV.MOD_TOKEN;
     try{fs.mkdirSync(DATA,{recursive:true});fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);}catch(e){}}}
@@ -160,6 +161,14 @@ function sevBroadcast(){const list=sev.snapshot();for(const p of players.values(
 // роли между игроками (server/node/roles.js): бариста — заказ, цена, оплата через кошелёк; счётчики — DATA_DIR/roles.json
 const roles=RolesLib.Roles({wallet,fs,file:path.join(DATA,'roles.json'),limits:/^\d+$/.test(ENV.ROLE_AGE_MS||'')?{age:+ENV.ROLE_AGE_MS}:undefined});   // ROLE_AGE_MS — только для проверок (по умолчанию сутки)
 const taxi=TaxiLib.Taxi({wallet,fs,file:path.join(DATA,'taxi.json'),limits:/^\d+$/.test(ENV.ROLE_AGE_MS||'')?{age:+ENV.ROLE_AGE_MS}:undefined});   // такси между игроками
+let shopItems=[];try{shopItems=PlategaLib.readShop(fs.readFileSync(path.join(__dirname,'../../site/js/shop.js'),'utf8'));}catch(e){log('витрина магазина не прочиталась');}
+const platega=PlategaLib.Platega({merchantId:ENV.PLATEGA_MERCHANT_ID,secret:ENV.PLATEGA_SECRET,shop:shopItems,fs,file:path.join(DATA,'platega.json')});
+function payOrigin(req){const pub=String(ENV.PUBLIC_URL||'https://kazan.lifegorod.com').replace(/\/$/,'');const host=String((req.headers&&(req.headers['x-forwarded-host']||req.headers.host))||'');
+  if(!host||/localhost|127\.0\.0\.1/.test(host))return pub;const proto=String((req.headers['x-forwarded-proto']||'https')).split(',')[0].trim();return proto+'://'+host.split(',')[0].trim();}
+async function payFor(req,body){const a=accByToken(body.token);if(!a)return {err:'auth'};if(body.check)return {ok:1,items:platega.owned(a.k)};
+  if(!allow('pay:'+a.k,8,600))return {err:'rate_limited'};const origin=payOrigin(req);
+  try{return await platega.create(a.k,String(body.item||'').slice(0,40),{ok:origin+'/?pay=back',fail:origin+'/?pay=fail'},ipOf(req));}catch(e){log('platega: счёт не создался');return {err:'platega'};}}
+function grantPaid(k){const a=store.get(k);if(!a)return;const prev=a.state&&typeof a.state==='object'?a.state:{};const next=platega.apply(k,prev);if(next!==prev)store.save(k,next,a.profile,a.city);}
 function rolePl(p){return p?{id:p.id,name:p.meta&&typeof p.meta.n==='string'?p.meta.n:'Игрок',room:p.room||null,acc:p.acc||null}:null;}
 function barSend(list){for(const e of list||[]){const p=players.get(e.to);if(p)wsSend(p,e.m);}}
 const taxiSend=barSend;   // то же: [{to, m}]
@@ -188,7 +197,9 @@ function accByToken(token){return typeof token==='string'&&token.length>=20?stor
 // отказ conflict с серверной копией: устройство берёт её, а не затирает. Без base (старый клиент) — как раньше, последний пишет.
 // wal = {who, ops} — изменения денег этого устройства (wallet.js): проводятся только вместе с принятым сохранением
 function saveFor(token,state,profile,city,base,wal){const a=accByToken(token);if(!a)return {err:'auth'};
-  if(typeof base==='number'&&isFinite(base)&&(a.updated||0)>base+0.001)return accOut(a,{ok:0,err:'conflict'});const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
+  if(typeof base==='number'&&isFinite(base)&&(a.updated||0)>base+0.001)return accOut(a,{ok:0,err:'conflict'});
+  if(state&&typeof state==='object')state=platega.apply(a.k,state);
+  const s=JSON.stringify(state||null),p=JSON.stringify(profile||null),c=JSON.stringify(city||null);if(s.length>150000||p.length>12000||c.length>60000)return {err:'too_big'};
   if(!allow('save:'+a.k,30,60))return {err:'rate_limited'};let w=null;
   try{w=wallet.commit(a.k,{prior:a.state,incoming:state,wal:wal&&typeof wal==='object'?wal:null},()=>store.save(a.k,state||a.state,profile||a.profile,city||a.city));}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}
   if(w.init&&w.init.req>w.init.amt)log('кошелёк: перенос урезан',w.init.req,'→',w.init.amt,'у',a.k);
@@ -506,9 +517,14 @@ async function setupSave(body,ip){if(!allow('setup:'+ip,10,600))return {err:'rat
   const [tid,...rest]=token.split(':');
   let me=null;try{me=await fetch(`https://api.telegram.org/bot${tid}:${encodeURIComponent(rest.join(':'))}/getMe`,{signal:AbortSignal.timeout(10000)}).then(r=>r.json());}catch(e){return {err:'tg_unreachable'};}
   if(!me||!me.ok)return {err:'token_wrong'};const uname=String(me.result&&me.result.username||'').toLowerCase();if(uname!==SETUP_BOT)return {err:'other_bot',bot:uname};
+  const merchant=cleanKey(body.merchant).slice(0,40),psec=cleanKey(body.platega).slice(0,200);
+  if((merchant&&!psec)||(!merchant&&psec))return {err:'platega_pair'};
+  if(merchant&&!/^[0-9a-f-]{16,40}$/i.test(merchant))return {err:'platega_id'};
+  if(psec&&psec.length<8)return {err:'platega_secret'};
   let sec={};try{sec=JSON.parse(fs.readFileSync(SECRETS,'utf8'))||{};}catch(e){}sec.TG_BOT_TOKEN=token;if(admin)sec.ADMIN_TG_ID=admin;if(llm)sec.LLM_API_KEY=llm;
+  if(merchant){sec.PLATEGA_MERCHANT_ID=merchant;sec.PLATEGA_SECRET=psec;}
   fs.writeFileSync(SECRETS+'.tmp',JSON.stringify(sec),{mode:0o600});fs.renameSync(SECRETS+'.tmp',SECRETS);
-  log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':''));
+  log('настройка: токен бота @'+uname+' сохранён'+(admin?', админ задан':'')+(llm?', ключ ИИ задан':'')+(merchant?', Platega задан':''));
   setTimeout(()=>process.exit(0),1500);   // systemd запустит заново уже с ключами
   return {ok:1,bot:uname,mod:ENV.MOD_TOKEN||''};}
 const SETUP_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Настройка · Живая Казань</title>
@@ -518,11 +534,13 @@ const SETUP_HTML=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><me
 <label for="t">Токен бота от @BotFather</label><input id="t" autocomplete="off" placeholder="1234567890:AAH…"><small>@BotFather → /mybots → @zhivaya_kazan_bot → API Token → нажать на строку, чтобы скопировать. Если сервер уже настроен и токен не меняется — можно оставить пустым.</small>
 <label for="a">Ваш id в Телеге (число)</label><input id="a" inputmode="numeric" placeholder="123456789"><small>Напишите боту @userinfobot — он ответит числом. Сюда будут приходить сводка по утрам и тревоги.</small>
 <label for="l">Ключ Claude для жителей (по желанию)</label><input id="l" autocomplete="off" placeholder="sk-ant-…"><small>console.anthropic.com → API Keys. Можно оставить пустым — жители будут говорить заготовленными фразами.</small>
+<label for="pm">Platega: MerchantId</label><input id="pm" autocomplete="off" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"><small>Из кабинета Platega. Пусто — не менять. В кабинете укажите callback: https://kazan.lifegorod.com/api.php?a=platega</small>
+<label for="ps">Platega: секрет API</label><input id="ps" autocomplete="off" placeholder="секрет"><small>Оба поля сразу. В чат их не присылайте.</small>
 <button id="go">Сохранить</button><div id="st"></div></main><script>
-const E={token_empty:'Вставьте токен бота от @BotFather',token_is_llm:'В поле токена бота вставлен ключ Claude (sk-ant-…). Его — в поле «Ключ Claude для жителей», а токен бота — от @BotFather (или оставьте пустым, если не меняли)',token_is_mod:'В поле токена бота вставлен ключ модератора. Его — в верхнее поле «Ключ модератора»',token_format:'Это не похоже на токен бота: в начале должны быть цифры и двоеточие, вида 1234567890:AAH…',token_wrong:'Телега не приняла этот токен — скопируйте его заново у @BotFather',other_bot:'Это токен другого бота',admin_format:'id — только цифры',tg_unreachable:'Сервер не достучался до Телеги, попробуйте ещё раз через минуту',already:'Уже настроено — нужен верный ключ модератора',rate_limited:'Слишком много попыток, подождите 10 минут'};
+const E={token_empty:'Вставьте токен бота от @BotFather',token_is_llm:'В поле токена бота вставлен ключ Claude (sk-ant-…). Его — в поле «Ключ Claude для жителей», а токен бота — от @BotFather (или оставьте пустым, если не меняли)',token_is_mod:'В поле токена бота вставлен ключ модератора. Его — в верхнее поле «Ключ модератора»',token_format:'Это не похоже на токен бота: в начале должны быть цифры и двоеточие, вида 1234567890:AAH…',token_wrong:'Телега не приняла этот токен — скопируйте его заново у @BotFather',other_bot:'Это токен другого бота',admin_format:'id — только цифры',tg_unreachable:'Сервер не достучался до Телеги, попробуйте ещё раз через минуту',already:'Уже настроено — нужен верный ключ модератора',rate_limited:'Слишком много попыток, подождите 10 минут',platega_pair:'Для Platega нужны и MerchantId, и секрет',platega_id:'MerchantId должен быть как в кабинете Platega',platega_secret:'Секрет Platega слишком короткий'};
 if(location.hash==='#change'||window.__configured)mw.hidden=false;
-go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
- go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';
+go.onclick=async()=>{st.className='';st.textContent='Проверяю…';go.disabled=true;let j;try{j=await fetch('/api.php?a=setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value,admin:a.value,llm:l.value,mod:m.value,merchant:pm.value,platega:ps.value})}).then(r=>r.json());}catch(e){j={err:'net'};}
+ go.disabled=false;if(!j.ok){st.className='bad';st.textContent=(E[j.err]||('Ошибка: '+j.err))+(j.bot?' (@'+j.bot+')':'');return;}t.value='';l.value='';ps.value='';
  st.className='ok';st.textContent='Готово! Бот @'+j.bot+' подключён.\\n\\nСервер перезапускается — через 10 секунд всё заработает.'+(j.mod?'\\n\\nКлюч модератора для страницы /mod.html (сохраните): '+j.mod:'');};
 </script></body></html>`;
 
@@ -550,7 +568,7 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,roles:1,taxi:1,tg:!!TG_TOKEN,online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,roles:1,taxi:1,tg:!!TG_TOKEN,pay:platega.on(),online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
     if(a==='courtyard'){const [status,result]=courtyard.handle(req,body,ip);return send(res,status,result);}
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
@@ -572,6 +590,8 @@ async function handleReq(req,res){
     if(a==='boot')return send(res,200,bootReport(body,ip));
     if(a==='story')return send(res,200,storyReport(body,ip));
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
+    if(a==='pay')return send(res,200,await payFor(req,body));
+    if(a==='platega'){const r=await platega.callback(req.headers,body);if(r.k)grantPaid(r.k);return send(res,r.code||200,r.err&&r.code!==200?{err:r.err}:{ok:1});}
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})(),roles:{baristas:roles.onDuty(),orders:roles.count(),rides:taxi.count()}});}
