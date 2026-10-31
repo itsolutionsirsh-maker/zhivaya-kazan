@@ -110,13 +110,25 @@
     seenInbox=(L.inbox||[]).length;
     btn.textContent='Сегодня';
     const badges=badgeHtml();
-    const body=tab==='badges'?badges:rows.map(function(s){return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.08);font-size:15px">'+esc(s)+'</div>';}).join('');
-    panel.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'+tabBtn('feed','Сегодня')+tabBtn('badges','Значки')+'</div>'
+    const shots=tab==='shots';
+    const body=tab==='badges'?badges:shots?'<div id="shotList"></div>':rows.map(function(s){return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.08);font-size:15px">'+esc(s)+'</div>';}).join('');
+    panel.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'+tabBtn('feed','Сегодня')+tabBtn('shots','Снимки')+tabBtn('badges','Значки')+'</div>'
       +'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline"><strong>Казань сегодня</strong><span style="opacity:.6;font-size:14px">'+esc(head)+'</span></div>'
       +'<div style="margin:6px 0 10px;color:#3d5c4a;font-size:15px">'+esc(sky)+'</div>'
-      +(tab==='badges'?'':('<div style="font-size:15px;margin-bottom:8px">'+esc(memory(L))+'</div>'))
+      +(tab==='feed'?'<div style="font-size:15px;margin-bottom:8px">'+esc(memory(L))+'</div>':'')
       +(tab==='feed'&&richInbox?'<div id="storyPhoneInbox"></div>':'')+body;
     if(tab==='feed'&&richInbox)panel.querySelector('#storyPhoneInbox').append(storyUI.inbox(L.inbox||[]));
+    if(shots){
+      const box=panel.querySelector('#shotList');
+      let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
+      if(!list.length){const empty=document.createElement('div');empty.style.cssText='padding:8px 0;font-size:15px';empty.textContent='Пока пусто. Фотограф стоит на Баумана.';box.append(empty);}
+      list.slice().reverse().forEach(function(p){
+        if(!p||typeof p.src!=='string'||p.src.indexOf('data:image/')!==0)return;
+        const img=document.createElement('img');img.src=p.src;img.alt=p.title||'снимок';img.style.cssText='width:100%;border-radius:12px;margin-top:8px;display:block';
+        const cap=document.createElement('div');cap.textContent=p.title||'Баумана';cap.style.cssText='font-size:13px;opacity:.7;margin-top:2px';
+        box.append(img,cap);
+      });
+    }
     panel.querySelectorAll('[data-tab]').forEach(function(b){
       b.addEventListener('click',function(){tab=b.getAttribute('data-tab'); draw();});
     });
