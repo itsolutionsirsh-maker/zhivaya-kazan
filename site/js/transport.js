@@ -62,16 +62,16 @@ function renderRouteModal(){const list=$('#rtList'),plans=$('#rtPlans');list.inn
   const walkL=pathLen(world.pedAdj,player.x,player.y,d.x,d.y,pedCost),canWalk=Number.isFinite(walkL);
   card('🚶','Пешком',canWalk?[`${fmtDist(walkL)} · ≈ ${fmtMin(walkL/WALK_SPEED)}`,'Бесплатно. Ожидание на переходах может увеличить время']:['Маршрут пока не найден'],'Идти',()=>{closeRouteModal();startWalkNav(d);},!canWalk);
   let bp=planBus(d);if(bp&&bp.cost>walkL/WALK_SPEED*0.85)bp=null;
-  if(bp)card(bp.route.type==='tram'?'🚋':bp.route.type==='trolleybus'?'🚎':'🚌',`${busWord(bp.route.type)} ${bp.route.ref}`,[`Пешком ${fmtDist(bp.walk1)} до «${bp.from.st.n}»`,`${bp.nStops} ост. до «${bp.to.st.n}», дальше ${fmtDist(bp.walk2)} пешком`,`≈ ${fmtMin(bp.cost)} · ${BUS_FARE} ₽`],'Поехать',()=>{closeRouteModal();startBusPlan(bp,d);},player.money<BUS_FARE);
+  if(bp)card(bp.route.type==='tram'?'🚋':bp.route.type==='trolleybus'?'🚎':'🚌',`${busWord(bp.route.type)} ${bp.route.ref}`,[`Пешком ${fmtDist(bp.walk1)} до «${bp.from.st.n}»`,`${bp.nStops} ост. до «${bp.to.st.n}», дальше ${fmtDist(bp.walk2)} пешком`,`≈ ${fmtMin(bp.cost)} · ${BUS_FARE} ₽`],'Поехать',()=>{closeRouteModal();startBusPlan(bp,d);},player.money<BUS_FARE&&!(typeof errandCityRide==='function'&&errandCityRide('bus')));
   else card('🚌','Автобус',['Пешком тут быстрее, или подходящего маршрута рядом нет'],'—',()=>{},true);
   const carL=pathLen(world.carAdj,player.x,player.y,d.x,d.y,carCost);const fare=Math.round(TAXI.base+carL/1000*TAXI.km);
-  card('🚕','Такси',Number.isFinite(carL)?[`${fmtDist(carL)} · ≈ ${fmtMin(carL/9+40)} с подачей`,`≈ ${fare} ₽ (${TAXI.base} ₽ подача + ${TAXI.km} ₽/км)`]:['Машине пока не найден путь'],'Вызвать',()=>{closeRouteModal();callTaxi(d);},!Number.isFinite(carL)||player.money<fare);
+  card('🚕','Такси',Number.isFinite(carL)?[`${fmtDist(carL)} · ≈ ${fmtMin(carL/9+40)} с подачей`,`≈ ${fare} ₽ (${TAXI.base} ₽ подача + ${TAXI.km} ₽/км)`]:['Машине пока не найден путь'],'Вызвать',()=>{closeRouteModal();callTaxi(d);},!Number.isFinite(carL)||(player.money<fare&&!(typeof errandCityRide==='function'&&errandCityRide('taxi'))));
   journeyCards(card,d);
   const back=document.createElement('button');back.className='btn';back.textContent='← Другое место';back.addEventListener('click',()=>{rtDest=null;renderRouteModal();});plans.append(back);}
 
 // ---------- автобус по плану ----------
 function startBusPlan(bp,dest){cancelTrip(true);const r=bp.route;const sp=bp.from.p;let ws=null,wd=60;for(const s of world.stops){const dd=dist(s.x,s.y,sp[0],sp[1]);if(dd<wd){wd=dd;ws=s;}}
-  const stopPt=ws?[ws.x,ws.y]:sp;if(!journeyAvailable()||player.money<BUS_FARE)return false;
+  const stopPt=ws?[ws.x,ws.y]:sp;if(!journeyAvailable()||(player.money<BUS_FARE&&!(typeof errandCityRide==='function'&&errandCityRide('bus'))))return false;
   if(!walkTo(stopPt[0],stopPt[1],true)){setHint('До остановки не пройти. Выберите другой способ');updateTripBox();return false;}
   player.busPlan={route:r,dir:bp.dir,s1:bp.to.st.s,toName:bp.to.st.n,fromName:bp.from.st.n,dest,stopPt,stage:'walk'};
   followPlayer();addEvent(`Маршрут: ${busWord(r.type).toLowerCase()} ${r.ref} от «${bp.from.st.n}» до «${bp.to.st.n}»`);updateTripBox();return true;}
@@ -81,25 +81,24 @@ function busPlanArrived(){const p=player.busPlan;if(!p)return;player.busPlan=nul
 
 // ---------- такси ----------
 function callTaxi(dest){if(!journeyAvailable()||!journeyDest(dest)){setHint('Сначала завершите текущую поездку');return false;}
-  const len=pathLen(world.carAdj,player.x,player.y,dest.x,dest.y,carCost);if(!Number.isFinite(len)||player.money<Math.round(TAXI.base+len/1000*TAXI.km)){setHint('Нет маршрута или не хватает денег на такси');return false;}
+  const len=pathLen(world.carAdj,player.x,player.y,dest.x,dest.y,carCost);if(!Number.isFinite(len)||(player.money<Math.round(TAXI.base+len/1000*TAXI.km)&&!(typeof errandCityRide==='function'&&errandCityRide('taxi')))){setHint('Нет маршрута или не хватает денег на такси');return false;}
   cancelTrip(true);let car=null,bd=1e9;for(const c of cars){if(c.kind!=='taxi'||c.crashed||c.target!=null||c.taxiFor||c.state==='scene')continue;const d=dist(c.x,c.y,player.x,player.y);if(d<bd&&d<900){bd=d;car=c;}}
   if(!car){car=new Car('taxi',nodeNear(world.carNodes,[player.x,player.y],350));cars.push(car);bd=dist(car.x,car.y,player.x,player.y);}
   const pickup=nearestNode(player.x,player.y,world.carAdj,200);car.taxiFor=true;car.target=pickup;car.path=null;car.state='idle';car.ttl=0.05;car.vmax=14;
-  taxiCall={car,dest,state:'coming',t:0};car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало');setHint('Такси ждёт: подойдите и нажмите E');updateTripBox();}};
+  taxiCall={car,dest,state:'coming',t:0};if(typeof errandCityRide==='function'&&errandCityRide('taxi'))taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало');setHint('Такси ждёт: подойдите и нажмите E');updateTripBox();}};
   addEvent(`Вызвали такси: ${dest.n}. Подача ≈ ${fmtMin(bd/9+20)}`);updateTripBox();return true;}
 function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvailable())return false;const c=tc.car;
   if(!c||c.remove||!cars.includes(c)){setHint('Машина уже уехала. Вызовите другую');cancelTrip(true);return false;}
   if(c.crashed||dist(c.x,c.y,player.x,player.y)>9){setHint('Машина ждёт у обочины — подойдите ближе');return false;}
   const route=vehiclePath({kind:'taxi',x:c.x,y:c.y},tc.dest.x,tc.dest.y,true);if(!route)return false;
-  if(player.money<(tc.fixedFare==null?TAXI.base:tc.fixedFare)){setHint('Не хватает денег на посадку');return false;}
+  if(player.money<(tc.fixedFare==null?TAXI.base:tc.fixedFare)&&!tc.errandRide){setHint('Не хватает денег на посадку');return false;}
   const i=cars.indexOf(c);if(i>=0)cars.splice(i,1);taxiCall=null;cancelTrip(true);
   player.vehicle={kind:'taxi',x:c.x,y:c.y,hx:c.hx,hy:c.hy,speed:0,spec:VEH.taxi,startMin:clock.minutes,auto:null,damaged:0,color:'#F4C542',crashedLook:false,odo:0,dest:tc.dest};
-  const v=player.vehicle;v.driver=tc.driver;v.fixedFare=tc.fixedFare==null?null:tc.fixedFare;
+  const v=player.vehicle;v.driver=tc.driver;v.fixedFare=tc.fixedFare==null?null:tc.fixedFare;if(tc.errandRide){v.errandRide=true;if(typeof errandUsedTaxi==='function')errandUsedTaxi();}
   journeyHint('boarding',c,player.x,player.y,c.x,c.y);player.x=c.x;player.y=c.y;
   if(tc.folkDriver&&typeof folkTaxiStart==='function')folkTaxiStart(tc.folkDriver,v);
   player.waypoints=null;player.waitingStop=null;player.vehicle.auto={wps:route,i:0};addEvent(`Едем на такси: ${tc.dest.n}`);updateTripBox();return true;}
-function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);journeyCharge(fare,'Оплата такси');   // бомбила из своих людей — цена, о которой договорились
-  addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
+function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);if(v.errandRide)addEvent(`Такси по поручению: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ оплатил город`);else{journeyCharge(fare,'Оплата такси');addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);}const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
   let ex=v.x-v.hy*1.8,ey=v.y+v.hx*1.8;if(inBuilding(ex,ey)){ex=v.x+v.hy*1.8;ey=v.y-v.hx*1.8;}player.x=ex;player.y=ey;const dest=v.dest;player.vehicle=null;
   journeyHint('exiting',v,v.x,v.y,player.x,player.y);if(typeof folkTaxiEnd==='function')folkTaxiEnd(v);
   if(dest)journeyFinishFoot(dest);updateTripBox();}

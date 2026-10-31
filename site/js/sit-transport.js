@@ -2,7 +2,8 @@
 
 // ---------- проезд в автобусе ----------
 defSit('fare',{title:'Оплата проезда',quiet:true,multi:false,
-  start(s){if(player.money<BUS_FARE){player.fare='hare';setHint('На проезд не хватает — едете зайцем');return false;}
+  start(s){if(typeof errandCityRide==='function'&&errandCityRide('bus')){player.fare='paid';sitCard({s,icon:'🎫',tone:'good',title:'Проезд',text:'По поручению проезд оплатил город.',ttl:4,choices:[{t:'Ок',primary:true,run:()=>endSit(s)}],onTimeout:()=>endSit(s)});return true;}
+    if(player.money<BUS_FARE){player.fare='hare';setHint('На проезд не хватает — едете зайцем');return false;}
     sitCard({s,icon:'🎫',title:`Проезд ${BUS_FARE} ₽`,text:'Приложить карту к валидатору?',ttl:8,
       choices:[{t:`Оплатить ${BUS_FARE} ₽`,primary:true,run:()=>{if(player.money>=BUS_FARE){player.money-=BUS_FARE;player.fare='paid';}else player.fare='hare';endSit(s);}},{t:'Проехать зайцем',run:()=>{player.fare='hare';endSit(s);}}],
       onTimeout:()=>{if(player.money>=BUS_FARE){player.money-=BUS_FARE;player.fare='paid';}else player.fare='hare';endSit(s);}});return true;}});
