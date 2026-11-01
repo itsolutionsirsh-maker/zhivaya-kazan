@@ -79,8 +79,8 @@
     if(full('light')){ctx.fillStyle='#ffdf8d';ctx.beginPath();ctx.arc(4,-5,.7,0,TAU);ctx.fill();ctx.fillStyle='#51665c';ctx.fillRect(3.1,-5.8,1.8,.25);}
     ctx.fillStyle='#6f6654';ctx.fillRect(-2.9,3,.25,2);ctx.fillRect(2.6,3,.25,2);ctx.fillStyle=full('mural')?'#203e50':'#c2bba8';ctx.fillRect(-3,1.5,6,2.7);
     if(full('mural')){ctx.fillStyle='#f2bc6e';ctx.beginPath();ctx.arc(1.7,2.3,.55,0,TAU);ctx.fill();ctx.fillStyle='#70c1a2';ctx.beginPath();ctx.moveTo(-3,4.2);ctx.lineTo(-1,2.1);ctx.lineTo(.7,4.2);ctx.fill();ctx.fillStyle='#d9e1c9';ctx.fillRect(-1.7,2.8,.5,1.4);ctx.fillRect(-.8,3.2,.7,1);}
-    drawPerson(-3,.8,0,-1,{clothes:'#ba7252',skin:'#e2bd98',hair:'#504239'},0,{scale:1.2});
-    if(full('bench'))drawPerson(-.6,.4,-1,0,{clothes:'#5c8190',skin:'#e9c6a5',hair:'#55463c'},0,{scale:1.2});
+    drawPerson(-3,.8,0,-1,{clothes:'#ba7252',skin:'#e2bd98',hair:'#504239'},0,{scale:1.2,moving:false});
+    if(full('bench'))drawPerson(-.6,.4,-1,0,{clothes:'#5c8190',skin:'#e9c6a5',hair:'#55463c'},0,{scale:1.2,moving:false});
     if(z>4){ctx.fillStyle='#234b3f';ctx.font='600 1.1px system-ui';ctx.textAlign='center';ctx.fillText('СВОЙ ДВОР',0,-7);}ctx.restore();
   }
   $('courtyardBtn').onclick=open;$('courtyardClose').onclick=close;$('courtyardRoute').onclick=route;$('courtyardRetry').onclick=()=>request(retry.op,{},true);

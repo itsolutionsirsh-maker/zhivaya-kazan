@@ -37,7 +37,7 @@ function sharedPeerAction(){
 }
 function drawSharedPeople(){
   for(const pr of peerRender.values()){if(!sharedPeerHere(pr))continue;
-    drawPerson(pr.ix,pr.iy,pr.ihx,pr.ihy,Object.assign({clothes:pr.c,skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),pr.iphase||0,{scale:.55});}
+    drawPerson(pr.ix,pr.iy,pr.ihx,pr.ihy,Object.assign({clothes:pr.c,skin:'#F1D3B5',hair:'#2B1B12',role:'player'},pr.look),pr.iphase||0,{scale:.55,moving:Math.hypot((pr.itx??pr.ix)-pr.ix,(pr.ity??pr.iy)-pr.iy)>0.03,time:cityAnimT});}
 }
 function drawSharedLabels(it){
   // In a crowd keep the closest names readable; every avatar remains selectable.

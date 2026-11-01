@@ -33,7 +33,7 @@ function escortStep(dt){const c=companion;if(!c||c.mode!=='go'||c.arrived||c.w.i
   const T=[w.x-w.hx*1.6,w.y-w.hy*1.6];const d=dist(player.x,player.y,T[0],T[1]);
   if(d<1.2){const dx=w.x-player.x,dy=w.y-player.y,L=Math.hypot(dx,dy)||1;player.hx=dx/L;player.hy=dy/L;player.waypoints=null;return true;}
   if(d<22&&clearLine(player.x,player.y,T[0],T[1])){player.waypoints=null;const sp=(d>4?WALK_SPEED*1.1:WALK_SPEED*0.9)*dt;const ux=(T[0]-player.x)/d,uy=(T[1]-player.y)/d;const st=Math.min(sp,d);const nx=player.x+ux*st,ny=player.y+uy*st;player.hx=ux;player.hy=uy;
-    if(unsafeStep(player.x,player.y,nx+ux*1.2,ny+uy*1.2))return true;if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;player.phase+=dt*12;}return true;}
+    if(unsafeStep(player.x,player.y,nx+ux*1.2,ny+uy*1.2))return true;if(!inBuilding(nx,ny)){player.x=nx;player.y=ny;player.stepping=true;player.phase+=dt*12;}return true;}
   player.escortT=(player.escortT||0)-dt;if(!player.waypoints||player.escortT<=0){player.escortT=2;walkTo(w.x,w.y,true);}return false;}
 
 function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=dt;

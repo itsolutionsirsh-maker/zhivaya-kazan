@@ -290,7 +290,7 @@ joy.addEventListener('pointermove',e=>{if(e.pointerId!==joyId)return;let dx=e.cl
 const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyVec=[0,0];joyKnob.style.transform='';};joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
 
 // ---------- обновление игрока ----------
-function updatePlayer(dt){routeTick();
+function updatePlayer(dt){routeTick();player.stepping=false;
   if(player.state==='hurt'){player.hurtT+=dt;if(player.hurtT>60&&!cine){addEvent('Скорая доставила вас в больницу');playerToHospital(null);}return;}
   if(player.bus){player.x=player.bus.x;player.y=player.bus.y;return;}
   if(player.vehicle){updateVehicle(dt);return;}
@@ -300,11 +300,11 @@ function updatePlayer(dt){routeTick();
   if(typeof cityBenchHold==='function'&&cityBenchHold(m>0.08))return;
   if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
   if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
-  if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const wetK=player.inside?1:(weather.kind==='rain'&&!player.umbrella?1.12:(weather.kind==='snow'||weather.ice)?0.84:1);const sp=(run?RUN_SPEED:WALK_SPEED)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul*wetK;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?15:12);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
+  if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const wetK=player.inside?1:(weather.kind==='rain'&&!player.umbrella?1.12:(weather.kind==='snow'||weather.ice)?0.84:1);const sp=(run?RUN_SPEED:WALK_SPEED)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul*wetK;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.stepping=true;player.phase+=dt*(run?15:12);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}
   else if(player.waypoints&&player.waypoints.length){const w=player.waypoints[0];const d=dist(w[0],w[1],player.x,player.y);if(d<0.6){player.waypoints.shift();if(!player.waypoints.length)player.waypoints=null;}else{let [sx,sy,dk]=drunkSway((w[0]-player.x)/d,(w[1]-player.y)/d);const sp=WALK_SPEED*dt*dk;let dx=(w[0]-player.x)/d,dy=(w[1]-player.y)/d;const step=Math.min(sp,d);if(!inBuilding(player.x+sx*step,player.y+sy*step)){dx=sx;dy=sy;}const nx=player.x+dx*step,ny=player.y+dy*step;player.hx=dx;player.hy=dy;
     if(unsafeStep(player.x,player.y,nx+dx*1.2,ny+dy*1.2)){if(!player.crossWait){player.crossWait=true;setHint('Ждём, пока проедут машины');}return;}player.crossWait=false;
-    if(blockedStep(player.x,player.y,nx,ny)){const px=player.x,py=player.y;tryMove(dx*step,dy*step);player.phase+=dt*12;if(dist(px,py,player.x,player.y)<step*0.3){player.stuckT=(player.stuckT||0)+dt;if(player.stuckT>1.2){player.stuckT=0;const last=player.waypoints[player.waypoints.length-1];player.waypoints=null;player.replans=(player.replans||0)+1;if(player.replans<=2)walkTo(last[0],last[1],true);else{player.replans=0;setHint('Сюда не пройти — мешает здание');}}}return;}
-    player.stuckT=0;player.x=nx;player.y=ny;player.phase+=dt*12;}}}
+    if(blockedStep(player.x,player.y,nx,ny)){const px=player.x,py=player.y;tryMove(dx*step,dy*step);player.stepping=true;player.phase+=dt*12;if(dist(px,py,player.x,player.y)<step*0.3){player.stuckT=(player.stuckT||0)+dt;if(player.stuckT>1.2){player.stuckT=0;const last=player.waypoints[player.waypoints.length-1];player.waypoints=null;player.replans=(player.replans||0)+1;if(player.replans<=2)walkTo(last[0],last[1],true);else{player.replans=0;setHint('Сюда не пройти — мешает здание');}}}return;}
+    player.stuckT=0;player.x=nx;player.y=ny;player.stepping=true;player.phase+=dt*12;}}}
 // шаг упирается в стену дома или кремля (если уже внутри контура — например, вышли из помещения — выпускаем)
 function blockedStep(x0,y0,x1,y1){if(wallBlocks(x0,y0,x1,y1))return true;return !!inBuilding(x1,y1)&&!inBuilding(x0,y0);}
 function tryMove(dx,dy){const bb=world.bbox;let nx=clamp(player.x+dx,bb[0]+5,bb[2]-5),ny=clamp(player.y+dy,bb[1]+5,bb[3]-5);const ok=(x,y)=>!blockedStep(player.x,player.y,x,y);if(ok(nx,ny)){player.x=nx;player.y=ny;return;}if(ok(nx,player.y)){player.x=nx;return;}if(ok(player.x,ny)){player.y=ny;}}

@@ -52,7 +52,7 @@ function tpOut(){const c=TP.car;if(c&&player.bus===c){player.bus=null;let ex=c.x
 // true — шаг игрока сделан здесь (идёт к машине), обычный не нужен
 function tpFollow(dt){const r=TP.ride;if(!r||r.side!=='passenger')return false;const pr=peerRender.get(r.with);
   if(TP.board){const d=pr?dist(pr.x,pr.y,player.x,player.y):0;if(!pr||d<2.5||performance.now()>TP.board.until){tpBoardNow();return false;}
-    const s=Math.min(d,WALK_SPEED*dt),ux=(pr.x-player.x)/d,uy=(pr.y-player.y)/d;player.x+=ux*s;player.y+=uy*s;player.hx=ux;player.hy=uy;player.phase=(player.phase||0)+dt*12;player.waypoints=null;return true;}
+    const s=Math.min(d,WALK_SPEED*dt),ux=(pr.x-player.x)/d,uy=(pr.y-player.y)/d;player.x+=ux*s;player.y+=uy*s;player.hx=ux;player.hy=uy;player.stepping=true;player.phase=(player.phase||0)+dt*12;player.waypoints=null;return true;}
   if(!TP.car||player.bus!==TP.car)return false;
   if(pr){TP.car.x=pr.x;TP.car.y=pr.y;TP.car.hx=pr.hx;TP.car.hy=pr.hy;TP.lostT=0;}
   else if((TP.lostT+=dt)>15){tpSend({k:'leave',id:r.id});tpOut();addEvent('🚕 Связь с водителем пропала — вы вышли');}
