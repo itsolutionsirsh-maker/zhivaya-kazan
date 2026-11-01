@@ -10,6 +10,7 @@
   function syncAccount(){if(identity===account())return;identity=account();person=null;seenStage=null;invited=false;release();unmark('yard:target');if(!modal.hidden)close();}
   function target(){const s=story();return s&&s.stage==='done'?(person?D.people[person].place:null):D.step(s).place;}
   function sidewalk(place){
+    if(place==='court'&&window.cityCourt){const q=cityCourt.spot();if(q)return q;}
     if(!world||!world.pedAdj)return null;if(spotWorld!==world){spots.clear();spotWorld=world;}
     if(spots.has(place)){const q=spots.get(place);if(!inBuilding(q.x,q.y))return q;spots.delete(place);}
     const p=D.point(place,world.meta);if(!p)return null;
@@ -52,6 +53,7 @@
       const label=c.id==='join'&&s?'Вступить в «'+TerritoryRules.factions[D.endings[s.ending].district].name+'» и завершить':c.label;
       choices.append(button(label,()=>choose(c.id),!ready||!!state.active||!!(place&&!near(place))||!!blocked));
     }
+    if(s&&s.choices.repair&&window.cityCourt&&Net.courtGame&&(place==='court'))choices.append(button('Попробовать три броска · одному или с другом',()=>{close();cityCourt.open();},!near('court')));
     if(s&&s.stage==='done'&&person&&!s.visits[person])choices.append(button('Поговорить после турнира',()=>cityTerritories.story({step:'visit',person}),!ready||!near(place)));
     if(s&&s.stage==='done'){
       $('yardPlace').textContent=person?$('yardPlace').textContent:'Знакомые остались в городе. Выберите человека ниже и вернитесь к нему: он помнит ваш выбор.';
@@ -88,6 +90,13 @@
       walkers.push(w);takeActor(s,w);faceTo(w,player.x,player.y);
     }
     const current=story(),r=D.reunion(current);
+    if(current&&current.stage!=='done'&&s.ids.includes('ruslan')){
+      const q=sidewalk('court'),ready=!!current.choices.repair;
+      if(q)for(let i=0;i<3;i++){const x=q.x+(ready?2+i:5+i),y=q.y+(ready?1:3);if(inBuilding(x,y))continue;
+        const w=new Walker('resident',q.node);w.temp=true;w.x=x;w.y=y;w.yardPerson='ruslan';w.courtSeated=!ready&&i===0;Object.assign(w.p,{name:['Ильдар','Алия','Марат'][i],clothes:['#c6a464','#7ca79a','#a59abc'][i],job:ready?'Участник дворовой игры':'У площадки'});walkers.push(w);takeActor(s,w);faceTo(w,ready?q.x:x+1,q.y);
+        if(!ready&&i===1)say(w,'Кто первым играет? Давайте договоримся.',5);
+      }
+    }
     if(r&&s.ids.includes(r.who)){
       const q=sidewalk(r.place);
       for(let i=0;i<3;i++){

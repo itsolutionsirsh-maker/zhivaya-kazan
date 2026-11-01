@@ -15,6 +15,7 @@ const WalletLib=require('./wallet.js');
 const TerritoryLib=require('./territories.js');
 const CourtyardLib=require('./courtyard.js');
 const RealWorldLib=require('./realworld.js');
+const courtGames=require('./court-game').CourtGames();
 const SharedEventsLib=require('./shared-events.js');
 const RolesLib=require('./roles.js');
 const TaxiLib=require('./taxi.js');
@@ -472,6 +473,14 @@ function apiTerritory(body,ip){
   try{return territories.call(a.k,body,pose,getTerritoryMeta());}catch(e){log('районы: запись не удалась',e.message);return {ok:0,err:'busy'};}
 }
 
+function apiCourt(body,ip){
+  const a=accByToken(body.token);if(!a)return {ok:0,err:'auth'};
+  if(!allow('court:'+a.k,180,60))return {ok:0,err:'rate_limited'};
+  const cid=idstr(body.id),p=cid.length>=8?players.get(pubOf(cid)):null;
+  const pose=p&&p.priv===cid&&p.ip===ip&&!modBlocked(p)?{x:p.x,y:p.y,t:p.positionAt*1000,b:p.b,room:p.room,vehicle:p.meta.v}:null;
+  return courtGames.call(a.k,a.name||p?.meta.n,body,pose,getTerritoryMeta());
+}
+
 // ---------- ИИ: лимит на игрока в день и общий лимит в день ----------
 const llmDay={d:day(),total:0,per:new Map()};
 function llmQuota(who,ip){const d=day();if(llmDay.d!==d){llmDay.d=d;llmDay.total=0;llmDay.per.clear();}if(llmDay.total>=LLM.perDay)return 'budget';const n=llmDay.per.get(who)||0;if(n>=LLM.perPlayerDay)return 'quota';
@@ -589,8 +598,9 @@ async function handleReq(req,res){
   if(u.pathname==='/api.php'||u.pathname==='/api'){
     let body={};if(req.method==='POST'){try{body=await readBody(req,600000);}catch(e){return send(res,413,{err:'too_big'});}}
     const a=u.searchParams.get('a')||body.a||'';
-    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,roles:1,taxi:1,tg:!!TG_TOKEN,pay:platega.on(),online:players.size,now:Date.now()});
+    if(a==='ping')return send(res,200,{ok:1,llm:!!LLM.key,ws:true,acct:true,wallet:true,territories:true,yardStory:1,yardReunion:1,courtGame:1,roles:1,taxi:1,tg:!!TG_TOKEN,pay:platega.on(),online:players.size,now:Date.now()});
     if(a==='mapstatus')return send(res,200,mapStatus());
+    if(a==='court')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiCourt(body,ip):{err:'method'});
     if(a==='courtyard'){const [status,result]=courtyard.handle(req,body,ip);return send(res,status,result);}
     if(a==='territory')return send(res,req.method==='POST'?200:405,req.method==='POST'?apiTerritory(body,ip):{err:'method'});
     if(a==='bench'){if(body.list)return send(res,200,{ok:1,notes:benches.list(body.list)});const who=accByToken(body.token);if(!who)return send(res,200,{err:'auth'});return send(res,200,benches.put(who.k,who.name,body.id,body.text));}
