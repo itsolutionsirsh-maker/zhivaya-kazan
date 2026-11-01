@@ -32,7 +32,7 @@ setInterval(()=>{if(feedEl.childElementCount)renderFeed();},1000);
 $('#logBtn').addEventListener('click',()=>{$('#logBtn').classList.remove('ping');$('#logModal').hidden=false;player.busy=true;renderFeed();$('#logList').scrollTop=0;});
 $('#logClose').addEventListener('click',()=>{$('#logModal').hidden=true;player.busy=false;});
 function fmtTime(){const h=Math.floor(clock.minutes/60)%24,m=Math.floor(clock.minutes%60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
-let hintTtl=0;function setHint(t){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=5;}
+let hintTtl=0;function setHint(t,ttl){const h=$('#hint');h.textContent=t;h.hidden=false;hintTtl=ttl||5;}
 
 // ---------- старт мира ----------
 // точка старта новичка: середина улицы Баумана (если её нет на карте — центр карты)
@@ -297,6 +297,7 @@ function updatePlayer(dt){routeTick();
   if(player.talkTarget){const t=player.talkTarget;if(t.bus||player.busy||t.state==='hurt'){player.talkTarget=null;}else if(dist(t.x,t.y,player.x,player.y)<5){player.talkTarget=null;player.waypoints=null;openChat(t);return;}}
   let mx=0,my=0;if(!player.busy){if(keys.w||keys['ц']||keys.ArrowUp)my-=1;if(keys.s||keys['ы']||keys.ArrowDown)my+=1;if(keys.a||keys['ф']||keys.ArrowLeft)mx-=1;if(keys.d||keys['в']||keys.ArrowRight)mx+=1;mx+=joyVec[0];my+=joyVec[1];}
   const m=Math.hypot(mx,my);const run=keys.shift||keys.ShiftLeft;
+  if(typeof cityBenchHold==='function'&&cityBenchHold(m>0.08))return;
   if(m>0.05&&player.escort){player.escort=false;updateCompBox();}
   if(m<=0.05&&player.escort&&companion&&escortStep(dt))return;
   if(m>0.05){if(cam.free)followPlayer();if(player.waypoints)navPause();player.waypoints=null;player.waitingStop=null;player.talkTarget=null;mx/=m;my/=m;let dk=1;[mx,my,dk]=drunkSway(mx,my);const wetK=player.inside?1:(weather.kind==='rain'&&!player.umbrella?1.12:(weather.kind==='snow'||weather.ice)?0.84:1);const sp=(run?RUN_SPEED:WALK_SPEED)*Math.min(1,m)*(player.energy<10?0.6:1)*dk*SIT.speedMul*wetK;tryMove(mx*sp*dt,my*sp*dt);player.hx=mx;player.hy=my;player.phase+=dt*(run?15:12);if(run)player.energy=clamp(player.energy-dt*0.12,0,100);}

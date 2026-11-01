@@ -1,8 +1,10 @@
 // Дворовые мелочи в каждом районе рядом с игроком: несколько лавочек, ночные киоски, фотографы, голуби, кортеж.
 (function(){
-  let grans=[],kiosks=[],cams=[],flocks=[],wed=null,carry=null,placeT=0,fair=null,noteT=0;
+  let grans=[],kiosks=[],cams=[],flocks=[],wed=null,carry=null,placeT=0,fair=null,noteT=0,seat=null;
   const notes=new Map();
-  const still={x:0,y:0,t:0},bags=new Set();
+  const still={x:0,y:0,t:0},bags=new Set(),sat=new Set();
+  let introLeft=14,introDone=false;
+  try{introDone=localStorage.getItem('zk.bitsIntro')==='1';}catch(e){}
   const NAMES=['Равиля','Насима','Зухра','Сания','Альфия','Фатыма','Гульсум'];
   function hour(){return typeof cityHour==='function'?cityHour():12;}
   function day(){return (typeof clock!=='undefined'&&clock.day)||1;}
@@ -47,13 +49,57 @@
     const asked=bags.has(key)||!!carry;
     const note=notes.get(benchId(g));
     const choices=[{t:'Потом',run:()=>reply('👵',g.name,granLine())},{t:'Оставить записку',run:()=>askNote(g)}];
-    if(!asked)choices.unshift({t:'Донести пакет',primary:true,run:()=>{
+    if(!asked)choices.unshift({t:'Донести пакет',run:()=>{
       bags.add(key);const d=doorOf(g.b,g);carry={x:d[0],y:d[1],name:g.name};
       saveShot('Бабушка с пакетом');
       reply('👜',g.name,'Там кефир и хлеб. До двери, не до соседа. Сосед и так всё видит.');
     }});
+    choices.unshift({t:'Сесть',primary:true,run:()=>sitDown(g)});
     const extra=note?' На лавочке записка'+(note.name?' от '+note.name:'')+': «'+note.text+'».':'';
     card('👵',g.name+' · лавочка',granLine()+(asked?'':' Донесите пакет до двери: спина уже не та.')+extra,choices);
+  }
+  function noteLine(g){
+    const note=g&&notes.get(benchId(g));
+    return note?'Перед вами записка'+(note.name?' от '+note.name:'')+': «'+note.text+'».':'Лавочка пустая. Можно оставить записку.';
+  }
+  function sitSpot(g){
+    const dx=player.x-g.x,dy=player.y-g.y,L=Math.hypot(dx,dy)||1;
+    const px=-dy/L,py=dx/L;
+    let x=g.x+px*1.15,y=g.y+py*1.15;
+    if(!outside(x,y)){x=g.x-px*1.15;y=g.y-py*1.15;}
+    return [x,y];
+  }
+  function sitDown(g){
+    if(!g)return;
+    const q=sitSpot(g);
+    player.waypoints=null;player.x=q[0];player.y=q[1];
+    const dx=g.x-q[0],dy=g.y-q[1],L=Math.hypot(dx,dy)||1;
+    player.hx=dx/L;player.hy=dy/L;
+    seat={x:q[0],y:q[1],hx:player.hx,hy:player.hy,g};
+    window.cityBenchSit=seat;
+    const key=day()+':'+benchId(g);
+    if(!sat.has(key)){sat.add(key);mood(4);}
+    const rain=weather&&weather.kind==='rain';
+    setHint(noteLine(g)+(rain?' '+g.name+' подвинулась под зонт.':''),12);
+    if(rain)addEvent(g.name+' подвинулась под зонт. Зонт один на двоих');
+  }
+  function standBench(){
+    if(!seat)return;
+    const g=seat.g;seat=null;window.cityBenchSit=null;
+    if(g){const dx=player.x-g.x,dy=player.y-g.y,L=Math.hypot(dx,dy)||1;const nx=player.x+dx/L*0.9,ny=player.y+dy/L*0.9;if(outside(nx,ny)){player.x=nx;player.y=ny;}}
+  }
+  window.cityBenchHold=function(go){
+    if(!seat)return false;
+    if(go||player.vehicle||player.inside||player.bus||player.state==='hurt'||scene!=='city'){standBench();return false;}
+    player.x=seat.x;player.y=seat.y;player.hx=seat.hx;player.hy=seat.hy;player.waypoints=null;
+    return true;
+  };
+  function benchCard(){
+    const g=seat&&seat.g;
+    card('🪑',(g?g.name+' · ':'')+'лавочка',noteLine(g),[
+      {t:'Встать',primary:true,run:standBench},
+      {t:'Оставить записку',run:()=>g&&askNote(g)}
+    ]);
   }
   function giveBag(){
     const name=carry&&carry.name||'Бабушка';carry=null;player.money+=80;mood(6);
@@ -205,8 +251,10 @@
   }
   function buyPie(){spend(90,()=>{player.food=typeof clamp==='function'?clamp(player.food+14,0,100):Math.min(100,player.food+14);mood(3);saveShot('Ярмарка, эчпочмак');reply('🥟','Ярмарка','Горячий. Руки потом в снег, если он есть.');});}
   function updateCityBits(dt){
-    if(typeof player==='undefined'||!world||scene!=='city')return;
-    if(bags.day!==day()){bags.clear();bags.day=day();}
+    if(typeof player==='undefined')return;
+    weatherSound();
+    if(!world||scene!=='city'){if(seat){seat=null;window.cityBenchSit=null;}return;}
+    if(bags.day!==day()){bags.clear();bags.day=day();sat.clear();}
     if(player.inside){grans=[];kiosks=[];cams=[];flocks=[];return;}
     placeT-=dt;if(placeT<=0){placeT=0.5;place();}
     const h=hour(),did=districtHere();
@@ -221,6 +269,13 @@
     if(fk&&(!fair||fair.day!==day()||fair.did!==did))startFair(did,fk);
     if(fair&&(fair.day!==day()||hour()<18||hour()>=21))fair=null;
     noteT-=dt;if(noteT<=0){noteT=8;pullNotes();}
+    if(seat&&(player.inside||player.vehicle||player.bus||scene!=='city'||dist(player.x,player.y,seat.x,seat.y)>6))standBench();
+    if(!introDone&&!window.zkNoStory){introLeft-=dt;if(introLeft<=0&&hour()>=18&&scene==='city'&&!player.inside&&!player.busy&&!(typeof SIT!=='undefined'&&SIT.card)){
+      introDone=true;try{localStorage.setItem('zk.bitsIntro','1');}catch(e){}
+      const text='Первый вечер: после десяти у остановки — шаурма. На лавочке можно сесть и оставить записку. Снимки лежат в телефоне.';
+      addEvent(text);setHint(text,14);
+      if(window.cityPhone&&cityPhone.push)try{cityPhone.push({from:'Город',text:text,kind:'event'});}catch(e){}
+    }}
     for(const k of kiosks)k.ph+=dt;
     for(const c of cams)c.ph+=dt;
     for(const g of grans)g.ph+=dt;
@@ -238,6 +293,7 @@
   }
   function bitsAction(){
     if(scene!=='city'||player.inside||player.busy)return null;
+    if(seat)return {d:0,label:'Лавочка',run:benchCard};
     if(carry&&dist(carry.x,carry.y,player.x,player.y)<3)return {d:dist(carry.x,carry.y,player.x,player.y),label:'Отдать пакет '+carry.name,run:giveBag};
     const g=nearest(grans,2.3);if(g&&!player.vehicle)return {d:g._d,label:'Поговорить: '+g.name+', лавочка',run:()=>talkGran(g)};
     if(fair&&!player.vehicle&&dist(fair.x,fair.y,player.x,player.y)<3.2){
@@ -269,14 +325,28 @@
     if(scene!=='city')return;
     const t=(typeof performance!=='undefined'?performance.now():0)/1000;
     for(const g of grans){
+      const share=seat&&seat.g===g&&weather&&weather.kind==='rain';
+      let gx=g.x,gy=g.y;
+      if(share){const vx=player.x-g.x,vy=player.y-g.y,L=Math.hypot(vx,vy)||1;gx+=vx/L*0.85;gy+=vy/L*0.85;}
       const bob=Math.sin(t*2+g.ph)*1.4;
-      const p=person(g.x,g.y,'#6E4A6A',toS,z,bob);
+      const p=person(gx,gy,'#6E4A6A',toS,z,bob);
       if(!p)continue;
       ctx.strokeStyle='#C4A574';ctx.lineWidth=Math.max(2,p[2]*2);ctx.beginPath();ctx.moveTo(p[0]-8*p[2],p[1]+4);ctx.lineTo(p[0]+8*p[2],p[1]+4);ctx.stroke();
       ctx.strokeStyle='#E7D2A8';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p[0]+2*p[2],p[1]-2);ctx.lineTo(p[0]+7*p[2]+Math.sin(t*6+g.ph)*4,p[1]-6);ctx.stroke();
-      if(wet()){ctx.fillStyle='rgba(35,55,80,.9)';ctx.beginPath();ctx.ellipse(p[0],p[1]-18*p[2],9*p[2],3.2*p[2],0,Math.PI,0,true);ctx.fill();}
+      if(wet()){
+        let ux=p[0],uw=9*p[2];
+        if(share){const pl=toS(player.x,player.y);ux=(p[0]+pl[0])/2;uw=Math.max(14*p[2],Math.abs(pl[0]-p[0])/2+8*p[2]);}
+        ctx.fillStyle='rgba(35,55,80,.9)';ctx.beginPath();ctx.ellipse(ux,p[1]-18*p[2],uw,3.2*p[2],0,Math.PI,0,true);ctx.fill();
+      }
       const note=notes.get(benchId(g));
       if(z>2)label(p[0],p[1],(note?'📝 ':'')+'👵 '+g.name);
+      if(seat&&seat.g===g&&z>1.4){
+        const line=note?note.text:'можно оставить записку';
+        ctx.font='12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(255,250,240,.94)';
+        const tw=Math.min(220,ctx.measureText(line).width+16);
+        ctx.fillRect(p[0]-tw/2,p[1]-46,tw,18);
+        ctx.fillStyle='#243028';ctx.fillText(line.length>42?line.slice(0,41)+'…':line,p[0],p[1]-33);
+      }
     }
     for(const k of kiosks){
       const [sx,sy]=toS(k.x,k.y);if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
@@ -320,6 +390,32 @@
       }
     }
   }
+  let actx=null,sndGain=null,sndFilter=null,sndOn=false;
+  function armSound(){
+    if(sndOn)return;sndOn=true;
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    try{
+      actx=new AC();
+      const len=actx.sampleRate*2,buf=actx.createBuffer(1,len,actx.sampleRate),data=buf.getChannelData(0);
+      let b=0;for(let i=0;i<len;i++){const w=Math.random()*2-1;b=0.97*b+0.03*w;data[i]=b*3;}
+      const src=actx.createBufferSource();src.buffer=buf;src.loop=true;
+      sndFilter=actx.createBiquadFilter();sndFilter.type='lowpass';sndFilter.frequency.value=900;
+      sndGain=actx.createGain();sndGain.gain.value=0;
+      src.connect(sndFilter);sndFilter.connect(sndGain);sndGain.connect(actx.destination);src.start();
+    }catch(e){actx=null;}
+    weatherSound();
+  }
+  function weatherSound(){
+    if(!sndGain||!actx||typeof weather==='undefined')return;
+    if(actx.state==='suspended')actx.resume();
+    const k=weather.kind,quiet=document.hidden||player.inside||scene!=='city';
+    const v=quiet?0:(k==='rain'?0.15:k==='snow'?0.04:0);
+    sndGain.gain.setTargetAtTime(v,actx.currentTime,0.35);
+    sndFilter.frequency.setTargetAtTime(k==='snow'?420:1400,actx.currentTime,0.35);
+  }
+  document.addEventListener('pointerdown',armSound,{once:true});
+  document.addEventListener('keydown',armSound,{once:true});
+  document.addEventListener('visibilitychange',()=>weatherSound());
   window.updateCityBits=updateCityBits;window.drawCityBits=drawCityBits;
   function boot(){
     if(typeof findAction==='function'&&!findAction._bits){const prev=findAction;function wrapped(){const mine=bitsAction();const a=prev();if(mine&&mine.d<2.5)return mine;return a||mine;}wrapped._bits=1;wrapped._park=findAction._park;findAction=wrapped;}
