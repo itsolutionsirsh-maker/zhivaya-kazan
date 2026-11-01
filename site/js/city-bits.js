@@ -122,8 +122,16 @@
     try{return c.toDataURL('image/jpeg',0.72);}catch(e){return '';}
   }
   function wet(){return !!(weather&&(weather.kind==='rain'||weather.kind==='snow'||weather.ice));}
+  const SHOT_FILE={
+    'Бабушка с пакетом':'img/shots/babushka.gif',
+    'Ночная шаурма':'img/shots/shaurma.gif',
+    'Свадебный кортеж':'img/shots/kortezh.gif',
+    'Голуби на площади':'img/shots/golubi.gif',
+    'Ярмарка, эчпочмак':'img/shots/yarmarka.gif',
+    'Вечерняя ярмарка':'img/shots/yarmarka.gif'
+  };
   function saveShot(title){
-    const src=postcard(title);if(!src)return;
+    const src=SHOT_FILE[title]||postcard(title);if(!src)return;
     let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
     if(list.some(p=>p&&p.title===title&&Date.now()-(p.at||0)<120000))return;
     list.push({src,title,at:Date.now()});if(list.length>12)list=list.slice(-12);
@@ -155,7 +163,7 @@
   function takePhoto(cam){
     const place=cam.place||'Казань';
     spend(100,()=>{
-      const src=postcard(place);if(!src){setHint('Фотограф махнул рукой: плёнка кончилась');return;}
+      const src='img/shots/fotograf.gif';if(!src){setHint('Фотограф махнул рукой: плёнка кончилась');return;}
       let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
       list.push({src,title:place+' · день '+day(),at:Date.now()});if(list.length>8)list=list.slice(-8);
       try{localStorage.setItem('zk.photos',JSON.stringify(list));}catch(e){setHint('Снимок есть, но телефон его не сохранил');return;}
