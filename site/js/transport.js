@@ -93,7 +93,7 @@ function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvaila
   const route=vehiclePath({kind:'taxi',x:c.x,y:c.y},tc.dest.x,tc.dest.y,true);if(!route)return false;
   if(player.money<(tc.fixedFare==null?TAXI.base:tc.fixedFare)&&!tc.errandRide){setHint('Не хватает денег на посадку');return false;}
   const i=cars.indexOf(c);if(i>=0)cars.splice(i,1);taxiCall=null;cancelTrip(true);
-  player.vehicle={kind:'taxi',x:c.x,y:c.y,hx:c.hx,hy:c.hy,speed:0,spec:VEH.taxi,startMin:clock.minutes,auto:null,damaged:0,color:'#F4C542',crashedLook:false,odo:0,dest:tc.dest};
+  player.vehicle={kind:'taxi',x:c.x,y:c.y,hx:c.hx,hy:c.hy,speed:0,spec:VEH.taxi,startMin:typeof playMinutesNow==='function'?playMinutesNow():clock.minutes,auto:null,damaged:0,color:'#F4C542',crashedLook:false,odo:0,dest:tc.dest};
   const v=player.vehicle;v.driver=tc.driver;v.fixedFare=tc.fixedFare==null?null:tc.fixedFare;if(tc.errandRide){v.errandRide=true;if(typeof errandUsedTaxi==='function')errandUsedTaxi();}
   journeyHint('boarding',c,player.x,player.y,c.x,c.y);player.x=c.x;player.y=c.y;
   if(window.citySaveShot)citySaveShot('Такси');

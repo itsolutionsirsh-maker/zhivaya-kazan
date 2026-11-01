@@ -21,7 +21,7 @@ function journeyRentalQuote(o,d){
   const walk=pathLen(world.pedAdj,player.x,player.y,o.x,o.y,pedCost);
   const ride=pathLen(light?world.pedAdj:world.carAdj,o.x,o.y,d.x,d.y,light?pedCost:carCost);
   const sec=walk/WALK_SPEED+ride/(light?spec.vmax:9);
-  const cost=spec.start+Math.round(Math.max(1,ride/(light?spec.vmax:9)/60*GAME_SCALE)*spec.perMin);
+  const cost=spec.start+Math.round(Math.max(1,ride/(light?spec.vmax:9)/60*(typeof PLAY_SCALE==='number'?PLAY_SCALE:GAME_SCALE))*spec.perMin);
   return {walk,ride,sec,cost};
 }
 function journeyCards(card,d){
@@ -66,7 +66,7 @@ function journeyText(){
   const v=player.vehicle;if(v&&v.dest)return `${journeyIcon(v.kind)} ${v.auto?'Едем':'Остановились'}: ${v.dest.n} · ${fmtDist(dist(player.x,player.y,v.dest.x,v.dest.y))}`;
   if(JOURNEY.resume)return `🚶 Поездка прервана · ${JOURNEY.resume.n}`;return null;
 }
-function journeyBill(v){if(!v)return 0;return v.kind==='taxi'?(v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+(v.odo||0)/1000*TAXI.km)):Math.round(Math.max(1,clock.minutes-v.startMin)*v.spec.perMin);}
+function journeyBill(v){if(!v)return 0;const now=typeof playMinutesNow==='function'?playMinutesNow():clock.minutes;return v.kind==='taxi'?(v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+(v.odo||0)/1000*TAXI.km)):Math.round(Math.max(1,now-v.startMin)*v.spec.perMin);}
 function journeyCharge(amount,label){
   const paid=Math.min(player.money,Math.max(0,amount));player.money-=paid;
   const owed=Math.max(0,amount-paid);if(owed&&typeof ECON!=='undefined')ECON.owed=(ECON.owed||0)+owed;

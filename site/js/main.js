@@ -1,14 +1,15 @@
 // ===== Игрок, ввод, HUD, диалоги, цикл =====
-// ---------- общие часы: время в игре одно на всех, ×4 от настоящего (игровые сутки — 6 часов) ----------
-// Отсчёт от общей точки; в 21:00 по Москве и в игре 21:00 — удобно собираться вечером. Поправку часов устройства даёт сервер (clockOff).
-// Еда, работа, сон и поездки часы не перематывают: на них тратятся силы и сытость (spendTime), а заработок повторяется не чаще, чем «длится».
-const GAME_SCALE=4,GAME_T0=Date.UTC(2026,8,30,21,0)-135*60000;   // 01.10.2026 00:00 МСК минус 2 ч 15 мин: в полночь по Москве в игре 09:00
+// ---------- общие часы: у всех одно время, и это время Казани (МСК) ----------
+// Полночь в городе — полночь по Москве. Небо, фонари, вывески и часы наверху идут вместе с настоящими сутками.
+// Смена, ожидание метро и голод тикают быстрее, пока вы в игре: иначе двухчасовая смена заняла бы два реальных часа.
+const GAME_SCALE=1,PLAY_SCALE=4,GAME_T0=Date.UTC(2026,8,30,21,0);   // 01.10.2026 00:00 МСК
 let clockOff=0;
 function gameMinutesNow(){return (Date.now()+clockOff-GAME_T0)/60000*GAME_SCALE;}
+function playMinutesNow(){return (Date.now()+clockOff-GAME_T0)/60000*PLAY_SCALE;}
 // для проверок: перевести игровые часы на минуту min (от начала отсчёта); меняет только свою вкладку
 function zkSetTime(min){clockOff+=(min-gameMinutesNow())*60000/GAME_SCALE;clock.minutes=gameMinutesNow();clock.day=Math.floor(clock.minutes/1440)+1;}
 const player={x:0,y:0,hx:0,hy:1,phase:0,name:'Гость',desc:'',role:'resident',avatar:null,avatarImg:null,thumb:null,clothes:'#2F9E6B',skin:'#F1D3B5',hair:'#2B1B12',energy:92,food:80,mood:70,money:3000,pantry:0,waypoints:null,home:null,bus:null,waitingStop:null,exitNext:false,busy:false,state:'ok',vehicle:null,talkTarget:null,inside:false,ix:0,iy:0,ihx:0,ihy:-1,iwp:null,hasCar:true,carColor:'#C62828',hurtT:0};
-const clock={minutes:gameMinutesNow(),scale:GAME_SCALE,day:Math.floor(gameMinutesNow()/1440)+1};
+const clock={minutes:gameMinutesNow(),scale:PLAY_SCALE,day:Math.floor(gameMinutesNow()/1440)+1};
 const weather={kind:'clear',ttl:400,rain:[],real:false,t:null,ice:false,wind:null,flakes:false};
 const cam={x:0,y:0,z:5.5,zt:5.5,free:false};let LOD=1;
 const keys={};const flags={};
@@ -322,7 +323,7 @@ function checkPlayerHit(){if(player.inside||player.state==='hurt'||cine||player.
 function updateNeeds(gameMin){player.energy=clamp(player.energy-gameMin*0.085,0,100);player.food=clamp(player.food-gameMin*0.12,0,100);let target=55;if(player.food<25)target-=20;if(player.energy<20)target-=20;if(weather.kind==='rain')target-=5;if(weather.kind==='snow'||weather.ice)target-=4;player.mood=lerp(player.mood,target,Math.min(1,gameMin*0.004));}
 let dayPhaseAnnounced={};
 function updateClock(dt){const before=clock.minutes;clock.minutes=gameMinutesNow();if(clock.minutes<before&&before-clock.minutes<30)clock.minutes=before;   // поправка с сервера назад — не откатываем
-  updateNeeds(dt*GAME_SCALE/60);   // силы и сытость тратятся, только пока играете
+  updateNeeds(dt*clock.scale/60);   // силы и сытость тратятся, только пока играете
   const d=Math.floor(clock.minutes/1440)+1;if(d!==clock.day){clock.day=d;dayPhaseAnnounced={};}
   const h=(clock.minutes/60)%24;const key=Math.floor(h);const we=typeof isWeekend==='function'&&isWeekend();const marks=we?{7:'Выходной. Город просыпается не спеша',11:'Выходной: на Баумана и у Кремля всё больше гуляющих',14:'Кафе и набережная полны',20:'Зажглись фонари, бары заполняются',23:'Поздний вечер выходного: на Баумана ещё гуляют',2:'Ночь. Такси развозят из баров'}:{6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно, на остановках очереди',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Кафе закрываются, остались бары, таксисты и полиция'};
   if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}}
@@ -363,7 +364,7 @@ function frameBody(now){
 function updateHud(){$('#clock').textContent=fmtTime();$('#dayLbl').textContent='день '+clock.day;{const wl=$('#weatherLbl'),txt=weatherLabel();if(wl.textContent!==txt){wl.textContent=txt;wl.title=weather.real?'Настоящая погода в Казани · MET Norway (CC BY 4.0)':'';}}
   setBar('#bEnergy',player.energy);setBar('#bFood',player.food);setBar('#bMood',player.mood);{const dr=player.drunk||0;const on=dr>1;$('#lDrunk').hidden=!on;$('#bDrunk').hidden=!on;if(on){setBar('#bDrunk',dr);$('#lDrunk').textContent='🍺 '+(drunkLabel()||'хмель');}}$('#moneyLbl').textContent=fmtMoney(player.money);{const r=player.rep||0;const nl=$('#nameLbl');const t=player.name+(r?` · ⭐ ${r>0?'+':''}${r}`:'');if(nl.textContent!==t){nl.textContent=t;nl.title='Репутация в городе: '+r;}}
   if(typeof window.uiUpdateHud==='function')window.uiUpdateHud();
-  const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,clock.minutes-v.startMin);$('#vehLbl').textContent=`${journeyIcon(v.kind)} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&!isLightVehicle(v.kind)?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
+  const v=player.vehicle;const vb=$('#vehBox');if(v){vb.hidden=false;const kmh=Math.round(Math.abs(v.speed)*3.6);const mins=Math.max(0,playMinutesNow()-v.startMin);$('#vehLbl').textContent=`${journeyIcon(v.kind)} ${v.spec.label} · ${kmh} км/ч${v.spec.perMin?' · '+Math.round(mins)+' мин · '+Math.round(v.spec.start+mins*v.spec.perMin)+' ₽':''}${v.onRoad===false&&!isLightVehicle(v.kind)?' · вне дороги':''}${v.auto?' · автопилот':''}`;}else vb.hidden=true;
   currentAction=player.busy?null:findAction();const ab=$('#actBtn');if(currentAction){ab.hidden=false;ab.innerHTML='';const k=document.createElement('kbd');k.textContent='E';ab.append(k,document.createTextNode(currentAction.label));}else ab.hidden=true;}
 function setBar(sel,v){const b=$(sel),n=Math.round(clamp(v,0,100));b.querySelector('i').style.width=clamp(v,0,100)+'%';b.classList.toggle('low',v<22);b.setAttribute('aria-valuenow',String(n));b.title=b.getAttribute('aria-label')+': '+n+'%';const value=b.parentElement.querySelector('.need-value');if(value&&value.textContent!==n+'%')value.textContent=n+'%';}
 

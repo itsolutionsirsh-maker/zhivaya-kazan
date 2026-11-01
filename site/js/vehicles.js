@@ -59,14 +59,14 @@ function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=pla
   if(jp&&jp.object===obj&&!planned)return false;
   cancelTrip(true);JOURNEY.rental=jp;
   if(kind!=='own'){const i=rentals.indexOf(obj);if(i>=0)rentals.splice(i,1);player.money-=spec.start;}else ownCar.parked=false;
-  player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};
+  player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:typeof playMinutesNow==='function'?playMinutesNow():clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};
   journeyHint('boarding',obj,player.x,player.y,obj.x,obj.y);player.x=obj.x;player.y=obj.y;
   if(window.citySaveShot)citySaveShot(kind==='bike'?'Велосипед':kind==='scooter'?'Самокат':kind==='own'?'Своя машина':'Каршеринг');
   player.waypoints=null;player.waitingStop=null;player.talkTarget=null;player.navDest=null;
   if(kind!=='bike')addEvent(kind==='scooter'?`Взяли самокат: 50 ₽ + 6 ₽/мин. Клик по карте — поехать туда`:kind==='car'?`Каршеринг: 200 ₽ + 10 ₽/мин. Клик по карте — поедет сам, WASD — руль`:'Вы за рулём своей машины. Клик по карте — поедет сама, WASD — руль');
   if(kind==='bike')addEvent('Велосипед: 20 ₽ + 3 ₽/игр. мин. Клик по карте — поехать туда');
   if(!flags.droveOnce){flags.droveOnce=true;setHint('W — газ, S — тормоз, A/D — руль. Или клик по карте: приедет по правилам');}journeyOnBoard(player.vehicle,obj,planned);return true;}
-function exitVehicle(){const v=player.vehicle;if(!v)return;if(v.kind==='taxi'){taxiExit();return;}const spec=v.spec;const mins=Math.max(1,clock.minutes-v.startMin);const cost=Math.round(mins*spec.perMin);
+function exitVehicle(){const v=player.vehicle;if(!v)return;if(v.kind==='taxi'){taxiExit();return;}const spec=v.spec;const now=typeof playMinutesNow==='function'?playMinutesNow():clock.minutes;const mins=Math.max(1,now-v.startMin);const cost=Math.round(mins*spec.perMin);
   if(spec.perMin)journeyCharge(cost,`Поездка на ${spec.word} · ${Math.round(mins)} игр. мин`);
   if(v.kind==='own'){ownCar.x=v.x;ownCar.y=v.y;ownCar.hx=v.hx;ownCar.hy=v.hy;ownCar.parked=true;}else rentals.push({kind:v.kind,x:v.x,y:v.y,hx:v.hx,hy:v.hy,color:v.color});
   if(!isLightVehicle(v.kind))parkingCheck(v.kind==='own'?ownCar:rentals[rentals.length-1],v.kind);
