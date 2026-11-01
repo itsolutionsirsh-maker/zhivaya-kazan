@@ -20,6 +20,7 @@ const VENUE_STYLES={
 };
 function venueStyleId(it){
   if(it.kind==='hospital'&&it.key==='story:ward')return 'ward';
+  if(it.kind==='guest')return 'home';   // в гостях у жителя — как дома
   const k=it.kind,n=String(it.name||'').toLowerCase();
   if(k==='cafe'){
     if(/т[юүу]бет[еэ]й|tubat[aä]y|tubetey|кыстыбый|дом чая|ашхан/.test(n))return 'tatar';
