@@ -99,10 +99,10 @@ function faOpen(s){const w=s.w,f=s.f,a=s.act,nm=w.p.name;
       faSay(s,'вежливо, без крика и без угроз, просишь ровно 100 рублей «на район». Если откажут — ты не дерёшься, просто говоришь, что тогда триста, и забираешь','Земляк, сотку на район. По-хорошему.');
       faCard(s,{icon:'🧢',text:`${nm} вежливо просит ${fmtMoney(ask)} «на район». Если не отдать — забирает ${fmtMoney(take)} и уходит. Без драки.`,
         choices:[
-          {t:`Отдать ${fmtMoney(ask)}`,primary:true,run:()=>spend(ask,()=>{sitMood(-2);say(w,pick(['Вот и хорошо. Иди.','Нормально. Мы квиты.','Сотка есть — вопросов нет.']),4);addEvent(`${nm}: отдали ${fmtMoney(ask)}, разошлись`,'say');endSit(s);})},
-          {t:'Не отдавать',run:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);sitRep(-1,'не отдал сотку во дворе');say(w,pick(['Ладно. Тогда триста.','По-хорошему не вышло. Триста.','Сказали сразу. Триста — и мы ушли.']),4);endSit(s);}}
+          {t:`Отдать ${fmtMoney(ask)}`,primary:true,run:()=>spend(ask,()=>{sitMood(-2);say(w,pick(['Вот и хорошо. Иди.','Нормально. Мы квиты.','Сотка есть — вопросов нет.']),4);addEvent(`${nm}: отдали ${fmtMoney(ask)}`,'say');endSit(s);yardHandOff(f,w,ask);})},
+          {t:'Не отдавать',run:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);sitRep(-1,'не отдал сотку во дворе');say(w,pick(['Ладно. Тогда триста.','По-хорошему не вышло. Триста.','Сказали сразу. Триста — и мы ушли.']),4);endSit(s);yardHandOff(f,w,take);}}
         ],
-        onTimeout:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);say(w,'Молчишь — значит, триста.',4);endSit(s);}});return;}
+        onTimeout:()=>{sitMoney(-take,`${nm} забрал, раз сотку не дали`);sitMood(-6);say(w,'Молчишь — значит, триста.',4);endSit(s);yardHandOff(f,w,take);}});return;}
     default:{faSay(s,'рассказываешь свежий слух района, коротко',null);
       faCard(s,{icon:'🗣',text:`${nm} делится новостью района.`,ttl:14,choices:[{t:'Интересно',primary:true,run:()=>{sitMood(1);endSit(s);}}]});}}}
 function faThanks(s){const w=s.w;say(w,pick(['Рәхмәт, добрый человек.','Спасибо. Хорошему человеку — хороший день.','Спасибо. А на Кабане сегодня утки — сходи.']),5);endSit(s);}
@@ -118,6 +118,41 @@ function faHelpEnd(s,ok){const w=s.w;unmark('fa:go');
   if(ok){sitRep(2,'помогли соседям донести сумку');sitMood(5);player.food=clamp(player.food+8,0,100);say(w,pick(['Спасибо, улым! Вот, держи чак-чак.','Рәхмәт, кызым! Возьми конфетку.','Спасибо! Таких бы побольше.']),5);addEvent(`Помогли донести сумку до подъезда — ${w.p.name} ${w.p.female?'угостила':'угостил'} чак-чаком`,'say');}
   else say(w,'Ладно, дальше сам донесу.',4);
   endSit(s);}
+// сотка участковому: гопник отдаёт ровно 100 из уже взятого и на этом расходится.
+// Цепочку, облаву и «кто крышует» сюда не кладём — только сцена и запись PROG.yardCut на потом.
+function yardOfficer(district){return (window.cityPeople||[]).find(p=>p.role==='officer'&&p.district===district)||null;}
+function yardCutLog(f,w,off,bag,seen){if(!off)return;const rec={day:clock.day,t:Math.round(clock.minutes),from:f&&f.id,fromName:w&&w.p?w.p.name:'',to:off.id,toName:off.name,district:f&&f.district,sum:100,bag:bag||100,seen:seen?1:0};
+  const P=PROG.yardCut||(PROG.yardCut=[]);P.push(rec);if(P.length>16)P.shift();progSave();
+  if(w&&w.p)remember(w,`Отдал 100 ₽ участковому ${off.name}. Сам разговор не начинает, цепочку не объясняет.`);
+  const nm=w&&w.p?w.p.name:'Он';const tail=bag>100?` Из ${fmtMoney(bag)} — только сотка. Дальше ничего.`:'' ;
+  addEvent(`${nm} отдал 100 ₽ участковому ${off.name}.${tail}`,'say');
+  if(window.cityPhone)try{window.cityPhone.push({from:off.name,text:`${nm} передал 100 ₽. Вы это видели.`,kind:'event'});}catch(e){}}
+function yardCopSpot(w){const away=Math.atan2(w.y-player.y,w.x-player.x);
+  for(let i=0;i<8;i++){const a=away+1.15+(i-3)*0.38;const x=w.x+Math.cos(a)*14,y=w.y+Math.sin(a)*14;
+    const n=nearestNode(x,y,world.pedAdj,40);if(n<0)continue;const q=sidewalkPos(n);
+    if(inBuilding(q[0],q[1])||dist(q[0],q[1],w.x,w.y)<6)continue;return {n,x:q[0],y:q[1]};}
+  return null;}
+function yardHandOff(f,w,bag){const off=f&&yardOfficer(f.district);if(!f||!w||!off||typeof startSit!=='function')return;
+  const prev=sitActive('yardCut');if(prev)endSit(prev);
+  if(typeof folkCancelRoute==='function')folkCancelRoute(f);f.away=true;
+  if(!startSit('yardCut',{w,f,off,bag:bag||100}))yardCutLog(f,w,off,bag||100,false);}
+defSit('yardCut',{title:'Сотка участковому',quiet:true,cool:0,
+  start(s){const w=s.w,off=s.off;if(!w||!off||walkers.indexOf(w)<0)return false;const spot=yardCopSpot(w);if(!spot)return false;
+    const cop=new Walker('police',spot.n);cop.temp=true;cop.keep=true;cop.x=spot.x;cop.y=spot.y;cop.state='sit';cop.ttl=9e9;
+    Object.assign(cop.p,{name:off.name,age:off.age||40,female:!!off.female,job:'участковый',clothes:'#2B3F8C',hairStyle:4,role:'police'});
+    cop.officerId=off.id;walkers.push(cop);s.cop=cop;takeActor(s,w,'sit');takeActor(s,cop,'sit');
+    const dx=cop.x-w.x,dy=cop.y-w.y,L=Math.hypot(dx,dy)||1;s.meet=[w.x+dx/L*2.6,w.y+dy/L*2.6];s.phase='walk';
+    moveActor(cop,s.meet[0],s.meet[1],2.6);return true;},
+  update(s,dt){const w=s.w,cop=s.cop;if(!w||!cop||walkers.indexOf(w)<0){if(!s.logged){s.logged=1;yardCutLog(s.f,w,s.off,s.bag||100,false);}endSit(s);return;}s.t+=dt;
+    if(s.phase==='walk'){if(cop.mv)stepActor(cop,dt);else{const d=dist(cop.x,cop.y,s.meet[0],s.meet[1]);if(d>0.45){const st=Math.min(2.6*dt,d);cop.hx=(s.meet[0]-cop.x)/d;cop.hy=(s.meet[1]-cop.y)/d;const nx=cop.x+cop.hx*st,ny=cop.y+cop.hy*st;if(!inBuilding(nx,ny)){cop.x=nx;cop.y=ny;}}}
+      faceTo(w,cop.x,cop.y);cop.phase=(cop.phase||0)+dt*7;
+      if(dist(cop.x,cop.y,w.x,w.y)<3.1||s.t>14){const bag=s.bag||100;say(w,bag>100?pick(['Из трёхсот тебе сотка. Как договаривались.','Триста взял. Тебе — сотка.','Держи сотку. Остальное не твоё.']):pick(['Вот сотка. Как договаривались.','Держи. Районная.','Сотка, как всегда.']),4);
+        s.logged=1;yardCutLog(s.f,w,s.off,bag,true);s.phase='hold';s.left=3.6;}return;}
+    faceTo(w,cop.x,cop.y);faceTo(cop,w.x,w.y);s.left-=dt;
+    if(!s.copSaid&&s.left<2.3){s.copSaid=1;say(cop,pick(['Видел. Иди.','Ладно. На сегодня хватит.','Принял. Иди дальше.']),4);}
+    if(s.left<=0)endSit(s);},
+  end(s){const w=s.w,f=s.f;if(w)releaseActor(w);if(f&&f.w===w&&typeof folkGo==='function'){f.away=true;folkGo(f,typeof folkWant==='function'?folkWant(f):'home');}}});
+
 // поездка: машина подъезжает сразу, дальше — обычное такси (у бомбилы цена своя и фиксированная)
 function faRide(s,dst,fixed){const w=s.w;if(fixed&&player.money<fixed){setHint(`Не хватает: нужно ${fmtMoney(fixed)}`);endSit(s);return;}
   const n=nearestNode(player.x,player.y,world.carAdj,150);if(n<0){setHint('Сюда машине не подъехать');endSit(s);return;}
