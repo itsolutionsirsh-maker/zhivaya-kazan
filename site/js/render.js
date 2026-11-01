@@ -42,7 +42,7 @@ function render(){
   // ---- площади
   for(const a of world.areas){if(a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;ctx.fillStyle=AREA_FILL[a.k]||'#ddd';poly(a.p);ctx.fill();
     if(a.k==='water'&&z>1.2){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.6;ctx.stroke();
-      if(!reduceMotion&&z>1.8){ctx.save();ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=0.4;ctx.setLineDash([1.7,2.5]);ctx.lineDashOffset=-(cityAnimT*1.8+(a.bb[0]%9));ctx.stroke();ctx.restore();}}}
+      if(!reduceMotion&&z>1.8){ctx.save();ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=0.4;ctx.setLineDash([1.7,2.5]);ctx.lineDashOffset=-(cityAnimT*1.8+(a.bb[0]%9));ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=0.25;ctx.lineDashOffset=-(cityAnimT*0.7);ctx.stroke();ctx.restore();}}}
   drawKremlinGround(vx0,vy0,vx1,vy1);
   // ---- дороги (батчами по ширине)
   // только улицы на экране — через сетку улиц (раньше каждый кадр перебирались все улицы, когда-либо загруженные: после объезда города — 40% времени кадра)
@@ -138,7 +138,8 @@ function render(){
   for(const w of walkers){if(w.state!=='cross'||z<2.5)continue;const [sx,sy]=toS(w.x,w.y);ctx.fillStyle='rgba(235,187,75,.95)';rrect(ctx,sx-8,sy-22,16,14,4);ctx.fill();ctx.fillStyle='#2B2200';ctx.fillText('!',sx,sy-15);}
   if(typeof drawMetroSigns==='function')drawMetroSigns(vx0,vy0,vx1,vy1,z,toS);
   // Навигационные метки поверх ночного затемнения. Издалека — прежнее рисование без новых проходов.
-  if(z>=3){drawTransportMarks(toS,z,vx0,vy0,vx1,vy1);drawPlayerBeacon(toS,z);drawActionTarget(toS,z,playerNameBox);}
+  if(z>=3){drawTransportMarks(toS,z,vx0,vy0,vx1,vy1);drawActionTarget(toS,z,playerNameBox);}
+  drawPlayerBeacon(toS,z);
   // свои люди: имя над головой у тех, с кем уже знакомы
   if(z>2.2&&typeof FOLK!=='undefined'){ctx.font='600 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';for(const f of FOLK.list){const w=f.w;if(!w||!f.met||w.x<vx0-5||w.x>vx1+5||w.y<vy0-5||w.y>vy1+5)continue;const [sx,sy]=toS(w.x,w.y);const t='★ '+f.name;const tw=ctx.measureText(t).width+12;ctx.fillStyle='rgba(20,60,40,.85)';rrect(ctx,sx-tw/2,sy-46*Math.min(1.6,z/4)-9,tw,18,9);ctx.fill();ctx.fillStyle='#E9FFF1';ctx.fillText(t,sx,sy-46*Math.min(1.6,z/4));}}
   if(weather.kind==='fog'){ctx.fillStyle='rgba(205,210,214,.32)';ctx.fillRect(0,0,W,H);}
@@ -182,12 +183,14 @@ function drawTransportMarks(toS,z,x0,y0,x1,y1){
   for(const c of cars)if(c.kind==='taxi')mark(c,'taxi');
 }
 function drawPlayerBeacon(toS,z){
-  if(player.bus||player.inside)return;
-  const [sx,sy]=toS(player.x,player.y),v=player.vehicle;
-  const r=Math.max(11,(v&&v.kind!=='scooter'&&v.kind!=='bike'?3.1:1.7)*z)+(reduceMotion?0:Math.sin(cityAnimT*2.2)*1.6);
+  if(player.inside)return;
+  const who=player.bus||player;
+  const [sx,sy]=toS(who.x,who.y),v=player.bus?null:player.vehicle;
+  const r=Math.max(14,(v&&v.kind!=='scooter'&&v.kind!=='bike'?3.1:1.7)*z)+(reduceMotion?0:Math.sin(cityAnimT*2.2)*1.6);
   ctx.save();ctx.translate(sx,sy);ctx.beginPath();ctx.arc(0,0,r,0,TAU);
   ctx.strokeStyle='#102E28';ctx.lineWidth=6;ctx.stroke();ctx.strokeStyle='#FFFFFF';ctx.lineWidth=4;ctx.stroke();ctx.strokeStyle='#35D69B';ctx.lineWidth=2;ctx.stroke();
-  ctx.rotate(Math.atan2(player.hy,player.hx));ctx.beginPath();ctx.moveTo(r+7,0);ctx.lineTo(r+1,-4);ctx.lineTo(r+1,4);ctx.closePath();
+  const hx=who.hx||player.hx||0,hy=who.hy||player.hy||1;
+  ctx.rotate(Math.atan2(hy,hx));ctx.beginPath();ctx.moveTo(r+7,0);ctx.lineTo(r+1,-4);ctx.lineTo(r+1,4);ctx.closePath();
   ctx.strokeStyle='#102E28';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#FFFFFF';ctx.fill();ctx.restore();
 }
 function drawActionTarget(toS,z,nameBox){
@@ -258,6 +261,7 @@ function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=
     if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<1&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,facadeKind(b));detailedWalls++;facadeWallsLeft--;}
     if(win&&L>3.2){const lv=Math.min(b.h,14);const ux=dx/L,uy=dy/L;const cols=Math.floor((L-1.2)/2.4);const gap=(L-1.2-cols*2.4)/2+0.6+0.7;const ws=(b.dash%1.5);for(let k=0;k<lv;k++){const v0=(k+0.3)/lv,v1=(k+0.72)/lv;const list=(lit&&((k*7+b.i)%5!==0))?(((b.i+k)&1)?winLitB:winLit):winDark;for(let c=0;c<cols;c++){const s0=gap+c*2.4+ws,s1=s0+1.0;list.push([ax+ux*s0+ex*v0,ay+uy*s0+ey*v0,ax+ux*s1+ex*v0,ay+uy*s1+ey*v0,ax+ux*s1+ex*v1,ay+uy*s1+ey*v1,ax+ux*s0+ex*v1,ay+uy*s0+ey*v1]);}}}}
   ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
+  if(z>4.8){ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=0.18;ctx.stroke();}
   if(z>4.5&&b.n&&b.area>400){ctx.save();ctx.font='500 1.6px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(40,30,20,.6)';ctx.fillText(b.n,b.cx+ex,b.cy+ey);ctx.restore();}}
 function drawFacadeDetail(ax,ay,bx,by,ex,ey,kind){
   // Четыре отделки, не больше 12 отрезков и одного stroke на стену.
@@ -565,6 +569,7 @@ function renderMini(){const tn=performance.now();if(!renderMini.t||tn-renderMini
   for(const ac of accidents){mctx.fillStyle='#DC3A44';mctx.beginPath();mctx.arc(ac.x,ac.y,16,0,TAU);mctx.fill();}
   for(const pr of peerRender.values()){mctx.fillStyle='#4A90E2';mctx.beginPath();mctx.arc(pr.x,pr.y,12,0,TAU);mctx.fill();}
   mctx.fillStyle='#2BB062';mctx.beginPath();mctx.arc(player.x,player.y,14,0,TAU);mctx.fill();mctx.strokeStyle='#fff';mctx.lineWidth=5;mctx.stroke();
+  if(!reduceMotion){mctx.strokeStyle='rgba(43,176,98,.85)';mctx.lineWidth=3;mctx.beginPath();mctx.arc(player.x,player.y,22+6*Math.sin(tn/280),0,TAU);mctx.stroke();}
   const z=cam.z;mctx.strokeStyle='rgba(20,30,26,.5)';mctx.lineWidth=4;mctx.strokeRect(cam.x-W/2/z,cam.y-H/2/z,W/z,H/z);}
 
 // ---------- мелкий масштаб: готовая картинка города + движущиеся точки ----------

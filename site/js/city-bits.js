@@ -80,6 +80,7 @@
     const key=day()+':'+benchId(g);
     if(!sat.has(key)){sat.add(key);mood(4);}
     saveShot('Двор');
+    const hh=hour();if(hh<9)saveShot('Утро');else if(hh>=21||hh<5)saveShot('Ночь');
     const rain=weather&&weather.kind==='rain';
     setHint(noteLine(g)+(rain?' '+g.name+' подвинулась под зонт.':''),12);
     if(rain)addEvent(g.name+' подвинулась под зонт. Зонт один на двоих');
@@ -143,7 +144,16 @@
     'Баумана':'img/shots/bauman.gif',
     'Парк':'img/shots/park.gif',
     'Набережная':'img/shots/naberezhnaya.gif',
-    'Площадь':'img/shots/fontan.gif'
+    'Площадь':'img/shots/fontan.gif',
+    'Велосипед':'img/shots/bike.gif',
+    'Самокат':'img/shots/scooter.gif',
+    'Каршеринг':'img/shots/car.gif',
+    'Своя машина':'img/shots/car.gif',
+    'Метро':'img/shots/metro.gif',
+    'Мост':'img/shots/most.gif',
+    'Арена':'img/shots/arena.gif',
+    'Утро':'img/shots/utro.gif',
+    'Ночь':'img/shots/noch.gif'
   };
   function saveShot(title){
     const src=SHOT_FILE[title]||postcard(title);if(!src)return;
@@ -183,6 +193,8 @@
     if(/набереж|казанк/i.test(n))return 'img/shots/naberezhnaya.gif';
     if(/площад/i.test(n))return 'img/shots/fontan.gif';
     if(/двор/i.test(n))return 'img/shots/dvor.gif';
+    if(/мост/i.test(n))return 'img/shots/most.gif';
+    if(/арен|стадион/i.test(n))return 'img/shots/arena.gif';
     return 'img/shots/fotograf.gif';
   }
   function takePhoto(cam){

@@ -226,12 +226,21 @@ let resetArm=0;$('#resetBtn').addEventListener('click',async()=>{const b=$('#res
   // zk.prog — задания, значки, обучение; zk.invq — приглашения: тоже с начала (раньше оставались и гасили вечерние события новой игры)
   try{for(const k of ['zk.state','zk.profile','zk.howto','zk.citylife','zk.folk','zk.prog','zk.invq'])localStorage.removeItem(k);}catch(e){}location.reload();});
 
-$('#centerBtn').addEventListener('click',followPlayer);
-mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;$('#centerBtn').hidden=false;clampCam();});
+$('#centerBtn').addEventListener('click',findMe);
+mini.addEventListener('click',e=>{if(scene!=='city')return;const rc=mini.getBoundingClientRect();const mx=(e.clientX-rc.left)*mini.width/rc.width,my=(e.clientY-rc.top)*mini.height/rc.height;const bb=world.bbox;const s=Math.min(mini.width/(bb[2]-bb[0]),mini.height/(bb[3]-bb[1]));const ox=(mini.width-(bb[2]-bb[0])*s)/2,oy=(mini.height-(bb[3]-bb[1])*s)/2;cam.x=(mx-ox)/s+bb[0];cam.y=(my-oy)/s+bb[1];cam.free=true;clampCam();});
 $('#zin').addEventListener('click',()=>{cam.zt=clamp(cam.zt*1.3,zMin(),16);});$('#zout').addEventListener('click',()=>{cam.zt=clamp(cam.zt/1.3,zMin(),16);});
 canvas.addEventListener('wheel',e=>{e.preventDefault();const nz=clamp(cam.zt*(e.deltaY<0?1.12:0.89),zMin(),16);if(scene==='city'&&cam.free){const wx=cam.x+(e.clientX-W/2)/cam.z,wy=cam.y+(e.clientY-H/2)/cam.z;cam.z=cam.zt=nz;cam.x=wx-(e.clientX-W/2)/nz;cam.y=wy-(e.clientY-H/2)/nz;}else cam.zt=nz;},{passive:false});
 let pdown=null,dragging=false,pinch=null;const ptrs=new Map();
-function followPlayer(){cam.free=false;$('#centerBtn').hidden=true;}
+function followPlayer(){cam.free=false;}
+function findMe(){
+  if(player.inside){setHint('Вы внутри. На улице кнопка «Я» сразу покажет вас вблизи');return;}
+  followPlayer();
+  const who=player.bus||player;
+  cam.x=who.x;cam.y=who.y;
+  if(cam.zt<8)cam.zt=8;
+  cam.z=cam.zt;
+  clampCam();
+}
 function clampCam(){const bb=world.bbox;cam.x=clamp(cam.x,bb[0],bb[2]);cam.y=clamp(cam.y,bb[1],bb[3]);}
 canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<180&&e.clientY>innerHeight-200)return;try{canvas.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,[e.clientX,e.clientY]);
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:cam.zt};pdown=null;dragging=false;return;}

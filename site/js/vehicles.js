@@ -61,6 +61,7 @@ function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=pla
   if(kind!=='own'){const i=rentals.indexOf(obj);if(i>=0)rentals.splice(i,1);player.money-=spec.start;}else ownCar.parked=false;
   player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};
   journeyHint('boarding',obj,player.x,player.y,obj.x,obj.y);player.x=obj.x;player.y=obj.y;
+  if(window.citySaveShot)citySaveShot(kind==='bike'?'Велосипед':kind==='scooter'?'Самокат':kind==='own'?'Своя машина':'Каршеринг');
   player.waypoints=null;player.waitingStop=null;player.talkTarget=null;player.navDest=null;
   if(kind!=='bike')addEvent(kind==='scooter'?`Взяли самокат: 50 ₽ + 6 ₽/мин. Клик по карте — поехать туда`:kind==='car'?`Каршеринг: 200 ₽ + 10 ₽/мин. Клик по карте — поедет сам, WASD — руль`:'Вы за рулём своей машины. Клик по карте — поедет сама, WASD — руль');
   if(kind==='bike')addEvent('Велосипед: 20 ₽ + 3 ₽/игр. мин. Клик по карте — поехать туда');
