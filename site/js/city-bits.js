@@ -79,6 +79,7 @@
     window.cityBenchSit=seat;
     const key=day()+':'+benchId(g);
     if(!sat.has(key)){sat.add(key);mood(4);}
+    saveShot('Двор');
     const rain=weather&&weather.kind==='rain';
     setHint(noteLine(g)+(rain?' '+g.name+' подвинулась под зонт.':''),12);
     if(rain)addEvent(g.name+' подвинулась под зонт. Зонт один на двоих');
@@ -131,7 +132,18 @@
     'Вечерняя ярмарка':'img/shots/yarmarka.gif',
     'Гармонь':'img/shots/garmon.gif',
     'Шары':'img/shots/shary.gif',
-    'Ледяной городок':'img/shots/led.gif'
+    'Ледяной городок':'img/shots/led.gif',
+    'Трамвай':'img/shots/tram.gif',
+    'Автобус':'img/shots/bus.gif',
+    'Такси':'img/shots/taxi.gif',
+    'Дождь':'img/shots/rain.gif',
+    'Снег':'img/shots/snow.gif',
+    'Двор':'img/shots/dvor.gif',
+    'Кремль':'img/shots/kremlin.gif',
+    'Баумана':'img/shots/bauman.gif',
+    'Парк':'img/shots/park.gif',
+    'Набережная':'img/shots/naberezhnaya.gif',
+    'Площадь':'img/shots/fontan.gif'
   };
   function saveShot(title){
     const src=SHOT_FILE[title]||postcard(title);if(!src)return;
@@ -163,12 +175,22 @@
       if(j.note)notes.set(j.note.id,j.note);close();setHint('Записка осталась на лавочке');
     };
   }
+  function placeShot(place){
+    const n=String(place||'');
+    if(/кремл/i.test(n))return 'img/shots/kremlin.gif';
+    if(/бауман/i.test(n))return 'img/shots/bauman.gif';
+    if(/парк/i.test(n))return 'img/shots/park.gif';
+    if(/набереж|казанк/i.test(n))return 'img/shots/naberezhnaya.gif';
+    if(/площад/i.test(n))return 'img/shots/fontan.gif';
+    if(/двор/i.test(n))return 'img/shots/dvor.gif';
+    return 'img/shots/fotograf.gif';
+  }
   function takePhoto(cam){
     const place=cam.place||'Казань';
     spend(100,()=>{
-      const src='img/shots/fotograf.gif';if(!src){setHint('Фотограф махнул рукой: плёнка кончилась');return;}
+      const src=placeShot(place);if(!src){setHint('Фотограф махнул рукой: плёнка кончилась');return;}
       let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
-      list.push({src,title:place+' · день '+day(),at:Date.now()});if(list.length>8)list=list.slice(-8);
+      list.push({src,title:place+' · день '+day(),at:Date.now()});if(list.length>12)list=list.slice(-12);
       try{localStorage.setItem('zk.photos',JSON.stringify(list));}catch(e){setHint('Снимок есть, но телефон его не сохранил');return;}
       if(window.cityPhone&&cityPhone.push)cityPhone.push({from:'Фотограф',text:'Снимок («'+place+'») во вкладке «Снимки».',kind:'photo'});
       mood(5);reply('📷','Фотограф','Держите. В телефоне, вкладка «Снимки».');
@@ -189,7 +211,7 @@
   }
   function yell(){mood(4);saveShot('Свадебный кортеж');reply('💍','Кортеж','Молодожёны махнули. Кто-то уже ищет второй букет.');}
   function tipCar(){spend(50,()=>{mood(6);reply('💍','Кортеж','На капот легло 50 ₽. Им на счастье, вам на настроение.');});}
-  function feedBirds(f){if(wet()){reply('🐦','Голуби','В такую погоду они не садятся. Хлеб подождёт.');return;}spend(20,()=>{f.fed=1;f.stolen=0;still.t=0;mood(3);saveShot('Голуби на площади');reply('🐦','Голуби','Сели ближе. Стойте смирно: у них тут комитет.');});}
+  function feedBirds(f){if(wet()){saveShot(weather&&weather.kind==='snow'?'Снег':'Дождь');reply('🐦','Голуби','В такую погоду они не садятся. Хлеб подождёт.');return;}spend(20,()=>{f.fed=1;f.stolen=0;still.t=0;mood(3);saveShot('Голуби на площади');reply('🐦','Голуби','Сели ближе. Стойте смирно: у них тут комитет.');});}
   function place(){
     const onFoot=!player.vehicle&&!player.bus;
     if(!onFoot||!world.bgrid){grans=[];kiosks=[];cams=[];flocks=[];return;}
@@ -427,7 +449,7 @@
   document.addEventListener('pointerdown',armSound,{once:true});
   document.addEventListener('keydown',armSound,{once:true});
   document.addEventListener('visibilitychange',()=>weatherSound());
-  window.updateCityBits=updateCityBits;window.drawCityBits=drawCityBits;
+  window.updateCityBits=updateCityBits;window.drawCityBits=drawCityBits;window.citySaveShot=saveShot;
   function boot(){
     if(typeof findAction==='function'&&!findAction._bits){const prev=findAction;function wrapped(){const mine=bitsAction();const a=prev();if(mine&&mine.d<2.5)return mine;return a||mine;}wrapped._bits=1;wrapped._park=findAction._park;findAction=wrapped;}
   }

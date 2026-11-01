@@ -70,7 +70,7 @@ async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id
   return d||{name:'',parent:''};}
 
 // ---------- автобус ----------
-function boardBus(bus,stop){if(player.vehicle||player.bus||player.inside)return false;journeyHint('boarding',bus,player.x,player.y,bus.x,bus.y);player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
+function boardBus(bus,stop){if(player.vehicle||player.bus||player.inside)return false;journeyHint('boarding',bus,player.x,player.y,bus.x,bus.y);player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;if(window.citySaveShot)citySaveShot(/трамва/i.test(busWord(bus.route.type))?'Трамвай':'Автобус');addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
 function leaveBus(stop){const b=player.bus;if(player.busPlan&&!busPlanExit(b,stop))player.busPlan=null;player.bus=null;player.fare=null;player.exitNext=false;player.x=b.x-b.hy*4;player.y=b.y+b.hx*4;journeyHint('exiting',b,b.x,b.y,player.x,player.y);addEvent(`Вы вышли на «${stop.n}»`);}
 
 // ---------- действия ----------

@@ -265,10 +265,10 @@ $('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||
 
 // ===== Кадр на входе: короткое фото заведения (site/img/inside/*.jpg), потом обычная комната =====
 // Нет файла — ничего не показываем. Клик или движение пропускают кадр. В то же место второй раз за минуту не повторяем.
-const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school'];const shotImg={};const shotSeen=new Map();let shotT=null;
+const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school','worship','police','market','bakery','tea','barber','flower','gym'];const shotImg={};const shotSeen=new Map();let shotT=null;
 // фото качаем, когда город уже на экране: при входе 600 КБ картинок мешали карте
 (function shotLater(){const L=$('#loading');if(L&&!L.hidden){setTimeout(shotLater,700);return;}setTimeout(()=>{for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}},1500);})();
-function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(src.kind==='market')return 'shop';return SHOT_KINDS.includes(src.kind)?src.kind:null;}
+function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';return SHOT_KINDS.includes(src.kind)?src.kind:null;}
 function insideShot(src){const k=shotKind(src);const im=k&&shotImg[k];if(!im)return;const key=src.key||src.name;const now=performance.now();if(now-(shotSeen.get(key)||-1e9)<60000)return;shotSeen.set(key,now);
   const el=$('#insideShot');el.style.backgroundImage=`url("${im.src}")`;$('#insideShotName').textContent=src.name||'';el.hidden=false;el.classList.remove('out');void el.offsetWidth;el.classList.add('in');
   clearTimeout(shotT);shotT=setTimeout(hideShot,800);}

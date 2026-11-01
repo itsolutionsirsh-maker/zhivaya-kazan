@@ -96,6 +96,7 @@ function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvaila
   player.vehicle={kind:'taxi',x:c.x,y:c.y,hx:c.hx,hy:c.hy,speed:0,spec:VEH.taxi,startMin:clock.minutes,auto:null,damaged:0,color:'#F4C542',crashedLook:false,odo:0,dest:tc.dest};
   const v=player.vehicle;v.driver=tc.driver;v.fixedFare=tc.fixedFare==null?null:tc.fixedFare;if(tc.errandRide){v.errandRide=true;if(typeof errandUsedTaxi==='function')errandUsedTaxi();}
   journeyHint('boarding',c,player.x,player.y,c.x,c.y);player.x=c.x;player.y=c.y;
+  if(window.citySaveShot)citySaveShot('Такси');
   if(tc.folkDriver&&typeof folkTaxiStart==='function')folkTaxiStart(tc.folkDriver,v);
   player.waypoints=null;player.waitingStop=null;player.vehicle.auto={wps:route,i:0};addEvent(`Едем на такси: ${tc.dest.n}`);updateTripBox();return true;}
 function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);if(v.errandRide)addEvent(`Такси по поручению: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ оплатил город`);else{journeyCharge(fare,'Оплата такси');addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);}const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
