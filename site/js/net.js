@@ -121,8 +121,34 @@ function acctOwnBeacon(j){return !!(syncRev&&j.state&&bootLocalT&&j.state.t===bo
 function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)&&!acctOwnBeacon(j)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
 // тайм-аут: зависший запрос (переключилась мобильная сеть) не держит сохранения минутами — обрыв, следующее через 30 с
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store',signal:typeof AbortSignal!=='undefined'&&AbortSignal.timeout?AbortSignal.timeout(20000):undefined});return r.json();}
+// Снимки и поручение живут в браузере отдельно от zk.state. В аккаунт кладём только короткие пути к файлам
+// и само поручение: нарисованная открытка (data:) тяжёлая и на другой телефон не нужна. Нет ключа — не трогаем
+// чужое сохранение: пустой телефон не стирает галерею, которая есть на втором устройстве.
+function acctPhotoList(raw){
+  let list=raw;
+  if(list==null)return null;
+  if(typeof list==='string'){try{list=JSON.parse(list);}catch(e){return null;}}
+  if(!Array.isArray(list))return null;
+  const out=[];
+  for(const p of list.slice(-12)){
+    if(!p||typeof p!=='object')continue;
+    const src=typeof p.src==='string'?p.src:'';
+    if(src.length>120||src.indexOf('..')>=0||!/^img\/[a-z0-9/_-]+\.(gif|jpe?g|png|webp)$/i.test(src))continue;
+    out.push({src,title:String(p.title||'Казань').slice(0,80),at:Number.isFinite(+p.at)?Math.round(+p.at):0});
+  }
+  return out;
+}
+function acctErrandPack(raw){
+  let e=raw;
+  if(e==null)return null;
+  if(typeof e==='string'){try{e=JSON.parse(e);}catch(err){return null;}}
+  if(!e||typeof e!=='object'||Array.isArray(e))return null;
+  let s;try{s=JSON.stringify({active:e.active||null,done:e.done&&typeof e.done==='object'&&!Array.isArray(e.done)?e.done:{},day:e.day|0,count:e.count|0});}catch(err){return null;}
+  if(!s||s.length>8000)return null;
+  return JSON.parse(s);
+}
 // снимок для сервера; wallet — изменения денег операциями (wallet.js), проводятся только вместе с этим сохранением
-function acctSnapshot(){if(window.zkNoSave)return null;const wo=typeof walletOut==='function'?walletOut():undefined;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(state)delete state.wal;if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city,wallet:wo?{who:wo.who,ops:wo.ops}:undefined,wsnap:wo?wo.snap:undefined};}
+function acctSnapshot(){if(window.zkNoSave)return null;const wo=typeof walletOut==='function'?walletOut():undefined;try{saveState();}catch(e){}let state=null,profile=null,city=null;try{state=JSON.parse(localStorage.getItem('zk.state')||'null');const prog=JSON.parse(localStorage.getItem('zk.prog')||'null');if(state&&prog)state=Object.assign({},state,{prog});profile=JSON.parse(localStorage.getItem('zk.profile')||'null');city=JSON.parse(localStorage.getItem('zk.citylife')||'null');}catch(e){}if(state)delete state.wal;if(state){try{const rawP=localStorage.getItem('zk.photos');if(rawP!=null){const photos=acctPhotoList(rawP);if(photos&&photos.length)state.photos=photos;}}catch(e){}try{const rawE=localStorage.getItem('zk.errand');if(rawE!=null){const errand=acctErrandPack(rawE);if(errand)state.errand=errand;}}catch(e){}}if(profile&&profile.photo&&profile.photo.length>9000)profile=Object.assign({},profile,{photo:null});return {state,profile,city,wallet:wo?{who:wo.who,ops:wo.ops}:undefined,wsnap:wo?wo.snap:undefined};}
 // одно сохранение за раз: второе с той же base, пока первое в пути, сервер счёл бы чужим (конфликт)
 async function acctSave(){if(!acct||window.zkNoSave||Net.saving)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
   Net.saving=true;const {wsnap,...body}=snap;
@@ -179,7 +205,10 @@ function acctApply(j){
   window.zkNoSave=true;
   try{setRev(j.updated||0);if(!keepLocal){
     if(j.state&&j.state.wal)delete j.state.wal;   // состояние кошелька — только своё (wallet.js); загруженная игра начинает с баланса сервера
-    localStorage.setItem('zk.state',JSON.stringify(j.state));
+    const state=j.state&&typeof j.state==='object'?Object.assign({},j.state):j.state;
+    if(state&&Object.prototype.hasOwnProperty.call(j.state,'photos')){const photos=acctPhotoList(j.state.photos);if(photos)localStorage.setItem('zk.photos',JSON.stringify(photos));delete state.photos;}
+    if(state&&Object.prototype.hasOwnProperty.call(j.state,'errand')){const errand=acctErrandPack(j.state.errand);if(errand)localStorage.setItem('zk.errand',JSON.stringify(errand));delete state.errand;}
+    localStorage.setItem('zk.state',JSON.stringify(state));
     if(j.state&&j.state.prog)localStorage.setItem('zk.prog',JSON.stringify(j.state.prog));
     if(j.profile)localStorage.setItem('zk.profile',JSON.stringify(j.profile));
     if(j.city)localStorage.setItem('zk.citylife',JSON.stringify(j.city));else localStorage.removeItem('zk.citylife');

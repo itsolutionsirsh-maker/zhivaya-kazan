@@ -16,6 +16,12 @@
   }
   function pad(n){return (n<10?'0':'')+n;}
   function life(){try{return JSON.parse(localStorage.getItem('zk.citylife')||'{}')||{};}catch(e){return {};}}
+  function shotSrc(p){
+    if(!p||typeof p.src!=='string')return '';
+    if(p.src.indexOf('data:image/')===0&&p.src.length<120000)return p.src;
+    if(p.src.length<120&&p.src.indexOf('..')<0&&/^img\/[a-z0-9/_-]+\.(gif|jpe?g|png|webp)$/i.test(p.src))return p.src;
+    return '';
+  }
 
   let seenInbox=0;
   function pushInbox(msg){
@@ -123,8 +129,8 @@
       let list=[];try{list=JSON.parse(localStorage.getItem('zk.photos')||'[]')||[];}catch(e){list=[];}
       if(!list.length){const empty=document.createElement('div');empty.style.cssText='padding:8px 0;font-size:15px';empty.textContent='Пока пусто. Снимки сами падают сюда: фотограф, голуби, шаурма, бабушка, кортеж, вечерняя ярмарка.';box.append(empty);}
       list.slice().reverse().forEach(function(p){
-        if(!p||typeof p.src!=='string'||p.src.indexOf('data:image/')!==0)return;
-        const img=document.createElement('img');img.src=p.src;img.alt=p.title||'снимок';img.style.cssText='width:100%;border-radius:12px;margin-top:8px;display:block';
+        const src=shotSrc(p);if(!src)return;
+        const img=document.createElement('img');img.src=src;img.alt=p.title||'снимок';img.style.cssText='width:100%;border-radius:12px;margin-top:8px;display:block';
         const cap=document.createElement('div');cap.textContent=p.title||'Баумана';cap.style.cssText='font-size:13px;opacity:.7;margin-top:2px';
         const share=document.createElement('button');share.type='button';share.textContent='Показать рядом';
         share.style.cssText='margin:4px 0 10px;min-height:44px;padding:8px 12px;border-radius:999px;border:1px solid rgba(0,0,0,.15);background:#fff;font:600 14px inherit;cursor:pointer';
