@@ -128,7 +128,10 @@
     'Свадебный кортеж':'img/shots/kortezh.gif',
     'Голуби на площади':'img/shots/golubi.gif',
     'Ярмарка, эчпочмак':'img/shots/yarmarka.gif',
-    'Вечерняя ярмарка':'img/shots/yarmarka.gif'
+    'Вечерняя ярмарка':'img/shots/yarmarka.gif',
+    'Гармонь':'img/shots/garmon.gif',
+    'Шары':'img/shots/shary.gif',
+    'Ледяной городок':'img/shots/led.gif'
   };
   function saveShot(title){
     const src=SHOT_FILE[title]||postcard(title);if(!src)return;
