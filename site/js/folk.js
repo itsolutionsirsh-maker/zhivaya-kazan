@@ -38,6 +38,31 @@ function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Mat
 function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){const dx=p.x-x,dy=p.y-y;if(dx>bd||dx<-bd||dy>bd||dy<-bd||!test(p))continue;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=p;}}return best;}
 function poiPlace(p,kind){return p?{x:p.x,y:p.y,inside:true,key:poiKey(p),poi:p,name:p.n||KIND_RU[p.t]||'',kind}:null;}
 function spotPlace(x,y,name,kind){const n=nearestNode(x,y,world.pedAdj,150);if(n<0)return null;const sp=sidewalkPos(n);return {x:sp[0],y:sp[1],inside:false,node:n,name,kind};}
+function folkPointOk(x,y){return !inBuilding(x,y)&&!(typeof inWater==='function'&&inWater(x,y));}
+// тротуар у узла без жребия: борт из seed, оба борта проверяются, в дом и в воду не встаём
+function folkSideAt(node,seed){const p=world.nodes[node];if(!p)return null;let best=null;
+  for(const e of adjList(world.pedAdj,node)){const r=world.roads[e[2]];if(r.c>8)return folkPointOk(p[0],p[1])?[p[0],p[1]]:null;if(!best||r.hw>best.r.hw)best={e,r};}
+  if(!best)return folkPointOk(p[0],p[1])?[p[0],p[1]]:null;
+  const q=world.nodes[best.e[0]];const L=dist(p[0],p[1],q[0],q[1])||1;const dx=(q[0]-p[0])/L,dy=(q[1]-p[1])/L;const off=best.r.hw+SIDEWALK*0.55;const sgn=(seed&1)?1:-1;
+  const at=s=>{const x=p[0]-dy*off*s,y=p[1]+dx*off*s;return folkPointOk(x,y)?[x,y]:null;};
+  return at(sgn)||at(-sgn)||(folkPointOk(p[0],p[1])?[p[0],p[1]]:null);}
+// ближайший сухой тротуар и личные метры в сторону, чтобы набережная не складывалась в одну точку
+function folkDryStand(x,y,seed,maxR){const R=maxR||720;const n0=nearestNode(x,y,world.pedAdj,R);if(n0<0)return null;
+  const p0=world.nodes[n0];const reach=Math.min(R,Math.hypot(p0[0]-x,p0[1]-y)+72);const m=world.pedAdj.m,nm=world.g.nm;const best=[];
+  world.ngrid.query(x-reach,y-reach,x+reach,y+reach,i=>{if(m&&!(nm[i]&m))return;const p=world.nodes[i];const d=(p[0]-x)**2+(p[1]-y)**2;if(d>reach*reach)return;
+    if(best.length===28&&d>=best[27][0])return;let k=best.length;while(k>0&&best[k-1][0]>d)k--;best.splice(k,0,[d,i]);if(best.length>28)best.pop();});
+  const dry=[];for(let i=0;i<best.length;i++){if(!folkSideAt(best[i][1],seed))continue;dry.push(best[i]);if(dry.length>=12)break;}
+  if(!dry.length)return null;const lim=(Math.sqrt(dry[0][0])+64)**2;const band=dry.filter(q=>q[0]<=lim);const pick=band[seed%band.length];
+  const node=pick[1],base=folkSideAt(node,seed);if(!base)return null;
+  let edge=null;for(const ed of adjList(world.pedAdj,node)){edge=ed;break;}
+  let dx=1,dy=0;if(edge){const q=world.nodes[edge[0]];const L=dist(base[0],base[1],q[0],q[1])||1;dx=(q[0]-base[0])/L;dy=(q[1]-base[1])/L;}
+  const slot=seed%10;const rad=4.8;let spare=null;
+  for(let t=0;t<10;t++){const a=(slot+t)%10*(Math.PI*2/10);const px=base[0]+Math.cos(a)*rad,py=base[1]+Math.sin(a)*rad;if(!folkPointOk(px,py))continue;if(!spare)spare={x:px,y:py,node};if(!folkCrowded(px,py))return {x:px,y:py,node};}
+  const along0=(seed%13)-6;for(let t=0;t<13;t++){const s=along0+((t%2?1:-1)*Math.floor((t+1)/2));const distA=Math.max(-18,Math.min(18,s*3));const px=base[0]+dx*distA,py=base[1]+dy*distA;if(!folkPointOk(px,py))continue;if(!spare)spare={x:px,y:py,node};if(!folkCrowded(px,py))return {x:px,y:py,node};}
+  if(spare)return spare;return {x:base[0],y:base[1],node};}
+function folkCrowded(x,y){const id=FOLK.sep,pts=FOLK.sepPts;if(pts)for(const p of pts)if((p[0]-x)**2+(p[1]-y)**2<4.84)return true;
+  if(!FOLK.list)return false;for(const q of FOLK.list){if(q.id===id||!q.places)continue;for(const k of ['yard','work','haunt']){const pl=q.places[k];if(pl&&!pl.inside&&(pl.x-x)**2+(pl.y-y)**2<4.84)return true;}}return false;}
+function folkOutdoor(x,y,name,kind,seed,rad){const st=folkDryStand(x,y,seed,rad||640);return st?{x:st.x,y:st.y,inside:false,node:st.node,open:true,name:name||'на улице',kind:kind||'street'}:null;}
 // опорные точки центра считаем один раз на карту (раньше — перебор тысяч мест на каждого жителя); вызывающие правят копию
 let FOLK_ANCH=null;
 function folkAnchors(){const key=world.roads.length+':'+world.pois.length;
@@ -65,22 +90,28 @@ function folkOpenSpot(sp,f,c,role){const norm=s=>String(s||'').toLowerCase().rep
   if(hs.length){let bs=0,bd=4500;for(const l of [...(window.cityLandmarks||[]),...(window.cityPlaces||[])]){if(!Array.isArray(l.ll))continue;const ns=l.nn||(l.nn=[l.name].concat(l.alias||[]).map(norm));   // ориентиры и места для праздников и постов (city-people.js)
     let sc=0;for(const h of hs)sc+=ns.some(n=>n===h)?2:ns.some(n=>n.includes(h))?1:0;if(!sc)continue;   // точное совпадение с названием важнее «вокзал» внутри «автовокзал»
     const q=llToXY(l.ll);const d=dist(q[0],q[1],c[0],c[1]);if(d>4500)continue;if(sc>bs||(sc===bs&&d<bd)){bs=sc;bd=d;at=q;label=l.name;}}
-    if(!at){let bd2=3000;roadsIn(c[0]-3000,c[1]-3000,c[0]+3000,c[1]+3000,r=>{if(!r.n||!r.p)return;const rn=r.nl||(r.nl=norm(r.n));if(!hs.some(h=>rn.includes(h)))return;for(const i of r.p){const q=world.nodes[i];if(!q)continue;const d=dist(q[0],q[1],c[0],c[1]);if(d<bd2){bd2=d;at=[q[0],q[1]];label=r.n;}}});}}
-  if(!at)return null;const sd=hashStr(f.id+role);const jx=((sd%41)-20),jy=(((sd>>>6)%41)-20);   // ±20 м, у каждого своё место
-  const n=nearestNode(at[0]+jx,at[1]+jy,world.pedAdj,600);if(n<0)return null;const q=sidewalkPos(n);   // озеро или парк: ближайшая дорожка может быть далеко от центра
-  return {x:q[0],y:q[1],inside:false,node:n,open:true,kind:sp.kind,name:label?(role==='work'&&/^(taxi|bombila)$/.test(f.type)?'у машины, '+label:label):'на улице'};}
+    if(!at){let bd2=3000;roadsIn(c[0]-3000,c[1]-3000,c[0]+3000,c[1]+3000,r=>{if(!r.n||!r.p)return;const rn=r.nl||(r.nl=norm(r.n));if(!hs.some(h=>rn.includes(h)))return;for(const i of r.p){const q=world.nodes[i];if(!q)continue;const d=dist(q[0],q[1],c[0],c[1]);if(d<bd2){bd2=d;at=[q[0],q[1]];label=r.n;}}});}
+    if(!at){let bs2=0,bd3=4500;for(const p of world.pois){if(!p.n)continue;const dx=p.x-c[0],dy=p.y-c[1];if(dx>4500||dx<-4500||dy>4500||dy<-4500)continue;const pn=p.nl||(p.nl=norm(p.n));let sc=0;for(const h of hs)sc+=pn===h?2:pn.includes(h)?1:0;if(!sc)continue;const d=Math.hypot(dx,dy);if(sc>bs2||(sc===bs2&&d<bd3)){bs2=sc;bd3=d;at=[p.x,p.y];label=p.n;}}
+      if(!at){let bd4=2500;for(const s of world.stops||[]){if(!s.n)continue;const sn=norm(s.n);if(!hs.some(h=>sn.includes(h)))continue;const d=dist(s.x,s.y,c[0],c[1]);if(d<bd4){bd4=d;at=[s.x,s.y];label=s.n;}}}}}
+  const seed=hashStr(f.id+role);let st=at?folkDryStand(at[0],at[1],seed,780):null;if(!st&&at)st=folkDryStand(at[0],at[1],seed,1400);   // центр парка и озеро часто без своей дорожки — берём берег
+  if(!st)st=folkDryStand(c[0],c[1],seed,1100);   // ориентир за краем загруженной карты: сухой тротуар своего района, не дом
+  if(!st)return null;const near=!!(at&&Math.hypot(st.x-at[0],st.y-at[1])<520);const taxi=role==='work'&&/^(taxi|bombila)$/.test(f.type||'');
+  const name=taxi?(near&&label?'у машины, '+label:'у машины'):(label?(near?label:'к «'+label+'»'):'на улице');
+  return {x:st.x,y:st.y,inside:false,node:st.node,open:true,kind:sp.kind,name};}
 function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   // таксист и бомбила из folk3 ждут пассажиров у своей машины (у вокзала, рынка, метро), а не сидят невидимыми в салоне
-  if(k==='taxi'&&/^(taxi|bombila)$/.test(f.type||'')&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
-  if(OPEN_KIND.test(k)&&f.type&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
+  if(k==='taxi'&&/^(taxi|bombila)$/.test(f.type||'')&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;
+    const st=folkDryStand(a[0],a[1],hashStr(f.id+role+'taxi'),1200);if(st)return {x:st.x,y:st.y,inside:false,node:st.node,open:true,kind:'taxi',name:'у машины'};}
+  if(OPEN_KIND.test(k)&&sp.hints.length){const pl=folkOpenSpot(sp,f,hintAnchor(sp.hints,A,a),role);if(pl)return pl;}
   if(k==='taxi')return {x:a[0],y:a[1],inside:true,key:'taxi',name:'за рулём такси',kind:'taxi'};
   // водитель автобуса на перерыве — у ближайшей к его району остановки (folk3: work.kind 'bus')
   if(k==='bus'){const c=hintAnchor(sp.hints,A,a);let best=null,bd=2500;for(const s of world.stops||[]){const d=Math.hypot(s.x-c[0],s.y-c[1]);if(d<bd){bd=d;best=s;}}
-    if(best)return spotPlace(best.x+3,best.y+2,sp.label||'на остановке','street');}
+    if(best){const pl=folkOutdoor(best.x+3,best.y+2,sp.label||'на остановке','street',hashStr(f.id+role),220);if(pl)return pl;return spotPlace(best.x+3,best.y+2,sp.label||'на остановке','street');}}
   if(k==='home')return role==='work'?P.home:P.yard;
   if(k==='yard')return P.yard;
   const c=hintAnchor(sp.hints,A,a);
-  if(k==='street'){const s=nearestPoi(c[0],c[1],p=>p.t==='sight',350);const q=s?[s.x,s.y]:c;return spotPlace(q[0]+8,q[1]+6,sp.label||(sp.hints.some(h=>/бауман/.test(h))?'на Баумана':sp.hints.some(h=>/кремл/.test(h))?'у Кремля':'на улице'),'street');}
+  if(k==='street'){const s=nearestPoi(c[0],c[1],p=>p.t==='sight',350);const q=s?[s.x,s.y]:c;const nm=sp.label||(sp.hints.some(h=>/бауман/.test(h))?'на Баумана':sp.hints.some(h=>/кремл/.test(h))?'у Кремля':'на улице');
+    return folkOutdoor(q[0]+8,q[1]+6,nm,'street',hashStr(f.id+role),520)||spotPlace(q[0]+8,q[1]+6,nm,'street');}
   let test=KIND_TEST[k]||(p=>p.t===k);if(k==='office'&&/школ|лицей|гимназ/i.test(sp.label))test=KIND_TEST.school;
   const taken=new Set(Object.values(P).filter(Boolean).map(q=>q.key));
   const use=FOLK.use||(FOLK.use={});const named=p=>!!p.n&&!taken.has(poiKey(p))&&(use[poiKey(p)]||0)<(role==='work'?1:2);   // на работе по одному, «своё место» — не больше двоих
@@ -94,11 +125,13 @@ function resolveSpec(sp,f,A,a,role,P){if(!sp)return null;const k=sp.kind;
   if(!best&&cand.length)best=cand[0][1];
   if(!best)best=nearestPoi(c[0],c[1],p=>test(p)&&!!p.n);
   const pl=poiPlace(best,role);if(pl){use[pl.key]=(use[pl.key]||0)+(role==='work'?2:1);if(sp.label)pl.label=sp.label;}return pl;}
-function folkPlaces(f,A){const a=A[f.ward]||A.freedom;const seed=hashStr(f.id);const P={};
+function folkPlaces(f,A){const a=A[f.ward]||A.freedom;const seed=hashStr(f.id);const P={};FOLK.sep=f.id;FOLK.sepPts=[];
+  const note=pl=>{if(pl&&!pl.inside)FOLK.sepPts.push([pl.x,pl.y]);return pl;};
   P.home=f.id==='fidania'&&player.home?{x:player.home.cx,y:player.home.bb[3]+3,inside:true,key:'home:player',name:'ваш дом',kind:'home'}:(homeNear(a[0]+((seed%7)-3)*60,a[1]+((seed%5)-2)*60,420,seed)||spotPlace(a[0],a[1],'дом','home'));
-  {const s=hashStr(f.id+'yard');P.yard=spotPlace(A.yard[0]+6+((s%51)-25),A.yard[1]+8+(((s>>>6)%51)-25),'во дворе','yard');if(P.yard){P.yard.x+=((s>>>12)%5)-2;P.yard.y+=((s>>>15)%5)-2;}}   /* во дворе у каждого своё место: раньше весь район стоял в одной точке */
-  P.work=resolveSpec(normSpec(f.work),f,A,a,'work',P);
-  P.haunt=resolveSpec(normSpec(f.haunt),f,A,a,'haunt',P);
+  if(!P.home){const st=folkDryStand(a[0],a[1],seed,1000)||folkDryStand(a[0],a[1],seed,1800);if(st)P.home={x:st.x,y:st.y,inside:true,node:st.node,key:'home:'+seed,name:'дом',kind:'home'};}
+  {const s=hashStr(f.id+'yard');P.yard=note(folkOutdoor(A.yard[0],A.yard[1],'во дворе','yard',s,240)||folkOutdoor(A.yard[0],A.yard[1],'во дворе','yard',s,980)||folkOutdoor(a[0],a[1],'во дворе','yard',s,980)||folkOutdoor(a[0],a[1],'во дворе','yard',s,1800));}   // у каждого своё место во дворе; у края карты — ближайший сухой тротуар
+  P.work=note(resolveSpec(normSpec(f.work),f,A,a,'work',P));
+  P.haunt=note(resolveSpec(normSpec(f.haunt),f,A,a,'haunt',P));
   for(const k of ['work','haunt'])if(!P[k])P[k]=P.home;return P;}
 function folkInit(){if(FOLK.ready||!world||!player.home)return;FOLK.ready=true;folkLoad();const A=folkAnchors();
   for(const src of folkSrc()){const f=Object.assign({},src);f.p=folkPersona(f);const sv=FOLK.save[f.id]||{};f.met=sv.met||0;f.last=sv.last||0;f.greet=sv.greet||0;if(Array.isArray(sv.mem))f.p.memory=sv.mem.slice();
@@ -122,7 +155,8 @@ function folkWhere(id){const f=FOLK.list.find(q=>q.id===id);if(!f)return null;co
   return {id,name:f.name,at:f.trip?'road':f.at,place:pl?pl.name:'',x:(f.w?f.w.x:pl&&pl.x),y:(f.w?f.w.y:pl&&pl.y),known:f.met>0,text:f.trip?`${f.name} идёт ${f.trip.to==='home'?'домой':'в «'+(pl&&pl.name)+'»'}`:f.at==='home'?`${f.name} дома`:f.at==='work'?`${f.name} на работе${pl&&pl.inside&&pl.key!=='taxi'?' в «'+pl.name+'»':pl?' · '+pl.name:''}`:`${f.name} ${pl&&pl.inside?'в «'+pl.name+'»':pl?pl.name:''}`};}
 // ---------- на улице ----------
 function folkPos(f){if(f.w)return [f.w.x,f.w.y];const pl=f.places[f.at];return pl?[pl.x,pl.y]:[0,0];}
-function folkSpawn(f,pl){const n=nearestNode(pl.x,pl.y,world.pedAdj,120);if(n<0)return null;const w=new Walker('resident',n);w.p=f.p;w.folk=f.id;w.spd=f.age>60?1.6:rnd(2.0,2.5);if(!pl.inside){w.x=pl.x;w.y=pl.y;}w.state='folkStay';
+function folkSpawn(f,pl){const n=pl.node!=null?pl.node:nearestNode(pl.x,pl.y,world.pedAdj,120);if(n<0)return null;const w=new Walker('resident',n);w.p=f.p;w.folk=f.id;w.spd=f.age>60?1.6:rnd(2.0,2.5);if(!pl.inside){w.x=pl.x;w.y=pl.y;}
+  else{const q=folkSideAt(n,hashStr(f.id+'out'));if(q){w.x=q[0];w.y=q[1];}else if(!folkPointOk(w.x,w.y)){const st=folkDryStand(pl.x,pl.y,hashStr(f.id+'out'),180);if(st){w.x=st.x;w.y=st.y;w.node=st.node;}}}w.state='folkStay';
   w.recover=function(){this.state='folkStay';this.ttl=0;};const update=w.update;
   w.update=function(dt){if(!folkLeadStep(this,dt))update.call(this,dt);};walkers.push(w);f.w=w;return w;}
 function folkId(w){return w&&(w.folk||(w.p&&w.p.folk)||(w.companionOf&&folkId(w.companionOf)));}
@@ -138,7 +172,7 @@ function folkClearJoin(x0,y0,x1,y1){if(typeof wallBlocks==='function'&&wallBlock
 function folkLeadStep(w,dt){const l=w.folkLead;if(!l)return false;if(w.state!=='walk'||!l.valid()){w.folkLead=null;return true;}
   const d=dist(w.x,w.y,l.x,l.y);if(d<0.05){w.folkLead=null;if(l.done)l.done();return true;}
   const ux=(l.x-w.x)/d,uy=(l.y-w.y)/d,st=Math.min(d,w.spd*dt);const x=w.x+ux*st,y=w.y+uy*st;
-  if(unsafeStep(w.x,w.y,x+ux*1.2,y+uy*1.2))return true;if(inBuilding(x,y)){l.fail();return true;}
+  if(unsafeStep(w.x,w.y,x+ux*1.2,y+uy*1.2))return true;if(!folkPointOk(x,y)){l.fail();return true;}
   w.hx=ux;w.hy=uy;w.x=x;w.y=y;w.phase+=dt*7;if(st===d){w.folkLead=null;if(l.done)l.done();}return true;}
 function folkGo(f,to){if(folkPersonBusy(f))return false;if(f.retry&&f.retry.to===to&&clock.minutes<f.retry.until)return false;
   const from=f.places[f.at],dst=f.places[to];folkCancelRoute(f);f.retry=null;
@@ -157,7 +191,8 @@ function folkGo(f,to){if(folkPersonBusy(f))return false;if(f.retry&&f.retry.to==
       if(dst.inside||d>120||!clearLine(w.x,w.y,dst.x,dst.y)){fail();return;}w.state='walk';w.folkLead={x:dst.x,y:dst.y,valid,fail,done:()=>w.arrive()};return;}
     w.path=path;w.seg=0;const a=world.nodes[path[0]],b=world.nodes[path[1]],L=dist(a[0],a[1],b[0],b[1]);if(!L){fail();return;}
     const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L,r=edgeRoad(world.pedAdj,path[0],path[1]);const want=r&&r.c<=8?r.hw+1.3:0,off=want?Math.min(safeSideOff(path[0],path[1],want+0.6),want+w.off):w.off;
-    w.t=clamp((w.x-a[0])*dx+(w.y-a[1])*dy,0,L);const x=a[0]+dx*w.t-dy*off,y=a[1]+dy*w.t+dx*off;
+    w.t=clamp((w.x-a[0])*dx+(w.y-a[1])*dy,0,L);let x=a[0]+dx*w.t-dy*off,y=a[1]+dy*w.t+dx*off;
+    if(!folkPointOk(x,y)){let fixed=false;for(const ff of [0.6,0.3,0]){const o=off*ff,px=a[0]+dx*w.t-dy*o,py=a[1]+dy*w.t+dx*o;if(folkPointOk(px,py)){x=px;y=py;fixed=true;break;}}if(!fixed){fail();return;}}
     if(dist(w.x,w.y,x,y)>0.5){if(!folkClearJoin(w.x,w.y,x,y)){fail();return;}w.folkLead={x,y,valid,fail};}w.state='walk';});return true;}
 function folkTaxiStart(fOrId,v){const f=typeof fOrId==='string'?FOLK.list.find(q=>q.id===fOrId):fOrId;if(!f||!v)return false;
   f.driving=v;v.folkDriver=f.id;f.away=true;f.retry=null;folkDrop(f);return true;}

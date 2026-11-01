@@ -49,7 +49,10 @@ class Walker{
       if(this.t+step>=L){step-=L-this.t;this.seg++;this.t=0;this.node=b;if(this.seg>=this.path.length-1){this.arrive();return;}}else{this.t+=step;step=0;}}
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
     const r=edgeRoad(world.pedAdj,a,b);this.road=r;const want=r&&r.c<=8?r.hw+1.3:0;const off=want?Math.min(safeSideOff(a,b,want+0.6),want+this.off):this.off;
-    this.x=pa[0]+dx*this.t-dy*off;this.y=pa[1]+dy*this.t+dx*off;this.hx=dx;this.hy=dy;
+    let x=pa[0]+dx*this.t-dy*off,y=pa[1]+dy*this.t+dx*off;
+    // свой человек не срезает угол дома и не заходит в воду: сдвиг к оси дорожки, пока точка не станет сухой
+    if(this.folk&&!folkPointOk(x,y)){let fixed=false;for(const f of [0.6,0.3,0]){const o=off*f,px=pa[0]+dx*this.t-dy*o,py=pa[1]+dy*this.t+dx*o;if(folkPointOk(px,py)){x=px;y=py;fixed=true;break;}}if(!fixed){x=this.x;y=this.y;}}
+    this.x=x;this.y=y;this.hx=dx;this.hy=dy;
     if(r&&r.c>8&&Math.abs(this.x-player.x)<450&&Math.abs(this.y-player.y)<450){const q=pushOffRoad(this.x,this.y,dx,dy);if(q){this.x=q[0];this.y=q[1];}}}
   arrive(){this.path=null;if(this.rallySlot){this.x=this.rallySlot[0];this.y=this.rallySlot[1];this.state='rally';rallyFace(this);return;}if(this.goalStop){const s=this.goalStop;this.goalStop=null;this.waitStop=s;this.state='wait';this.ttl=rnd(60,140);this.x=s.x+rnd(-2,2);this.y=s.y+rnd(-2,2);return;}
     if(this.goalPoi){const poi=this.goalPoi;this.goalPoi=null;this.x=poi.x+rnd(-1.5,1.5);this.y=poi.y+rnd(-1.5,1.5);if(inBuilding(this.x,this.y)){const q=toSidewalk(this.x,this.y);if(!inBuilding(q[0],q[1])){this.x=q[0]+rnd(-0.8,0.8);this.y=q[1]+rnd(-0.8,0.8);}}}
