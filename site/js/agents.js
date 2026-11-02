@@ -68,12 +68,19 @@ class Walker{
 
 // Общая проверка препятствий впереди: машины, аварии, пешеходы на дороге, занятые переходы
 function obstacleAhead(self,vehicles,see){let ahead=1e9;self.acBlock=null;const hx=self.hx,hy=self.hy;const siren=(self.kind==='amb'||self.kind==='police')&&self.target!=null;const pushy=(self.waitT||0)>(siren?1.5:6);
-  if(!siren)for(const v of vehicles){if(v===self)continue;const ox=v.x-self.x,oy=v.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>26)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<(v.wid||2)*0.5+self.wid*0.5+0.4){const g=f-(v.len||4)*0.5-self.len*0.5;if(g<ahead)ahead=g;}}
+  if(!siren)for(const v of vehicles){if(v===self||v.remove)continue;const ox=v.x-self.x,oy=v.y-self.y;const f=ox*hx+oy*hy;if(f<-self.len*0.45||f>26)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<(v.wid||2)*0.5+self.wid*0.5+0.85){const g=f-(v.len||4)*0.5-self.len*0.5;if(g<ahead)ahead=g;}}
   if(!siren)for(const ac of accidents){if(ac.blocking===false)continue;const ox=ac.x-self.x,oy=ac.y-self.y;const f=ox*hx+oy*hy;if(f>0&&f<26&&Math.abs(-ox*hy+oy*hx)<4.5&&f-6<ahead){ahead=f-6;self.acBlock=ac;}}
   for(const p of roadPeds){const ox=p.x-self.x,oy=p.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>see)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<self.wid*0.5+0.9){const g=f-self.len*0.5-(pushy?0.2:0.7);if(g<ahead)ahead=g;}}
   if(!pushy)for(const c of activeCrossings){const ox=c.x-self.x,oy=c.y-self.y;const f=ox*hx+oy*hy;if(f<=0||f>30)continue;const s=Math.abs(-ox*hy+oy*hx);if(s<c.hw+1){const g=f-self.len*0.5-2.2;if(g<ahead)ahead=g;}}
   return ahead;}
-function limitBySpace(vlim,ahead){if(ahead<2.5)return 0;if(ahead<13)return Math.min(vlim,ahead*0.75);return vlim;}
+function limitBySpace(vlim,ahead){if(ahead<3.2)return 0;if(ahead<16)return Math.min(vlim,ahead*0.55);return vlim;}
+function unstickTraffic(list){for(let i=0;i<list.length;i++){const a=list[i];if(!a||a.crashed||a.remove||a.isPlayer)continue;
+  for(let j=i+1;j<list.length;j++){const b=list[j];if(!b||b.crashed||b.remove||b.isPlayer)continue;const ox=b.x-a.x,oy=b.y-a.y;if(Math.abs(ox)>16||Math.abs(oy)>16)continue;
+    const hx=a.hx||1,hy=a.hy||0,f=ox*hx+oy*hy,s=Math.abs(-ox*hy+oy*hx);const side=(a.wid+(b.wid||2))*0.5+0.25,along=(a.len+(b.len||4))*0.5;
+    if(s>=side||Math.abs(f)>=along)continue;const back=f>=0?a:b,front=f>=0?b:a,gap=along-Math.abs(f)+0.45;
+    if(back.route){back.s=clamp(back.s-gap*(back.dir||1),0,back.route.len);back.place();}
+    else{back.x-=(back.hx||hx)*gap;back.y-=(back.hy||hy)*gap;if(Number.isFinite(back.t))back.t=Math.max(0,back.t-gap);}
+    if((back.speed||0)>(front.speed||0))back.speed=front.speed||0;}}}
 // Наезд на пешехода (после движения)
 function checkPedHits(self){if(self.speed<2.2)return;for(const p of roadPeds){if(p.hurt)continue;const ox=p.x-self.x,oy=p.y-self.y;const f=ox*self.hx+oy*self.hy;const s=Math.abs(-ox*self.hy+oy*self.hx);if(Math.abs(f)<self.len*0.5+0.3&&s<self.wid*0.5+0.45){onPedHit(self,p);return;}}}
 

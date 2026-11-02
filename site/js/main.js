@@ -238,7 +238,7 @@ function findMe(){
   followPlayer();
   const who=player.bus||player;
   cam.x=who.x;cam.y=who.y;
-  if(cam.zt<8)cam.zt=8;
+  cam.zt=Math.max(cam.zt,10);
   cam.z=cam.zt;
   clampCam();
 }
@@ -389,6 +389,7 @@ function frameBody(now){
     for(const w of walkers)w.update(dt);
     for(let i=cars.length-1;i>=0;i--){const c=cars[i];c.update(dt,vehicles);if(c.remove)cars.splice(i,1);}
     for(const b of buses)b.update(dt,vehicles);
+    if(typeof unstickTraffic==='function')unstickTraffic(vehicles);
     accidentTimer-=dt;if(accidentTimer<=0){accidentTimer=rnd(90,180);if(accidents.length<3)spawnRandomAccident();}
     updateAccidents(dt);updateRallies(dt);updateTransport(rdt);updateSay(rdt);updateDrunk(rdt);updateSituations(rdt);updateRhythm(rdt);updateFolk(rdt);updateEcon(rdt);updateMetro(rdt);updatePopulation(dt);updateRentals(dt);updateCine(rdt);if(typeof updatePark==='function')updatePark(dt);if(typeof updateCityBits==='function')updateCityBits(dt);
     if(scene==='interior')updateInterior(dt);else{updatePlayer(dt);checkPlayerHit();}updateCompanion(dt);
