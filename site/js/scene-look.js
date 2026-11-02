@@ -1,0 +1,38 @@
+// ДТП крупным планом: у каждого случая свой кадр, не одна и та же картинка.
+const SCENE_SHOTS=[
+  {id:'nose',src:'img/scenes/nose.jpg',day:1,title:'Лоб в лоб',text:'Две машины сошлись на перекрёстке. Бамперы всмятку, водители уже на тротуаре, инспектор с рулеткой.'},
+  {id:'rear',src:'img/scenes/rear.jpg',day:1,title:'Догнал на светофоре',text:'Чуть не успел затормозить. Стоят между машинами и смотрят на бампер: царапина есть, люди целы.'},
+  {id:'night',src:'img/scenes/night.jpg',night:1,title:'Ночная встреча',text:'Мокрый асфальт, мигалки в лужах. Машины встали углом, проезд сузился, зеваки держатся подальше.'},
+  {id:'rain',src:'img/scenes/rain.jpg',rain:1,title:'На мокрой',text:'Дождь, зонты и две машины, которые не поделили полосу. Скорая стоит на всякий случай, пострадавших не видно.'},
+  {id:'snow',src:'img/scenes/snow.jpg',snow:1,title:'Гололёд',text:'Машину снесло в снежный вал. Вторая встала рядом. Зима в городе, все живы, оформление на холоде.'},
+  {id:'tram',src:'img/scenes/tram.jpg',day:1,title:'Трамвай и легковушка',text:'Легковушка задела трамвай на путях. Вагон стоит, пассажиры смотрят из салона, водитель уже вышел.'},
+  {id:'bus',src:'img/scenes/bus.jpg',day:1,title:'Автобус притёрся',text:'На остановке автобус и легковушка не разъехались. Бампер поцарапан, водители говорят спокойно.'},
+  {id:'scooter',src:'img/scenes/scooter.jpg',ped:1,title:'Самокат на переходе',text:'Самокат лежит на зебре, парень сидит на бордюре под пледом. Скорая рядом, крови нет, все на ногах.'},
+  {id:'ped',src:'img/scenes/ped.jpg',ped:1,title:'Пешехода задели',text:'Машина встала, человека усадили на тротуар. Врачи проверяют, дышит ровно, толпа не лезет близко.'},
+  {id:'taxi',src:'img/scenes/taxi.jpg',day:1,title:'Такси и седан',text:'Мелкая встреча бамперов: жёлтое такси и белая машина. Водители с кофе, спора нет, только обмен телефонами.'},
+  {id:'dusk',src:'img/scenes/dusk.jpg',night:1,title:'На закате',text:'Фонари только зажглись. На перекрёстке две машины боком, полиция и скорая, люди смотрят с той стороны улицы.'},
+  {id:'moto',src:'img/scenes/moto.jpg',day:1,title:'Мотоцикл лёг',text:'Мотоцикл на боку после тихого падения. Водитель в шлеме стоит рядом и говорит с хозяином машины. Обойтись должно.'}
+];
+function scenePool(ac){const ped=ac.kind==='ped';const all=SCENE_SHOTS.filter(s=>ped?s.ped:!s.ped);if(!all.length)return SCENE_SHOTS;
+  const snow=typeof weather!=='undefined'&&(weather.kind==='snow'||weather.ice);
+  const rain=typeof weather!=='undefined'&&weather.kind==='rain';
+  const night=typeof isNight==='function'&&isNight();
+  const fit=all.filter(s=>snow?s.snow:rain?s.rain:night?s.night:s.day);
+  return fit.length&&Math.random()<0.55?fit:all;}
+function sceneForAccident(ac){if(ac.shot)return ac.shot;const pool=scenePool(ac);ac.shot=pool[Math.floor(Math.random()*pool.length)];return ac.shot;}
+function nearAccident(){if(typeof player==='undefined'||scene!=='city'||player.inside)return null;let best=null,bd=20;
+  for(const ac of accidents){if(ac.cleared||ac.medical)continue;const d=dist(ac.x,ac.y,player.x,player.y);if(d<bd){bd=d;best=ac;}}return best;}
+let sceneLookAc=null;
+function openSceneLook(ac){if(!ac)return;const s=sceneForAccident(ac);sceneLookAc=ac;
+  const pic=$('#sceneLookPic');pic.style.backgroundImage=`url("${s.src}")`;
+  $('#sceneLookTitle').textContent=s.title+(ac.road?' · '+ac.road:'');
+  $('#sceneLookText').textContent=s.text+(ac.reported?' Вы уже помогли на месте.':'');
+  const help=$('#sceneLookHelp');help.hidden=!!(ac.reported||ac.playerCar);
+  $('#sceneLook').hidden=false;player.busy=true;}
+function closeSceneLook(){const m=$('#sceneLook');if(m)m.hidden=true;sceneLookAc=null;if(typeof chatNpc==='undefined'||!chatNpc)player.busy=false;}
+function sceneHelp(){const ac=sceneLookAc;if(!ac||ac.reported||ac.playerCar){closeSceneLook();return;}
+  ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');closeSceneLook();}
+function syncSceneLook(){const b=$('#sceneLookBtn');if(!b)return;const ac=nearAccident();b.hidden=!ac;if(ac)b._ac=ac;}
+if(typeof frame==='function'){const frame0=frame;frame=function(now){frame0(now);syncSceneLook();};}
+document.addEventListener('click',e=>{const t=e.target;if(!t)return;if(t.id==='sceneLookBtn'&&t._ac)openSceneLook(t._ac);if(t.id==='sceneLookClose')closeSceneLook();if(t.id==='sceneLookHelp')sceneHelp();});
+if(typeof createAccident==='function'){const mk=createAccident;createAccident=function(o){const ac=mk.apply(this,arguments);if(ac)sceneForAccident(ac);return ac;};}
