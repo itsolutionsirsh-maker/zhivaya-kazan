@@ -29,7 +29,7 @@ const STORY_FB={
     paid:['Спасибо, приходите ещё!','Всего доброго, {bro}.','Рады были видеть.'],
     call:['Э, ты куда звонишь? Подожди, давай договоримся.','Всё-всё, {bro}, недоразумение вышло. Сейчас разберёмся.','Ладно, плати за свой чай и иди. Без обид.'],
     sms:['Ты где пропал? 😘 Давай ещё увидимся?','Привет! Классно вчера посидели. Повторим?','Скучаю 🙈 Может, сегодня вечером?'],
-    doctor:['Очнулись? Вас привезли без документов и без денег. Сотрясение лёгкое, жить будете.','Тише, не вставайте резко. Вас нашли во дворе у кафе.','Деньги, говорите? При вас ничего не было. Идите в полицию.'],
+    doctor:['Очнулись? Вчера вы где-то поскользнулись и упали.','Лицо повредили. Ничего страшного, жить будете.','Денег и документов при вас не было. Совсем ничего.'],
     police:['Опять {place}? Это уже не первое заявление.','Пишите всё как было: кто подошёл, что заказывали, сколько вышло.','Таких ловушек в центре несколько. Нужен свидетель — тогда дело пойдёт.'],
     witness:['Я там официанткой работала. Девушки водят туда парней, им процент со счёта.','Меня там тоже развели в прошлом месяце. Я дам показания.','Счёт они пишут какой хотят. Меню с ценами прячут.'],
     prosecutor:['Так-так… {place}. Дело хорошее, доведём.','Материалов достаточно. Передаю в суд — пусть разбираются.','Молодец, что не махнули рукой. Таких дел у меня много, а дойти до конца решаются немногие.'],
@@ -159,7 +159,9 @@ function platesTable(s){if(s.ending)return;const id='plates',w=s.w;s.order=plate
   sitCard(storyCard({s,icon:'🍽',title:s.v.n,pic:plateGif(),text:`${w.p.name}: «${pick(['Ну вот, сели. Теперь можно нормально познакомиться.','Так лучше, чем на ветру. Расскажи, как ты.','Я правда есть хотела. Давай закажем и поговорим.'])}» Потом подзывает официанта: «${storyLine(id,'order')}»`,
     choices:[{t:'Спросить, сколько это стоит',primary:true,run:()=>platesAsk(s)},{t:'Ладно, гуляем',run:()=>platesBill(s)},{t:'Мне пора',run:()=>platesLeave(s)}],dflt:()=>platesLeave(s)}));}
 function platesOrder(){const M=storyList('plates','menu').filter(m=>m&&m.name&&m.price>0);const menu=(M.length>=5?M:STORY_FB.plates.menu).slice().sort(()=>Math.random()-0.5);
-  const out=[];let sum=0;for(const m of menu){if(sum>=35000)break;if(sum+m.price>46000)continue;out.push({name:m.name,price:m.price});sum+=m.price;}return {items:out,sum,menu};}
+  const out=[];let sum=0;for(const m of menu){if(sum>=42000)break;if(sum+m.price>50000)continue;out.push({name:m.name,price:m.price});sum+=m.price;}
+  if(sum<40000){for(const m of menu){if(out.some(x=>x.name===m.name))continue;if(sum+m.price>50000)continue;out.push({name:m.name,price:m.price});sum+=m.price;if(sum>=40000)break;}}
+  return {items:out,sum,menu};}
 function platesAsk(s){const id='plates';storyStep(id,'asked');
   sitCard(storyCard({s,icon:'🧾',title:'Официант',text:`«${storyLine(id,'waiterAsk')}»`,
     choices:[{t:'Настоять: меню с ценами',primary:true,run:()=>platesMenu(s)},{t:'Ну ладно',run:()=>platesBill(s)},{t:'Уйти',run:()=>platesLeave(s)}],dflt:()=>platesBill(s)}));}
@@ -184,17 +186,18 @@ function platesGuard(s){const id='plates';storyStep(id,'guard');const money=Math
 function platesCall(s){const id='plates';const tea=Math.min(600,Math.max(0,Math.round(player.money||0)));
   sitCard(storyCard({s,icon:'📞',title:'112',text:`Охранник: «${storyLine(id,'call')}» Через десять минут у входа наряд. Официант вдруг вспоминает, что вы заказывали только чай: ${fmtMoney(tea)}.`,tone:'good',
     choices:[{t:'Заплатить за чай и дать показания',primary:true,run:()=>{if(tea)player.money-=tea;storyOut(s,'called',`👮 Полиция приняла показания на месте. ${qName(s.v.n)} проверят — вы заплатили только за свой чай.`);}}],dflt:()=>{if(tea)player.money-=tea;storyOut(s,'called','👮 Полиция приняла показания на месте.');}}));}
-function platesBeaten(s){const id='plates';const lost=Math.max(0,Math.round(player.money||0));
-  sitCard(storyCard({s,icon:'🌑',title:s.v.n,tone:'alert',text:'Охрана выводит вас во двор «поговорить». Дальше — темнота.',choices:[{t:'…',primary:true,run:()=>{
-    player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order.sum});storyWard();}}],dflt:()=>{player.money-=lost;storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order.sum});storyWard();}}));}
-// больница: игрок приходит в себя в палате ближайшей больницы
+function storyFade(then){let el=$('#storyFade');if(!el){el=document.createElement('div');el.id='storyFade';el.style.cssText='position:fixed;inset:0;background:#000;z-index:220;opacity:0;pointer-events:none;transition:opacity .7s ease';document.body.append(el);}el.hidden=false;el.style.pointerEvents='auto';requestAnimationFrame(()=>{el.style.opacity='1';});setTimeout(()=>{then&&then();setTimeout(()=>{el.style.opacity='0';el.style.pointerEvents='none';},500);},1200);}
+function platesBeaten(s){if(s.ending)return;const lost=Math.max(0,Math.round(player.money||0));player.money=0;
+  storyFade(()=>{storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order&&s.order.sum});storyWard();});}
+// больница: игрок приходит в себя в палате ближайшей больницы, потом выходит на улицу с нулём
 function storyWard(){const hs=world.pois.filter(p=>p.t==='hospital');let h=null,bd=1e9;for(const p of hs){const d=dist(p.x,p.y,player.x,player.y);if(d<bd){bd=d;h=p;}}
   if(h){const q=toSidewalk(h.x,h.y);player.x=q[0];player.y=q[1];cam.x=player.x;cam.y=player.y;}
-  player.energy=Math.min(player.energy,25);player.mood=clamp(player.mood-25,0,100);
+  player.money=0;player.energy=Math.min(player.energy,25);player.mood=clamp(player.mood-25,0,100);
   enterInterior({kind:'hospital',name:h&&h.n?`Палата · ${h.n}`:'Палата',key:'story:ward',x:player.x,y:player.y});
-  const lines=[storyLine('plates','doctor'),storyLine('plates','doctor')].filter((t,i,a)=>a.indexOf(t)===i);
-  const done=()=>{addEvent(`🩺 ${lines[0]}`,'alert');setHint('Напишите заявление в полиции — отдел полиции отмечен на карте');storyAfterStart();};
-  storyShow('wake',{kind:'hospital',lines,onDone:done},storyCard({icon:'🩺',title:'Врач',text:lines.join(' '),choices:[{t:'Встать',primary:true,run:done}],dflt:done}));}
+  const room=new Image();room.src='img/story/ward.jpg';room.onload=()=>{if(interior&&interior.key==='story:ward'){interior.photoImg=room;if(typeof placeChatLook==='function')placeChatLook();}};
+  const lines=['Очнулись? Вчера вы где-то поскользнулись и упали.','Лицо повредили. Ничего страшного, жить будете.','Денег и документов при вас не было. Совсем ничего.'];
+  const done=()=>{player.money=0;if(scene==='interior')exitInterior();addEvent('🩺 В кармане пусто. Вы у больницы, денег нет.','alert');setHint('Вы на улице у больницы. В кармане ноль. Заявление можно написать в полиции — отдел отмечен на карте');storyAfterStart();};
+  storyShow('wake',{kind:'hospital',lines,pic:'img/story/ward.jpg',onDone:done},storyCard({icon:'🩺',title:'Врач',text:lines.join(' '),choices:[{t:'Выйти на улицу',primary:true,run:done}],dflt:done}));}
 
 // ---------- клофелинщики: в баре ----------
 function clofTable(s){if(s.ending)return;const id='clofelin',w=s.w;

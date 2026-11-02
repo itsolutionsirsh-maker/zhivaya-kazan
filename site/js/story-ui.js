@@ -61,12 +61,14 @@
   }
   function wake(o={}){
     const hospital=o.kind==='hospital',s=open('wake',hospital?'Палата. Утро.':'Утро на скамейке.');
-    s.shell.prepend(wakeArt(o.kind));s.shell.append(el('div','story-wake-dark'));
+    if(o.pic){const im=el('img','story-wake-photo');im.src=o.pic;im.alt='';im.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;z-index:-1';s.shell.prepend(im);}
+    else s.shell.prepend(wakeArt(o.kind));
+    s.shell.append(el('div','story-wake-dark'));
     const lines=Array.isArray(o.lines)?o.lines.filter(x=>x!=null).map(String):[];
     const text=el('p','story-wake-line'),progress=el('span','story-wake-progress');text.setAttribute('aria-live','polite');text.setAttribute('aria-atomic','true');s.body.append(text,progress);
     const next=el('button','story-button is-primary','Открыть глаза');next.type='button';s.foot.append(next);
     let i=-1;
-    const advance=()=>{if(active!==s)return;s.root.classList.add('is-awake');if(++i>=lines.length){finish(s,o.onDone);return;}text.textContent=lines[i];progress.textContent=(i+1)+' / '+lines.length;next.textContent=i===lines.length-1?'Подняться':'Дальше';};
+    const advance=()=>{if(active!==s)return;s.root.classList.add('is-awake');if(++i>=lines.length){finish(s,o.onDone);return;}text.textContent=lines[i];progress.textContent=(i+1)+' / '+lines.length;next.textContent=i===lines.length-1?(hospital?'Выйти на улицу':'Подняться'):'Дальше';};
     next.addEventListener('click',advance);s.advance=advance;
     // Первый абзац появляется после короткого пробуждения. Ранний тап пропускает ожидание.
     s.timers.push(setTimeout(()=>{if(active===s&&i<0)advance();},matchMedia('(prefers-reduced-motion: reduce)').matches?0:2600));
