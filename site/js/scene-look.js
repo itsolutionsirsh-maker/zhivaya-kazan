@@ -40,9 +40,13 @@ function openSceneLook(ac){if(!ac)return;const s=sceneForAccident(ac);sceneLookA
   const help=$('#sceneLookHelp');help.hidden=!!(ac.reported||ac.playerCar);
   $('#sceneLook').hidden=false;player.busy=true;}
 function closeSceneLook(){const m=$('#sceneLook');if(m)m.hidden=true;sceneLookAc=null;if(typeof chatNpc==='undefined'||!chatNpc)player.busy=false;}
+function openStreetLook(shot){if(!shot)return;sceneLookAc=null;const pic=$('#sceneLookPic');if(pic)pic.style.backgroundImage=`url("${shot.src}")`;
+  $('#sceneLookTitle').textContent=shot.title||'';$('#sceneLookText').textContent=shot.text||'';const help=$('#sceneLookHelp');if(help)help.hidden=true;$('#sceneLook').hidden=false;player.busy=true;}
 function sceneHelp(){const ac=sceneLookAc;if(!ac||ac.reported||ac.playerCar){closeSceneLook();return;}
   ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');closeSceneLook();}
-function syncSceneLook(){const b=$('#sceneLookBtn');if(!b)return;const ac=nearAccident();b.hidden=!ac;if(ac)b._ac=ac;}
+function syncSceneLook(){const b=$('#sceneLookBtn');if(!b)return;const ac=nearAccident();
+  if(ac){b.hidden=false;b._ac=ac;b._shot=null;return;}
+  const shot=typeof streetLookNow==='function'?streetLookNow():null;b.hidden=!shot;b._ac=null;b._shot=shot||null;}
 if(typeof frame==='function'){const frame0=frame;frame=function(now){frame0(now);syncSceneLook();};}
-document.addEventListener('click',e=>{const t=e.target;if(!t)return;if(t.id==='sceneLookBtn'&&t._ac)openSceneLook(t._ac);if(t.id==='sceneLookClose')closeSceneLook();if(t.id==='sceneLookHelp')sceneHelp();});
+document.addEventListener('click',e=>{const t=e.target;if(!t)return;if(t.id==='sceneLookBtn'){if(t._ac)openSceneLook(t._ac);else if(t._shot)openStreetLook(t._shot);}if(t.id==='sceneLookClose')closeSceneLook();if(t.id==='sceneLookHelp')sceneHelp();});
 if(typeof createAccident==='function'){const mk=createAccident;createAccident=function(o){const ac=mk.apply(this,arguments);if(ac)sceneForAccident(ac);return ac;};}

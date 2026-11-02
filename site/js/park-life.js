@@ -119,6 +119,10 @@
       if(o.bubbleT>0){ctx.fillStyle='rgba(20,30,26,.88)';const tw=Math.min(160,ctx.measureText(o.bubble).width+12);rrect(ctx,sx-tw/2,sy-k*1.5-28,tw,16,6);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(o.bubble.slice(0,28),sx,sy-k*1.5-20);}}
   }
   function drawPark(toS,z){if(scene!=='city')return;for(const d of dogs)drawDog(d,toS,z);for(const q of quads){if(q.bubbleT>0)q.bubbleT-=0.016;drawQuad(q,toS,z);}}
+  function parkNear(r){const d=nearest(dogs,r),q=nearest(quads,r);
+    if(d&&q)return dist(d.x,d.y,player.x,player.y)<=dist(q.x,q.y,player.x,player.y)?{kind:'dog',o:d}:{kind:'quad',o:q};
+    return d?{kind:'dog',o:d}:q?{kind:'quad',o:q}:null;}
+  window.parkNear=parkNear;
   window.updatePark=updatePark;window.drawPark=drawPark;
   function boot(){
     if(typeof findAction==='function'&&!findAction._park){const prev=findAction;findAction=function(){const a=prev();return a||parkAction();};findAction._park=1;}
