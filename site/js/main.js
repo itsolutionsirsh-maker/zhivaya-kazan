@@ -167,16 +167,19 @@ function busyFor(key,min){const T=player.cool||(player.cool={});const left=(T[ke
 // ---------- диалог ----------
 let chatNpc=null,chatBusy=false;
 const SCRIPTED={police:['Проходите, не задерживайтесь. Всё под контролем.','Документы при себе? Шучу. Хорошего дня.','Если видели ДТП — сообщите, пригодится.'],guard:['Сюда нельзя, пропуск нужен.','Стою тут с восьми. Погода ничего.','Камеры всё видят, имейте в виду.'],courier:['Извините, заказ стынет, бегу!','Весь день на самокате — ноги уже не чувствую.','На Баумана опять не проехать…'],staff:['Что будете заказывать?','Сегодня свежие эчпочмаки, рекомендую.','Минутку, сейчас подойду.'],resident:['Исәнмесез! Как сами?','Говорят, на Кольце пробка. Опять.','Вы не знаете, где тут нормальный кофе? Хотя я сама знаю, пойдёмте покажу.','Казань — лучший город, не спорьте.','Автобус десятый уже полчаса жду.','Рәхмәт за беседу, но я спешу.','Слышали, на набережной вечером салют?']};
-function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);player.busy=true;$('#chatModal').hidden=false;const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
+function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);player.busy=true;$('#chatModal').hidden=false;if(typeof paintNpcFace==='function')paintNpcFace(w.p);else{const f=$('#npcFace');f.style.background=w.p.clothes;f.textContent=w.p.name[0];}$('#npcName').textContent=w.p.name+', '+w.p.age;$('#npcJob').textContent=w.p.job+' · настроение '+w.p.mood;const log=$('#chatLog');log.innerHTML='';
   $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
   if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
   $('#brainLbl').textContent=sampleFn?'думает сам: отвечает ИИ':'реплики по сценарию (без ИИ)';
   if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}if(typeof placeChatLook==='function')placeChatLook();setTimeout(()=>$('#chatInput').focus(),50);}
 function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;if(typeof placeChatLook==='function')placeChatLook();}
-function placeChatLook(){const box=$('#chatModal')&&$('#chatModal').querySelector('.box');if(!box)return;const im=scene==='interior'&&interior&&typeof interiorPhoto==='function'?interiorPhoto(interior):null;
-  if(im){box.style.backgroundImage=`linear-gradient(rgba(14,24,20,.78),rgba(14,24,20,.9)),url("${im.src}")`;box.style.backgroundSize='cover';box.style.backgroundPosition='center';}
+function placeChatLook(){const box=$('#chatModal')&&$('#chatModal').querySelector('.box');if(!box)return;
+  const im=scene==='interior'&&interior&&typeof interiorPhoto==='function'?interiorPhoto(interior):null;
+  const face=!im&&chatNpc&&chatNpc.p&&typeof npcFaceUrl==='function'?npcFaceUrl(chatNpc.p):'';
+  const src=im&&typeof lookUrl==='function'?lookUrl(im):face;
+  if(src){const veil=im instanceof HTMLCanvasElement?'rgba(14,24,20,.42),rgba(14,24,20,.62)':'rgba(14,24,20,.78),rgba(14,24,20,.9)';box.style.backgroundImage=`linear-gradient(${veil}),url("${src}")`;box.style.backgroundSize='cover';box.style.backgroundPosition='center';}
   else if(!(typeof GUEST!=='undefined'&&GUEST.visit)){box.style.backgroundImage='';box.style.backgroundSize='';box.style.backgroundPosition='';}
-  const me=$('#meFace');if(me){const on=typeof privateTogether==='function'&&privateTogether()&&!!player.avatar;me.hidden=!on;if(on){me.style.backgroundImage=`url(${player.avatar})`;me.style.backgroundSize='cover';me.style.backgroundPosition='center';me.textContent='';}}}
+  const me=$('#meFace');if(me){const on=!!$('#chatModal')&&!$('#chatModal').hidden&&!!player.avatar;me.hidden=!on;if(on){me.style.backgroundImage=`url(${player.avatar})`;me.style.backgroundSize='cover';me.style.backgroundPosition='center';me.textContent='';}}}
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
 async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text||chatBusy||!chatNpc)return;inp.value='';const w=chatNpc;appendMsg('me',text);w.p.memory.push({role:'user',content:text});chatBusy=true;let reply=null;
   let act=null;

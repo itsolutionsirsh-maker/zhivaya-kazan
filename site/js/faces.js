@@ -1,0 +1,44 @@
+// Портреты жителей: один и тот же человек всегда с одним лицом.
+// Компания за столом: общий кадр из фото тех, кто сидит рядом.
+const FACE_BANDS={
+  f:[['f-23','f-27'],['f-36','f-44'],['f-58','f-70']],
+  m:[['m-23','m-29'],['m-37','m-46'],['m-60','m-72']]
+};
+const faceImg={};
+function faceHash(s){let h=2166136261;s=String(s||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function faceBand(age){age=+age||30;return age<32?0:age<52?1:2;}
+function npcFaceId(p){if(!p)return null;const g=p.female?'f':'m';const band=FACE_BANDS[g][faceBand(p.age)];return band[faceHash((p.name||'')+'|'+g)%band.length];}
+function npcFaceUrl(p){const id=npcFaceId(p);return id?'img/faces/'+id+'.jpg':null;}
+function npcFaceImg(p){const id=npcFaceId(p);return id&&faceImg[id]||null;}
+(function loadFaces(){const ids=[].concat(...FACE_BANDS.f,...FACE_BANDS.m);for(const id of ids){const im=new Image();im.onload=()=>{faceImg[id]=im;};im.src='img/faces/'+id+'.jpg';}})();
+function paintNpcFace(p){const f=$('#npcFace');if(!f||!p)return;const url=npcFaceUrl(p);
+  if(url){f.style.backgroundImage=`url("${url}")`;f.style.backgroundSize='cover';f.style.backgroundPosition='center 18%';f.style.backgroundColor='#24302a';f.textContent='';f.classList.add('photo');}
+  else{f.style.backgroundImage='';f.style.background=p.clothes||'#2F9E6B';f.textContent=(p.name||'?')[0];f.classList.remove('photo');}}
+let tableFrame=null,tableFrameKey='';
+function tableMates(){if(scene!=='interior'||!interior||typeof peerRender==='undefined')return null;
+  const name=String(interior.name||'').toLowerCase();
+  if(!/cafe|bar|restaurant|tea/.test(interior.kind||'')&&!/бар|кафе|ресторан|чай/.test(name))return null;
+  const mates=[{name:player.name||'Вы',img:player.avatarImg,key:'me:'+(player.avatarImg?'1':'0')}];
+  for(const pr of peerRender.values()){if(typeof sharedPeerHere==='function'&&!sharedPeerHere(pr))continue;
+    if(Math.hypot((pr.ix||0)-player.ix,(pr.iy||0)-player.iy)>3.2)continue;
+    mates.push({name:pr.name||'друг',img:pr.img,key:(pr.key||pr.name)+':'+(pr.img?'1':'0')});}
+  return mates.length>1?mates:null;}
+function tableFrameCanvas(){const mates=tableMates();if(!mates){const had=tableFrame;tableFrame=null;tableFrameKey='';if(had&&!$('#chatModal').hidden&&typeof placeChatLook==='function')placeChatLook();return null;}
+  const bg=typeof shotImg!=='undefined'&&typeof shotKind==='function'?shotImg[shotKind(interior)]:null;
+  const key=(interior.key||interior.name)+'|'+mates.map(m=>m.key).join(',')+'|'+(bg&&bg.width?1:0);
+  if(tableFrame&&tableFrameKey===key)return tableFrame;
+  const c=document.createElement('canvas');c.width=960;c.height=540;const g=c.getContext('2d');
+  if(bg&&bg.width){const s=Math.max(960/bg.width,540/bg.height),dw=bg.width*s,dh=bg.height*s;g.drawImage(bg,(960-dw)/2,(540-dh)/2,dw,dh);}
+  else{g.fillStyle='#1a2420';g.fillRect(0,0,960,540);}
+  g.fillStyle='rgba(8,12,10,.22)';g.fillRect(0,0,960,540);
+  g.fillStyle='#5c3b28';g.beginPath();g.ellipse(480,448,320,58,0,0,Math.PI*2);g.fill();
+  g.fillStyle='#8a6244';g.beginPath();g.ellipse(480,432,270,36,0,0,Math.PI*2);g.fill();
+  const n=mates.length;
+  mates.forEach((m,i)=>{const x=480+(i-(n-1)/2)*Math.min(168,860/n),y=248,r=70;
+    g.save();g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.clip();
+    if(m.img&&m.img.width)g.drawImage(m.img,x-r,y-r-8,r*2,r*2);
+    else{g.fillStyle='#24483a';g.fillRect(x-r,y-r,r*2,r*2);g.fillStyle='#fff';g.font='700 42px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText((m.name||'?')[0],x,y);}
+    g.restore();g.strokeStyle='#fff';g.lineWidth=4;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.stroke();
+    g.font='600 22px "IBM Plex Sans",sans-serif';g.fillStyle='#fff';g.textAlign='center';g.shadowColor='rgba(0,0,0,.7)';g.shadowBlur=6;g.fillText(m.name,x,y+r+28);g.shadowBlur=0;});
+  tableFrame=c;tableFrameKey=key;if(!$('#chatModal').hidden&&typeof placeChatLook==='function')placeChatLook();return c;}
+function lookUrl(im){if(!im)return '';if(im.src)return im.src;if(!im._url)im._url=im.toDataURL('image/jpeg',0.72);return im._url;}

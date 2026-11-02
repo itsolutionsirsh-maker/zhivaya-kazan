@@ -61,7 +61,7 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
   else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
   const line=npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.';
   setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
-function interiorPhoto(it){if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}
+function interiorPhoto(it){if(it&&it===interior){const g=typeof tableFrameCanvas==='function'?tableFrameCanvas():null;if(g)return g;}if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}
 function privateTogether(){if(scene!=='interior'||!interior||typeof companion==='undefined'||!companion)return false;const k=interior.kind;
   if(k==='home'||k==='guest')return true;const npc=interior.npcs&&interior.npcs.find(n=>n.companionOf===companion.w);return !!(npc&&npc.seated);}
 function exitInterior(){const it=interior;if(!it)return;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
@@ -177,7 +177,7 @@ function interiorView(it,width,height){
 }
 function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);
   const im=typeof interiorPhoto==='function'?interiorPhoto(it):null;
-  if(im){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.fillStyle='rgba(16,22,26,.58)';ctx.fillRect(0,0,W,H);}
+  if(im){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.fillStyle=im instanceof HTMLCanvasElement?'rgba(16,22,26,.28)':'rgba(16,22,26,.58)';ctx.fillRect(0,0,W,H);}
   else{ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);}
   const {iz,ox,oy}=interiorView(it,W,H);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
