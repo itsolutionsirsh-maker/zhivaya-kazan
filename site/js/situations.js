@@ -59,6 +59,7 @@ function spotNear(minR,maxR){for(let k=0;k<12;k++){const an=Math.random()*TAU,R=
 // sitCard({s,icon,title,text,choices:[{t,run,primary}],ttl,onTimeout,tone:'alert'|'good'|'call'})
 function sitCard(o){if(SIT.card&&SIT.card!==o){if(o.urgent){SIT.queue.unshift(SIT.card);}else{SIT.queue.push(o);return o;}}
   SIT.card=o;o.left=o.ttl||0;const el=$('#sitCard');el.hidden=false;el.className=o.tone||'';$('#scIcon').textContent=o.icon||'❗';$('#scTitle').textContent=o.title||'';$('#scText').textContent=o.text||'';
+  let pic=$('#scPic');if(!pic){pic=document.createElement('img');pic.id='scPic';pic.alt='';pic.style.cssText='width:100%;max-height:190px;object-fit:cover;object-position:center 18%;border-radius:12px;display:block;margin:0 0 8px';$('#scText').before(pic);}if(o.pic){pic.hidden=false;if(pic.src!==o.pic&&!String(pic.src).endsWith(o.pic))pic.src=o.pic;}else pic.hidden=true;
   const bx=$('#scBtns');bx.innerHTML='';(o.choices||[]).forEach((c,i)=>{const b=document.createElement('button');b.className='btn'+(c.primary?' primary':'');const k=document.createElement('kbd');k.textContent=String(i+1);b.append(k,document.createTextNode(c.t));b.addEventListener('click',()=>pickChoice(o,c));bx.append(b);});
   $('#scTimer').style.width=o.ttl?'100%':'0';return o;}
 function pickChoice(o,c){if(SIT.card!==o)return;closeSitCardObj(o);c.run&&c.run();}

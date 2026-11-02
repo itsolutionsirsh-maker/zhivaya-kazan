@@ -75,8 +75,14 @@ function storySave(o){PROG.story=Object.assign(PROG.story||{},o);progSave();if(t
 function storyShow(ui,data,card){if(window.storyUI&&typeof window.storyUI[ui]==='function'){try{window.storyUI[ui](data);return;}catch(e){console.warn(e);}}sitCard(card);}
 function storyCard(o){return Object.assign({icon:'💬',ttl:0},o,{onTimeout:o.dflt?()=>o.dflt():undefined});}
 function storyFemale(n){return /[ая]$/i.test(n)&&!/^(Илья|Никита|Кузьма|Фома|Лука|Савва|Миша|Гоша|Паша|Саша|Женя|Валя|Ваня|Петя|Коля|Дима|Серёжа|Сережа|Лёша|Леша|Вася|Слава|Тимоха|Данила|Гаврила|Муса|Иса|Айнура|Хамза|Мустафа)$/i.test(n)||/^(Любовь|Ассоль|Гульназ|Ляйсан|Гульнур|Айгуль|Альфинур|Гульшат|Рамиль?я)$/i.test(n);}
+const PLATE_LOOKS=['img/story/plate-1.jpg','img/story/plate-2.jpg','img/story/plate-3.jpg'];
+const PLATE_GIFS=['img/story/champagne.gif','img/story/oyster.gif'];
+const PLATE_IM={};(function(){const room=new Image();room.src='img/story/lounge.jpg';PLATE_IM.room=room;for(const u of PLATE_LOOKS){const im=new Image();im.src=u;PLATE_IM[u]=im;}})();
+function plateGif(){return PLATE_GIFS[(Math.floor(Date.now()/8000))%PLATE_GIFS.length];}
+function plateFilm(on){let el=$('#plateFilm');if(!el){el=document.createElement('img');el.id='plateFilm';el.alt='';el.style.cssText='position:fixed;left:12px;right:12px;top:64px;height:min(36vh,260px);object-fit:cover;object-position:center 28%;border-radius:16px;z-index:5;pointer-events:none;box-shadow:0 12px 32px rgba(0,0,0,.45)';document.body.append(el);}if(!on){el.hidden=true;if(el._t){clearInterval(el._t);el._t=0;}return;}let i=0;el.hidden=false;el.src=PLATE_GIFS[0];if(el._t)clearInterval(el._t);el._t=setInterval(()=>{if(!interior||String(interior.key||'').indexOf('story:plates')!==0){plateFilm(false);return;}i=1-i;el.src=PLATE_GIFS[i];},8000);}
+function platesDress(it){if(!it)return;const room=PLATE_IM.room;const apply=()=>{if(interior===it&&room.width){it.photoImg=room;if(typeof placeChatLook==='function')placeChatLook();}};if(room.complete&&room.width)apply();else room.addEventListener('load',apply,{once:true});plateFilm(true);}
 function storyPersona(id,name){const p=makePersona('resident');p.name=name;p.female=storyFemale(name.split(' ')[0]);
-  if(id==='plates'){p.age=Math.floor(rnd(22,29));p.clothes=pick(['#C2185B','#8E24AA','#D32F2F','#E91E63']);p.bag='#2A2A2A';p.story='charmer';p.hairStyle=pick([1,1,2]);}
+  if(id==='plates'){p.age=Math.floor(rnd(22,29));p.clothes=pick(['#C2185B','#8E24AA','#D32F2F','#E91E63']);p.bag='#2A2A2A';p.story='charmer';p.hairStyle=pick([1,1,2]);p.look=PLATE_LOOKS[(typeof faceHash==='function'?faceHash(name):name.length)%PLATE_LOOKS.length];p.lookImg=PLATE_IM[p.look];}
   else{p.age=Math.floor(rnd(26,40));p.story='stranger';}
   p.job='';p.ctx=`Ты — ${name}. Вы только что познакомились с собеседником на улице, и ты зовёшь его посидеть в заведении рядом. Ты весёлый человек, делаешь комплименты, расспрашиваешь о работе. О ценах и о себе говоришь уклончиво.`;return p;}
 // выдуманное заведение: тротуар у дома в 60–170 м, рядом нет настоящих заведений
@@ -99,7 +105,7 @@ defSit('story',{title:'История новичка',quiet:true,
     if(s.phase==='come'){s.rt-=dt;if(s.rt<=0){s.rt=1;moveActor(w,player.x,player.y,2.7);}stepActor(w,dt);
       if(s.t>40||scene!=='city'||player.vehicle||player.bus){storyAbort(s);return;}   // не дождалась
       if(dist(w.x,w.y,player.x,player.y)<2.4&&!SIT.card){w.mv=null;faceTo(w,player.x,player.y);s.phase='ask';const a=storyLine(id,'approach'),b=storyLine(id,'invite');say(w,a,6);
-        sitCard(storyCard({s,icon:id==='plates'?'💃':'🍻',title:w.p.name,text:`«${a}» — «${b}»`,choices:[{t:'Пойдём',primary:true,run:()=>storyGo(s)},{t:'В другой раз',run:()=>storyRefuse(s)}],dflt:()=>storyRefuse(s)}));}
+        sitCard(storyCard({s,icon:id==='plates'?'💃':'🍻',title:w.p.name,text:`«${a}» — «${b}»`,pic:id==='plates'?w.p.look:'',choices:[{t:'Пойдём',primary:true,run:()=>storyGo(s)},{t:'В другой раз',run:()=>storyRefuse(s)}],dflt:()=>storyRefuse(s)}));}
       return;}
     if(s.phase==='leave'){stepActor(w,dt);s.lt-=dt;if(s.lt<=0)endSit(s);return;}
     if(s.phase==='go'){
@@ -111,7 +117,7 @@ defSit('story',{title:'История новичка',quiet:true,
       return;}
     if(s.phase==='inside'&&scene!=='interior'&&!s.ending){storyOut(s,'avoided','Вы вышли на улицу. Новые знакомые остались внутри.');}},
   action(s){const v=s.v;if(s.phase!=='go'||!v||scene!=='city'||dist(v.x,v.y,player.x,player.y)>7)return null;
-    return {label:`Зайти в «${v.n.replace(/^.*«|»$/g,'')||v.n}» (${s.w.p.name} с вами)`,run:()=>{unmark('sdoor');enterInterior({kind:v.kind,name:v.n,key:s.key,x:player.x,y:player.y});}};},
+    return {label:`Зайти в «${v.n.replace(/^.*«|»$/g,'')||v.n}» (${s.w.p.name} с вами)`,run:()=>{unmark('sdoor');enterInterior({kind:v.kind,name:v.n,key:s.key,x:player.x,y:player.y});if(s.id==='plates')platesDress(interior);}};},
   end(s){player.busy=false;if(STORY.v===s.v)STORY.v=null;if(s.it)s.it.npcs=s.it.npcs.filter(n=>!n.storyTwo);if(companion&&companion.w===s.w)stopCompanion(true);unmark('sdoor');
     for(const w of [s.w,s.w2]){if(!w)continue;w.sitBy=null;const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);}s.actors=[];}});   // ушли насовсем
 // официант и охранник у двери — для story-ui (образы waiter и guard); в баре клофелинщиков охраны нет
@@ -131,12 +137,12 @@ function storyOut(s,out,text,extra){if(s.ending)return;s.ending=true;const id=s.
   if(out==='avoided'){storyStep(id,'avoided');storySave({id,st:'done',out:'avoided',v:s.v});cityTrack('story_dodge');if(typeof sitRep==='function')sitRep(2,'не повелись на «знакомство»');}
   if(out==='called'){storyStep(id,'called');storySave({id,st:'done',out:'called',v:s.v});cityTrack('story_win');if(typeof memNote==='function')memNote(id+'_win',{place:s.v&&s.v.n});if(typeof sitRep==='function')sitRep(5,'вызвали полицию в кафе-ловушке');}
   if(out==='caught'){storyStep(id,'caught');storySave(Object.assign({id,st:id==='clofelin'?'bank':'police',out:'caught',v:s.v,day:clock.day,who:s.w&&s.w.p.name},extra||{}));if(typeof memNote==='function')memNote(id,{place:s.v&&s.v.n});}
-  if(scene==='interior'&&interior&&interior.key===s.key)exitInterior();
+  if(scene==='interior'&&interior&&interior.key===s.key){plateFilm(false);exitInterior();}
   endSit(s);if(out==='caught')storyAfterStart();}
 
 // ---------- тарелочница: за столом ----------
 function platesTable(s){if(s.ending)return;const id='plates',w=s.w;s.order=platesOrder();
-  sitCard(storyCard({s,icon:'🍽',title:s.v.n,text:`${w.p.name}: «${storyLine(id,'table')}» Она подзывает официанта: «${storyLine(id,'order')}»`,
+  sitCard(storyCard({s,icon:'🍽',title:s.v.n,pic:plateGif(),text:`${w.p.name}: «${storyLine(id,'table')}» Она подзывает официанта: «${storyLine(id,'order')}»`,
     choices:[{t:'Спросить, сколько это стоит',primary:true,run:()=>platesAsk(s)},{t:'Ладно, гуляем',run:()=>platesBill(s)},{t:'Мне пора',run:()=>platesLeave(s)}],dflt:()=>platesLeave(s)}));}
 function platesOrder(){const M=storyList('plates','menu').filter(m=>m&&m.name&&m.price>0);const menu=(M.length>=5?M:STORY_FB.plates.menu).slice().sort(()=>Math.random()-0.5);
   const out=[];let sum=0;for(const m of menu){if(sum>=35000)break;if(sum+m.price>46000)continue;out.push({name:m.name,price:m.price});sum+=m.price;}return {items:out,sum,menu};}
@@ -145,7 +151,7 @@ function platesAsk(s){const id='plates';storyStep(id,'asked');
     choices:[{t:'Настоять: меню с ценами',primary:true,run:()=>platesMenu(s)},{t:'Ну ладно',run:()=>platesBill(s)},{t:'Уйти',run:()=>platesLeave(s)}],dflt:()=>platesBill(s)}));}
 function platesMenu(s){const id='plates';storyStep(id,'menu');const items=s.order.menu.slice(0,6);const line=storyLine(id,'menuShown');
   const choices=[{t:'Встать и уйти',primary:true,run:()=>platesLeave(s,true)},{t:'Остаться',run:()=>platesBill(s)}];
-  storyShow('menu',{place:s.v.n,items,line,choices},storyCard({s,icon:'📋',title:'Меню',text:`Официант: «${line}» ${items.map(m=>`${m.name} — ${fmtMoney(m.price)}`).join(' · ')}`,choices,dflt:()=>platesLeave(s,true)}));}
+  storyShow('menu',{place:s.v.n,items,line,pic:plateGif(),choices},storyCard({s,icon:'📋',title:'Меню',pic:plateGif(),text:`Официант: «${line}» ${items.map(m=>`${m.name} — ${fmtMoney(m.price)}`).join(' · ')}`,choices,dflt:()=>platesLeave(s,true)}));}
 function platesLeave(s,sawMenu){say(s.w,storyLine('plates','leaveEarly'),5);
   storyOut(s,'avoided',sawMenu?'Вы встали и ушли. С такими ценами «знакомство» вышло бы дороже квартиры.':'Вы ушли. Официант что-то крикнул вслед, но догонять не стал.');}
 function platesBill(s){if(s.ending)return;const id='plates',w=s.w;const o=s.order;storyStep(id,'bill');
@@ -153,7 +159,7 @@ function platesBill(s){if(s.ending)return;const id='plates',w=s.w;const o=s.orde
   const line=storyLine(id,'bill',{sum:o.sum}),money=Math.max(0,Math.round(player.money||0));
   const choices=[money>=o.sum?{t:`Оплатить ${fmtMoney(o.sum)}`,run:()=>platesPay(s,o.sum)}:{t:`Отдать всё, что есть (${fmtMoney(money)})`,run:()=>platesPay(s,money)},
     {t:'Не буду платить',tone:'alert',run:()=>platesGuard(s)},{t:'Позвонить 112',primary:true,run:()=>platesCall(s)}];
-  sitCard(storyCard({s,icon:'🍽',title:s.v.n,text:pre,choices:[{t:'Дальше',primary:true,run:()=>storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,choices},
+  sitCard(storyCard({s,icon:'🍽',title:s.v.n,pic:'img/story/champagne.gif',text:pre,choices:[{t:'Дальше',primary:true,run:()=>storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,pic:'img/story/oyster.gif',choices},
     storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» ${o.items.map(m=>`${m.name} — ${fmtMoney(m.price)}`).join(' · ')}. Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}))}],dflt:()=>platesBill2(s,choices,line)}));}
 function platesBill2(s,choices,line){const o=s.order;storyShow('bill',{place:s.v.n,items:o.items,total:o.sum,line,choices},storyCard({s,icon:'🧾',title:'Счёт',text:`«${line}» Итого: ${fmtMoney(o.sum)}`,choices,dflt:()=>platesGuard(s)}));}
 function platesPay(s,sum){const lost=Math.min(sum,Math.max(0,Math.round(player.money||0)));player.money-=lost;addEvent(`🧾 Счёт в ${qName(s.v.n)}: −${fmtMoney(lost)}`,'alert');
