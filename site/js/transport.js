@@ -54,19 +54,21 @@ function renderRouteModal(){const list=$('#rtList'),plans=$('#rtPlans');list.inn
     const c=destCandidates($('#rtSearch').value);if(!c.length){const p=document.createElement('p');p.className='cp-empty';p.textContent='Ничего не нашлось. Попробуйте другое название или укажите точку на карте.';list.append(p);}
     for(const d of c){const b=document.createElement('button');b.className='cp-person';const t=document.createElement('b');t.textContent=d.n;const s=document.createElement('span');s.textContent=`${d.kind} · ${fmtDist(d.d)}`;b.append(t,s);b.addEventListener('click',()=>{rtDest=d;renderRouteModal();});list.append(b);}return;}
   $('#rtTitle').textContent=`Как добраться: ${rtDest.n}`;list.hidden=true;plans.hidden=false;$('#rtPick').hidden=true;const d=rtDest;
-  const card=(icon,title,lines,btn,fn,dis)=>{const el=document.createElement('div');el.className='rt-card';const h=document.createElement('b');h.textContent=icon+' '+title;el.append(h);for(const l of lines){const s=document.createElement('span');s.textContent=l;el.append(s);}const bt=document.createElement('button');bt.className='btn primary';bt.textContent=btn;bt.disabled=!!dis;bt.addEventListener('click',fn);el.append(bt);plans.append(el);};
+  const opts=[];
+  const card=(icon,title,lines,btn,fn,dis,sec)=>{const el=document.createElement('div');el.className='rt-card';const h=document.createElement('b');h.textContent=icon+' '+title;el.append(h);for(const l of lines){const s=document.createElement('span');s.textContent=l;el.append(s);}const bt=document.createElement('button');bt.className='btn primary';bt.textContent=btn;bt.disabled=!!dis;bt.addEventListener('click',fn);el.append(bt);opts.push({sec:dis||!Number.isFinite(sec)?1e15:sec,el});};
+  const flush=()=>{opts.sort((a,b)=>a.sec-b.sec);for(const o of opts)plans.append(o.el);};
   if(player.vehicle){const v=player.vehicle;
-    card(journeyIcon(v.kind),'Вы уже в транспорте',[v.kind==='taxi'?'Сначала завершите текущую поездку':`Продолжить на ${v.spec.word}`],v.kind==='taxi'?'Идёт поездка':'Ехать сюда',()=>{if(driveTo(d.x,d.y,true)){v.dest=journeyDest(d);closeRouteModal();updateTripBox();}},v.kind==='taxi');return;}
-  if(player.bus){card('🚌','Вы уже в автобусе',['Сначала выйдите на остановке'],'Идёт поездка',()=>{},true);return;}
-  if(scene!=='city'){card('🚪','Сначала выйдите на улицу',['Выбрать поездку можно снаружи'],'В помещении',()=>{},true);return;}
-  const walkL=pathLen(world.pedAdj,player.x,player.y,d.x,d.y,pedCost),canWalk=Number.isFinite(walkL);
-  card('🚶','Пешком',canWalk?[`${fmtDist(walkL)} · ≈ ${fmtMin(walkL/WALK_SPEED)}`,'Бесплатно. Ожидание на переходах может увеличить время']:['Маршрут пока не найден'],'Идти',()=>{closeRouteModal();startWalkNav(d);},!canWalk);
-  let bp=planBus(d);if(bp&&bp.cost>walkL/WALK_SPEED*0.85)bp=null;
-  if(bp)card(bp.route.type==='tram'?'🚋':bp.route.type==='trolleybus'?'🚎':'🚌',`${busWord(bp.route.type)} ${bp.route.ref}`,[`Пешком ${fmtDist(bp.walk1)} до «${bp.from.st.n}»`,`${bp.nStops} ост. до «${bp.to.st.n}», дальше ${fmtDist(bp.walk2)} пешком`,`≈ ${fmtMin(bp.cost)} · ${BUS_FARE} ₽`],'Поехать',()=>{closeRouteModal();startBusPlan(bp,d);},player.money<BUS_FARE&&!(typeof errandCityRide==='function'&&errandCityRide('bus')));
-  else card('🚌','Автобус',['Пешком тут быстрее, или подходящего маршрута рядом нет'],'—',()=>{},true);
-  const carL=pathLen(world.carAdj,player.x,player.y,d.x,d.y,carCost);const fare=Math.round(TAXI.base+carL/1000*TAXI.km);
-  card('🚕','Такси',Number.isFinite(carL)?[`${fmtDist(carL)} · ≈ ${fmtMin(carL/9+40)} с подачей`,`≈ ${fare} ₽ (${TAXI.base} ₽ подача + ${TAXI.km} ₽/км)`]:['Машине пока не найден путь'],'Вызвать',()=>{closeRouteModal();callTaxi(d);},!Number.isFinite(carL)||(player.money<fare&&!(typeof errandCityRide==='function'&&errandCityRide('taxi'))));
-  journeyCards(card,d);
+    card(journeyIcon(v.kind),'Вы уже в транспорте',[v.kind==='taxi'?'Сначала завершите текущую поездку':`Продолжить на ${v.spec.word}`],v.kind==='taxi'?'Идёт поездка':'Ехать сюда',()=>{if(driveTo(d.x,d.y,true)){v.dest=journeyDest(d);closeRouteModal();updateTripBox();}},v.kind==='taxi',0);flush();return;}
+  if(player.bus){card('🚌','Вы уже в автобусе',['Сначала выйдите на остановке'],'Идёт поездка',()=>{},true);flush();return;}
+  if(scene!=='city'){card('🚪','Сначала выйдите на улицу',['Выбрать поездку можно снаружи'],'В помещении',()=>{},true);flush();return;}
+  const walkL=pathLen(world.pedAdj,player.x,player.y,d.x,d.y,pedCost),canWalk=Number.isFinite(walkL),walkSec=walkL/WALK_SPEED;
+  card('🚶','Пешком',canWalk?[`${fmtDist(walkL)} · ≈ ${fmtMin(walkSec)}`,'Бесплатно. Ожидание на переходах может увеличить время']:['Маршрут пока не найден'],'Идти',()=>{closeRouteModal();startWalkNav(d);},!canWalk,walkSec);
+  const bp=planBus(d);
+  if(bp)card(bp.route.type==='tram'?'🚋':bp.route.type==='trolleybus'?'🚎':'🚌',`${busWord(bp.route.type)} ${bp.route.ref}`,[`Пешком ${fmtDist(bp.walk1)} до «${bp.from.st.n}»`,`${bp.nStops} ост. до «${bp.to.st.n}», дальше ${fmtDist(bp.walk2)} пешком`,`≈ ${fmtMin(bp.cost)} · ${BUS_FARE} ₽`],'Поехать',()=>{closeRouteModal();startBusPlan(bp,d);},player.money<BUS_FARE&&!(typeof errandCityRide==='function'&&errandCityRide('bus')),bp.cost);
+  else card('🚌','Автобус',['Подходящего маршрута рядом нет'],'—',()=>{},true);
+  const carL=pathLen(world.carAdj,player.x,player.y,d.x,d.y,carCost),taxiSec=carL/9+40;const fare=Math.round(TAXI.base+carL/1000*TAXI.km);
+  card('🚕','Такси',Number.isFinite(carL)?[`${fmtDist(carL)} · ≈ ${fmtMin(taxiSec)} с подачей`,`≈ ${fare} ₽ (${TAXI.base} ₽ подача + ${TAXI.km} ₽/км)`]:['Машине пока не найден путь'],'Вызвать',()=>{closeRouteModal();callTaxi(d);},!Number.isFinite(carL)||(player.money<fare&&!(typeof errandCityRide==='function'&&errandCityRide('taxi'))),taxiSec);
+  journeyCards(card,d);flush();
   const back=document.createElement('button');back.className='btn';back.textContent='← Другое место';back.addEventListener('click',()=>{rtDest=null;renderRouteModal();});plans.append(back);}
 
 // ---------- автобус по плану ----------

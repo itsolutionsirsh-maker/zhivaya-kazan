@@ -30,7 +30,7 @@ function journeyCards(card,d){
     if(!o){card(journeyIcon(kind),title,[kind==='own'?'Своя машина сейчас недоступна':'Рядом нет свободного транспорта'],'Недоступно',()=>{},true);continue;}
     const q=journeyRentalQuote(o,d),ok=Number.isFinite(q.sec);
     card(journeyIcon(kind),title,ok?[`${fmtDist(q.walk)} до транспорта · ≈ ${fmtMin(q.sec)} всего`,spec.perMin?`≈ ${fmtMoney(q.cost)} · ${spec.start} ₽ старт + ${spec.perMin} ₽/игр. мин`:'Без аренды · расходы своей машины сохраняются']:
-      ['Подходящий маршрут пока не найден'],ok?'Подойти и поехать':'Нет маршрута',()=>{if(startRentalPlan(o,d))closeRouteModal();},!ok||player.money<q.cost||!journeyAvailable());
+      ['Подходящий маршрут пока не найден'],ok?'Подойти и поехать':'Нет маршрута',()=>{if(startRentalPlan(o,d))closeRouteModal();},!ok||player.money<q.cost||!journeyAvailable(),ok?q.sec:1e15);
   }
 }
 function startRentalPlan(o,d){

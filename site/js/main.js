@@ -261,7 +261,12 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
-  player.talkTarget=null;walkTo(wx,wy);});
+  player.talkTarget=null;
+  if(dist(player.x,player.y,wx,wy)>1200&&typeof openRouteModal==='function'&&journeyAvailable()){
+    const near=typeof placesNear==='function'?placesNear(wx,wy,50,1)[0]:null;
+    openRouteModal(near?{x:near.x,y:near.y,n:near.n,kind:(typeof POI_RU!=='undefined'&&POI_RU[near.t])||'место'}:{x:wx,y:wy,n:(typeof nearestRoadName==='function'&&nearestRoadName(wx,wy))||'точка на карте',kind:'точка'});
+    return;}
+  walkTo(wx,wy);});
 const LOOK_KIND={cafe:'кафе',bar:'бар',shop:'магазин',police:'отдел полиции',hospital:'больница',pharmacy:'аптека',bank:'банк',atm:'банкомат',school:'школа',university:'университет',theatre:'театр',museum:'музей',worship:'храм',fuel:'заправка',market:'рынок',hotel:'гостиница',library:'библиотека',office:'офис',sight:'достопримечательность',prosecutor:'прокуратура',mall:'торговый центр',stadium:'стадион',park:'парк',station:'станция',univ:'университет',apartments:'жилой дом',house:'дом',residential:'жилой дом',yes:'здание',commercial:'торговое здание',retail:'магазин',industrial:'производство',warehouse:'склад',garage:'гараж',garages:'гаражи',church:'церковь',cathedral:'собор',mosque:'мечеть',chapel:'часовня',public:'общественное здание',government:'учреждение',civic:'учреждение',train_station:'вокзал',transportation:'транспорт',kiosk:'киоск',supermarket:'супермаркет',dormitory:'общежитие',monument:'памятник',memorial:'мемориал',statue:'памятник',castle_tower:'башня',tower:'башня',ruins:'руины',kindergarten:'детский сад',place_of_worship:'храм',college:'колледж'};
 function lookKind(t){if(!t)return '';const s=String(t).toLowerCase();if(LOOK_KIND[s])return LOOK_KIND[s];for(const k in LOOK_KIND)if(s.includes(k))return LOOK_KIND[k];return '';}
 function lookCap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
