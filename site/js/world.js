@@ -75,6 +75,20 @@ function buildWorld(d){
   initLandmarks(d);
   return world;
 }
+// Машины на парковке стоят рядами вдоль длинной стороны, носом к проезду. Узкая полоса — параллельно бордюру.
+function placeLotCars(a,rng){const p=a.p;const A=Math.abs(polyArea(p));a.cars=[];if(A<80||p.length<6)return;
+  let best=0,ux=1,uy=0;for(let i=0;i<p.length;i+=2){const j=(i+2)%p.length,dx=p[j]-p[i],dy=p[j+1]-p[i+1],L=Math.hypot(dx,dy);if(L>best){best=L;ux=dx/L;uy=dy/L;}}
+  const px=-uy,py=ux;let cx=0,cy=0;for(let i=0;i<p.length;i+=2){cx+=p[i];cy+=p[i+1];}cx/=p.length/2;cy/=p.length/2;
+  let minU=1e9,maxU=-1e9,minV=1e9,maxV=-1e9;for(let i=0;i<p.length;i+=2){const u=(p[i]-cx)*ux+(p[i+1]-cy)*uy,v=(p[i]-cx)*px+(p[i+1]-cy)*py;if(u<minU)minU=u;if(u>maxU)maxU=u;if(v<minV)minV=v;if(v>maxV)maxV=v;}
+  const parallel=maxV-minV<9,nose=parallel?Math.atan2(uy,ux):Math.atan2(py,px);
+  const stepU=parallel?6.4:2.75,stepV=parallel?3.1:5.5,padU=parallel?3.4:1.5,padV=parallel?1.5:2.5;
+  const u0=minU+padU,u1=maxU-padU,v0=minV+padV,v1=maxV-padV;if(u1-u0<2||v1-v0<1.2)return;
+  const cap=Math.min(parallel?8:24,Math.max(2,Math.floor(A/78))),aisle=!parallel&&v1-v0>8,mid=(v0+v1)/2,slots=[];
+  for(let v=v0;v<=v1+0.01;v+=stepV){if(aisle&&Math.abs(v-mid)<2.3)continue;const face=aisle?(v<mid?nose:nose+Math.PI):nose,hx=Math.cos(face),hy=Math.sin(face);
+    for(let u=u0;u<=u1+0.01;u+=stepU){const x=cx+ux*u+px*v,y=cy+uy*u+py*v;if(!pointInPoly(p,x,y)||inBuilding(x,y)||inBuilding(x+hx*1.7,y+hy*1.7))continue;
+      const ns=nearestRoadSeg(x,y,5);if(ns&&ns.d<(ns.seg.r.hw||3)*0.62)continue;slots.push({x,y,ang:face});}}
+  if(!slots.length)return;const stride=Math.max(1,Math.ceil(slots.length/cap));
+  for(let i=0;i<slots.length&&a.cars.length<cap;i+=stride){if(rng()<0.12)continue;const s=slots[i];a.cars.push({x:s.x,y:s.y,ang:s.ang,color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});}}
 // добавить часть карты: узлы, дороги (граф для пешеходов, машин и скорой), дома, площади с деревьями и парковками, места.
 // В кусках ссылка на узел < 0 — это узел base (-(i+1)), иначе — свой узел куска.
 function addMapPart(d,key){const W=world,g=W.g;const off=W.nodes.length;
@@ -101,8 +115,7 @@ function addMapPart(d,key){const W=world,g=W.g;const off=W.nodes.length;
     // деревья и припаркованные машины
     if(/park|forest|grass|cemetery/.test(a.k)){const A=Math.abs(polyArea(a.p));const dens=a.k==='forest'?60:a.k==='park'?150:a.k==='cemetery'?130:300;let n=Math.min(450,Math.floor(A/dens));const bb=a.bb;let tries=0;
       while(n>0&&tries<n*8+40){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;const r=a.k==='forest'?2.2+rng()*2.2:1.7+rng()*2.3;const t={x,y,r,c:Math.floor(rng()*3)};W.trees.push(t);rec.trees.push(t);W.tgrid.add(t,x-r,y-r,x+r,y+r);n--;}}
-    if(a.k==='parking'){const A=Math.abs(polyArea(a.p));a.cars=[];if(A<140)continue;const n=Math.min(16,Math.floor(A/95));const bb=a.bb;let tries=0;const ang=(bb[2]-bb[0]>bb[3]-bb[1])?0:Math.PI/2;
-      while(a.cars.length<n&&tries<300){tries++;const x=bb[0]+rng()*(bb[2]-bb[0]),y=bb[1]+rng()*(bb[3]-bb[1]);if(!pointInPoly(a.p,x,y))continue;if(a.cars.some(c=>dist(c.x,c.y,x,y)<3.4))continue;a.cars.push({x,y,ang,color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});}}}
+    if(a.k==='parking')placeLotCars(a,rng);}
   for(const p0 of d.pois||[]){const o={x:p0.x/10,y:p0.y/10,t:p0.t,n:p0.n||'',st:p0.st||'',i:W.pseq++};W.pois.push(o);rec.pois.push(o);}
   W.parts.set(key===null?'base':key,rec);return rec;}
 // выгрузить кусок: дома, площади, деревья и места уходят из памяти; узлы и дороги остаются (на них могут ехать машины и идти люди)
