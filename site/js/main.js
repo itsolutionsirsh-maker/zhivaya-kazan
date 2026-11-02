@@ -248,12 +248,13 @@ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<
   pdown={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now()};dragging=false;});
 canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
   if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];cam.zt=cam.z=clamp(pinch.z*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d,zMin(),16);return;}
-  if(!pdown||scene!=='city')return;if(!dragging&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>6){dragging=true;cam.free=true;$('#centerBtn').hidden=false;canvas.style.cursor='grabbing';}
+  if(!pdown||scene!=='city')return;if(!dragging&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>6){dragging=true;cam.free=true;canvas.style.cursor='grabbing';hideLook();}
   if(dragging){cam.x-=(e.clientX-pdown.lx)/cam.z;cam.y-=(e.clientY-pdown.ly)/cam.z;pdown.lx=e.clientX;pdown.ly=e.clientY;clampCam();}});
 canvas.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinch=null;pdown=null;dragging=false;canvas.style.cursor='';});
 canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;pdown=null;return;}if(!pdown)return;if(dragging){dragging=false;pdown=null;canvas.style.cursor='';return;}const moved=Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y);pdown=null;if(moved>8||player.busy||player.bus||player.state==='hurt')return;
   if(scene==='interior'){const it=interior,x=(e.clientX-it.ox)/it.iz,y=(e.clientY-it.oy)/it.iz,pr=sharedPeerAt(x,y,.8);if(pr){openChatPanel('dm',pr.key);return;}player.iwp=[x,y];return;}
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
+  if(scene==='city')showLook(e.clientX,e.clientY,1600);
   if(pickingDest){pickDestAt(wx,wy);return;}
   followPlayer();
   if(player.vehicle){if(player.vehicle.kind==='taxi')return;if(driveTo(wx,wy)){player.vehicle.dest=journeyDest({x:wx,y:wy,n:'Точка на карте'});updateTripBox();}return;}
@@ -261,6 +262,35 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   let hitW=null,hd=Math.max(2.2,14/cam.z);for(const w of walkers){if(w.bus||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<hd){hd=d;hitW=w;}}
   if(hitW){player.talkTarget=hitW;hitW.state='idle';hitW.ttl=Math.max(hitW.ttl,dist(hitW.x,hitW.y,player.x,player.y)/2.5+4);hitW.path=null;setHint(`Идём к ${hitW.p.name}`);walkTo(hitW.x,hitW.y,true);return;}
   player.talkTarget=null;walkTo(wx,wy);});
+const LOOK_KIND={cafe:'кафе',bar:'бар',shop:'магазин',police:'отдел полиции',hospital:'больница',pharmacy:'аптека',bank:'банк',atm:'банкомат',school:'школа',university:'университет',theatre:'театр',museum:'музей',worship:'храм',fuel:'заправка',market:'рынок',hotel:'гостиница',library:'библиотека',office:'офис',sight:'достопримечательность',prosecutor:'прокуратура',mall:'торговый центр',stadium:'стадион',park:'парк',station:'станция',univ:'университет',apartments:'жилой дом',house:'дом',residential:'жилой дом',yes:'здание',commercial:'торговое здание',retail:'магазин',industrial:'производство',warehouse:'склад',garage:'гараж',garages:'гаражи',church:'церковь',cathedral:'собор',mosque:'мечеть',chapel:'часовня',public:'общественное здание',government:'учреждение',civic:'учреждение',train_station:'вокзал',transportation:'транспорт',kiosk:'киоск',supermarket:'супермаркет',dormitory:'общежитие',monument:'памятник',memorial:'мемориал',statue:'памятник',castle_tower:'башня',tower:'башня',ruins:'руины',kindergarten:'детский сад',place_of_worship:'храм',college:'колледж'};
+function lookKind(t){if(!t)return '';const s=String(t).toLowerCase();if(LOOK_KIND[s])return LOOK_KIND[s];for(const k in LOOK_KIND)if(s.includes(k))return LOOK_KIND[k];return '';}
+function lookCap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
+let poiBuck=null,poiN=-1,lookTimer=0,lookRaf=0,lookXY=null;
+function poiAt(x,y,r){if(!world||!world.pois||!world.pois.length)return null;if(poiN!==world.pois.length){poiN=world.pois.length;poiBuck=new Map();for(const p of world.pois){const k=Math.floor(p.x/80)+':'+Math.floor(p.y/80);let a=poiBuck.get(k);if(!a)poiBuck.set(k,a=[]);a.push(p);}}
+  let best=null,bd=r;for(let cx=Math.floor((x-r)/80);cx<=Math.floor((x+r)/80);cx++)for(let cy=Math.floor((y-r)/80);cy<=Math.floor((y+r)/80);cy++){const a=poiBuck.get(cx+':'+cy);if(!a)continue;for(const p of a){if(!p.n)continue;const d=dist(p.x,p.y,x,y);if(d<bd){bd=d;best=p;}}}return best;}
+function landmarkAt(x,y,r){const list=window.cityLandmarks;if(!list||typeof llToXY!=='function')return null;let best=null,bd=r;for(const l of list){if(!l.xy){if(!l.ll)continue;l.xy=llToXY(l.ll);}const d=dist(l.xy[0],l.xy[1],x,y);if(d<bd){bd=d;best=l;}}return best;}
+function busLook(b){const word=busWord(b.route.type),ref=b.route.ref||'';let name=b.route.name||'';if(name&&ref&&name.indexOf(String(ref))===0)name=name.slice(String(ref).length).replace(/^[:\s·—-]+/,'');const nx=b.upcoming&&b.upcoming();return `${word} ${ref}${name?' · '+name:''}${nx?' · едет к «'+nx.n+'»':''}`;}
+function lookText(wx,wy){if(!world||scene!=='city')return '';const z=Math.max(0.2,cam.z),near=Math.max(4,16/z);
+  for(const pr of peerRender.values()){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<near)return pr.name||'Игрок';}
+  let who=null,wd=near;for(const w of walkers){if(w.bus||w.inside||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<wd){wd=d;who=w;}}
+  if(who&&who.p&&who.p.name)return who.p.name;
+  let bus=null,bd=Math.max(near,8);for(const b of buses){const d=dist(b.x,b.y,wx,wy);if(d<bd){bd=d;bus=b;}}
+  if(bus)return busLook(bus);
+  for(const c of cars){if(c.kind!=='taxi'&&c.kind!=='police'&&c.kind!=='amb')continue;if(dist(c.x,c.y,wx,wy)<near)return c.kind==='taxi'?'Такси':c.kind==='police'?'Полицейская машина':'Скорая помощь';}
+  for(const r of rentals){if(dist(r.x,r.y,wx,wy)<near)return r.kind==='bike'?'Велосипед проката':r.kind==='scooter'?'Самокат проката':'Каршеринг';}
+  let stop=null,sd=Math.max(near,6);for(const s of world.stops){const d=dist(s.x,s.y,wx,wy);if(d<sd){sd=d;stop=s;}}
+  if(stop){if(!stop._refs){const rts=routesAtStop(stop);stop._refs=rts.slice(0,8).map(r=>r.ref).join(', ');}return `Остановка «${stop.n}»`+(stop._refs?` · ${stop.k==='tram'?'трамвай':'маршруты'} ${stop._refs}`:'');}
+  const poi=poiAt(wx,wy,Math.max(near,10)),b=typeof inBuilding==='function'?inBuilding(wx,wy):null,lm=landmarkAt(wx,wy,Math.max(36,80/z));
+  if(poi&&poi.n&&(!b||!b.n)){const k=lookKind(poi.t);return k&&k!==String(poi.n).toLowerCase()?`${poi.n} · ${k}`:poi.n;}
+  if(b){const k=lookKind(b.t);if(b.n)return k?`${b.n} · ${k}`:b.n;if(lm)return lm.name;if(k)return lookCap(k);}
+  if(lm)return lm.name;
+  const road=typeof nearestRoadSeg==='function'?nearestRoadSeg(wx,wy,Math.max(8,14/z)):null;
+  if(road&&road.seg.r.n)return road.seg.r.n;
+  return '';}
+function hideLook(){clearTimeout(lookTimer);const el=$('#look');if(el)el.hidden=true;}
+function showLook(x,y,hold){clearTimeout(lookTimer);const el=$('#look');if(!el||!world)return;const wx=cam.x+(x-innerWidth/2)/cam.z,wy=cam.y+(y-innerHeight/2)/cam.z;const text=lookText(wx,wy);if(!text){el.hidden=true;return;}el.textContent=text;el.hidden=false;const w=280;let left=x+14,top=y+16;if(left+w>innerWidth-8)left=Math.max(8,x-w-8);if(top+48>innerHeight-8)top=Math.max(8,y-40);el.style.left=left+'px';el.style.top=top+'px';if(hold)lookTimer=setTimeout(()=>{el.hidden=true;},hold);}
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&(dragging||e.buttons))return;if(scene!=='city'||dragging){hideLook();return;}lookXY=[e.clientX,e.clientY];if(lookRaf)return;lookRaf=requestAnimationFrame(()=>{lookRaf=0;if(!lookXY||dragging)return;showLook(lookXY[0],lookXY[1],e.pointerType==='touch'?1600:0);});});
+canvas.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch')hideLook();});
 function walkTo(wx,wy,keepTarget){if(!keepTarget){player.replans=0;if(player.navDest){player.navDest=null;player.navPaused=false;updateTripBox();}}if(!keepTarget&&inBuilding(wx,wy)){setHint('Туда не пройти: это здание');return false;}
   // близко и по прямой ничего не мешает (через парк, двор, площадь) — напрямик, без крюка по дорожкам
   const smart=!(player.replans>0);   // застряли и ищем путь заново — только по дорожкам
