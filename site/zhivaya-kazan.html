@@ -526,6 +526,14 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div class="row"><button class="btn" id="seasonClose">Закрыть</button></div>
   </div>
 </div>
+<div class="modal" id="hotelModal" hidden>
+  <div class="box">
+    <h2>Номер в гостинице</h2>
+    <input type="text" id="hotelQ" aria-label="Найти гостиницу" placeholder="Корстон, Ногай, Шаляпин…" maxlength="40">
+    <div id="hotelList" style="max-height:46vh;overflow:auto"></div>
+    <div class="row"><button class="btn" id="hotelClose">Не сейчас</button></div>
+  </div>
+</div>
 <div class="modal" id="routeModal" hidden>
   <div class="box">
     <h2 id="rtTitle">Куда поехать?</h2>
@@ -713,4 +721,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
 <template id="zkLater"><script src="js/folk3.js"></script></template>
-<script src="js/faces.js"></script><script src="js/sky-slot.js"></script><script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js"></script><script src="js/street-look.js"></script>
+<script src="js/faces.js"></script><script src="js/sky-slot.js"></script><script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js"></script><script src="js/street-look.js"></script><script src="js/hotels.js"></script>

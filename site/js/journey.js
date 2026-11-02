@@ -52,7 +52,7 @@ function journeyOnBoard(v,o,route){
   updateTripBox();
 }
 function journeyFinishFoot(d){
-  if(!d)return;if(dist(player.x,player.y,d.x,d.y)<18){if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether())return;addEvent(`Вы на месте: ${d.n}`);setHint(`Вы на месте: ${d.n}`);return;}
+  if(!d)return;if(dist(player.x,player.y,d.x,d.y)<18){if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether())return;if(typeof maybeEnterHotelTogether==='function'&&maybeEnterHotelTogether())return;addEvent(`Вы на месте: ${d.n}`);setHint(`Вы на месте: ${d.n}`);return;}
   startWalkNav(d);
 }
 function journeyTick(){

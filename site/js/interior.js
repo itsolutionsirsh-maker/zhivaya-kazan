@@ -1,9 +1,9 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
-const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
+const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
 function makeInterior(kind,name,key,room){
   const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
-  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],default:[12,9]};
+  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],hotelroom:[12,8],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],default:[12,9]};
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
@@ -34,6 +34,7 @@ function makeInterior(kind,name,key,room){
     case 'theatre':{it.floor='dark';F('stage',w/2,2.3,w-2,3,{});const per=Math.floor((w-3)/0.9);for(let r=0;r<5;r++)for(let i=0;i<per;i++){const x=1.9+i*0.9,y=5.2+r*1.3;F('seat',x,y,0.7,0.7,{spot:'seat',row:r});if(rng()<0.55){const n=NPC(x,y,{seated:true});n.hx=0;n.hy=-1;}}break;}
     case 'museum':{it.floor='marble';for(let i=0;i<6;i++)F('painting',1.6+i*(w-3.2)/5,0.35,1.6,0.4,{spot:'exhibit',c:i});for(let i=0;i<4;i++)F('pedestal',3+i*(w-6)/3,h/2,1,1,{spot:'exhibit',c:i+6});NPC(w-1.2,h-1.4,{role:'guard',job:'смотритель'});for(let i=0;i<3;i++)NPC(2+rng()*(w-4),2.5+rng()*(h-5),{wander:true});break;}
     case 'hotel':{it.floor='carpet';F('counter',w/2,1.1,6,1.2,{spot:'reception'});NPC(w/2,0.5,{role:'staff',job:'администратор'});F('sofa',3,h/2,3,1.2,{spot:'sofa'});F('sofa',w-3,h/2,3,1.2,{spot:'sofa'});plant(0.9,0.9);plant(w-0.9,0.9);const g=NPC(3,h/2,{seated:true});g.hy=-1;break;}
+    case 'hotelroom':{it.floor='carpet';F('window',w/2,0.15,4.2,0.3);F('bed',w*0.72,2.3,3.1,1.5,{});F('table',w/2,h-3.5,1.15,1.15,{spot:'table'});F('sofa',w/2,h-2.15,3.2,1.05,{spot:'sofa'});plant(0.7,0.85);break;}
     case 'hospital':{it.floor='tiles';F('counter',w/2,1.1,6,1.1,{spot:'reception'});NPC(w/2,0.5,{role:'staff',job:'врач'});for(let i=0;i<6;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});const q=NPC(3.4,h-2.2,{seated:true});q.hy=-1;F('bed',w-2.5,3.4,2.2,1.2,{});F('bed',w-2.5,5.4,2.2,1.2,{});break;}
     case 'university':case 'school':case 'library':{it.floor='wood';if(kind==='library'){for(let i=0;i<Math.floor((w-2)/2.2);i++)F('shelf',1.8+i*2.2,1.1,1.6,0.7,{spot:'books',goods:1,horiz:true});}else{F('board',w/2,0.25,5,0.4);F('desk',w/2,1.8,2,0.8,{});NPC(w/2,1.1,{role:'staff',job:kind==='school'?'учитель':'преподаватель'});}
       const cols=Math.floor((w-2)/2.6),rows=Math.floor((h-4)/1.8);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=1.5+c*2.6+1.1,y=3.4+r*1.8;F('desk',x,y,1.8,0.7,{spot:'study'});F('chair',x-0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});F('chair',x+0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});if(rng()<0.45){const n=NPC(x-0.45,y+0.75,{seated:true,job:'студент'});n.hy=-1;n.hx=0;}}break;}
@@ -59,11 +60,13 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
   const table=it.furn.find(f=>f.spot==='table'),sofa=it.furn.find(f=>f.t==='sofa');
   if(table){npc.x=table.x;npc.y=table.y-0.9;npc.seated=true;npc.hx=0;npc.hy=1;npc.tableF=table;table.comp=npc;player.ix=table.x;player.iy=table.y+0.95;player.ihx=0;player.ihy=-1;}
   else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
-  const line=npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.';
+  const line=it.kind==='hotelroom'
+    ?(npc.p.female?'Номер наш. Садись, отсюда город видно. Поговорим.':'Номер наш. Садись, поговорим спокойно.')
+    :(npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.');
   setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
 function interiorPhoto(it){if(it&&it===interior){const g=typeof tableFrameCanvas==='function'?tableFrameCanvas():null;if(g)return g;}if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}
 function privateTogether(){if(scene!=='interior'||!interior||typeof companion==='undefined'||!companion)return false;const k=interior.kind;
-  if(k==='home'||k==='guest')return true;const npc=interior.npcs&&interior.npcs.find(n=>n.companionOf===companion.w);return !!(npc&&npc.seated);}
+  if(k==='home'||k==='guest'||k==='hotelroom')return true;const npc=interior.npcs&&interior.npcs.find(n=>n.companionOf===companion.w);return !!(npc&&npc.seated);}
 function exitInterior(){const it=interior;if(!it)return;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
@@ -283,7 +286,7 @@ $('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||
 const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school','worship','police','market','bakery','tea','barber','flower','gym'];const shotImg={};const shotSeen=new Map();let shotT=null;
 // фото качаем, когда город уже на экране: при входе 600 КБ картинок мешали карте
 (function shotLater(){const L=$('#loading');if(L&&!L.hidden){setTimeout(shotLater,700);return;}setTimeout(()=>{for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}},1500);})();
-function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';if(src.kind==='guest')return 'home';if(src.kind==='prosecutor')return 'office';return SHOT_KINDS.includes(src.kind)?src.kind:(src.kind?'shop':null);}
+function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';if(src.kind==='guest'||src.kind==='hotelroom')return 'home';if(src.kind==='prosecutor')return 'office';return SHOT_KINDS.includes(src.kind)?src.kind:(src.kind?'shop':null);}
 function insideShot(src){/* фото остаётся фоном комнаты, а не вспышкой на несколько секунд */}
 function hideShot(){const el=$('#insideShot');if(el.hidden)return;clearTimeout(shotT);el.classList.remove('in');el.classList.add('out');setTimeout(()=>{el.hidden=true;el.classList.remove('out');},280);}
 $('#insideShot').addEventListener('pointerdown',hideShot);

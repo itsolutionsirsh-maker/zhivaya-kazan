@@ -42,7 +42,7 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
   if(player.vehicle&&c.homeVisit&&typeof isLightVehicle==='function'&&isLightVehicle(player.vehicle.kind)){w.inside=false;w.x=player.x-player.hx*1.15+(-player.hy)*0.55;w.y=player.y-player.hy*1.15+player.hx*0.55;w.hx=player.hx;w.hy=player.hy;
     if(c.toldRide!==player.vehicle.kind){c.toldRide=player.vehicle.kind;addEvent(`${w.p.name} едет с вами на ${player.vehicle.spec.word}`,'say');}updateCompBox();return;}
   if(player.inside||player.bus||(player.vehicle&&player.vehicle.kind!=='scooter'&&player.vehicle.kind!=='bike')){if(c.homeVisit&&!w.inside&&(player.bus||player.vehicle))addEvent(`${w.p.name} едет с вами`,'say');w.inside=true;c.route=null;updateCompBox();return;}
-  if(w.inside){w.inside=false;const sp=[player.x-player.hx*1.5,player.y-player.hy*1.5];w.x=sp[0];w.y=sp[1];w.cwps=null;}
+  if(w.inside){if(c.staysInRoom&&!player.inside){updateCompBox();return;}w.inside=false;const sp=[player.x-player.hx*1.5,player.y-player.hy*1.5];w.x=sp[0];w.y=sp[1];w.cwps=null;}
   // игрок уехал далеко (машина, автобус, самокат) — житель «догоняет»
   if(dist(w.x,w.y,player.x,player.y)>70){const n=nearestNode(player.x,player.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);w.x=sp[0];w.y=sp[1];w.node=n;w.cwps=null;c.route=null;}}
   const look=()=>{const dx=player.x-w.x,dy=player.y-w.y,L=Math.hypot(dx,dy)||1;w.hx=dx/L;w.hy=dy/L;};
