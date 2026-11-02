@@ -84,8 +84,8 @@ function placeLotCars(a,rng){const p=a.p;const A=Math.abs(polyArea(p));a.cars=[]
     if(!pointInPoly(p,x,y)||inBuilding(x,y)||inBuilding(x+hx*1.7,y+hy*1.7))return;
     const ns=nearestRoadSeg(x,y,5);if(ns&&ns.d<(ns.seg.r.hw||3)*0.55)return;slots.push({x,y,ang:face});};
   if(maxV-minV<9){const face=Math.atan2(uy,ux),v=(minV+maxV)/2;for(let u=minU+3.2;u<=maxU-3.2;u+=6.2)push(u,v,face);}
-  else{const face=Math.atan2(py,px),vA=minV+2.4,vB=maxV-2.4;for(let u=minU+1.5;u<=maxU-1.5;u+=2.75){push(u,vA,face);if(vB-vA>=8)push(u,vB,face+Math.PI);}}
-  if(!slots.length)return;const cap=maxV-minV<9?Math.min(12,slots.length):Math.min(28,Math.max(4,Math.floor(A/55)));
+  else{const face=Math.atan2(py,px),vA=minV+2.4,vB=maxV-2.4;for(let u=minU+1.5;u<=maxU-1.5;u+=2.75)push(u,vA,face);if(vB-vA>=8)for(let u=minU+1.5;u<=maxU-1.5;u+=2.75)push(u,vB,face+Math.PI);}
+  if(!slots.length)return;const cap=maxV-minV<9?Math.min(12,slots.length):Math.min(40,Math.max(4,Math.floor(A/40)));
   const stride=Math.max(1,Math.ceil(slots.length/cap));
   for(let i=0;i<slots.length&&a.cars.length<cap;i+=stride){if(rng()<0.14)continue;const s=slots[i];a.cars.push({x:s.x,y:s.y,ang:s.ang,color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});}}
 // добавить часть карты: узлы, дороги (граф для пешеходов, машин и скорой), дома, площади с деревьями и парковками, места.
