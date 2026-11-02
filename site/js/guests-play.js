@@ -57,13 +57,12 @@ function guestAction(){if(scene!=='city'||!companion)return null;const c=compani
 if(typeof findAction==='function'){const fa0=findAction;window.findAction=findAction=function(){return guestAction()||fa0.apply(this,arguments);};}
 
 // ---------- в гостях ----------
-function guestShot(pic,name){if(!pic)return;const el=$('#insideShot');if(!el)return;const im=new Image();
-  im.onload=()=>{el.style.backgroundImage=`url("${pic}")`;$('#insideShotName').textContent=name||'';el.hidden=false;el.classList.remove('out');void el.offsetWidth;el.classList.add('in');setTimeout(()=>{if(typeof hideShot==='function')hideShot();},900);};im.src=pic;}
+function guestShot(pic){if(!pic)return;const im=new Image();im.onload=()=>{if(interior&&interior.kind==='guest'){interior.photoImg=im;if(typeof placeChatLook==='function')placeChatLook();}};im.src=pic;}
 function guestEnter(){const c=companion;if(!c||!c.dest||!c.dest.guest)return;const id=c.dest.guest,f=FOLK.list.find(q=>q.id===id),g=guestData(id);if(!f||!g)return;
   const st=guestState(id);const story=st.v<g.visits.length;if(story)st.v++;st.day=clock.day;progSave();
   const n=Math.min(st.v,g.visits.length),beat=story?g.visits[n-1]:null,pic=g.home&&g.home.pic;
-  const name=f.name,title=`Дома у ${guestOf(name)}`;guestShot(pic,title);
-  enterInterior({kind:'guest',name:title,key:'guest:'+id,x:player.x,y:player.y,guest:id});
+  const name=f.name,title=`Дома у ${guestOf(name)}`;
+  enterInterior({kind:'guest',name:title,key:'guest:'+id,x:player.x,y:player.y,guest:id});guestShot(pic);
   const it=interior;if(!it)return;const npc=it.npcs.find(q=>q.companionOf===c.w);if(!npc)return;
   const t=g.treat||{};if(npc.tableF)npc.tableF.ordered=t.name||'чай';
   player.mood=clamp(player.mood+clamp(+t.mood||0,0,10),0,100);player.food=clamp((player.food||0)+clamp(+t.food||0,0,8),0,100);

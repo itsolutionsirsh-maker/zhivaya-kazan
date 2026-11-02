@@ -61,7 +61,9 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
   else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
   const line=npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.';
   setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
-function interiorPhoto(it){const k=it&&shotKind(it);return k&&shotImg[k]||null;}
+function interiorPhoto(it){if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}
+function privateTogether(){if(scene!=='interior'||!interior||typeof companion==='undefined'||!companion)return false;const k=interior.kind;
+  if(k==='home'||k==='guest')return true;const npc=interior.npcs&&interior.npcs.find(n=>n.companionOf===companion.w);return !!(npc&&npc.seated);}
 function exitInterior(){const it=interior;if(!it)return;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
@@ -201,7 +203,10 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';
   {const left=Math.max(12,ox),space=W-left-12;let title=String(it.name||'');while(title.length>1&&ctx.measureText(title).width>space)title=title.slice(0,-2)+'…';ctx.fillText(title,left,oy+it.h*iz+34);
     const nw=ctx.measureText(title).width,kr=it.kind==='worship'&&venueStyleId(it)==='mosque'?'мечеть':KIND_RU[it.kind]||KIND_RU.default;ctx.font='500 12px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';if(kr.toLowerCase()!==String(it.name).toLowerCase()){const inline=nw+12+ctx.measureText(kr).width<=space;ctx.fillText(kr,inline?left+nw+12:left,oy+it.h*iz+(inline?35:53));}}
-  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);drawSharedLabels(it);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
+  const [sx,sy]=[ox+player.ix*iz,oy+player.iy*iz];drawSitInterior(it);labelPlayer(sx,sy-iz*0.55,player.name,true,player.avatarImg,myLook().frame);
+  if(player.avatarImg&&privateTogether()){const r=Math.max(36,Math.min(58,iz*1.2));ctx.save();ctx.beginPath();ctx.arc(sx,sy-iz*0.2,r,0,TAU);ctx.clip();ctx.drawImage(player.avatarImg,sx-r,sy-iz*0.2-r,r*2,r*2);ctx.restore();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy-iz*0.2,r,0,TAU);ctx.stroke();}
+  else if(privateTogether()&&!player.avatar&&!flags.askedFace){flags.askedFace=true;setHint('Загрузите своё фото в анкете или в шкафу — дома и наедине будет видно именно вас');}
+  drawSharedLabels(it);drawInteriorBubbles(it);if(it.kind==='metro'&&typeof drawMetroOverlay==='function')drawMetroOverlay(it);}
 function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
   if(f.t==='rails'){ctx.fillStyle='#2B2A28';ctx.fillRect(x,y,f.w,f.h);ctx.fillStyle='#4A4440';for(let i=0;i<f.w;i+=0.7)ctx.fillRect(x+i,y+0.55,0.32,1.3);ctx.fillStyle='#B8B4AE';ctx.fillRect(x,y+0.75,f.w,0.08);ctx.fillRect(x,y+1.55,f.w,0.08);return;}
   if(f.own){drawOwnFurniture(f);return;}
@@ -278,7 +283,7 @@ $('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||
 const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school','worship','police','market','bakery','tea','barber','flower','gym'];const shotImg={};const shotSeen=new Map();let shotT=null;
 // фото качаем, когда город уже на экране: при входе 600 КБ картинок мешали карте
 (function shotLater(){const L=$('#loading');if(L&&!L.hidden){setTimeout(shotLater,700);return;}setTimeout(()=>{for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}},1500);})();
-function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';return SHOT_KINDS.includes(src.kind)?src.kind:null;}
+function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';if(src.kind==='guest')return 'home';if(src.kind==='prosecutor')return 'office';return SHOT_KINDS.includes(src.kind)?src.kind:(src.kind?'shop':null);}
 function insideShot(src){/* фото остаётся фоном комнаты, а не вспышкой на несколько секунд */}
 function hideShot(){const el=$('#insideShot');if(el.hidden)return;clearTimeout(shotT);el.classList.remove('in');el.classList.add('out');setTimeout(()=>{el.hidden=true;el.classList.remove('out');},280);}
 $('#insideShot').addEventListener('pointerdown',hideShot);
