@@ -77,7 +77,9 @@ function drawMetroTrain(it,t){const R=METRO.ride;if(!R||(R.phase!=='here'&&R.pha
     for(let wdw=0;wdw<4;wdw++){ctx.fillStyle=R.phase==='here'&&wdw%2===1?'#2A2A2A':'#BFD9F2';ctx.fillRect(cx+0.35+wdw*(cw-0.7)/4,y+0.2,(cw-0.7)/4-0.25,0.55);}}
   ctx.restore();}
 function drawMetroOverlay(it){const R=METRO.ride;if(!R||R.phase!=='go')return;const dst=metroStation(R.to);const a=Math.min(1,R.t/0.4,(3.2-R.t)/0.4);
-  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=Math.max(0,a);ctx.fillStyle='#07090C';ctx.fillRect(0,0,W,H);
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalAlpha=Math.max(0,a);
+  const im=window.metroRideImg;if(im&&im.width){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.fillStyle='rgba(7,9,12,.42)';ctx.fillRect(0,0,W,H);}
+  else{ctx.fillStyle='#07090C';ctx.fillRect(0,0,W,H);}
   const tt=performance.now()/1000;for(let i=0;i<9;i++){const x=((i*170-tt*900)%(W+200)+W+200)%(W+200)-100;ctx.fillStyle='rgba(255,214,120,.55)';ctx.fillRect(x,H*0.42,60,3);ctx.fillRect(x+40,H*0.62,30,2);}
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#EEF3EE';ctx.font='700 20px "Unbounded",sans-serif';ctx.fillText(`Следующая станция — «${dst.n}»`,W/2,H*0.5-14);
   ctx.font='500 15px "IBM Plex Sans",system-ui';ctx.fillStyle='#9BB1A4';ctx.fillText(`Киләсе станция — «${dst.tat||dst.n}»`,W/2,H*0.5+16);ctx.globalAlpha=1;}
