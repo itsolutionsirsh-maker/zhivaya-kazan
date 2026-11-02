@@ -159,7 +159,8 @@ test('insufficient quote budget prevents rental approach before any start fee',(
 
 test('walking choice displays ETA at actual WALK_SPEED',()=>{
   const g=game();g.c.openRouteModal(g.dest);
-  const first=g.dom.get('#rtPlans').children[0];const text=first.children.map(n=>n.textContent).join(' ');
+  const plans=g.dom.get('#rtPlans').children;let text='';
+  for(let i=0;i<plans.length;i++){const t=plans[i].children.map(n=>n.textContent).join(' ');if(t.includes('Пешком')){text=t;break;}}
   assert.match(text,/8 мин/); // 1000 m / 2 m/s = 8.33 min, not the old hardcoded 3 m/s.
 });
 

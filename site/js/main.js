@@ -276,7 +276,7 @@ function poiAt(x,y,r){if(!world||!world.pois||!world.pois.length)return null;if(
 function landmarkAt(x,y,r){const list=window.cityLandmarks;if(!list||typeof llToXY!=='function')return null;let best=null,bd=r;for(const l of list){if(!l.xy){if(!l.ll)continue;l.xy=llToXY(l.ll);}const d=dist(l.xy[0],l.xy[1],x,y);if(d<bd){bd=d;best=l;}}return best;}
 function busLook(b){const word=busWord(b.route.type),ref=b.route.ref||'';let name=b.route.name||'';if(name&&ref&&name.indexOf(String(ref))===0)name=name.slice(String(ref).length).replace(/^[:\s·—-]+/,'');const nx=b.upcoming&&b.upcoming();return `${word} ${ref}${name?' · '+name:''}${nx?' · едет к «'+nx.n+'»':''}`;}
 function lookText(wx,wy){if(!world||scene!=='city')return '';const z=Math.max(0.2,cam.z),near=Math.max(4,16/z);
-  for(const pr of peerRender.values()){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<near)return pr.name||'Игрок';}
+  for(const pr of (typeof peerRender!=='undefined'&&peerRender?peerRender:[]).values()){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<near)return pr.name||'Игрок';}
   let who=null,wd=near;for(const w of walkers){if(w.bus||w.inside||w.state==='hurt')continue;const d=dist(w.x,w.y,wx,wy);if(d<wd){wd=d;who=w;}}
   if(who&&who.p&&who.p.name)return who.p.name;
   let bus=null,bd=Math.max(near,8);for(const b of buses){const d=dist(b.x,b.y,wx,wy);if(d<bd){bd=d;bus=b;}}
