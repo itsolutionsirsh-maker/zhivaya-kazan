@@ -121,6 +121,32 @@ function acctOwnBeacon(j){return !!(syncRev&&j.state&&bootLocalT&&j.state.t===bo
 function acctBootSync(j){if(acctServerNewer(j)&&(j.state||syncRev)&&!acctOwnBeacon(j)){acctApply(j);return true;}setRev(j.updated||0);Net.syncReady=true;acctSave();return false;}
 // тайм-аут: зависший запрос (переключилась мобильная сеть) не держит сохранения минутами — обрыв, следующее через 30 с
 async function acctCall(a,body){const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({a},body)),cache:'no-store',signal:typeof AbortSignal!=='undefined'&&AbortSignal.timeout?AbortSignal.timeout(20000):undefined});return r.json();}
+(function(){try{const r=new URLSearchParams(location.search).get('ref')||'';if(/^(r_[a-f0-9]{10}|ref_\d{3,15})$/.test(r)&&!localStorage.getItem('zk.acct'))localStorage.setItem('zk.ref',r);}catch(e){}})();
+function pendingRef(){try{const r=localStorage.getItem('zk.ref')||'';return /^(r_[a-f0-9]{10}|ref_\d{3,15})$/.test(r)?r:'';}catch(e){return '';}}
+function clearPendingRef(){try{localStorage.removeItem('zk.ref');}catch(e){}}
+function rememberRef(j){if(!acct||!j||typeof j.ref!=='string'||!/^[a-f0-9]{10}$/.test(j.ref))return;acct.ref=j.ref;try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}}
+function bonusList(j){return Array.isArray(j&&j.bonus)?j.bonus.filter(x=>x&&x.amt>0&&x.name):[];}
+function stashBonus(j){const list=bonusList(j);if(list.length){try{sessionStorage.setItem('zk.bonus',JSON.stringify(list));}catch(e){}}return list;}
+function acctBonus(j){const list=bonusList(j);if(!list.length)return;const sum=list.reduce((s,x)=>s+(+x.amt||0),0);if(typeof walletNote==='function')walletNote(sum);
+  for(const x of list)if(typeof addEvent==='function'&&typeof fmtMoney==='function')addEvent(`👋 ${x.name} провёл в городе 5 минут. Вам ${fmtMoney(x.amt)}`,'say');}
+function showStashedBonus(){let raw=[];try{raw=JSON.parse(sessionStorage.getItem('zk.bonus')||'[]');sessionStorage.removeItem('zk.bonus');}catch(e){return;}acctBonus({bonus:raw});}
+function inviteUrl(code){if(typeof TG!=='undefined'&&TG.on)return `https://t.me/${typeof TG_BOT==='string'?TG_BOT:'zhivaya_kazan_bot'}/${typeof TG_APP==='string'?TG_APP:'game'}?startapp=r_${code}`;
+  const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('ref','r_'+code);return u.toString();}
+function closeInvite(){const m=$('#inviteModal');if(m)m.hidden=true;if(typeof player!=='undefined')player.busy=false;}
+async function openInvite(){const m=$('#inviteModal');if(!m)return;const menu=$('#menuModal');if(menu)menu.hidden=true;m.hidden=false;if(typeof player!=='undefined')player.busy=true;
+  const link=$('#inviteLink'),msg=$('#inviteMsg'),copy=$('#inviteCopy'),share=$('#inviteShare');
+  if(!acct){if(link)link.value='';if(msg)msg.textContent='Сначала войдите: меню, блок «Аккаунт». Без входа ссылку не сделать.';if(copy)copy.disabled=true;if(share)share.disabled=true;return;}
+  if(!acct.ref){try{const j=await acctCall('load',{token:acct.token});if(j&&j.ok){rememberRef(j);acctBonus(j);}}catch(e){}}
+  if(!acct.ref){if(msg)msg.textContent='Не удалось получить ссылку. Проверьте связь и откройте окно ещё раз.';if(copy)copy.disabled=true;if(share)share.disabled=true;return;}
+  const url=inviteUrl(acct.ref);if(link)link.value=url;if(copy)copy.disabled=false;if(share)share.disabled=typeof navigator.share!=='function';
+  if(msg)msg.textContent='Скопируйте ссылку и отправьте. 5 000 ₽ придут, когда друг пробудет в городе пять минут.';}
+if($('#inviteClose'))$('#inviteClose').addEventListener('click',closeInvite);
+if($('#inviteBtn'))$('#inviteBtn').addEventListener('click',()=>openInvite());
+if($('#inviteCopy'))$('#inviteCopy').addEventListener('click',async()=>{const v=$('#inviteLink')&&$('#inviteLink').value;if(!v)return;
+  try{await navigator.clipboard.writeText(v);$('#inviteMsg').textContent='Ссылка скопирована.';}catch(e){const el=$('#inviteLink');if(el){el.focus();el.select();}$('#inviteMsg').textContent='Выделите ссылку и скопируйте её.';}});
+if($('#inviteShare'))$('#inviteShare').addEventListener('click',async()=>{const v=$('#inviteLink')&&$('#inviteLink').value;if(!v||typeof navigator.share!=='function')return;
+  try{await navigator.share({title:'Живая Казань',text:'Заходи в «Живую Казань» — живой город.',url:v});}catch(e){}});
+setTimeout(showStashedBonus,2500);
 // Снимки и поручение живут в браузере отдельно от zk.state. В аккаунт кладём только короткие пути к файлам
 // и само поручение: нарисованная открытка (data:) тяжёлая и на другой телефон не нужна. Нет ключа — не трогаем
 // чужое сохранение: пустой телефон не стирает галерею, которая есть на втором устройстве.
@@ -152,23 +178,25 @@ function acctSnapshot(){if(window.zkNoSave)return null;const wo=typeof walletOut
 // одно сохранение за раз: второе с той же base, пока первое в пути, сервер счёл бы чужим (конфликт)
 async function acctSave(){if(!acct||window.zkNoSave||Net.saving)return;if(!Net.syncReady){if(Net.acct&&!(typeof TG!=='undefined'&&TG.on))acctSyncOnBoot();return;}const snap=acctSnapshot();if(!snap||!snap.state)return;
   Net.saving=true;const {wsnap,...body}=snap;
-  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},body));if(j.ok){if(j.updated)setRev(j.updated);if(typeof walletAfter==='function')walletAfter(j.wallet,wsnap);return;}
+  try{const j=await acctCall('save',Object.assign({token:acct.token,base:syncRev||undefined},body));if(j.ok){if(j.updated)setRev(j.updated);rememberRef(j);acctBonus(j);if(typeof walletAfter==='function')walletAfter(j.wallet,wsnap);return;}
     if(j.err==='conflict'){if(typeof walletDrop==='function')walletDrop();acctConflict();return;}   // на сервере новее: игра открыта на другом устройстве (или там «Начать заново»)
     if(j.err==='too_big'&&!Net.bigTold){Net.bigTold=true;setHint('Сохранение слишком большое — на сервер не уходит. Напишите нам');}
     if(j.err==='auth'){acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}renderAcct();}}catch(e){}finally{Net.saving=false;}}
-async function acctLogin(name,pin){const j=await acctCall('login',{name,pin}).catch(()=>({err:'net'}));
+async function acctLogin(name,pin){const j=await acctCall('login',{name,pin,ref:pendingRef()}).catch(()=>({err:'net'}));
   const E={name:'Имя — от 2 букв',pin:'PIN — от 4 до 8 цифр',wrong_pin:'Неверный PIN для этого имени',locked:'Слишком много попыток. Подождите 15 минут',rate_limited:'Слишком часто. Попробуйте через минуту',net:'Нет связи с сервером'};
   if(j.err){$('#acctMsg').textContent=E[j.err]||'Не получилось';return;}
   if(!j.created&&j.state&&localHasGame()&&!confirm('У этого игрока на сервере уже есть игра — загрузить её? Прогресс этого браузера заменится.')){$('#acctMsg').textContent='Вход отменён: остаётся игра этого браузера';return;}
-  acct={token:j.token,name:j.name};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
-  if(!j.created&&j.state){acctApply(j);return;}
+  acct={token:j.token,name:j.name,ref:j.ref};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
+  if(j.created)clearPendingRef();if(!j.created&&j.state){stashBonus(j);acctApply(j);return;}
+  acctBonus(j);
   setRev(j.updated||0);Net.syncReady=true;await acctSave();$('#acctMsg').textContent=j.created?'Аккаунт создан. Прогресс сохраняется на сервере':'Вошли. Прогресс сохраняется на сервере';renderAcct();}
 function renderAcct(){const hud=$('#acctHud');if(hud)hud.hidden=!!acct||!Net.acct;const box=$('#acctBox');if(!box)return;box.hidden=!Net.acct;if(!Net.acct)return;const inForm=$('#acctForm'),out=$('#acctOut');
   const tg=acct&&acct.tg;const p=inForm.querySelector('p');const go=$('#acctGo');const ob=$('#acctOutBtn');
   const inTg=typeof TG!=='undefined'&&TG.on;const tr=$('#acctTgRow');if(tr)tr.hidden=!Net.tg||inTg||!!acct;const pr=$('#pTgRow');if(pr)pr.hidden=!Net.tg||inTg||!!acct;
   if(tg){inForm.hidden=false;out.hidden=false;$('#acctWho').textContent=acct.name+' (Телеграм)';if(p)p.textContent='Уже играли на сайте под именем с PIN? Введите их — Телеграм будет открывать того игрока.';if(go)go.textContent='Привязать';if(ob)ob.hidden=inTg;return;}
   if(p)p.textContent='Войдите — деньги, работа и репутация будут храниться на сервере и откроются с любого устройства. Нового игрока создаст первый вход.';if(go)go.textContent='Войти';if(ob)ob.hidden=false;
-  if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}}
+  if(acct){inForm.hidden=true;out.hidden=false;$('#acctWho').textContent=acct.name;}else{inForm.hidden=false;out.hidden=true;}
+  const ib=$('#inviteBtn');if(ib)ib.hidden=false;}
 if($('#acctGo'))$('#acctGo').addEventListener('click',()=>acct&&acct.tg&&typeof tgLink==='function'?tgLink($('#acctName').value,$('#acctPin').value):acctLogin($('#acctName').value,$('#acctPin').value));
 if($('#acctOutBtn'))$('#acctOutBtn').addEventListener('click',async()=>{await acctSave();acct=null;try{localStorage.removeItem('zk.acct');}catch(e){}$('#acctMsg').textContent='Вы вышли. Прогресс остался на сервере';renderAcct();});
 if($('#acctHud'))$('#acctHud').addEventListener('click',e=>{e.stopPropagation();$('#menuBtn').click();const box=$('#acctBox');if(box)box.scrollIntoView({block:'center'});if(!acct){const n=$('#acctName');if(n)n.focus();}});
@@ -184,7 +212,7 @@ async function acctTgStart(){if(TGW.poll&&performance.now()<TGW.until){if(TGW.li
   TGW.poll=j.poll;TGW.link=j.link;TGW.until=performance.now()+(j.ttl||300)*1000;window.open(j.link,'_blank');
   tgwMsg('Откройте Телеграм: в чате с ботом нажмите «Запустить», потом «Да, войти». Ждём…');clearTimeout(TGW.timer);TGW.timer=setTimeout(tgwPoll,2500);}
 async function tgwPoll(){if(!TGW.poll)return;if(performance.now()>TGW.until){TGW.poll=null;tgwMsg('Время на вход вышло. Нажмите «Войти через Телеграм» ещё раз');return;}
-  let j=null;try{j=await acctCall('tgwebpoll',{poll:TGW.poll});}catch(e){}
+  let j=null;try{j=await acctCall('tgwebpoll',{poll:TGW.poll,ref:pendingRef()});}catch(e){}
   if(!j||j.wait){TGW.timer=setTimeout(tgwPoll,document.hidden?5000:2000);return;}
   TGW.poll=null;if(!j.ok){tgwMsg(j.err==='denied'?'Вход отменён в Телеге':'Ссылка устарела. Нажмите «Войти через Телеграм» ещё раз');return;}
   // в Телеге уже есть игра — загрузится она (как при входе по имени и PIN); новый аккаунт — положим туда то, что уже есть в браузере
@@ -192,8 +220,9 @@ async function tgwPoll(){if(!TGW.poll)return;if(performance.now()>TGW.until){TGW
     // спрашиваем, только если в браузере уже своя игра: персонаж создан и деньги или время ушли от стартовых
     const mine=localHasGame();
     if(mine&&!confirm('В Телеге у вас уже есть игра — загрузить её? Прогресс этого браузера заменится.')){tgwMsg('Вход отменён: остаётся игра этого браузера');return;}}
-  acct={token:j.token,name:j.name,tg:true,tgId:j.tgId};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
-  if(!j.created&&j.state){acctApply(j);return;}
+  acct={token:j.token,name:j.name,tg:true,tgId:j.tgId,ref:j.ref};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
+  if(j.created)clearPendingRef();if(!j.created&&j.state){stashBonus(j);acctApply(j);return;}
+  acctBonus(j);
   setRev(j.updated||0);Net.syncReady=true;await acctSave();tgwMsg('Вы вошли через Телеграм. Прогресс сохраняется на сервере и открывается и в Телеге, и здесь');renderAcct();}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TGW.poll){clearTimeout(TGW.timer);tgwPoll();}});
 for(const id of ['#acctTgBtn','#pTgBtn'])if($(id))$(id).addEventListener('click',acctTgStart);
@@ -218,7 +247,7 @@ function acctApply(j){
 // при запуске: если на сервере сохранение новее (играли с другого устройства) — взять его
 async function acctSyncOnBoot(){if(!acct||Net.syncing||Net.syncReady)return;if(acct.tg&&typeof TG!=='undefined'&&TG.on)return;   // в Телеге вход и загрузку делает tg.js
   Net.syncing=true;try{const j=await acctCall('load',{token:acct.token});if(j.err==='auth'){acct=null;localStorage.removeItem('zk.acct');renderAcct();return;}
-  if(j.ok)acctBootSync(j);}catch(e){}finally{Net.syncing=false;}}
+  if(j.ok){rememberRef(j);stashBonus(j);if(!acctBootSync(j))showStashedBonus();}}catch(e){}finally{Net.syncing=false;}}
 // Игра открыта на другом устройстве и оно сохранилось позже: здесь пауза и ни одного сохранения, пока игрок не выберет «Играть здесь»
 // (тогда берём свежую копию с сервера). Побеждает устройство, открытое последним, — без перезагрузок туда-сюда каждые 30 секунд.
 function acctConflict(){Net.syncReady=false;const m=$('#otherDevModal');if(!m||!m.hidden)return;m.hidden=false;player.busy=true;}

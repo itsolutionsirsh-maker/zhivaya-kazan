@@ -114,21 +114,25 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
     db.exec('CREATE TABLE IF NOT EXISTS visits(d TEXT,id TEXT,PRIMARY KEY(d,id)) WITHOUT ROWID;CREATE TABLE IF NOT EXISTS firsts(id TEXT PRIMARY KEY,d TEXT,src TEXT) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS firsts_d ON firsts(d);');
     // воронка историй новичка (story.js): какой шаг прошёл игрок — только номер устройства (хэш) и день
     db.exec('CREATE TABLE IF NOT EXISTS funnel(s TEXT,st TEXT,id TEXT,d TEXT,PRIMARY KEY(s,st,id)) WITHOUT ROWID;CREATE INDEX IF NOT EXISTS funnel_d ON funnel(d);');
-    for(const c of ['tg TEXT','city TEXT','refBy TEXT','invites TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
+    for(const c of ['tg TEXT','city TEXT','refBy TEXT','invites TEXT','refCode TEXT','playSec REAL','playAt REAL','refPaid INTEGER','refNotes TEXT'])try{db.exec('ALTER TABLE accounts ADD COLUMN '+c);}catch(e){}
+    try{db.exec('CREATE INDEX IF NOT EXISTS acc_ref ON accounts(refCode)');}catch(e){}
     const q={get:db.prepare('SELECT * FROM accounts WHERE k=?'),byTok:db.prepare('SELECT * FROM accounts WHERE tok=?'),ins:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated) VALUES(?,?,?,?,?,?,0)'),
       tok:db.prepare('UPDATE accounts SET tok=?,fails=0 WHERE k=?'),fail:db.prepare('UPDATE accounts SET fails=?,lock_until=? WHERE k=?'),save:db.prepare('UPDATE accounts SET state=?,profile=?,city=?,updated=? WHERE k=?'),count:db.prepare('SELECT COUNT(*) n FROM accounts'),
       tokIns:db.prepare('INSERT OR REPLACE INTO tokens(tok,k,t) VALUES(?,?,?)'),tokGet:db.prepare('SELECT k FROM tokens WHERE tok=?'),tokOld:db.prepare('DELETE FROM tokens WHERE k=? AND tok NOT IN (SELECT tok FROM tokens WHERE k=? ORDER BY t DESC LIMIT 8)'),
       tgGet:db.prepare('SELECT k FROM tgmap WHERE id=?'),tgSet:db.prepare('INSERT OR REPLACE INTO tgmap(id,k) VALUES(?,?)'),setTg:db.prepare('UPDATE accounts SET tg=? WHERE k=?'),setRef:db.prepare('UPDATE accounts SET refBy=? WHERE k=?'),setPin:db.prepare('UPDATE accounts SET salt=?,pin=? WHERE k=?'),
       imp:db.prepare('INSERT OR REPLACE INTO accounts(k,name,salt,pin,tok,state,profile,city,created,updated,fails,lock_until,tg,refBy,invites) VALUES(?,?,?,?,\'\',?,?,?,?,?,0,0,?,?,?)'),setInv:db.prepare('UPDATE accounts SET invites=? WHERE k=?'),insTg:db.prepare('INSERT INTO accounts(k,name,salt,pin,tok,created,updated,tg) VALUES(?,?,\'\',\'\',\'\',?,0,?)'),
+      setRefCode:db.prepare('UPDATE accounts SET refCode=? WHERE k=?'),byRef:db.prepare('SELECT k FROM accounts WHERE refCode=?'),
+      setPlay:db.prepare('UPDATE accounts SET playSec=?,playAt=? WHERE k=?'),setRefPaid:db.prepare('UPDATE accounts SET refPaid=1 WHERE k=?'),setNotes:db.prepare('UPDATE accounts SET refNotes=? WHERE k=?'),
       rmAcc:db.prepare('DELETE FROM accounts WHERE k=?'),rmTok:db.prepare('DELETE FROM tokens WHERE k=?'),rmTg:db.prepare('DELETE FROM tgmap WHERE k=?'),
       vis:db.prepare('INSERT OR IGNORE INTO visits(d,id) VALUES(?,?)'),first:db.prepare('INSERT OR IGNORE INTO firsts(id,d,src) VALUES(?,?,?)'),
       dau:db.prepare('SELECT d,COUNT(*) n FROM visits WHERE d>=? GROUP BY d'),nu:db.prepare('SELECT d,COUNT(*) n FROM firsts WHERE d>=? GROUP BY d'),
       ret:db.prepare("SELECT f.d,COUNT(*) n FROM firsts f JOIN visits v ON v.id=f.id AND v.d=date(f.d,'+'||?||' day') WHERE f.d>=? GROUP BY f.d"),
       src:db.prepare('SELECT src,COUNT(*) n FROM firsts WHERE d>=? GROUP BY src ORDER BY n DESC LIMIT 12'),everyone:db.prepare('SELECT COUNT(*) n FROM firsts'),
       fun:db.prepare('INSERT OR IGNORE INTO funnel(s,st,id,d) VALUES(?,?,?,?)'),funStat:db.prepare('SELECT s,st,COUNT(*) n FROM funnel WHERE d>=? GROUP BY s,st')};
-    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[]});
+    const row=r=>r&&Object.assign({},r,{state:r.state?JSON.parse(r.state):null,profile:r.profile?JSON.parse(r.profile):null,city:r.city?JSON.parse(r.city):null,invites:r.invites?JSON.parse(r.invites):[],refNotes:r.refNotes?JSON.parse(r.refNotes):[]});
     return {kind:'sqlite',db,get:k=>row(q.get.get(k)),byTok:t=>{const m=q.tokGet.get(t);return m?row(q.get.get(m.k)):row(q.byTok.get(t));},
       addTok:(k,t)=>{q.tokIns.run(t,k,now());q.tokOld.run(k,k);},tgGet:id=>{const m=q.tgGet.get(id);return m?m.k:null;},tgSet:(id,k)=>{q.tgSet.run(id,k);q.setTg.run(id,k);},setRef:(k,r)=>q.setRef.run(r,k),setInvites:(k,l)=>q.setInv.run(JSON.stringify(l||[]),k),setPin:(k,salt,pin)=>q.setPin.run(salt,pin,k),
+      setRefCode:(k,c)=>q.setRefCode.run(c,k),byRef:c=>{const m=q.byRef.get(c);return m?m.k:null;},setPlay:(k,sec,at)=>q.setPlay.run(sec,at,k),setRefPaid:k=>q.setRefPaid.run(k),setRefNotes:(k,l)=>q.setNotes.run(JSON.stringify(l||[]),k),
       importAcc:a=>q.imp.run(a.k,a.name,a.salt||'',a.pin||'',JSON.stringify(a.state??null),JSON.stringify(a.profile??null),JSON.stringify(a.city??null),a.created||now(),a.updated||0,a.tg||null,a.refBy||null,JSON.stringify(a.invites||[])),
       importTok:(h,k,t)=>q.tokIns.run(h,k,t||now()),createTg:(k,name,id)=>q.insTg.run(k,name,now(),id),create:(k,name,salt,pin,tok)=>q.ins.run(k,name,salt,pin,tok,now()),setTok:(k,t)=>q.tok.run(t,k),
       remove:k=>{q.rmAcc.run(k);q.rmTok.run(k);q.rmTg.run(k);},setFail:(k,f,l)=>q.fail.run(f,l,k),save:(k,s,p,c)=>q.save.run(JSON.stringify(s),JSON.stringify(p),JSON.stringify(c??null),now(),k),count:()=>q.count.get().n,
@@ -139,6 +143,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
   const flush=()=>{if(!dirty)return;dirty=false;fs.writeFileSync(F+'.tmp',JSON.stringify(acc));fs.renameSync(F+'.tmp',F);};setInterval(flush,3000).unref();
   return {kind:'json',get:k=>acc[k]||null,byTok:t=>Object.values(acc).find(a=>a.tok===t||(a.toks||[]).includes(t))||null,
     addTok:(k,t)=>{const a=acc[k];a.toks=[t].concat(a.toks||[]).slice(0,8);dirty=true;},tgGet:id=>{const a=Object.values(acc).find(x=>x.tg===id&&x.k!=='tg:'+id)||acc['tg:'+id];return a?a.k:null;},tgSet:(id,k)=>{acc[k].tg=id;dirty=true;},setRef:(k,r)=>{acc[k].refBy=r;dirty=true;},setInvites:(k,l)=>{acc[k].invites=l||[];dirty=true;},setPin:(k,salt,pin)=>{acc[k].salt=salt;acc[k].pin=pin;dirty=true;},
+    setRefCode:(k,c)=>{acc[k].refCode=c;dirty=true;},byRef:c=>{const a=Object.values(acc).find(x=>x.refCode===c);return a?a.k:null;},setPlay:(k,sec,at)=>{acc[k].playSec=sec;acc[k].playAt=at;dirty=true;},setRefPaid:k=>{acc[k].refPaid=1;dirty=true;},setRefNotes:(k,l)=>{acc[k].refNotes=l||[];dirty=true;},
     importAcc:a=>{acc[a.k]=Object.assign({tok:'',fails:0,lock_until:0},a);dirty=true;},importTok:(h,k)=>{const a=acc[k];if(a){a.toks=[h].concat(a.toks||[]).slice(0,8);dirty=true;}},
     createTg:(k,name,id)=>{acc[k]={k,name,salt:'',pin:'',tok:'',tg:id,state:null,profile:null,city:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},create:(k,name,salt,pin,tok)=>{acc[k]={k,name,salt,pin,tok,state:null,profile:null,created:now(),updated:0,fails:0,lock_until:0};dirty=true;},
     remove:k=>{delete acc[k];dirty=true;},setTok:(k,t)=>{acc[k].tok=t;acc[k].fails=0;dirty=true;},setFail:(k,f,l)=>{acc[k].fails=f;acc[k].lock_until=l;dirty=true;},save:(k,s,p,c)=>{acc[k].state=s;acc[k].profile=p;acc[k].city=c??null;acc[k].updated=now();dirty=true;},count:()=>Object.keys(acc).length,
@@ -187,13 +192,14 @@ const hashPin=(pin,salt)=>crypto.scryptSync(pin,salt,32).toString('hex');
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 // секреты сравниваем за равное время и только одинаковой длины в байтах (иначе timingSafeEqual бросает исключение)
 const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
-function login(name,pin,ip){name=clean(name,24);pin=String(pin||'');if(name.length<2||name.includes(':'))return {err:'name'};   // «tg:…» — ключи аккаунтов Телеги
+function login(name,pin,ip,ref){name=clean(name,24);pin=String(pin||'');if(name.length<2||name.includes(':'))return {err:'name'};   // «tg:…» — ключи аккаунтов Телеги
   if(!/^\d{4,8}$/.test(pin))return {err:'pin'};
   if(!allow('login:'+ip,10,60))return {err:'rate_limited'};const k=name.toLowerCase();let a=store.get(k);let created=false;const token=crypto.randomBytes(24).toString('hex');
-  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));return {ok:1,token,name,created:true,state:null,profile:null};}
+  if(!a){if(!allow('create:'+ip,5,3600))return {err:'rate_limited'};const salt=crypto.randomBytes(16).toString('hex');store.create(k,name,salt,hashPin(pin,salt),sha(token));store.addTok(k,sha(token));
+    const invitedBy=attachRef(k,ref,name);const made=store.get(k);return {ok:1,token,name,created:true,state:null,profile:null,invitedBy,ref:refCodeOf(made)};}
   if(a.lock_until&&a.lock_until>now())return {err:'locked'};
   if(!pinOk(a,pin)){const f=(a.fails||0)+1;store.setFail(k,f>=8?0:f,f>=8?now()+900:0);return {err:'wrong_pin'};}
-  store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated};}
+  store.addTok(k,sha(token));return {ok:1,token,name:a.name,created,state:a.state,profile:a.profile,city:a.city,updated:a.updated,ref:refCodeOf(store.get(k)),bonus:takeRefNotes(k)};}
 // PIN: свой scrypt; у самых старых аккаунтов — bcrypt (после первого входа переводим на scrypt)
 function pinOk(a,pin){if(a.salt==='bcrypt'){let bc=null;try{bc=require('bcryptjs');}catch(e){return false;}const ok=bc.compareSync(pin,String(a.pin).replace(/^\$2y\$/,'$2b$'));if(ok){const salt=crypto.randomBytes(16).toString('hex');store.setPin(a.k,salt,hashPin(pin,salt));}return ok;}
   try{return crypto.timingSafeEqual(Buffer.from(hashPin(pin,a.salt),'hex'),Buffer.from(a.pin,'hex'));}catch(e){return false;}}
@@ -209,8 +215,24 @@ function saveFor(token,state,profile,city,base,wal){const a=accByToken(token);if
   try{w=wallet.commit(a.k,{prior:a.state,incoming:state,wal:wal&&typeof wal==='object'?wal:null},()=>store.save(a.k,state||a.state,profile||a.profile,city||a.city));}catch(e){log('сохранение не записалось:',e.message);return {err:'busy'};}
   if(w.init&&w.init.req>w.init.amt)log('кошелёк: перенос урезан',w.init.req,'→',w.init.amt,'у',a.k);
   {const cut=w.res.reduce((s,x)=>s+(x.cut||0),0)+(w.init?w.init.firstReq-w.init.first:0);if(cut>0)log('кошелёк: сверх потолка не засчитано',cut,'у',a.k);}
-  const b=store.get(a.k);return {ok:1,updated:b?b.updated:now(),wallet:w};}
-function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated},extra||{});}
+  const b=store.get(a.k);refTick(a.k);return {ok:1,updated:b?b.updated:now(),wallet:w,ref:b?refCodeOf(b):undefined,bonus:takeRefNotes(a.k)};}
+function accOut(a,extra){return Object.assign({ok:1,name:a.name,tg:!!a.tg,state:a.state,profile:a.profile,city:a.city||null,updated:a.updated,ref:refCodeOf(a)},extra||{});}
+function refCodeOf(a){if(!a)return '';if(a.refCode&&/^[a-f0-9]{10}$/.test(a.refCode))return a.refCode;
+  let code=sha('zkref:'+a.k).slice(0,10);const other=store.byRef(code);if(other&&other!==a.k)code=sha('zkref2:'+a.k).slice(0,10);
+  store.setRefCode(a.k,code);a.refCode=code;return code;}
+function inviterByRef(ref){if(typeof ref!=='string')return null;
+  const tg=/^ref_(\d{3,15})$/.exec(ref);if(tg){const ik=store.tgGet(tg[1])||(store.get('tg:'+tg[1])?'tg:'+tg[1]:null);return ik?store.get(ik):null;}
+  const web=/^r_([a-f0-9]{10})$/.exec(ref);if(!web)return null;const ik=store.byRef(web[1]);return ik?store.get(ik):null;}
+function attachRef(newK,ref,name){const inv=inviterByRef(ref);if(!inv||inv.k===newK)return null;
+  store.setRef(newK,inv.k);store.setInvites(inv.k,(inv.invites||[]).concat([{name:clean(name,24)||'Игрок',t:Math.floor(now())}]).slice(-20));return inv.name;}
+function notesOf(a){const n=a&&a.refNotes;if(Array.isArray(n))return n;if(typeof n==='string'&&n){try{const p=JSON.parse(n);return Array.isArray(p)?p:[];}catch(e){return [];}}return [];}
+function takeRefNotes(k){const a=store.get(k);const n=notesOf(a).filter(x=>x&&x.amt>0).slice(-20);if(n.length)store.setRefNotes(k,[]);return n;}
+function refTick(k){const a=store.get(k);if(!a)return;const t=now();let sec=+a.playSec||0;const prev=+a.playAt||0;
+  if(prev>0){const gap=t-prev;if(gap>=1&&gap<=180)sec+=Math.min(45,gap);}store.setPlay(k,sec,t);
+  if(sec<300||!a.refBy||a.refPaid||a.refBy===k)return;const inv=store.get(a.refBy);if(!inv||inv.k===k)return;
+  const g=wallet.grant(inv.k,5000,'ref'+sha(a.k).slice(0,20),'Друг '+clean(a.name,24),'ref');
+  if(!g||(!g.ok&&!g.dup))return;store.setRefPaid(k,1);
+  if(g.ok&&!g.dup)store.setRefNotes(inv.k,notesOf(inv).concat([{name:a.name,amt:g.amt||5000}]).slice(-20));}
 // мини-приложение Телеги: initData подписан ботом, проверяем HMAC-SHA256 (ключ — HMAC «WebAppData» от токена бота)
 const TG_TOKEN=ENV.TG_BOT_TOKEN||'';
 function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096||!TG_TOKEN)return null;let sp;try{sp=new URLSearchParams(initData);}catch(e){return null;}
@@ -219,18 +241,13 @@ function tgVerify(initData){if(typeof initData!=='string'||initData.length>4096|
   const ok=[pairs,pairs.filter(([k])=>k!=='signature')].some(set=>{const dcs=set.slice().sort((x,y)=>x[0]<y[0]?-1:x[0]>y[0]?1:0).map(([k,v])=>k+'='+v).join('\n');const h=crypto.createHmac('sha256',secret).update(dcs).digest('hex');return safeEq(h,hash.toLowerCase());});
   if(!ok)return null;if(now()-(+sp.get('auth_date')||0)>86400)return null;let u=null;try{u=JSON.parse(sp.get('user')||'');}catch(e){}if(!u||!u.id)return null;
   return {id:String(Math.trunc(+u.id)),name:clean(((u.first_name||'')+' '+(u.last_name||'')).trim(),24)||'Игрок',start:clean(sp.get('start_param')||'',64)};}
-function tgLogin(initData,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};return tgAccount(u);}
+function tgLogin(initData,ip,ref){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tg:'+ip,30,60))return {err:'rate_limited'};const u=tgVerify(initData);if(!u)return {err:'tg_bad'};if(!u.start&&typeof ref==='string')u.start=clean(ref,64);return tgAccount(u);}
 // аккаунт игрока Телеги (u = {id, name, start}): тот же и в мини-приложении, и на сайте после входа через бота
 function tgAccount(u){
   let k=store.tgGet(u.id)||('tg:'+u.id);let a=store.get(k);let created=false,invitedBy=null;
   // под ключом tg:<id> лежит аккаунт, созданный не Телегой (имя «tg:…» до запрета) — владельцу Телеги его не отдаём
   if(a&&!store.tgGet(u.id)&&String(a.tg||'')!==u.id){log('Телега: ключ',k,'занят не Телегой — беру tgid:'+u.id);k='tgid:'+u.id;a=store.get(k);}
-  if(!a){store.createTg(k,u.name,u.id);created=true;
-    // новый игрок пришёл по ссылке друга: ref_<id Телеги друга>
-    const m=/^ref_(\d{3,15})$/.exec(u.start);
-    if(m&&m[1]!==u.id){const ik=store.tgGet(m[1])||('tg:'+m[1]);const inv=store.get(ik);
-      if(inv){store.setRef(k,ik);invitedBy=inv.name;store.setInvites(ik,(inv.invites||[]).concat([{name:u.name,t:Math.floor(now())}]).slice(-20));}}
-    a=store.get(k);}
+  if(!a){store.createTg(k,u.name,u.id);created=true;invitedBy=attachRef(k,u.start,u.name);a=store.get(k);}
   const invites=a.invites||[];if(invites.length&&!created)store.setInvites(k,[]);   // кто пришёл по ссылке этого игрока, пока он не заходил
   const token=crypto.randomBytes(24).toString('hex');store.addTok(k,sha(token));return accOut(a,{token,created,tgName:u.name,start:u.start,invitedBy,invites});}
 // бот: на /start отвечаем прямо в ответе на вебхук — серверу не нужно самому ходить в api.telegram.org
@@ -296,9 +313,9 @@ function tgWebStart(req,ip){if(!TG_TOKEN)return {err:'no_tg'};if(!allow('tgweb:'
   const code=crypto.randomBytes(12).toString('base64url'),poll=crypto.randomBytes(18).toString('base64url');
   TGW.set(code,{poll,t:now(),st:'wait',ua:clean(String(req.headers['user-agent']||''),300),tg:null,name:''});TGW_POLL.set(poll,code);
   return {ok:1,poll,ttl:TGW_TTL,link:'https://t.me/'+SETUP_BOT+'?start=login_'+code};}
-function tgWebPoll(poll,ip){if(!allow('tgwp:'+ip,150,60))return {err:'rate_limited'};const code=typeof poll==='string'?TGW_POLL.get(poll):null;const e=code?tgwGet(code):null;
+function tgWebPoll(poll,ip,ref){if(!allow('tgwp:'+ip,150,60))return {err:'rate_limited'};const code=typeof poll==='string'?TGW_POLL.get(poll):null;const e=code?tgwGet(code):null;
   if(!e)return {err:'expired'};if(e.st==='wait')return {wait:1};TGW.delete(code);TGW_POLL.delete(poll);if(e.st!=='ok')return {err:'denied'};
-  return Object.assign(tgAccount({id:e.tg,name:e.name||'Игрок',start:''}),{tgId:e.tg});}
+  return Object.assign(tgAccount({id:e.tg,name:e.name||'Игрок',start:typeof ref==='string'?clean(ref,64):''}),{tgId:e.tg});}
 function uaShort(ua){const b=/YaBrowser/.test(ua)?'Яндекс Браузер':/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'браузер';
   const o=/iPhone|iPad/.test(ua)?'iPhone/iPad':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac OS X/.test(ua)?'Mac':/Linux/.test(ua)?'Linux':'';return b+(o?', '+o:'');}
 setInterval(()=>{for(const code of TGW.keys())tgwGet(code);},60000).unref();
@@ -611,17 +628,17 @@ async function handleReq(req,res){
     if(a==='mod')return send(res,200,modAdmin(req,body));
     if(a==='setup')return send(res,200,await setupSave(body,ip));
     if(a==='llm')return send(res,200,await apiLlm(body,ip));
-    if(a==='login')return send(res,200,login(body.name,body.pin,ip));
+    if(a==='login')return send(res,200,login(body.name,body.pin,ip,body.ref));
     if(a==='save')return send(res,200,saveFor(body.token,body.state,body.profile,body.city,body.base,body.wallet));
-    if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv}));}
+    if(a==='load'){const acc=accByToken(body.token);if(!acc)return send(res,200,{err:'auth'});const inv=acc.invites||[];if(inv.length)store.setInvites(acc.k,[]);return send(res,200,accOut(acc,{invites:inv,bonus:takeRefNotes(acc.k)}));}
     if(a==='tgwebhook'){const pair=await tgWebhook(req,body);return send(res,pair[0],pair[1]);}
     if(a==='reset')return send(res,200,resetFor(body.token));
-    if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip));
+    if(a==='tglogin')return send(res,200,tgLogin(body.initData,ip,body.ref));
     if(a==='tglink')return send(res,200,tgLink(body.token,body.name,body.pin,ip));
     if(a==='tgweb')return send(res,200,tgWebStart(req,ip));
     if(a==='boot')return send(res,200,bootReport(body,ip));
     if(a==='story')return send(res,200,storyReport(body,ip));
-    if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip));
+    if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip,body.ref));
     if(a==='pay')return send(res,200,await payFor(req,body));
     if(a==='platega'){const r=await platega.callback(req.headers,body);if(r.k)grantPaid(r.k);return send(res,r.code||200,r.err&&r.code!==200?{err:r.err}:{ok:1});}
     return send(res,404,{err:'unknown_action'});}

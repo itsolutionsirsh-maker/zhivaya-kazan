@@ -49,3 +49,4 @@ function walletAfter(r,snap){if(!r||!walletOn()||typeof r.who!=='string')return;
   if(typeof saveState==='function')saveState();}
 // сохранение отвергнуто: этот прогресс не будет принят — и его деньги тоже; новые операции — только после загрузки с сервера
 function walletDrop(){WAL.pend=[];WAL.base=null;}
+function walletNote(d){if(d)WAL.note={d,until:Date.now()+15000};}

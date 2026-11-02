@@ -601,9 +601,19 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div id="ignBox"><h3 class="sub">Скрытые игроки</h3><div id="ignList"></div></div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
-    <div class="row menu-options"><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="courtyardBtn">🏡 Свой двор</button><button class="btn" id="inviteBtn" hidden>Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
+    <div class="row menu-options"><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="courtyardBtn">🏡 Свой двор</button><button class="btn primary" id="inviteBtn">Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button></div>
     <p class="legal"><a href="privacy.html" target="_blank" rel="noopener">Правила и конфиденциальность</a> · помощь и удаление аккаунта — в боте <a href="https://t.me/zhivaya_kazan_bot" target="_blank" rel="noopener">@zhivaya_kazan_bot</a></p>
+  </div>
+</div>
+
+<div class="modal" id="inviteModal" hidden style="z-index:40">
+  <div class="box">
+    <h2>Позвать друга</h2>
+    <p>Друг открывает вашу ссылку, входит и проводит в городе 5 минут. Вам на карту падает 5 000 ₽. Каждому другу — один раз. Ссылку может сделать только тот, кто вошёл в игру.</p>
+    <input id="inviteLink" type="text" readonly>
+    <div class="row"><button class="btn primary" id="inviteCopy">Скопировать</button><button class="btn" id="inviteShare">Отправить</button><button class="btn" id="inviteClose">Закрыть</button></div>
+    <p id="inviteMsg"></p>
   </div>
 </div>
 

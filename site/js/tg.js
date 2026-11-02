@@ -30,13 +30,14 @@ async function tgLogin(){const W=TG.W;if(!W||!W.initData){TG.state='nodata';retu
   try{
     // уже входили с этого телефона — пробуем сохранённый ключ, новый не выпускаем
     if(acct&&acct.tg&&acct.tgId===uid){const j=await acctCall('load',{token:acct.token});if(j&&j.ok){TG.state='ok';tgAfter(j);return;}}
-    const j=await acctCall('tglogin',{initData:W.initData});
+    const j=await acctCall('tglogin',{initData:W.initData,ref:typeof pendingRef==='function'?pendingRef():''});
     if(j.err==='no_tg'){TG.state='no_tg';tgMsg('Вход через Телеграм ещё не настроен на сервере — прогресс пока хранится только в этом телефоне');return;}
     if(j.err){TG.state='err';tgMsg('Не получилось войти через Телеграм ('+j.err+')');return;}
-    acct={token:j.token,name:j.name,tg:true,tgId:uid};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
+    acct={token:j.token,name:j.name,tg:true,tgId:uid,ref:j.ref};try{localStorage.setItem('zk.acct',JSON.stringify(acct));}catch(e){}
+    if(j.created&&typeof clearPendingRef==='function')clearPendingRef();
     TG.state='ok';tgAfter(j);
   }catch(e){TG.state='net';}}
-function tgAfter(j){if(typeof renderAcct==='function')renderAcct();
+function tgAfter(j){if(typeof renderAcct==='function')renderAcct();if(typeof acctBonus==='function')acctBonus(j);
   // приглашения: запомним до перезагрузки, покажем после
   try{const q=JSON.parse(localStorage.getItem('zk.invq')||'[]');if(j.invitedBy)q.push(['invited',j.invitedBy]);for(const v of (j.invites||[]))q.push(['inviter',v.name]);localStorage.setItem('zk.invq',JSON.stringify(q.slice(-10)));}catch(e){}
   if(acctBootSync(j))return;   // на сервере новее (другое устройство) — загрузим и перезапустим; иначе своя игра и сразу на сервер (net.js)
@@ -61,8 +62,7 @@ function tgIntroDraw(){const [ic,t,x]=TG_INTRO[tgIntroI];document.getElementById
   document.getElementById('tgIntroDots').textContent=TG_INTRO.map((_,i)=>i===tgIntroI?'●':'○').join('');document.getElementById('tgIntroNext').textContent=tgIntroI<TG_INTRO.length-1?'Дальше':'Играть';}
 function tgIntroClose(){document.getElementById('tgIntro').hidden=true;if(typeof player!=='undefined')player.busy=false;try{localStorage.setItem('zk.tgintro','1');}catch(e){}}
 (function(){const n=document.getElementById('tgIntroNext'),k=document.getElementById('tgIntroSkip');if(!n)return;
-  n.addEventListener('click',()=>{if(tgIntroI<TG_INTRO.length-1){tgIntroI++;tgIntroDraw();}else tgIntroClose();});k.addEventListener('click',tgIntroClose);
-  const ib=document.getElementById('inviteBtn');if(ib)ib.addEventListener('click',tgInvite);})();
+  n.addEventListener('click',()=>{if(tgIntroI<TG_INTRO.length-1){tgIntroI++;tgIntroDraw();}else tgIntroClose();});k.addEventListener('click',tgIntroClose);})();
 // подсказки для клавиатуры в Телеге подменяем своими
 function tgSwapHowto(){if(!TG.on)return;const h=document.getElementById('howtoModal');if(!h||h.hidden)return;let seen=false;try{seen=!!localStorage.getItem('zk.tgintro');}catch(e){}
   const c=document.getElementById('howtoClose');if(c)c.click();else h.hidden=true;if(!seen)tgIntroShow();}
