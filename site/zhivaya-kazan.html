@@ -78,6 +78,8 @@ body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 #logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
 #feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
 #tripBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(244,197,66,.7);pointer-events:auto}#tripBox .btn{padding:3px 8px;font-size:11px}
+#taxiRide{position:fixed;left:12px;bottom:96px;z-index:6;width:132px;aspect-ratio:3/4;border:0;padding:0;border-radius:16px;overflow:hidden;cursor:pointer;background:#1a2420 center 18%/cover no-repeat url("img/faces/taxi-driver.jpg");box-shadow:0 10px 28px rgba(0,0,0,.4)}
+#taxiRide[hidden]{display:none}#taxiRide span{position:absolute;left:0;right:0;bottom:0;padding:22px 8px 8px;background:linear-gradient(transparent,rgba(0,0,0,.78));color:#fff;font:600 12px "IBM Plex Sans",sans-serif;text-align:left}
 #rtList,#rtPlans{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}#rtList[hidden],#rtPlans[hidden]{display:none!important}
 .season-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:4px 0 2px}.season-bar i{display:block;height:100%;background:linear-gradient(90deg,#8FC6E8,#E7F3FA);border-radius:4px}.season-lvl{font-size:12.5px;padding:3px 2px;color:var(--text,#e8efe9);border-bottom:1px solid var(--line)}.season-lvl.got{color:var(--muted)}.season-lvl.next{font-weight:600}
 .wear-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--line);border-radius:10px}.wear-row>i{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.25)}.wear-row>div{flex:1;min-width:0;display:flex;flex-direction:column}.wear-row b{font-size:13px}.wear-row span{font-size:11.5px;color:var(--muted)}.wear-row .btn{flex:none}
@@ -410,7 +412,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
   <div class="mid"><div id="feed"></div></div>
   <div class="bottom">
     <div id="joy"><i></i></div>
-    <div id="action"><div id="sitCard" hidden><div class="sc-head"><span id="scIcon">❗</span><b id="scTitle"></b><button id="scX" aria-label="Скрыть">×</button></div><p id="scText"></p><div id="scBtns"></div><i id="scTimer"></i></div><div id="tripBox" hidden><span id="tripLbl"></span><button class="btn" id="tripResume" hidden>Продолжить</button><button class="btn" id="tripCancel">Отменить</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compTalk" title="Поговорить">💬</button><button class="btn" id="compFollow" hidden>Идти самому</button><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
+    <div id="action"><div id="sitCard" hidden><div class="sc-head"><span id="scIcon">❗</span><b id="scTitle"></b><button id="scX" aria-label="Скрыть">×</button></div><p id="scText"></p><div id="scBtns"></div><i id="scTimer"></i></div><div id="tripBox" hidden><span id="tripLbl"></span><button class="btn" id="tripResume" hidden>Продолжить</button><button class="btn" id="tripDriver" hidden>Водитель</button><button class="btn" id="tripCancel">Отменить</button></div><div id="compBox" hidden><span id="compLbl"></span><button class="btn" id="compTalk" title="Поговорить">💬</button><button class="btn" id="compFollow" hidden>Идти самому</button><button class="btn" id="compBye">Отпустить</button></div><div id="vehBox" hidden><span id="vehLbl"></span></div><button class="btn primary" id="actBtn" hidden></button><div id="hint" hidden></div></div>
     <div class="side">
       <canvas id="mini" class="card" width="420" height="300"></canvas>
       <div class="zoom"><button class="btn mebtn" id="centerBtn" title="Показать меня вблизи" aria-label="Показать меня"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="6.5" r="3.1" fill="currentColor"/><path d="M5.5 19.5c.7-3.6 3-5.4 6.5-5.4s5.8 1.8 6.5 5.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button><button class="btn" id="zin">+</button><button class="btn" id="zout">−</button></div>
@@ -569,12 +571,13 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
   </div>
 </div>
 
+<button id="taxiRide" hidden><span id="taxiRideName">Водитель</span></button>
 <div class="modal" id="chatModal" hidden>
   <div class="box">
     <div class="persona"><div class="face" id="npcFace">А</div><div><b id="npcName">Айрат</b><span id="npcJob">студент</span></div><div class="face" id="meFace" hidden title="Вы"></div></div>
     <div class="chat" id="chatLog"></div>
     <div class="row"><input type="text" id="chatInput" placeholder="Скажите что-нибудь…" maxlength="200" style="flex:1"><button class="btn primary" id="chatSend">Сказать</button></div>
-    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl"></span><span style="display:flex;gap:8px"><button class="btn" id="chatOrder" hidden>🍽 Заказать ещё</button><button class="btn" id="chatClose">Попрощаться</button></span></div>
+    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl"></span><span style="display:flex;gap:8px"><button class="btn" id="taxiTip" hidden>На чай 200 ₽</button><button class="btn" id="chatOrder" hidden>🍽 Заказать ещё</button><button class="btn" id="chatClose">Попрощаться</button></span></div>
   </div>
 </div>
 
@@ -698,4 +701,4 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
 <template id="zkLater"><script src="js/folk3.js"></script></template>
-<script src="js/faces.js"></script><script src="js/sky-slot.js"></script><script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script>
+<script src="js/faces.js"></script><script src="js/sky-slot.js"></script><script src="js/main.js"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script>
