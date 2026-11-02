@@ -356,7 +356,7 @@ const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyVec=[0,0];joyKnob.s
 
 // ---------- обновление игрока ----------
 function updatePlayer(dt){routeTick();player.stepping=false;
-  if(player.state==='hurt'){player.hurtT+=dt;if(player.hurtT>60&&!cine){addEvent('Скорая доставила вас в больницу');playerToHospital(null);}return;}
+  if(player.state==='hurt'){player.hurtT+=dt;if(player.hurtT>60&&!cine&&!window.ambRideOn){player.hurtT=0;addEvent('Скорая доставила вас в больницу');playerToHospital(null);}return;}
   if(player.bus){player.x=player.bus.x;player.y=player.bus.y;return;}
   if(player.vehicle){updateVehicle(dt);return;}
   if(player.talkTarget){const t=player.talkTarget;if(t.bus||player.busy||t.state==='hurt'){player.talkTarget=null;}else if(dist(t.x,t.y,player.x,player.y)<5){player.talkTarget=null;player.waypoints=null;openChat(t);return;}}

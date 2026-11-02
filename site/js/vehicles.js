@@ -125,7 +125,9 @@ function playerHitByCar(vehicle){if(player.state==='hurt'||cine)return;player.st
   const ac=createAccident({x:player.x,y:player.y,kind:'ped',cars:vehicle.kind?[vehicle]:[],victim:'player',jaywalk:!zebra});
   startCine('hit',vehicle.kind?'Вас сбила машина!':'Вас сбил автобус!',3.4);addEvent(`Вас сбил${vehicle.kind?'а машина':' автобус'}${ac.road?' — '+ac.road:''}. Вызвана скорая`,'alert');
   player.energy=clamp(player.energy-35,0,100);player.mood=clamp(player.mood-30,0,100);}
-function playerToHospital(hosp){if(player.state!=='hurt')return;const h=hosp||pick(world.pois.filter(p=>p.t==='hospital'));player.state='ok';
+function playerToHospital(hosp){if(player.state!=='hurt'||window.ambRideOn)return;const h=hosp||pick(world.pois.filter(p=>p.t==='hospital'));
+  if(!player._ambShown&&typeof ambulanceRide==='function'){player._ambShown=true;window.ambRideOn=true;ambulanceRide({mode:'self',hospital:h&&h.n},()=>{window.ambRideOn=false;player.state='hurt';playerToHospital(h);});return;}
+  player.state='ok';player._ambShown=false;
   if(h){const n=nearestNode(h.x,h.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);player.x=sp[0];player.y=sp[1];}cam.x=player.x;cam.y=player.y;}
   const bill=Math.min(player.money,1500);player.money-=bill;spendTime(120);player.energy=Math.max(player.energy,45);
   addEvent(`Вас подлечили${h&&h.n?' в «'+h.n+'»':' в больнице'}: −${bill} ₽, два часа`);

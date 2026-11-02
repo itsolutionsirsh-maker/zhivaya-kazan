@@ -197,7 +197,18 @@ function dispatchPolice(ac){let best=null,bd=1e9;for(const p of policeCars){if(p
 function dispatchAmbulance(ac){const hosp=world.pois.filter(p=>p.t==='hospital');if(!hosp.length)return;let hb=hosp[0],hd=1e9;for(const h of hosp){const d=dist(h.x,h.y,ac.x,ac.y);if(d<hd){hd=d;hb=h;}}const hn=nearestNode(hb.x,hb.y,world.carAdj,200);if(hn<0)return;
   const tgt=nearestNode(ac.x,ac.y,world.carAdj,150);let sn=emergencyStart(ac,tgt);
   if(sn<0)sn=nodeNear(world.carNodes,[ac.x,ac.y],320);const amb=new Car('amb',sn);amb.vmax=17;amb.target=tgt;amb.sceneXY=[ac.x,ac.y];amb.homeNode=hn;amb.hospital=hb;amb.state='idle';amb.ttl=rnd(0.5,1.5);
-  amb.onScene=()=>{addEvent(ac.victim==='player'?'Скорая приехала за вами':'Скорая на месте, помогают пострадавшим');amb.sceneTtl=ac.victim==='player'?6:30;};cars.push(amb);ac.amb=amb;}
+  amb.onScene=()=>{addEvent(ac.victim==='player'?'Скорая приехала за вами':ac.playerCar?'Скорая забирает с вашего ДТП':'Скорая на месте, помогают пострадавшим');if(beginAmbRide(ac,amb))return;amb.sceneTtl=ac.victim==='player'?6:30;};cars.push(amb);ac.amb=amb;}
+function playerAccident(ac){return !!(ac&&(ac.victim==='player'||ac.playerCar));}
+function beginAmbRide(ac,amb){if(!ac||ac.rode||window.ambRideOn||typeof ambulanceRide!=='function'||!playerAccident(ac))return false;ac.rode=true;ac.hold=true;window.ambRideOn=true;if(amb)amb.sceneTtl=1e9;
+  const mode=ac.victim==='player'?'self':(ac.kind==='ped'?'ped':'crash');const name=ac.victim&&ac.victim.p?ac.victim.p.name:'пешеход';const hosp=amb&&amb.hospital;
+  const go=()=>{if(player.vehicle&&typeof exitVehicle==='function')exitVehicle();ambulanceRide({mode,name,road:ac.road||'',hospital:hosp&&hosp.n},()=>finishAmbRide(ac,amb,hosp));};
+  const wait=()=>{if(typeof cine!=='undefined'&&cine){setTimeout(wait,300);return;}go();};setTimeout(wait,500);return true;}
+function finishAmbRide(ac,amb,hosp){ac.hold=false;window.ambRideOn=false;player.busy=false;
+  const h=hosp||(world&&world.pois?pick(world.pois.filter(p=>p.t==='hospital')):null);
+  const drop=()=>{if(!h)return;const n=nearestNode(h.x,h.y,world.pedAdj,120);if(n>=0){const sp=sidewalkPos(n);player.x=sp[0];player.y=sp[1];}cam.x=player.x;cam.y=player.y;};
+  if(ac.victim==='player'){player.state='ok';player.hurtT=0;drop();const bill=Math.min(Math.max(0,player.money||0),1500);player.money-=bill;if(typeof spendTime==='function')spendTime(120);player.energy=Math.max(player.energy,45);player.mood=clamp(player.mood-5,0,100);addEvent(`Вас подлечили${h&&h.n?' в «'+h.n+'»':''}: −${bill} ₽`,'alert');setHint('Вы у больницы. Сегодня лучше не бегать.');}
+  else{drop();if(ac.victim&&ac.victim!=='player'&&ac.victim.recover)ac.victim.recover();addEvent(ac.kind==='ped'?'Пострадавшего оставили в больнице. Вы на улице у приёмного.':'Осмотр после ДТП закончен. Вы у больницы.','say');setHint('Вы у больницы.');}
+  if(amb){sendAmbHome(amb);ac.amb=null;}ac.victim=null;}
 function createAccident(o){const ac=Object.assign({t:0,cars:[],victim:null,kind:'cars',police:null,amb:null,cleared:false,reported:false,road:nearestRoadName(o.x,o.y)},o);accidents.push(ac);if(!ac.medical)dispatchPolice(ac);dispatchAmbulance(ac);
   // зеваки
   for(const w of walkers){if(w.role==='guard'||w.bus||w.rally||w.companion||w.sitBy||w.folk||w.state!=='walk'&&w.state!=='idle')continue;if(dist(w.x,w.y,ac.x,ac.y)<70&&Math.random()<0.5){const n=nearestNode(ac.x,ac.y,world.pedAdj,120);if(n<0)continue;w.goalPoi=null;w.goalStop=null;w.state='routing';requestPath(w,world.pedAdj,w.node,n,pedCost,path=>{if(w.state!=='routing')return;if(!path||path.length<2){w.state='idle';w.ttl=2;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';w.arrive=function(){this.path=null;this.state='gather';this.gatherTtl=rnd(25,60);const an=rnd(0,TAU);this.x=ac.x+Math.cos(an)*rnd(6,11);this.y=ac.y+Math.sin(an)*rnd(6,11);delete this.arrive;};});}}
@@ -248,7 +259,7 @@ function treatVictim(ac){const v=ac.victim;if(!v)return;const serious=Math.rando
   if(v.state!=='hurt')return;if(serious){v.recover();return;}const p=toSidewalk(v.x,v.y);v.x=p[0];v.y=p[1];v.node=nearestNode(v.x,v.y,world.pedAdj,120);if(v.node<0)v.node=pick(world.pedNodes);v.state='idle';v.ttl=rnd(3,8);v.say={t:pick(['Спасибо, доктор…','Всё, я в порядке','Больше не побегу через дорогу']),ttl:5};}
 function sendAmbHome(amb){amb.target=null;amb.goHome=true;amb.onScene=null;amb.state='idle';amb.newGoal(amb.homeNode);}
 function updateAccidents(dt){
-  for(let i=accidents.length-1;i>=0;i--){const ac=accidents[i];ac.t+=dt;
+  for(let i=accidents.length-1;i>=0;i--){const ac=accidents[i];if(ac.hold)continue;ac.t+=dt;
     if(ac.amb&&ac.amb.state==='scene'){ac.amb.sceneTtl-=dt;if(ac.amb.sceneTtl<=0){treatVictim(ac);sendAmbHome(ac.amb);ac.amb=null;ac.victim=null;}}
     const done=ac.t>(ac.kind==='ped'?150:110);
     if(done&&!ac.cleared){ac.cleared=true;if(ac.kind!=='ped')addEvent(`Эвакуатор убрал машины${ac.road?' ('+ac.road+')':''}, движение восстановлено`);
