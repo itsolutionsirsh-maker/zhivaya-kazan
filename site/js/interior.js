@@ -70,7 +70,10 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
     :why==='tea'
     ?(npc.p.female?'Садись. Чайник ставлю, и спокойно поговорим.':'Садись. Чай поставлю, и поговорим.')
     :(npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.');
-  setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
+  setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});
+    const warm=typeof weather!=='undefined'&&weather&&weather.t!=null?weather.t>=16:true;
+    if(it.kind==='home'&&warm&&!npc.p.coatOff)setTimeout(()=>{if(scene!=='interior'||interior!==it)return;const coat=npc.p.female?'Жарко дома. Куртку сниму и повешу — в свитере нормально.':'Жарко. Куртку сниму, в свитере посижу.';npc.p.coatOff=true;npc.p.memory.push({role:'assistant',content:coat});if(chatNpc===npc&&!$('#chatModal').hidden)appendMsg('npc',coat);else addEvent(`${npc.p.name}: ${coat}`,'say');},3200);
+  },700);}
 function interiorPhoto(it){if(it&&it===interior){const g=typeof tableFrameCanvas==='function'?tableFrameCanvas():null;if(g)return g;}if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}
 function privateTogether(){if(scene!=='interior'||!interior||typeof companion==='undefined'||!companion)return false;const k=interior.kind;
   if(k==='home'||k==='guest'||k==='hotelroom')return true;const npc=interior.npcs&&interior.npcs.find(n=>n.companionOf===companion.w);return !!(npc&&npc.seated);}

@@ -80,7 +80,7 @@ function claimHomeAt(wx,wy){pickingHome=false;canvas.style.cursor='';
   if(player.hasCar&&(carHome||!ownCar))placeOwnCar();
   const street=nearestRoadName(best.cx,best.cy)||'этот двор';
   mark(null,'home',best.cx,best.cy,'🏠','Дом',{arrow:true,color:'#2BB062'});
-  addEvent(`🏠 Теперь вы живёте здесь: ${street}`);setHint(player.hasCar&&(carHome||!ownCar)?`Дом: ${street}. Машина стоит у подъезда`:`Дом: ${street}${player.hasCar?'. Машина осталась там, где вы её оставили':''}`);saveState();}
+  addEvent(`🏠 Теперь вы живёте здесь: ${street}`);setHint(player.hasCar&&(carHome||!ownCar)?`Дом: ${street}. Машина стоит у подъезда`:`Дом: ${street}${player.hasCar?'. Машина осталась там, где вы её оставили':''}`);saveState();if(typeof pendingHomeGo==='function')pendingHomeGo();}
 
 // ---------- автобус ----------
 function boardBus(bus,stop){if(player.vehicle||player.bus||player.inside)return false;journeyHint('boarding',bus,player.x,player.y,bus.x,bus.y);player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;if(window.citySaveShot)citySaveShot(/трамва/i.test(busWord(bus.route.type))?'Трамвай':'Автобус');addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}

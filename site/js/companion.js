@@ -71,7 +71,7 @@ function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.
   const eat=free&&MENU[it.kind];addEvent(`${w.p.name} заходит с вами${eat?' и занимает столик — подходите, закажем':''}`,'say');
   if(eat){const t=pick(['Я тут столик заняла, иди сюда!','Садись, я место заняла.','Вот свободный столик, давай сюда!']);npc.say={t:w.p.female?t:t.replace('заняла','занял'),ttl:6};}}
 function companionContext(w){const ww=w.companionOf||w;if(!companion||companion.w!==ww)return '';const c=companion;
-  if(w.companionOf&&interior){const f=w.tableF;const why=w.p&&w.p.homeWhy;const job=why==='repair'?' Вы дома на диване. Продолжай про поломку: где течёт, что сделать. Обычный быт.':why==='tea'?' Вы дома на диване, пьёте чай и разговариваете.':'';return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.${job}`;}
+  if(w.companionOf&&interior){const f=w.tableF;const why=w.p&&w.p.homeWhy;const coat=w.p&&w.p.coatOff?' Куртку уже сняла и повесила, осталась в свитере. Больше ничего не снимает.':'';const job=why==='repair'?' Вы дома на диване. Продолжай про поломку: где течёт, что сделать. Обычный быт.':why==='tea'?' Вы дома на диване, пьёте чай и разговариваете.':'';return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.${job}${coat}`;}
   return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в ${qName(c.dest.n)}.`:' Ты сейчас гуляешь вместе с собеседником.';}
 function drawCompanionMark(toS,z){if(!companion||companion.w.inside||player.inside)return;const w=companion.w;const [sx,sy]=toS(w.x,w.y);
   ctx.save();ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(sx,sy,Math.max(1.3*z,9),0,TAU);ctx.stroke();ctx.setLineDash([]);
@@ -106,16 +106,18 @@ function homeDeal(w,reply,act){if(w&&w.p&&w.p.age&&w.p.age<18)return false;if(w&
   const goes=/(пойд[её]м|пойду|подойду|приду|идем|гляну|посмотрю|зайду|подъеду|поехали)/.test(said);
   const actGo=act&&(act.action==='follow'||act.action==='go'||act.action==='home');
   return !!(goes||actGo||playerAskedHome(w));}
-function syncChatGo(){const b=$('#chatGo');if(!b)return;const w=typeof chatNpc!=='undefined'?chatNpc:null;const on=!!(w&&w.p&&w.p.homeOffer&&!(player.inside&&interior&&(interior.kind==='home'||interior.kind==='hotelroom')));b.hidden=!on;if(on)b.textContent='Поехать домой';}
+function syncChatGo(){const b=$('#chatGo');if(!b)return;const w=typeof chatNpc!=='undefined'?chatNpc:null;const on=!!(w&&w.p&&w.p.homeOffer&&!(player.inside&&interior&&(interior.kind==='home'||interior.kind==='hotelroom')));b.hidden=!on;if(on)b.textContent=player.home?'Поехать домой':'Указать дом';}
 function noteHomeOffer(w,reply,act){if(!w||!w.p||!homeDeal(w,reply,act))return;if(companion&&companion.homeVisit)return;w.p.homeOffer=true;w.p.homeWhy=homeReason(w);syncChatGo();
-  appendMsg('sys',player.home?'Договорились. Кнопка «Поехать домой» — потом пешком, самокат, такси или автобус.':'Договорились, но своего дома ещё нет: меню → «Работа и жильё».');}
+  appendMsg('sys',player.home?'Договорились. Кнопка «Поехать домой» — потом пешком, самокат, такси или автобус.':'Договорились, но дома ещё нет. Нажми «Указать дом» и ткни жилой дом на карте — иначе ехать некуда. Потом сразу выберем дорогу.');}
 function pressGoHome(){const w=typeof chatNpc!=='undefined'?chatNpc:null;if(!w)return;
-  if(!player.home){setHint('Своего дома ещё нет. Меню → «Работа и жильё» или анкета района');return;}
   let who=w.companionOf||(!w.isInterior?w:null);
   if(!who&&w.isInterior&&typeof applyNpcAction==='function'){applyNpcAction(w,{action:'follow',place:''});who=w.companionOf;}
   if(!who&&companion&&(companion.w.p===w.p))who=companion.w;
   if(!who||who.isInterior){setHint('Сначала выйдите на улицу вместе');return;}
+  if(!player.home){pendingHomeWho=who;if(typeof closeChat==='function')closeChat();pickingHome=true;if(typeof canvas!=='undefined')canvas.style.cursor='crosshair';setHint('Нажми на жилой дом — он станет твоим, и сразу поедете');addEvent(`${who.p.name} ждёт: укажи, где твой дом`,'say');return;}
   w.p.homeOffer=false;syncChatGo();walkHomeTogether(who);}
+let pendingHomeWho=null;
+function pendingHomeGo(){const who=pendingHomeWho;if(!who||!player.home)return;pendingHomeWho=null;if(who.p)who.p.homeOffer=false;setTimeout(()=>{if(player.home)walkHomeTogether(who);},350);}
 function paintHomeTogether(it){if(!it||!companion)return;const bg=shotImg.homeSofa||shotImg.home;const who=companion.w;const cnv=document.createElement('canvas');cnv.width=1280;cnv.height=720;const g=cnv.getContext('2d');
   if(bg&&bg.complete&&bg.width){const s=Math.max(1280/bg.width,720/bg.height),dw=bg.width*s,dh=bg.height*s;g.drawImage(bg,(1280-dw)/2,(720-dh)/2,dw,dh);}
   else{g.fillStyle='#241c16';g.fillRect(0,0,1280,720);if(bg&&!bg._wait){bg._wait=1;bg.addEventListener('load',()=>paintHomeTogether(it),{once:true});}}

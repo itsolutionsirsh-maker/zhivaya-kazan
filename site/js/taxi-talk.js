@@ -2,17 +2,30 @@
 // потом оказывается, что бизнесы есть, а баранку крутит для души.
 const TAXI_PIC='img/faces/taxi-driver.jpg';
 function taxiPick(a){return a[Math.floor(Math.random()*a.length)];}
-function taxiHard(w){return taxiPick([
+function taxiMate(){const c=typeof companion!=='undefined'&&companion&&companion.w&&companion.w.p;return c?c.name:'';}
+function taxiHard(w){const m=taxiMate();return taxiPick(m?[
+  `О, ${player.name}, и ${m} с тобой. Жизнь тяжёлая. Бензин — космос, на Кольце стою по часу. Вам обоим расскажу, не обижайтесь.`,
+  `Смена злая, а вас двое на заднем. С шести утра баранку кручу, спина деревенеет. ${m}, ты тоже слушай: чай в термосе остыл ещё у Кремля.`,
+  `Эх, пробки, штрафы, резина лысая. ${player.name}, ${m}, таксую, потому что иначе совсем никак.`
+]:[
   `Ой, ${player.name}, жизнь тяжёлая. Бензин — космос, на Кольце стою по часу, а дома ещё говорят, что опять без ужина.`,
   `Слушай, смена злая. С шести утра баранку кручу, спина деревенеет, чай в термосе остыл ещё у Кремля.`,
   `Эх. Пробки, штрафы, резина лысая. Таксую, потому что иначе совсем никак.`
 ]);}
-function taxiAsk(){return taxiPick([
+function taxiAsk(){const m=taxiMate();return taxiPick(m?[
+  `Слушай, ${player.name}, накинь на чай, а? ${m} не против, человеку на эчпочмак приятно.`,
+  'Может, чаевые будут? Вас двое, а смена всё равно тяжёлая. Хоть чай с чебуреком.',
+  `Накинь пару сотен, будь человеком. ${m}, ты подтверди: я сегодня ещё нормально не ел.`
+]:[
   'Слушай, накинь на чай, а? Счётчик счётчиком, а человеку на эчпочмак приятно.',
   'Может, чаевые будут? Не обижайся. Смена тяжёлая, хоть чай с чебуреком.',
   'Накинь пару сотен, будь человеком. Я сегодня ещё нормально не ел.'
 ]);}
-function taxiReveal(){return taxiPick([
+function taxiReveal(){const m=taxiMate();return taxiPick(m?[
+  `Ладно, ${player.name}, и ты, ${m}, не смотрите так. Шашлычная и две точки с шаурмой — мои, люди там работают. А я за руль сажусь, когда в кабинете душно. Для души.`,
+  'Шучу я про голод. Цех свой есть и машины в аренду. Таксую, чтоб не закиснуть. Вам двоим можно, секрет недорогой.',
+  'Не жалейте меня. Бизнес уже кормит. Такси — это я для души выехал, город послушать. А вас двоих везти даже веселее.'
+]:[
   'Ладно, не смотри так. У меня шашлычная и две точки с шаурмой, люди там работают. А я за руль сажусь, когда в кабинете душно. Для души.',
   'Шучу я про голод. Цех свой есть и машины в аренду. Таксую, чтоб не закиснуть. Дорогу люблю, вот и всё.',
   'Не жалей меня сильно. Бизнес уже кормит. Такси — это я для души выехал, город послушать.'
@@ -54,7 +67,7 @@ function taxiReply(w,text){const t=norm(text);
 if(typeof boardTaxi==='function'){const board0=boardTaxi;boardTaxi=function(){const ok=board0.apply(this,arguments);if(ok&&player.vehicle&&player.vehicle.kind==='taxi')taxiRideBegan(player.vehicle);return ok;};}
 if(typeof taxiExit==='function'){const exit0=taxiExit;taxiExit=function(){taxiRideEnd();return exit0.apply(this,arguments);};}
 if(typeof placeChatLook==='function'){const look0=placeChatLook;placeChatLook=function(){look0.apply(this,arguments);if(!(chatNpc&&chatNpc.taxiRide))return;const box=$('#chatModal')&&$('#chatModal').querySelector('.box');if(!box)return;box.style.backgroundImage=`linear-gradient(rgba(12,16,14,.34),rgba(12,16,14,.7)),url("${TAXI_PIC}")`;box.style.backgroundSize='cover';box.style.backgroundPosition='center 30%';};}
-if(typeof contextForNpc==='function'){const ctx0=contextForNpc;contextForNpc=function(w){const base=ctx0.apply(this,arguments);if(!w||!w.taxiRide)return base;const st=w.stage||0;return base+` Сейчас ты за рулём такси, пассажир на заднем сиденье. Ты казанский бомбила. Говори коротко, по-свойски, без мата. Сюжет такой и его нельзя ломать: сначала тяжёлая жизнь, потом просьба чаевых, и только после этого признание, что свои бизнесы уже есть (шаурма, шашлычная, аренда), а таксуешь для души. Сейчас этап ${st}: ${st<2?'ещё не проси бизнес, жалуйся и выйди на чаевые':st<3?'попроси чаевые, про бизнес пока намекни осторожно':'бизнес уже назван, не притворяйся бедным'}. Чаевые уже: ${w.tipped||0} ₽.`;};}
+if(typeof contextForNpc==='function'){const ctx0=contextForNpc;contextForNpc=function(w){const base=ctx0.apply(this,arguments);if(!w||!w.taxiRide)return base;const st=w.stage||0;const mate=typeof companion!=='undefined'&&companion&&companion.w&&companion.w.p?companion.w.p.name:'';return base+` Сейчас ты за рулём такси.${mate?` На заднем сиденье двое: ${player.name} и ${mate}. Болтай с обоими.`:' Пассажир на заднем сиденье.'} Ты казанский бомбила. Говори коротко, по-свойски, без мата. Сюжет такой и его нельзя ломать: сначала тяжёлая жизнь, потом просьба чаевых, и только после этого признание, что свои бизнесы уже есть (шаурма, шашлычная, аренда), а таксуешь для души. Сейчас этап ${st}: ${st<2?'ещё не проси бизнес, жалуйся и выйди на чаевые':st<3?'попроси чаевые, про бизнес пока намекни осторожно':'бизнес уже назван, не притворяйся бедным'}. Чаевые уже: ${w.tipped||0} ₽.`;};}
 if(typeof scriptedThink==='function'){const think0=scriptedThink;scriptedThink=function(w,text){if(w&&w.taxiRide)return taxiReply(w,text);return think0.apply(this,arguments);};}
 if(typeof closeChat==='function'){const close0=closeChat;closeChat=function(){const w=chatNpc;const r=close0.apply(this,arguments);if(w&&w.taxiRide){w.closed=true;const tip=$('#taxiTip');if(tip)tip.hidden=true;}return r;};}
 if(typeof updateTripBox==='function'){const trip0=updateTripBox;updateTripBox=function(){trip0.apply(this,arguments);const on=!!(player.vehicle&&player.vehicle.kind==='taxi'&&player.vehicle.talk);taxiRideCard(on);};}
