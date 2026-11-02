@@ -268,7 +268,7 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
   if(scene==='city')showLook(e.clientX,e.clientY,1600);
   if(pickingDest){pickDestAt(wx,wy);return;}
-  if(pickingHome){claimHomeAt(wx,wy);return;}
+  if(typeof pickingHome!=='undefined'&&pickingHome){claimHomeAt(wx,wy);return;}
   followPlayer();
   if(player.vehicle){if(player.vehicle.kind==='taxi')return;if(driveTo(wx,wy)){player.vehicle.dest=journeyDest({x:wx,y:wy,n:'Точка на карте'});updateTripBox();}return;}
   for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
