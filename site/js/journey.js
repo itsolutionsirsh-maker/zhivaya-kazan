@@ -37,6 +37,8 @@ function startRentalPlan(o,d){
   if(!journeyAvailable()||!journeyPresent(o)){setHint('Транспорт уже недоступен. Выберите другой');return false;}
   const q=journeyRentalQuote(o,d);if(!Number.isFinite(q.sec)){setHint('Не нашли путь к месту или транспорту');return false;}
   if(player.money<q.cost){setHint('Не хватает денег на поездку по этому маршруту');return false;}
+  if(o.kind==='own'&&dist(player.x,player.y,o.x,o.y)<=5){JOURNEY.rental={object:o,dest:journeyDest(d),stage:'board'};
+    if(enterVehicle(o)!==true){JOURNEY.rental=null;return false;}addEvent('Машина поехала сама');updateTripBox();return true;}
   cancelTrip(true);JOURNEY.rental={object:o,dest:journeyDest(d),stage:'walk'};followPlayer();
   if(dist(player.x,player.y,o.x,o.y)>4&&!walkTo(o.x,o.y,true)){JOURNEY.rental=null;return false;}
   addEvent(`${journeyIcon(o.kind)} Идём к транспорту: ${VEH[o.kind].label}`);updateTripBox();return true;

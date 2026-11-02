@@ -3,6 +3,7 @@
 // ---------- проезд в автобусе ----------
 defSit('fare',{title:'Оплата проезда',quiet:true,multi:false,
   start(s){if(typeof errandCityRide==='function'&&errandCityRide('bus')){player.fare='paid';sitCard({s,icon:'🎫',tone:'good',title:'Проезд',text:'По поручению проезд оплатил город.',ttl:4,choices:[{t:'Ок',primary:true,run:()=>endSit(s)}],onTimeout:()=>endSit(s)});return true;}
+    if(player.money<BUS_FARE&&typeof roadMoney==='function')roadMoney('на проезд');
     if(player.money<BUS_FARE){player.fare='hare';setHint('На проезд не хватает — едете зайцем');return false;}
     sitCard({s,icon:'🎫',title:`Проезд ${BUS_FARE} ₽`,text:'Приложить карту к валидатору?',ttl:8,
       choices:[{t:`Оплатить ${BUS_FARE} ₽`,primary:true,run:()=>{if(player.money>=BUS_FARE){player.money-=BUS_FARE;player.fare='paid';}else player.fare='hare';endSit(s);}},{t:'Проехать зайцем',run:()=>{player.fare='hare';endSit(s);}}],
@@ -40,40 +41,77 @@ function forgotCall(s){const c=s.car;if(!c||!cars.includes(c)||c.crashed){s.phas
 function forgotLose(s){if(/продукт/.test(s.what||'')&&player.pantry>0)player.pantry--;sitMood(-6);addEvent(`${s.what||'Вещи'} уехал${/зонтик/.test(s.what||'')?'':'и'} с таксистом`);}
 function forgotDone(s){if(/продукт/.test(s.what))player.pantry=(player.pantry||0);sitMood(4);endSit(s);}
 
-// ---------- парковка: эвакуатор и штрафстоянка ----------
-function parkingBad(x,y){
+// ---------- парковка: как в Казани — нельзя стоять, не оплатил, эвакуатор, штрафстоянка ----------
+// Будни 8:00–19:00 платно, выходные бесплатно. Час: 100 ₽ у Кремля, 70, 50 и 30 ₽ дальше.
+// В жизни на старт сессии дают 15 минут; здесь это полторы минуты, иначе игрок этого не увидит.
+// Эвакуация: тротуар, переход, остановка, газон, пешеходная улица, магистраль — и неоплаченная платная стоянка.
+// Стоянки города: Аделя Кутуя 157Б, Нариманова 40, Тэцевская 5Б, Малиновка на М-7. Эвакуация 3 100 ₽.
+const PARK_LOTS=[
+  {name:'штрафстоянке на ул. Аделя Кутуя, 157Б',ll:[55.7708,49.2312]},
+  {name:'штрафстоянке на ул. Нариманова, 40',ll:[55.7824,49.1235]},
+  {name:'штрафстоянке на ул. Тэцевская, 5Б',ll:[55.8622,49.0885]},
+  {name:'штрафстоянке в Малиновке, М-7',ll:[55.791,48.845]}];
+const PARK_EVAC=3100;
+function parkLotXY(l){if(!world||!world.meta||typeof llToXY!=='function')return null;const q=llToXY(l.ll);return {x:q[0],y:q[1],name:l.name};}
+function nearOwnYard(x,y){const b=player.home;if(!b)return false;const R=Math.max(36,(b.bb[2]-b.bb[0])/2+14,(b.bb[3]-b.bb[1])/2+14);return dist(x,y,b.cx,b.cy)<R;}
+function parkCenter(){if(world.kremlin)return [world.kremlin.x,world.kremlin.y];if(typeof llToXY==='function')return llToXY([55.79902,49.10617]);return [0,0];}
+function parkingTariff(x,y){if(nearOwnYard(x,y))return 0;const h=(clock.minutes/60)%24;if((typeof isWeekend==='function'&&isWeekend())||h<8||h>=19)return 0;
+  const c=parkCenter(),d=dist(x,y,c[0],c[1]);if(d<650)return 100;if(d<1200)return 70;if(d<2000)return 50;if(d<3400)return 30;return 0;}
+function parkingIllegal(x,y){if(nearOwnYard(x,y))return null;
+  for(const a of world.areas){if(a.k!=='park'&&a.k!=='forest'&&a.k!=='grass')continue;if(x<a.bb[0]||x>a.bb[2]||y<a.bb[1]||y>a.bb[3])continue;if(pointInPoly(a.p,x,y))return 'на газоне';}
+  for(const s of world.stops){if(Math.abs(s.x-x)<22&&Math.abs(s.y-y)<22&&dist(s.x,s.y,x,y)<15)return 'ближе 15 м к остановке';}
+  for(const c of world.crossings){if(Math.abs(c.x-x)<14&&Math.abs(c.y-y)<14&&dist(c.x,c.y,x,y)<10)return 'у пешеходного перехода';}
   for(const a of world.areas){if(a.k!=='parking')continue;if(x<a.bb[0]||x>a.bb[2]||y<a.bb[1]||y>a.bb[3])continue;if(pointInPoly(a.p,x,y))return null;}
-  const ns=nearestRoadSeg(x,y,14);if(!ns)return 'не на дороге';const r=ns.seg.r;
+  const ns=nearestRoadSeg(x,y,16);if(!ns)return 'не у проезжей части';const r=ns.seg.r;
   if(r.c>=9)return 'на пешеходной улице';
-  if(ns.d>r.hw+0.6)return 'на тротуаре';
-  for(const c of world.crossings){if(Math.abs(c.x-x)<9&&Math.abs(c.y-y)<9&&dist(c.x,c.y,x,y)<8)return 'у пешеходного перехода';}
-  if(r.c<=4)return 'на проезжей части большой улицы';
+  if(ns.d>r.hw+0.8)return 'на тротуаре';
+  if(r.c<=3)return 'на проезжей части магистрали';
   return null;}
-function parkingCheck(obj,kind){if(!obj)return;const why=parkingBad(obj.x,obj.y);if(!why)return;setHint(`⚠️ Здесь стоять нельзя (${why}) — могут эвакуировать`);startSit('tow',{obj,kind,why});}
+function parkingBad(x,y){return parkingIllegal(x,y);}
+function parkingMeter(obj){const rate=parkingTariff(obj.x,obj.y);obj.rate=rate;if(!rate){obj.paidTill=0;return;}
+  setHint(`Платная парковка ${rate} ₽/час. Будни 8:00–19:00. Оплатите, иначе эвакуируют`);startSit('parkpay',{obj,rate});}
+function parkingCheck(obj,kind){if(!obj)return;const why=parkingIllegal(obj.x,obj.y);
+  if(why){setHint(`Здесь стоять нельзя (${why}) — могут эвакуировать`);startSit('tow',{obj,kind,why,fine:1500});return;}
+  if(kind==='own')parkingMeter(obj);}
+defSit('parkpay',{title:'Платная парковка',quiet:true,cool:0,
+  start(s){s.left=90;const rate=s.rate;
+    sitCard({s,icon:'🅿️',title:`Парковка ${rate} ₽/час`,text:`Будний день, 8:00–19:00: платный участок. У Кремля 100 ₽/час, дальше 70, 50 и 30. У своего дома бесплатно, в выходные тоже. В городе на оплату дают 15 минут — здесь около полутора. Не оплатите — штраф 2 500 ₽ и эвакуатор.`,ttl:0,
+      choices:[{t:`Оплатить час · ${fmtMoney(rate)}`,primary:true,run:()=>{if(player.money<rate){if(typeof roadMoney==='function')roadMoney('на парковку');if(player.money<rate){setHint(`Нужно ${fmtMoney(rate)}`);return;}}
+        sitMoney(-rate,`Парковка, час · ${rate} ₽`);s.obj.paidTill=(clock.minutes||0)+60;s.obj.rate=rate;addEvent('Парковка оплачена на час');endSit(s);}},
+        {t:'Пока не платить',run:()=>{closeSitCard(s);}}]});return true;},
+  update(s,dt){const o=s.obj;if(!o||ownCar!==o||!o.parked||o.towed){endSit(s);return;}
+    if(o.paidTill&&clock.minutes<o.paidTill){endSit(s);return;}
+    if(!parkingTariff(o.x,o.y)){o.rate=0;endSit(s);return;}
+    s.left-=dt;if(s.left<=0){endSit(s);sitMoney(-2500,'Штраф за неоплату парковки, ст. 3.16 КоАП РТ');setHint('Парковку не оплатили: 2 500 ₽, машину забирают');startSit('tow',{obj:o,kind:'own',why:'не оплачена парковка',fine:2500});}}});
 defSit('tow',{title:'Эвакуатор',quiet:true,multi:true,cool:0,
-  start(s){s.wait=rnd(45,90);s.phase='parked';s.maxT=600;return true;},
+  start(s){s.wait=s.why==='не оплачена парковка'?rnd(20,35):rnd(45,90);s.phase='parked';s.maxT=600;s.fine=s.fine||1500;return true;},
   update(s,dt){const o=s.obj;
-    // уехал сам — ситуация закончилась
     if(s.phase!=='gone'&&((s.kind==='own'&&(!ownCar.parked||ownCar.x!==o.x||ownCar.y!==o.y))||(s.kind!=='own'&&!rentals.includes(o)))){if(s.truck)towTruckAway(s);endSit(s);return;}
     if(s.phase==='parked'){s.wait-=dt;if(s.wait<=0){s.phase='truck';const tgt=nearestNode(o.x,o.y,world.carAdj,150);const sn=emergencyStart({x:o.x,y:o.y},tgt);const tr=new Car('tow',sn>=0?sn:nodeNear(world.carNodes,[o.x,o.y],300));tr.color='#F2C230';tr.len=7.2;tr.wid=2.3;tr.vmax=12;tr.target=tgt;tr.sceneXY=[o.x,o.y];tr.state='idle';tr.ttl=0.3;tr.onScene=()=>{s.phase='loading';s.load=12;};cars.push(tr);s.truck=tr;
       if(dist(o.x,o.y,player.x,player.y)<60)addEvent('🚚 К вашей машине подъезжает эвакуатор!','alert');}}
     if(s.phase==='loading'){s.load-=dt;const near=dist(o.x,o.y,player.x,player.y)<12&&!player.vehicle;
-      if(near&&!s.asked){s.asked=true;sitCard({s,icon:'🚚',tone:'alert',title:'Эвакуатор грузит вашу машину',text:'Пока машину не увезли, эвакуацию можно остановить — но штраф всё равно выпишут.',ttl:10,
-        choices:[{t:'Остановить: штраф 1 500 ₽',primary:true,run:()=>{sitMoney(-1500,'Штраф за неправильную парковку');s.saved=true;towTruckAway(s);endSit(s);}},{t:'Пусть забирают',run:()=>{}}]});}
+      if(near&&!s.asked){s.asked=true;const fine=s.fine||1500;sitCard({s,icon:'🚚',tone:'alert',title:'Эвакуатор грузит машину',text:s.why==='не оплачена парковка'?'Парковку так и не оплатили. Пока платформу не подняли, можно остановить эвакуацию — штраф 2 500 ₽ всё равно останется.':`Стоять здесь нельзя: ${s.why}. Штраф останется, даже если эвакуацию остановить.`,ttl:10,
+        choices:[{t:`Остановить: штраф ${fmtMoney(fine)}`,primary:true,run:()=>{sitMoney(-fine,s.why==='не оплачена парковка'?'Штраф за неоплату парковки':'Штраф за неправильную парковку');if(s.obj)s.obj.paidTill=(clock.minutes||0)+60;s.saved=true;towTruckAway(s);endSit(s);}},{t:'Пусть забирают',run:()=>{}}]});}
       if(s.load<=0&&!s.saved)towTake(s);}},
   draw(s,toS,z){if(s.phase!=='loading'||!s.truck)return;const [sx,sy]=toS(s.obj.x,s.obj.y);ctx.strokeStyle='rgba(242,194,48,.9)';ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.beginPath();ctx.arc(sx,sy,Math.max(9,z*3),0,TAU);ctx.stroke();ctx.setLineDash([]);}});
 function towTake(s){const o=s.obj;s.phase='gone';closeSitCard(s);
-  if(s.kind==='own'){ownCar.parked=false;ownCar.towed=true;const lot=towLot();ownCar.lot=lot;startSit('impound',{lot});}
+  if(s.kind==='own'){ownCar.parked=false;ownCar.towed=true;const lot=towLot();ownCar.lot=lot;ownCar.x=lot.x;ownCar.y=lot.y;startSit('impound',{lot,fine:s.fine||1500,why:s.why||''});}
   else{const i=rentals.indexOf(o);if(i>=0)rentals.splice(i,1);sitMoney(-5000,`Каршеринг: машину эвакуировали (${s.why}) — штраф и эвакуация за ваш счёт`);}
   towTruckAway(s);endSit(s);}
 function towTruckAway(s){const tr=s.truck;if(!tr)return;tr.target=null;tr.onScene=null;tr.sceneXY=null;tr.creep=null;tr.state='idle';tr.ttl=0.5;tr.goHome=true;setTimeout(()=>{tr.remove=true;},40000);s.truck=null;}
-function towLot(){let best=null,bd=0;for(const a of world.areas){if(a.k!=='parking')continue;const cx=(a.bb[0]+a.bb[2])/2,cy=(a.bb[1]+a.bb[3])/2;const d=dist(cx,cy,player.x,player.y);if(d>500&&d<1600&&(a.bb[2]-a.bb[0])*(a.bb[3]-a.bb[1])>900){if(!best||Math.abs(d-900)<Math.abs(bd-900)){best={x:cx,y:cy};bd=d;}}}
-  if(!best){const n=nodeNear(world.carNodes,[player.x+700,player.y],400);const p=world.nodes[n];best={x:p[0],y:p[1]};}return best;}
+function towLot(){let best=null,bd=1e15;for(const l of PARK_LOTS){const q=parkLotXY(l);if(!q)continue;const d=dist(q.x,q.y,player.x,player.y);if(d<bd){bd=d;best=q;}}
+  if(best){const n=nearestNode(best.x,best.y,world.carAdj,500);if(n>=0){const p=world.nodes[n];if(!inBuilding(p[0],p[1]))return {x:p[0],y:p[1],name:best.name};}return best;}
+  let fb=null,fd=0;for(const a of world.areas){if(a.k!=='parking')continue;const cx=(a.bb[0]+a.bb[2])/2,cy=(a.bb[1]+a.bb[3])/2;const d=dist(cx,cy,player.x,player.y);if(d>500&&d<1600&&(a.bb[2]-a.bb[0])*(a.bb[3]-a.bb[1])>900){if(!fb||Math.abs(d-900)<Math.abs(fd-900)){fb={x:cx,y:cy,name:'штрафстоянке'};fd=d;}}}
+  if(!fb){const n=nodeNear(world.carNodes,[player.x+700,player.y],400);const p=world.nodes[n];fb={x:p[0],y:p[1],name:'штрафстоянке'};}return fb;}
 defSit('impound',{title:'Штрафстоянка',quiet:true,
   start(s){mark(s,'lot',s.lot.x,s.lot.y,'🅿️','Штрафстоянка',{arrow:true,color:'#2D4A9E'});
-    sitCard({s,icon:'🚚',tone:'alert',title:'Машину эвакуировали',text:`Вашу машину увезли на штрафстоянку ${placeName(s.lot.x,s.lot.y)}. Забрать: штраф 1 500 ₽ + эвакуация 2 600 ₽.`,ttl:0,choices:[{t:'Понятно',primary:true,run:()=>{}}]});return true;},
-  action(s){if(scene==='city'&&!player.vehicle&&dist(s.lot.x,s.lot.y,player.x,player.y)<22)return {label:'Забрать машину со штрафстоянки · 4 100 ₽',run:()=>{if(player.money<4100){setHint('Не хватает денег: нужно 4 100 ₽');return;}
-    sitMoney(-4100,'Штрафстоянка: штраф и эвакуация');dossier('эвакуация за неправильную парковку');const n=nearestNode(s.lot.x,s.lot.y,world.carAdj,150);const p=n>=0?world.nodes[n]:[s.lot.x,s.lot.y];ownCar.x=s.lot.x;ownCar.y=s.lot.y;if(inBuilding(ownCar.x,ownCar.y)){ownCar.x=p[0];ownCar.y=p[1];}ownCar.parked=true;ownCar.towed=false;endSit(s);addEvent('Машина снова ваша. Стоит рядом');}};return null;}});
+    const fine=s.fine||1500,sum=fine+PARK_EVAC;s.sum=sum;
+    sitCard({s,icon:'🚚',tone:'alert',title:'Машину эвакуировали',text:`Вашу машину увезли на ${s.lot.name||'штрафстоянку'}${s.why?': '+s.why:''}. Забрать: штраф ${fmtMoney(fine)} и эвакуация ${fmtMoney(PARK_EVAC)}.`,ttl:0,choices:[{t:'Понятно',primary:true,run:()=>{}}]});return true;},
+  action(s){if(scene==='city'&&!player.vehicle&&dist(s.lot.x,s.lot.y,player.x,player.y)<22)return {label:`Забрать машину со штрафстоянки · ${fmtMoney(s.sum||4600)}`,run:()=>{const sum=s.sum||(s.fine||1500)+PARK_EVAC;if(player.money<sum){if(typeof roadMoney==='function')roadMoney('чтобы забрать машину');if(player.money<sum){setHint(`Не хватает денег: нужно ${fmtMoney(sum)}`);return;}}
+    sitMoney(-sum,'Штрафстоянка: штраф и эвакуация');dossier(s.why==='не оплачена парковка'?'эвакуация: не оплатил парковку':'эвакуация за неправильную парковку');const n=nearestNode(s.lot.x,s.lot.y,world.carAdj,150);const p=n>=0?world.nodes[n]:[s.lot.x,s.lot.y];ownCar.x=p[0];ownCar.y=p[1];if(inBuilding(ownCar.x,ownCar.y)){ownCar.x=s.lot.x;ownCar.y=s.lot.y;}ownCar.parked=true;ownCar.towed=false;ownCar.lot=null;ownCar.paidTill=(clock.minutes||0)+30;endSit(s);addEvent('Машина снова ваша. Стоит рядом со штрафстоянкой');}};return null;}});
+defWatch(()=>{const o=typeof ownCar!=='undefined'&&ownCar;if(!o||!o.parked||o.towed||(player.vehicle&&player.vehicle.kind==='own'))return;
+  if(!o.paidTill||clock.minutes<o.paidTill)return;if(sitActive('parkpay')||sitActive('tow')||sitActive('impound'))return;
+  if(parkingIllegal(o.x,o.y)||!parkingTariff(o.x,o.y)){o.paidTill=0;o.rate=0;return;}o.paidTill=0;parkingMeter(o);});
 
 // ---------- камеры скорости ----------
 let speedCams=[];

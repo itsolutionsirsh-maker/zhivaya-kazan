@@ -42,7 +42,19 @@ function spawnRentals(cx,cy){
   for(const s of world.stops.filter(s=>dist(s.x,s.y,cx,cy)<500).slice(0,6))addBikeAt(s.x+3,s.y+2);
   for(let i=0;i<14;i++)addCarshareNear(cx,cy,650);
   if(player.hasCar&&!ownCar){placeOwnCar();}}
-function placeOwnCar(){if(!player.home)return;const n=nearestNode(player.home.cx,player.home.cy,world.carAdj,200);let s=n>=0?curbSpot(n):null;if(!s){const p=world.nodes[n>=0?n:pick(world.carNodes)];s={x:p[0],y:p[1],hx:1,hy:0};}ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:wornCarColor()||player.carColor||'#C62828',parked:true};}
+function placeOwnCar(){if(!player.home||player.hasCar===false)return;const hx=player.home.cx,hy=player.home.cy;
+  let s=null;const n0=nearestNode(hx,hy,world.carAdj,90);if(n0>=0)s=curbSpot(n0);
+  if(!s){const n=nearestNode(hx,hy,world.carAdj,220);if(n>=0)s=curbSpot(n);if(!s){const p=world.nodes[n>=0?n:pick(world.carNodes)];s={x:p[0],y:p[1],hx:1,hy:0};}}
+  ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:wornCarColor()||player.carColor||'#C62828',parked:true,towed:false,paidTill:0,rate:0};
+  if(typeof syncOwnCarPin==='function')syncOwnCarPin();}
+function ownCarXY(){if(player.vehicle&&player.vehicle.kind==='own')return [player.vehicle.x,player.vehicle.y];
+  if(ownCar&&ownCar.towed&&ownCar.lot)return [ownCar.lot.x,ownCar.lot.y];if(ownCar)return [ownCar.x,ownCar.y];return null;}
+function syncOwnCarPin(){if(typeof mark!=='function')return;if(!player.hasCar){if(typeof unmark==='function')unmark('mycar');return;}
+  const p=ownCarXY();if(!p||!Number.isFinite(p[0])){if(typeof unmark==='function')unmark('mycar');return;}
+  const towed=!!(ownCar&&ownCar.towed);let label=towed?'Машина на штрафстоянке':'Ваша машина';
+  if(!towed&&ownCar&&ownCar.rate&&!(ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill))label='Ваша машина · парковка не оплачена';
+  else if(!towed&&ownCar&&ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill)label='Ваша машина · парковка оплачена';
+  mark(null,'mycar',p[0],p[1],'🚗',label,{arrow:true,color:towed?'#2D4A9E':'#C62828'});}
 let rentalTimer=0;
 function updateRentals(dt){rentalTimer-=dt;if(rentalTimer>0)return;rentalTimer=2;const px=player.x,py=player.y;
   for(let i=rentals.length-1;i>=0;i--){const r=rentals[i];if(dist(r.x,r.y,px,py)>1100&&!(typeof JOURNEY!=='undefined'&&JOURNEY.rental&&JOURNEY.rental.object===r))rentals.splice(i,1);}
@@ -63,9 +75,10 @@ function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=pla
   journeyHint('boarding',obj,player.x,player.y,obj.x,obj.y);player.x=obj.x;player.y=obj.y;
   if(window.citySaveShot)citySaveShot(kind==='bike'?'Велосипед':kind==='scooter'?'Самокат':kind==='own'?'Своя машина':'Каршеринг');
   player.waypoints=null;player.waitingStop=null;player.talkTarget=null;player.navDest=null;
-  if(kind!=='bike')addEvent(kind==='scooter'?`Взяли самокат: 50 ₽ + 6 ₽/мин. Клик по карте — поехать туда`:kind==='car'?`Каршеринг: 200 ₽ + 10 ₽/мин. Клик по карте — поедет сам, WASD — руль`:'Вы за рулём своей машины. Клик по карте — поедет сама, WASD — руль');
+  if(kind==='own')addEvent('Вы в своей машине. Клик по карте — конечная, дальше она едет сама. Руль не перехватывается');
+  else if(kind!=='bike')addEvent(kind==='scooter'?`Взяли самокат: 50 ₽ + 6 ₽/мин. Клик по карте — поехать туда`:`Каршеринг: 200 ₽ + 10 ₽/мин. Клик по карте — поедет сам, WASD — руль`);
   if(kind==='bike')addEvent('Велосипед: 20 ₽ + 3 ₽/игр. мин. Клик по карте — поехать туда');
-  if(!flags.droveOnce){flags.droveOnce=true;setHint('W — газ, S — тормоз, A/D — руль. Или клик по карте: приедет по правилам');}journeyOnBoard(player.vehicle,obj,planned);return true;}
+  if(!flags.droveOnce&&kind!=='own'){flags.droveOnce=true;setHint('W — газ, S — тормоз, A/D — руль. Или клик по карте: приедет по правилам');}journeyOnBoard(player.vehicle,obj,planned);return true;}
 function exitVehicle(){const v=player.vehicle;if(!v)return;if(v.kind==='taxi'){taxiExit();return;}const spec=v.spec;const now=typeof playMinutesNow==='function'?playMinutesNow():clock.minutes;const mins=Math.max(1,now-v.startMin);const cost=Math.round(mins*spec.perMin);
   if(spec.perMin)journeyCharge(cost,`Поездка на ${spec.word} · ${Math.round(mins)} игр. мин`);
   if(v.kind==='own'){ownCar.x=v.x;ownCar.y=v.y;ownCar.hx=v.hx;ownCar.hy=v.hy;ownCar.parked=true;}else rentals.push({kind:v.kind,x:v.x,y:v.y,hx:v.hx,hy:v.hy,color:v.color});
@@ -79,11 +92,12 @@ function vehiclePath(v,wx,wy,noFinal){const light=isLightVehicle(v.kind),adj=lig
   let wps=pathToWaypoints(path,adj,light?'ped':'car');if(path.length===1||!wps.length){const n=world.nodes[g];if(dist(v.x,v.y,n[0],n[1])>10||!clearLine(v.x,v.y,n[0],n[1])){setHint('Маршрут не найден');return null;}wps=[[n[0],n[1]]];}
   if(!noFinal&&clearLine(wps[wps.length-1][0],wps[wps.length-1][1],wx,wy))wps.push([wx,wy]);return wps;}
 function driveTo(wx,wy,noFinal){const v=player.vehicle;if(!v)return false;const wps=vehiclePath(v,wx,wy,noFinal);if(!wps)return false;
-  v.auto={wps,i:0};setHint(isLightVehicle(v.kind)?`Едем на ${v.spec.word}`:v.kind==='taxi'?'Таксист везёт вас. E — выйти раньше':'Едем по маршруту. WASD — перехватить руль');return true;}
+  v.auto={wps,i:0};setHint(v.kind==='own'?'Машина едет сама. Другую точку можно указать кликом':isLightVehicle(v.kind)?`Едем на ${v.spec.word}`:v.kind==='taxi'?'Таксист везёт вас. E — выйти раньше':'Едем по маршруту. WASD — перехватить руль');return true;}
 function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   if(v.damaged>0){v.damaged-=dt;v.speed=0;return;}
-  let thr=0,steer=0;if(!player.busy&&v.kind!=='taxi'){if(keys.w||keys['ц']||keys.ArrowUp)thr+=1;if(keys.s||keys['ы']||keys.ArrowDown)thr-=1;if(keys.d||keys['в']||keys.ArrowRight)steer+=1;if(keys.a||keys['ф']||keys.ArrowLeft)steer-=1;thr+=-joyVec[1];steer+=joyVec[0];}
-  const manual=Math.abs(thr)>0.05||Math.abs(steer)>0.05;if(manual)v.auto=null;
+  let thr=0,steer=0;const ownDrive=v.kind==='own';
+  if(!player.busy&&v.kind!=='taxi'&&!ownDrive){if(keys.w||keys['ц']||keys.ArrowUp)thr+=1;if(keys.s||keys['ы']||keys.ArrowDown)thr-=1;if(keys.d||keys['в']||keys.ArrowRight)steer+=1;if(keys.a||keys['ф']||keys.ArrowLeft)steer-=1;thr+=-joyVec[1];steer+=joyVec[0];}
+  const manual=!ownDrive&&(Math.abs(thr)>0.05||Math.abs(steer)>0.05);if(manual)v.auto=null;
   const ns=nearestRoadSeg(v.x,v.y,16);const onRoad=!!(ns&&ns.d<ns.seg.r.hw+1.8);let vmax=s.vmax;if(v.kind==='own'&&typeof carSpeedMul==='function')vmax*=carSpeedMul();
   const boost=(keys.shift||keys.ShiftLeft)&&!v.auto;   // Shift — «газ в пол»: можно превысить, а камеры это заметят
   if(!isLightVehicle(v.kind)){vmax=onRoad?(boost?Math.min(vmax*1.45,(ns.seg.r.speed||8)*1.75+3):Math.min(vmax,(ns.seg.r.speed||8)*1.3+2)):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
