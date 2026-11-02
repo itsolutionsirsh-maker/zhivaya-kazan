@@ -29,7 +29,7 @@ function sunBookFor(minutes){const t0=typeof GAME_T0==='number'?GAME_T0:Date.UTC
   return sunBook={key,rise,set};}
 function clockUtc(){const t0=typeof GAME_T0==='number'?GAME_T0:Date.UTC(2026,8,30,21,0);return t0+(clock.minutes||0)*60000;}
 function isNight(){return nightAmount()>=0.55;}
-function nightAmount(){const el=solarEl(clockUtc());return clamp((1-el)/7,0,1);}
+function nightAmount(){const sec=Math.floor(clockUtc()/1000);if(nightAmount.sec===sec)return nightAmount.v;const el=solarEl(clockUtc());nightAmount.sec=sec;return nightAmount.v=clamp((1-el)/7,0,1);}
 
 // Один расчёт на кадр. Издалека остаются прежние тени и освещение стен.
 function citySun(minutes,night){
@@ -124,8 +124,8 @@ function render(){
     const allv=cars.concat(buses);if(player.vehicle)allv.push(vehProxy(player.vehicle));for(const v of allv){if(v.crashed||v.x<vx0||v.x>vx1||v.y<vy0||v.y>vy1)continue;ctx.save();ctx.translate(v.x+v.hx*(v.len/2-0.5),v.y+v.hy*(v.len/2-0.5));ctx.rotate(Math.atan2(v.hy,v.hx));ctx.drawImage(beamSprite,0,-6,20,12);ctx.restore();}
     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     if((winLit.length||winLitB.length)&&night>0.3){const glow=0.5+0.45*night;ctx.fillStyle=`rgba(255,214,130,${glow})`;if(reduceMotion){fillWin(winLit);fillWin(winLitB);}else{ctx.globalAlpha=0.78+0.22*Math.sin(cityAnimT*1.15);fillWin(winLit);ctx.globalAlpha=0.78+0.22*Math.sin(cityAnimT*1.15+2.2);fillWin(winLitB);ctx.globalAlpha=1;}}}
-  // ---- подписи
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  drawSkyWash(night);
   drawSkyBirds(night);
   if(z>2.1){ctx.font='500 11px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const done=new Set();
     for(const r of vis){if(!r.n||r.c>8||done.has(r.n))continue;let bi=0,bl=0;for(let i=0;i<r.p.length-1;i++){const a=world.nodes[r.p[i]],b=world.nodes[r.p[i+1]];const L=dist(a[0],a[1],b[0],b[1]);if(L>bl){bl=L;bi=i;}}
@@ -365,7 +365,7 @@ function drawPerson(x,y,hx,hy,p,phase,o){
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(handX,handY,0.16,0,TAU);ctx.arc(-sw,ha,0.16,0,TAU);ctx.fill();
   if(p.watch){ctx.fillStyle='#E8B830';ctx.beginPath();ctx.arc(handX-0.14,handY+0.02,0.09,0,TAU);ctx.fill();if(hi){ctx.fillStyle='#FFF3C4';ctx.beginPath();ctx.arc(handX-0.16,handY,0.035,0,TAU);ctx.fill();}}   // часы на руке — видно издалека
   ctx.fillStyle=p.clothes;rrect(ctx,-bw,-bl,bw*2,bl*2,hv?0.55:0.4);ctx.fill();
-  if(near){ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(0.06,-0.14,0.09,0.28);ctx.strokeStyle='rgba(20,16,12,.4)';ctx.lineWidth=0.05;rrect(ctx,-bw,-bl,bw*2,bl*2,hv?0.55:0.4);ctx.stroke();}
+  if(near){ctx.fillStyle=shade(p.clothes,0.78);ctx.fillRect(-bw,-bl*0.15,bw*0.7,bl*1.2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(0.06,-0.14,0.09,0.28);ctx.strokeStyle='rgba(20,16,12,.45)';ctx.lineWidth=0.05;rrect(ctx,-bw,-bl,bw*2,bl*2,hv?0.55:0.4);ctx.stroke();}
   if(hv){ctx.fillStyle=p.clothes;ctx.beginPath();ctx.ellipse(0.32,0,0.44,0.6,0,0,TAU);ctx.fill();ctx.fillStyle=shade(p.clothes,1.3);ctx.beginPath();ctx.ellipse(0.4,0,0.3,0.42,0,0,TAU);ctx.fill();}   // живот вперёд, как у начальника
   if(p.tie){ctx.fillStyle='#F2F2EE';ctx.beginPath();ctx.ellipse(0.46,0,0.28,0.13,0,0,TAU);ctx.fill();ctx.fillStyle=p.tie;rrect(ctx,0.3,-0.06,hv?0.46:0.34,0.12,0.04);ctx.fill();}
   if(hi){ctx.fillStyle='rgba(255,255,255,.14)';rrect(ctx,-0.1,-bl+0.06,bw+0.04,bl*2-0.12,0.3);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=0.05;rrect(ctx,-bw,-bl,bw*2,bl*2,hv?0.55:0.4);ctx.stroke();
@@ -378,7 +378,7 @@ function drawPerson(x,y,hx,hy,p,phase,o){
   else if(hs===3){ctx.fillStyle=shade(p.skin,0.92);ctx.beginPath();ctx.arc(-0.1,0,0.25,0,TAU);ctx.fill();}
   else if(hs===1){ctx.fillStyle=p.hair;ctx.beginPath();ctx.ellipse(-0.22,0,0.34,0.38,0,0,TAU);ctx.fill();ctx.beginPath();ctx.arc(-0.05,0,0.3,0,TAU);ctx.fill();}
   else if(hs===2){ctx.fillStyle=p.hair;ctx.beginPath();ctx.arc(-0.1,0,0.3,0,TAU);ctx.fill();}
-  else{ctx.fillStyle=p.hair;ctx.beginPath();ctx.arc(-0.13,0,0.27,0,TAU);ctx.fill();}
+  else{ctx.fillStyle=p.hair;ctx.beginPath();ctx.ellipse(-0.16,0,0.32,0.36,0,0,TAU);ctx.fill();}
   if(hi&&hs!==4){ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(-0.12,-0.1,0.1,0,TAU);ctx.fill();}
   if(cam.z>9&&hs!==4&&!o.lying){ctx.fillStyle='#2C241F';ctx.beginPath();ctx.arc(0.18,-0.1,0.04,0,TAU);ctx.arc(0.18,0.1,0.04,0,TAU);ctx.fill();ctx.strokeStyle='rgba(140,70,64,.7)';ctx.lineWidth=0.028;ctx.beginPath();ctx.arc(0.24,0,0.055,0.35,1.15);ctx.stroke();}
   if(p.role==='guard'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0,0,0.32,0,TAU);ctx.fill();}
@@ -502,6 +502,10 @@ function drawKremlinFlag(){
   for(let i=0;i<3;i++){const y0=-5.15+i*0.42;ctx.fillStyle=stripes[i];ctx.beginPath();ctx.moveTo(0.08,y0);ctx.lineTo(2.15,y0+fly*(i===1?1:0.7));ctx.lineTo(2.15,y0+0.42+fly);ctx.lineTo(0.08,y0+0.42);ctx.closePath();ctx.fill();}
   ctx.restore();
 }
+function drawSkyWash(night){if(night<0.08)return;const dusk=night<0.62,a=dusk?Math.min(0.42,night*0.85):Math.min(0.34,(night-0.28)*0.5);if(a<0.03)return;
+  const g=ctx.createLinearGradient(0,0,0,H*0.62);if(dusk){g.addColorStop(0,`rgba(255,112,58,${a})`);g.addColorStop(0.42,`rgba(255,176,104,${a*0.55})`);g.addColorStop(1,'rgba(255,176,104,0)');}
+  else{g.addColorStop(0,`rgba(12,20,48,${a})`);g.addColorStop(0.7,`rgba(18,28,62,${a*0.35})`);g.addColorStop(1,'rgba(12,20,48,0)');}
+  ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle=g;ctx.fillRect(0,0,W,H*0.62);ctx.restore();}
 function drawSkyBirds(night){
   if(reduceMotion||LOD<1||night>0.72)return;const w=typeof weather!=='undefined'&&weather.kind;if(w==='rain'||w==='snow'||w==='fog')return;
   ctx.save();ctx.strokeStyle='rgba(28,36,32,.72)';ctx.lineWidth=1.7;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
@@ -517,6 +521,7 @@ function drawCarSprite(x,y,hx,hy,L,Wd,color,kind,t,ex){ctx.save();ctx.translate(
     ctx.fillStyle=shade(color,0.8);rrect(ctx,L*0.12,-Wd/2-0.16,0.32,0.18,0.05);ctx.fill();rrect(ctx,L*0.12,Wd/2-0.02,0.32,0.18,0.05);ctx.fill();}
   ctx.fillStyle=shade(color,0.86);rrect(ctx,-L*0.18,-Wd/2+0.22,L*0.46,Wd-0.44,0.3);ctx.fill();
   ctx.fillStyle='rgba(30,40,55,.78)';rrect(ctx,L*0.27,-Wd/2+0.22,L*0.14,Wd-0.44,0.15);ctx.fill();rrect(ctx,-L*0.3,-Wd/2+0.25,L*0.1,Wd-0.5,0.1);ctx.fill();
+  if(typeof nightAmount==='function'&&nightAmount()>0.4){ctx.fillStyle='rgba(255,214,150,.55)';rrect(ctx,-L*0.16,-Wd/2+0.28,L*0.4,Wd-0.56,0.12);ctx.fill();}
   if(hi){ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.moveTo(L*0.29,-Wd/2+0.26);ctx.lineTo(L*0.38,-Wd/2+0.26);ctx.lineTo(L*0.31,Wd/2-0.3);ctx.lineTo(L*0.29,Wd/2-0.3);ctx.closePath();ctx.fill();
     ctx.fillStyle='rgba(30,40,55,.6)';ctx.fillRect(-L*0.16,-Wd/2+0.08,L*0.42,0.12);ctx.fillRect(-L*0.16,Wd/2-0.2,L*0.42,0.12);
     ctx.fillStyle='#F4F4F4';ctx.fillRect(-L/2+0.08,-0.26,0.14,0.52);ctx.fillStyle='#F4F4F4';ctx.fillRect(L/2-0.22,-0.26,0.14,0.52);}
@@ -534,7 +539,8 @@ function drawBusSprite(b){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan
   if(LOD>=1)drawRollingWheels(L,Wd,cityAnimT,b.speed||0,hi);
   ctx.fillStyle=b.color;rrect(ctx,-L/2,-Wd/2,L,Wd,0.5);ctx.fill();ctx.fillStyle=shade(b.color,1.12);rrect(ctx,-L/2+0.4,-Wd/2+0.45,L-0.8,Wd-0.9,0.3);ctx.fill();
   if(hi){ctx.fillStyle=shade(b.color,0.95);rrect(ctx,-L*0.2,-0.5,1.6,1,0.1);ctx.fill();rrect(ctx,L*0.1,-0.5,1.6,1,0.1);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=0.06;rrect(ctx,-L/2,-Wd/2,L,Wd,0.5);ctx.stroke();}
-  ctx.fillStyle='rgba(30,40,55,.7)';const n=Math.floor((L-2)/1.2);for(let i=0;i<n;i++){const x=-L/2+1+i*1.2;ctx.fillRect(x,-Wd/2+0.08,0.9,0.3);ctx.fillRect(x,Wd/2-0.38,0.9,0.3);}ctx.fillRect(L/2-0.7,-Wd/2+0.25,0.5,Wd-0.5);
+  const busGlow=typeof nightAmount==='function'?nightAmount():0;
+  ctx.fillStyle=busGlow>0.35?`rgba(255,206,120,${0.4+0.45*busGlow})`:'rgba(30,40,55,.7)';const n=Math.floor((L-2)/1.2);for(let i=0;i<n;i++){const x=-L/2+1+i*1.2;ctx.fillRect(x,-Wd/2+0.08,0.9,0.3);ctx.fillRect(x,Wd/2-0.38,0.9,0.3);}ctx.fillRect(L/2-0.7,-Wd/2+0.25,0.5,Wd-0.5);
   if(hi){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.04;for(let i=0;i<n;i++){const x=-L/2+1+i*1.2;ctx.strokeRect(x,Wd/2-0.38,0.9,0.3);ctx.strokeRect(x,-Wd/2+0.08,0.9,0.3);}
     ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=0.06;for(const dx of [L*0.3,-L*0.1,-L*0.4]){ctx.beginPath();ctx.moveTo(dx,Wd/2-0.42);ctx.lineTo(dx,Wd/2);ctx.moveTo(dx+0.7,Wd/2-0.42);ctx.lineTo(dx+0.7,Wd/2);ctx.stroke();}
     ctx.fillStyle='#FFE082';ctx.fillRect(L/2-0.72,-0.6,0.12,1.2);}
@@ -651,6 +657,7 @@ function ovtDrop(x0,y0,x1,y1){for(const k of [...OVT.tiles.keys()]){const [s,tx,
 function renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night){if(!overview)buildOverview();const bb=world.bbox;
   ctx.imageSmoothingEnabled=true;ctx.drawImage(overview,bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);ovtRender(z,vx0,vy0,vx1,vy1);
   if(night>0.02){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='multiply';ctx.fillStyle=`rgba(${Math.round(255-175*night)},${Math.round(255-160*night)},${Math.round(255-95*night)},1)`;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
+  drawSkyWash(night);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const dot=(x,y,r,c)=>{const [sx,sy]=toS(x,y);if(sx<-5||sx>W+5||sy<-5||sy>H+5)return;ctx.fillStyle=c;ctx.beginPath();ctx.arc(sx,sy,r,0,TAU);ctx.fill();};
   if(z>0.4)for(const w of walkers){if(w.bus||w.inside)continue;dot(w.x,w.y,1.2,w.p.clothes);}
