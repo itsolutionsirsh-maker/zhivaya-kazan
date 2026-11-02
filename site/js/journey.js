@@ -12,7 +12,7 @@ function journeyHint(kind,vehicle,fromX,fromY,toX,toY){
 function journeyDest(d){return d&&Number.isFinite(d.x)&&Number.isFinite(d.y)?{x:d.x,y:d.y,n:String(d.n||'Место').slice(0,100)}:null;}
 function journeyAvailable(){return scene==='city'&&!player.inside&&!player.bus&&!player.vehicle&&player.state!=='hurt';}
 function journeyRental(kind){
-  if(kind==='own')return ownCar&&ownCar.parked?ownCar:null;
+  if(kind==='own'){if(!ownCar||!ownCar.parked)return null;return dist(player.x,player.y,ownCar.x,ownCar.y)<=35?ownCar:null;}
   let best=null,bd=650;for(const r of rentals){if(r.kind!==kind)continue;const d=dist(player.x,player.y,r.x,r.y);if(d<bd){bd=d;best=r;}}return best;
 }
 function journeyPresent(o){return o&&(o.kind==='own'?o===ownCar&&o.parked:rentals.includes(o));}
@@ -27,7 +27,7 @@ function journeyRentalQuote(o,d){
 function journeyCards(card,d){
   for(const kind of ['scooter','bike','car','own']){
     const spec=VEH[kind],o=journeyRental(kind),title=spec.label[0].toUpperCase()+spec.label.slice(1);
-    if(!o){card(journeyIcon(kind),title,[kind==='own'?'Своя машина сейчас недоступна':'Рядом нет свободного транспорта'],'Недоступно',()=>{},true);continue;}
+    if(!o){const far=kind==='own'&&ownCar&&ownCar.parked?`Стоит в ${fmtDist(dist(player.x,player.y,ownCar.x,ownCar.y))} от вас. Сесть можно только рядом`:(kind==='own'?'Своя машина сейчас недоступна':'Рядом нет свободного транспорта');card(journeyIcon(kind),title,[far],'Недоступно',()=>{},true);continue;}
     const q=journeyRentalQuote(o,d),ok=Number.isFinite(q.sec);
     card(journeyIcon(kind),title,ok?[`${fmtDist(q.walk)} до транспорта · ≈ ${fmtMin(q.sec)} всего`,spec.perMin?`≈ ${fmtMoney(q.cost)} · ${spec.start} ₽ старт + ${spec.perMin} ₽/игр. мин`:'Без аренды · расходы своей машины сохраняются']:
       ['Подходящий маршрут пока не найден'],ok?'Подойти и поехать':'Нет маршрута',()=>{if(startRentalPlan(o,d))closeRouteModal();},!ok||player.money<q.cost||!journeyAvailable(),ok?q.sec:1e15);

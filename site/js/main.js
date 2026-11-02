@@ -69,6 +69,18 @@ async function settleInDistrict(id){const d=id?homeDistricts().find(q=>q.id===id
   player.x=q[0];player.y=q[1];cam.x=q[0];cam.y=q[1];player.waypoints=null;player.home=best;player.homeAt=null;
   populationJump(q[0],q[1]);spawnRentals(q[0],q[1]);if(player.hasCar)placeOwnCar();if(typeof folkReanchor==='function')folkReanchor();saveState();
   return d||{name:'',parent:''};}
+var pickingHome=false;
+function claimHomeAt(wx,wy){pickingHome=false;canvas.style.cursor='';
+  if((player.debt||0)>0){setHint('Сначала закройте долг за квартиру');return;}
+  if(player.flat){setHint('Сейчас у вас квартира с адресом. Другой дом — в «Работа и жильё»');return;}
+  let best=null,bd=22;world.bgrid.query(wx-24,wy-24,wx+24,wy+24,b=>{if(!HOME_T.has(b.t||''))return;const d=pointInPoly(b.p,wx,wy)?0:polyEdgeDist(b.p,wx,wy);if(d<bd){bd=d;best=b;}});
+  if(!best){pickingHome=true;canvas.style.cursor='crosshair';setHint('Это не жилой дом. Нажмите на многоэтажку или частный дом');return;}
+  const old=player.home,carHome=ownCar&&ownCar.parked&&old&&dist(ownCar.x,ownCar.y,old.cx,old.cy)<90;
+  player.home=best;player.homeAt=null;player.flat=null;
+  if(player.hasCar&&(carHome||!ownCar))placeOwnCar();
+  const street=nearestRoadName(best.cx,best.cy)||'этот двор';
+  mark(null,'home',best.cx,best.cy,'🏠','Дом',{arrow:true,color:'#2BB062'});
+  addEvent(`🏠 Теперь вы живёте здесь: ${street}`);setHint(player.hasCar&&(carHome||!ownCar)?`Дом: ${street}. Машина стоит у подъезда`:`Дом: ${street}${player.hasCar?'. Машина осталась там, где вы её оставили':''}`);saveState();}
 
 // ---------- автобус ----------
 function boardBus(bus,stop){if(player.vehicle||player.bus||player.inside)return false;journeyHint('boarding',bus,player.x,player.y,bus.x,bus.y);player.fare=null;player.bus=bus;startSit('fare');player.waitingStop=null;player.exitNext=false;if(window.citySaveShot)citySaveShot(/трамва/i.test(busWord(bus.route.type))?'Трамвай':'Автобус');addEvent(`Вы сели в ${busWord(bus.route.type).toLowerCase()} ${bus.route.ref} на «${stop.n}»`);const nx=bus.upcoming();setHint(`Следующая: «${nx?nx.n:'конечная'}» · E — выйти`);}
@@ -207,7 +219,7 @@ function loadState(){try{const s=JSON.parse(localStorage.getItem('zk.state')||'n
 window.addEventListener('keydown',e=>{if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')){if(e.key==='Escape')e.target.blur();return;}
   if(document.body.classList.contains('ui-dialog-open')||((e.key==='Enter'||e.key===' ')&&e.target.closest?.('button,a[href]')))return;
   keys[e.key.toLowerCase()]=true;keys[e.code]=true;
-  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(!$('#questModal').hidden)closeQuests();if(!$('#seasonModal').hidden)closeSeason();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
+  if(e.key==='Escape'){if(!$('#chatModal').hidden)closeChat();if($('#bankModal')&&!$('#bankModal').hidden)closeBank();if(!$('#menuModal').hidden){$('#menuModal').hidden=true;player.busy=false;}if(!$('#howtoModal').hidden)$('#howtoClose').click();if(!$('#rallyModal').hidden)closeRallyModal();if(!$('#speechModal').hidden)closeSpeech();if(!$('#logModal').hidden)$('#logClose').click();if(!$('#routeModal').hidden)closeRouteModal();if(!$('#orderModal').hidden)closeOrder();if(!$('#jobsModal').hidden)closeJobs();if(!$('#questModal').hidden)closeQuests();if(!$('#seasonModal').hidden)closeSeason();if(pickingDest){pickingDest=false;canvas.style.cursor='';}if(pickingHome){pickingHome=false;canvas.style.cursor='';}if(chatOpen())closeChatPanel();}
   if(e.key==='Enter'&&!player.busy&&!chatOpen()){e.preventDefault();openChatPanel('near');return;}
   if((e.key==='e'||e.key==='E'||e.key==='у'||e.key==='У')&&!player.busy){if(currentAction){currentAction.run();e.preventDefault();}}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
@@ -256,6 +268,7 @@ canvas.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(pinch){if(pt
   const wx=cam.x+(e.clientX-innerWidth/2)/cam.z,wy=cam.y+(e.clientY-innerHeight/2)/cam.z;
   if(scene==='city')showLook(e.clientX,e.clientY,1600);
   if(pickingDest){pickDestAt(wx,wy);return;}
+  if(pickingHome){claimHomeAt(wx,wy);return;}
   followPlayer();
   if(player.vehicle){if(player.vehicle.kind==='taxi')return;if(driveTo(wx,wy)){player.vehicle.dest=journeyDest({x:wx,y:wy,n:'Точка на карте'});updateTripBox();}return;}
   for(const [key,pr] of peerRender){if(pr.b)continue;if(dist(pr.x,pr.y,wx,wy)<Math.max(2.5,16/cam.z)){openChatPanel('dm',key);setHint(`Личные сообщения: ${pr.name}. Подойдите ближе — сможете говорить вслух`);return;}}
