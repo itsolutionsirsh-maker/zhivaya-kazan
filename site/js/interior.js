@@ -58,10 +58,17 @@ function enterInterior(src){if(window.citySaveShot&&src&&src.kind==='metro')city
   addEvent(`Вы зашли в ${qName(src.name)}`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.companionOf===companion.w);if(!npc)return;
   const table=it.furn.find(f=>f.spot==='table'),sofa=it.furn.find(f=>f.t==='sofa');
-  if(table){npc.x=table.x;npc.y=table.y-0.9;npc.seated=true;npc.hx=0;npc.hy=1;npc.tableF=table;table.comp=npc;player.ix=table.x;player.iy=table.y+0.95;player.ihx=0;player.ihy=-1;}
+  const onSofa=it.kind==='home'&&sofa;
+  if(onSofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
+  else if(table){npc.x=table.x;npc.y=table.y-0.9;npc.seated=true;npc.hx=0;npc.hy=1;npc.tableF=table;table.comp=npc;player.ix=table.x;player.iy=table.y+0.95;player.ihx=0;player.ihy=-1;}
   else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
+  const why=npc.p.homeWhy||'';
   const line=it.kind==='hotelroom'
     ?(npc.p.female?'Номер наш. Садись, отсюда город видно. Поговорим.':'Номер наш. Садись, поговорим спокойно.')
+    :why==='repair'
+    ?(npc.p.female?'Я на месте. Покажи, где под раковиной, — гайку гляну. Потом договорим здесь.':'Я на месте. Покажи, где течёт. Потом договорим здесь.')
+    :why==='tea'
+    ?(npc.p.female?'Садись. Чайник ставлю, и спокойно поговорим.':'Садись. Чай поставлю, и поговорим.')
     :(npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.');
   setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
 function interiorPhoto(it){if(it&&it===interior){const g=typeof tableFrameCanvas==='function'?tableFrameCanvas():null;if(g)return g;}if(it&&it.photoImg)return it.photoImg;const k=it&&shotKind(it);return k&&shotImg[k]||null;}

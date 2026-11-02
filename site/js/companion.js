@@ -71,7 +71,7 @@ function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.
   const eat=free&&MENU[it.kind];addEvent(`${w.p.name} заходит с вами${eat?' и занимает столик — подходите, закажем':''}`,'say');
   if(eat){const t=pick(['Я тут столик заняла, иди сюда!','Садись, я место заняла.','Вот свободный столик, давай сюда!']);npc.say={t:w.p.female?t:t.replace('заняла','занял'),ttl:6};}}
 function companionContext(w){const ww=w.companionOf||w;if(!companion||companion.w!==ww)return '';const c=companion;
-  if(w.companionOf&&interior){const f=w.tableF;return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.`;}
+  if(w.companionOf&&interior){const f=w.tableF;const why=w.p&&w.p.homeWhy;const job=why==='repair'?' Вы дома на диване. Продолжай про поломку: где течёт, что сделать. Обычный быт.':why==='tea'?' Вы дома на диване, пьёте чай и разговариваете.':'';return ` Ты пришёл(ла) вместе с собеседником в «${interior.name}»${f?(f.ordered?` и вы сидите за одним столиком, заказали: ${f.ordered}`:' и занял(а) столик, ждёшь его'):''}.${job}`;}
   return c.dest&&!c.arrived?` Ты сейчас идёшь вместе с собеседником в ${qName(c.dest.n)}.`:' Ты сейчас гуляешь вместе с собеседником.';}
 function drawCompanionMark(toS,z){if(!companion||companion.w.inside||player.inside)return;const w=companion.w;const [sx,sy]=toS(w.x,w.y);
   ctx.save();ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(sx,sy,Math.max(1.3*z,9),0,TAU);ctx.stroke();ctx.setLineDash([]);
@@ -94,6 +94,39 @@ function scriptedThink(w,text){const t=norm(text);if(/(пойд[её]м|идем
   if(/(пока|до свидания|сау бул|мне пора)/.test(t))return {reply:'Сау бул! Ещё увидимся.',action:'stop',place:''};return null;}
 function playerAskedHome(w){const mem=(w.p&&w.p.memory)||[];let t='';for(let i=mem.length-1;i>=0;i--)if(mem[i].role==='user'){t=norm(mem[i].content);break;}
   return /(ко мне|к себе домой|ко мне домой|домой ко мне|заходи ко мне|пошли ко мне|пойд[её]м ко мне|идем ко мне|идём ко мне|пошли домой|идем домой|идём домой|ко мне в гости|в гости ко мне|у меня дома)/.test(t);}
+function homeBlob(w){return norm(((w&&w.p&&w.p.memory)||[]).slice(-8).map(m=>m.content).join(' '));}
+function homeReason(w){const t=homeBlob(w);if(/(раковин|кран|теч|сифон|гайк|унитаз|батарей|розетк)/.test(t))return 'repair';if(/(чай|кофе|посидеть)/.test(t))return 'tea';return 'visit';}
+function homeDeal(w,reply,act){if(w&&w.p&&w.p.age&&w.p.age<18)return false;if(w&&/police|guard/.test(w.role||''))return false;
+  if(typeof hotelLastAsk==='function'&&hotelLastAsk(w))return false;
+  const t=homeBlob(w);
+  const about=/(раковин|кран|теч|сифон|гайк|унитаз|квартир|домой|ко мне|у меня|чай|посидеть|диван|посмотришь|глянь)/.test(t)||playerAskedHome(w);
+  if(!about)return false;
+  const said=norm(reply||'');
+  if(/(не пойду|не могу|не сейчас|занят|не выйдет|не поеду|откажу)/.test(said))return false;
+  const goes=/(пойд[её]м|пойду|подойду|приду|идем|гляну|посмотрю|зайду|подъеду|поехали)/.test(said);
+  const actGo=act&&(act.action==='follow'||act.action==='go'||act.action==='home');
+  return !!(goes||actGo||playerAskedHome(w));}
+function syncChatGo(){const b=$('#chatGo');if(!b)return;const w=typeof chatNpc!=='undefined'?chatNpc:null;const on=!!(w&&w.p&&w.p.homeOffer&&!(player.inside&&interior&&(interior.kind==='home'||interior.kind==='hotelroom')));b.hidden=!on;if(on)b.textContent='Поехать домой';}
+function noteHomeOffer(w,reply,act){if(!w||!w.p||!homeDeal(w,reply,act))return;if(companion&&companion.homeVisit)return;w.p.homeOffer=true;w.p.homeWhy=homeReason(w);syncChatGo();
+  appendMsg('sys',player.home?'Договорились. Кнопка «Поехать домой» — потом пешком, самокат, такси или автобус.':'Договорились, но своего дома ещё нет: меню → «Работа и жильё».');}
+function pressGoHome(){const w=typeof chatNpc!=='undefined'?chatNpc:null;if(!w)return;
+  if(!player.home){setHint('Своего дома ещё нет. Меню → «Работа и жильё» или анкета района');return;}
+  let who=w.companionOf||(!w.isInterior?w:null);
+  if(!who&&w.isInterior&&typeof applyNpcAction==='function'){applyNpcAction(w,{action:'follow',place:''});who=w.companionOf;}
+  if(!who&&companion&&(companion.w.p===w.p))who=companion.w;
+  if(!who||who.isInterior){setHint('Сначала выйдите на улицу вместе');return;}
+  w.p.homeOffer=false;syncChatGo();walkHomeTogether(who);}
+function paintHomeTogether(it){if(!it||!companion)return;const bg=shotImg.homeSofa||shotImg.home;const who=companion.w;const cnv=document.createElement('canvas');cnv.width=1280;cnv.height=720;const g=cnv.getContext('2d');
+  if(bg&&bg.complete&&bg.width){const s=Math.max(1280/bg.width,720/bg.height),dw=bg.width*s,dh=bg.height*s;g.drawImage(bg,(1280-dw)/2,(720-dh)/2,dw,dh);}
+  else{g.fillStyle='#241c16';g.fillRect(0,0,1280,720);if(bg&&!bg._wait){bg._wait=1;bg.addEventListener('load',()=>paintHomeTogether(it),{once:true});}}
+  g.fillStyle='rgba(12,10,8,.18)';g.fillRect(0,0,1280,720);
+  const faces=[{name:player.name||'Вы',img:player.avatarImg},{name:who.p.name,img:typeof npcFaceImg==='function'?npcFaceImg(who.p):null}];
+  faces.forEach((m,i)=>{const x=i?860:420,y=268,r=92;g.save();g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.clip();
+    if(m.img&&m.img.width)g.drawImage(m.img,x-r,y-r-6,r*2,r*2);else{g.fillStyle=i?'#3a4a68':'#2c6a4e';g.fillRect(x-r,y-r,r*2,r*2);g.fillStyle='#fff';g.font='700 64px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText((m.name||'?')[0],x,y);}
+    g.restore();g.strokeStyle='#fff';g.lineWidth=5;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.stroke();g.font='600 28px "IBM Plex Sans",sans-serif';g.fillStyle='#fff';g.textAlign='center';g.shadowColor='rgba(0,0,0,.75)';g.shadowBlur=8;g.fillText(m.name,x,y+r+36);g.shadowBlur=0;});
+  it.photoImg=cnv;if(typeof placeChatLook==='function')placeChatLook();}
+(function(){const im=new Image();im.onload=()=>{shotImg.homeSofa=im;};im.src='img/inside/room-sofa.jpg';})();
+const chatGoBtn=$('#chatGo');if(chatGoBtn)chatGoBtn.addEventListener('click',pressGoHome);
 function walkHomeTogether(who){if(!who||who.isInterior||!player.home)return null;startCompanion(who,'follow',null,true);const c=companion;if(!c||c.w!==who)return null;
   const b=player.home;let x=b.cx,y=b.cy;if(typeof inBuilding==='function'&&inBuilding(x,y)&&typeof toSidewalk==='function'){const q=toSidewalk(x,y);if(q){x=q[0];y=q[1];}}
   const street=typeof nearestRoadName==='function'?(nearestRoadName(b.cx,b.cy)||''):'';
@@ -106,7 +139,8 @@ function walkHomeTogether(who){if(!who||who.isInterior||!player.home)return null
 function maybeEnterHomeTogether(){const c=companion;if(!c||!c.homeVisit||!player.home||player.inside||player.vehicle||player.bus)return false;
   const b=player.home,reach=Math.max(28,(b.bb&&b.bb[2]-b.bb[0])/2+12||0,(b.bb&&b.bb[3]-b.bb[1])/2+12||0);
   if(dist(player.x,player.y,b.cx,b.cy)>reach)return false;c.homeVisit=false;c.arrived=true;
-  enterInterior({kind:'home',name:typeof housingHomeName==='function'?housingHomeName():'Ваша квартира',key:typeof housingHomeKey==='function'?housingHomeKey():'home',x:player.x,y:player.y,together:true});return true;}
+  enterInterior({kind:'home',name:typeof housingHomeName==='function'?housingHomeName():'Ваша квартира',key:typeof housingHomeKey==='function'?housingHomeKey():'home',x:player.x,y:player.y,together:true});
+  if(c.w.p)c.w.p.homeOffer=false;if(typeof paintHomeTogether==='function')paintHomeTogether(interior);if(typeof syncChatGo==='function')syncChatGo();return true;}
 function applyNpcAction(w,r){const real=w.companionOf||w;
   const homeAsk=playerAskedHome(w)&&(r.action==='follow'||r.action==='home'||r.action==='go');
   if(homeAsk){if(!player.home){setHint('Своего дома ещё нет. Выберите его: меню → «Работа и жильё» или анкета района');return `${w.p.name} согласна зайти, но дома пока нет`;}}

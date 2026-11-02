@@ -171,7 +171,7 @@ function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);p
   $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
   if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
   $('#brainLbl').textContent=sampleFn?'думает сам: отвечает ИИ':'реплики по сценарию (без ИИ)';
-  if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}if(typeof placeChatLook==='function')placeChatLook();setTimeout(()=>$('#chatInput').focus(),50);}
+  if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}if(typeof placeChatLook==='function')placeChatLook();if(typeof syncChatGo==='function')syncChatGo();setTimeout(()=>$('#chatInput').focus(),50);}
 function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;if(typeof placeChatLook==='function')placeChatLook();}
 function placeChatLook(){const box=$('#chatModal')&&$('#chatModal').querySelector('.box');if(!box)return;
   const im=scene==='interior'&&interior&&typeof interiorPhoto==='function'?interiorPhoto(interior):null;
@@ -186,7 +186,7 @@ async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();
   if(sampleFn){const bubble=appendMsg('npc','…');try{const r=await npcThink(w);reply=r.reply;bubble.textContent=reply;act=r;}catch(e){bubble.remove();if(e&&e.code==='not_granted'){sampleFn=null;$('#brainLbl').textContent='реплики по сценарию (ИИ не разрешён)';}}}
   if(!reply){const s=scriptedThink(w,text);reply=s?s.reply:pick(w.p.lines||SCRIPTED[w.role]||SCRIPTED.resident);act=s;await new Promise(r=>setTimeout(r,400));appendMsg('npc',reply);}
   if(act){const note=applyNpcAction(w,act);if(note)appendMsg('sys',note);}
-  w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);chatBusy=false;}
+  w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);if(typeof noteHomeOffer==='function')noteHomeOffer(w,reply,act);chatBusy=false;}
 function contextForNpc(w){let place;if(w.isInterior&&interior)place=`внутри «${interior.name}» (${KIND_RU[interior.kind]||'помещение'})`;else{const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,w.x,w.y)<80).slice(0,4).map(p=>p.n).join(', ');const road=nearestRoadName(w.x,w.y);place=`${road?'на улице '+road:'в центре'}${near?', рядом: '+near:''}`;}
   const rl=contextRallies(w.x||player.x,w.y||player.y);const ev=feed.slice(0,3).map(e=>e.text).join('; ')+(rl?'; '+rl:'');const pv=player.vehicle?(player.vehicle.kind==='scooter'?', подъехал на самокате':', подъехал на машине'):'';
   const sc=sitContextFor(w);
