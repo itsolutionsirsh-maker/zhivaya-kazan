@@ -14,17 +14,17 @@ function resolvePlace(name,x,y){const n=norm(name);if(!n)return null;let best=nu
     if(world.kremlin&&/кремл/.test(n))return {x:world.kremlin.x,y:world.kremlin.y,n:'Казанский Кремль'};return null;}
   return {x:best.x,y:best.y,n:best.n,poi:best};}
 
-function startCompanion(w,mode,place){if(w.isInterior){const cw=w.companionOf;if(cw)w=cw;else return;}
+function startCompanion(w,mode,place,quiet){if(w.isInterior){const cw=w.companionOf;if(cw)w=cw;else return;}
   if(companion&&companion.w!==w)stopCompanion(true);
   const f=typeof folkOf==='function'?folkOf(w):null;if(f){folkCancelRoute(f);f.away=true;f.retry=null;f.w=w;w.folk=f.id;w.temp=false;}
   let dest=null;if(mode==='go'&&place){dest=resolvePlace(place,w.x,w.y);if(!dest)mode='follow';}
   companion={w,mode,dest,arrived:false,t:0};player.escort=mode==='go'&&!!dest;w.companion=true;w.state='companion';w.path=null;w.goalPoi=null;w.goalStop=null;w.waitStop=null;w.cwps=null;w.repath=0;
-  addEvent(dest?`${w.p.name} идёт с вами в ${qName(dest.n)}`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
+  if(!quiet)addEvent(dest?`${w.p.name} идёт с вами в ${qName(dest.n)}`:`${w.p.name} идёт с вами`,'say');updateCompBox();}
 function stopCompanion(silent){if(!companion)return;player.escort=false;player.waypoints=null;const w=companion.w;w.companion=false;if(w.inside&&interior&&interior.ret){w.x=interior.ret.x;w.y=interior.ret.y;}w.inside=false;if(w.state==='companion'){w.state='idle';w.ttl=rnd(2,6);w.node=nearestNode(w.x,w.y,world.pedAdj,120);if(w.node<0)w.node=pick(world.pedNodes);}
   if(interior){interior.npcs=interior.npcs.filter(n=>n.companionOf!==w);}
   if(!silent)addEvent(`${w.p.name} пошёл по своим делам`,'say');companion=null;const f=typeof folkOf==='function'?folkOf(w):null;if(f){f.away=true;f.retry=null;folkGo(f,folkWant(f));}updateCompBox();}
 function updateCompBox(){const b=$('#compBox');if(!companion){b.hidden=true;return;}const c=companion;b.hidden=false;const going=c.mode==='go'&&c.dest&&!c.arrived;$('#compFollow').hidden=!going;$('#compFollow').textContent=player.escort?'Идти самому':(c.w.p.female?'Идти за ней':'Идти за ним');$('#compBye').textContent=going?'Передумать':'Отпустить';
-  $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ведёт вас ${c.dest.guest?'к себе в гости':'в '+qName(c.dest.n)} · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:c.dest&&c.dest.guest?`🏠 ${c.w.p.name} у своего подъезда · E — зайти в гости`:`🤝 ${c.w.p.name} с вами`;}
+  $('#compLbl').textContent=c.dest&&!c.arrived?`🤝 ${c.w.p.name} ${c.dest.host?'идёт с вами домой':c.dest.guest?'ведёт вас к себе в гости':'ведёт вас в '+qName(c.dest.n)} · ${Math.round(dist(c.w.x,c.w.y,c.dest.x,c.dest.y))} м`:c.dest&&c.dest.guest?`🏠 ${c.w.p.name} у своего подъезда · E — зайти в гости`:c.dest&&c.dest.host?`🏠 ${c.w.p.name} у вашего подъезда · E — зайти домой`:`🤝 ${c.w.p.name} с вами`;}
 $('#compTalk').addEventListener('click',()=>{if(!companion||player.busy)return;if(scene==='interior'){const n=compNpcInside();if(n)openChat(n);return;}openChat(companion.w);});
 $('#compBye').addEventListener('click',()=>{if(!companion)return;const c=companion,w=c.w;if(c.mode==='go'&&c.dest&&!c.arrived){const t=pick(['Ну ладно, в другой раз!','Эх, жаль. Ну, бывай!','Хорошо, передумали так передумали.']);w.say={t,ttl:5};nearLine(w.p.name,t,false);w.p.memory.push({role:'user',content:'Слушай, я передумал, давай в другой раз.'},{role:'assistant',content:t});}stopCompanion();});
 $('#compFollow').addEventListener('click',()=>{player.escort=!player.escort;player.waypoints=null;updateCompBox();});
@@ -51,7 +51,7 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     if(bd<1.5&&c.ri<R.length-1)c.ri++;
     if(pd>11){look();updateCompBox();return;}   // ждёт, пока игрок догонит
     stepTo(w,R[c.ri],pd>5?WALK_SPEED*1.1:WALK_SPEED*0.9,dt,true);   // ведёт в темпе игрока
-    if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;if(c.dest.guest){addEvent(`Вы с ${w.p.name} у ${w.p.female?'её':'его'} подъезда. Заходите — чай уже ждёт`,'say');setHint('E — зайти в гости');}else{addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}}
+    if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;if(c.dest.host){addEvent(`Вы с ${w.p.name} у вашего подъезда. Заходите домой вместе`,'say');setHint('E — зайти домой');}else if(c.dest.guest){addEvent(`Вы с ${w.p.name} у ${w.p.female?'её':'его'} подъезда. Заходите — чай уже ждёт`,'say');setHint('E — зайти в гости');}else{addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}}
     updateCompBox();return;}
   else{T=[player.x-player.hx*1.6,player.y-player.hy*1.6];if(pd<2.6)T=null;}
   if(!T||dist(w.x,w.y,T[0],T[1])<stop){look();updateCompBox();return;}
@@ -82,21 +82,32 @@ async function npcThink(w,extra){const base=w.isInterior&&interior?interior.ret:
   const sys=contextForNpc(w)+companionContext(w)+`\nМеста рядом (называй только их, точными названиями): ${placesText(base.x,base.y)}.`+(extra?'\n'+extra:'')+
     (typeof guestHomeHint==='function'?guestHomeHint(w):'')+
     '\nОтветь ТОЛЬКО JSON без пояснений: {"reply":"твоя живая реплика, 1–2 предложения","action":"none|follow|go|stop'+(typeof guestHomeOk==='function'&&guestHomeOk(w)?'|home':'')+'","place":"точное название места из списка или пустая строка"}.'+
-    ' action=go — вы только что договорились вместе пойти в конкретное место из списка (ты идёшь рядом и показываешь дорогу); follow — ты согласился пойти с собеседником, куда он поведёт; stop — ты прощаешься или больше не идёшь вместе; иначе none. Соглашайся, только если это в твоём характере и у тебя есть время.';
+    ' action=go — вы только что договорились вместе пойти в конкретное место из списка (ты идёшь рядом и показываешь дорогу); follow — ты согласился пойти с собеседником, куда он поведёт, в том числе к нему домой; stop — ты прощаешься или больше не идёшь вместе; home — только если ТЫ зовёшь собеседника к себе, не наоборот. Соглашайся, только если это в твоём характере и у тебя есть время.';
   const turns=mem.map((m,i)=>i===mem.length-1?{role:'user',content:sys+'\n\nРеплика собеседника: '+m.content}:m);
   const res=await sampleFn.json(turns,{cache:false,modelTier:'quick'});
   const action=['follow','go','stop'].includes(res&&res.action)||(res&&res.action==='home'&&typeof guestHomeOk==='function'&&guestHomeOk(w))?res.action:'none';
   return {reply:String((res&&res.reply)||'').trim()||'…',action,place:String((res&&res.place)||'').slice(0,80)};}
 function scriptedThink(w,text){const t=norm(text);if(/(пойд[её]м|идем|пошли|айда|проводи|покажи дорогу|давай со мной|за мной)/.test(t))return {reply:pick(['Пойдём, мне как раз по пути!','Давай, веди!','Айда!']),action:'follow',place:''};
   if(/(пока|до свидания|сау бул|мне пора)/.test(t))return {reply:'Сау бул! Ещё увидимся.',action:'stop',place:''};return null;}
+function playerAskedHome(w){const mem=(w.p&&w.p.memory)||[];let t='';for(let i=mem.length-1;i>=0;i--)if(mem[i].role==='user'){t=norm(mem[i].content);break;}
+  return /(ко мне|к себе домой|ко мне домой|домой ко мне|заходи ко мне|пошли ко мне|пойд[её]м ко мне|идем ко мне|идём ко мне|пошли домой|идем домой|идём домой|ко мне в гости|в гости ко мне|у меня дома)/.test(t);}
+function walkHomeTogether(who){if(!who||who.isInterior||!player.home)return null;startCompanion(who,'follow',null,true);const c=companion;if(!c||c.w!==who)return null;
+  const b=player.home,street=typeof nearestRoadName==='function'?(nearestRoadName(b.cx,b.cy)||''):'';
+  c.mode='go';c.dest={x:b.cx,y:b.cy,n:street?('дом на '+street):'домой',host:true};c.route=null;c.arrived=false;player.escort=true;
+  addEvent(`🏠 ${who.p.name} идёт с вами домой${street?' · '+street:''}`,'say');setHint(`${who.p.female?'Она знает':'Он знает'} дорогу. У вашего подъезда — E «Зайти домой»`);updateCompBox();
+  return `${who.p.name} идёт с вами домой`;}
 function applyNpcAction(w,r){const real=w.companionOf||w;
-  if(r.action==='home'&&typeof guestGo==='function')return guestGo(w);
+  const homeAsk=playerAskedHome(w)&&(r.action==='follow'||r.action==='home'||r.action==='go');
+  if(homeAsk){if(!player.home){setHint('Своего дома ещё нет. Выберите его: меню → «Работа и жильё» или анкета района');return `${w.p.name} согласна зайти, но дома пока нет`;}}
+  if(!homeAsk&&r.action==='home'&&typeof guestGo==='function')return guestGo(w);
+  if(homeAsk&&player.home&&r.action==='home')r.action='follow';
   if(w.isInterior&&(!interior||!interior.ret||(interior.npcs&&!interior.npcs.includes(w))))return null;
   if(r.action==='follow'||r.action==='go'){
     if(w.isInterior&&!w.companionOf){const f=typeof folkOf==='function'?folkOf(w):null;if(f&&f.driving)return null;let nw;
       if(f){folkCancelRoute(f);nw=f.w||folkSpawn(f,interior.ret);if(!nw)return null;nw.x=interior.ret.x;nw.y=interior.ret.y;nw.folk=f.id;nw.temp=false;f.away=true;}
       else{const n=nearestNode(interior.ret.x,interior.ret.y,world.pedAdj,120);if(n<0)return null;nw=new Walker(w.role==='staff'?'resident':(w.role||'resident'),n);nw.p=w.p;nw.temp=true;walkers.push(nw);}
       nw.inside=true;w.companionOf=nw;}
+    if(homeAsk)return walkHomeTogether(w.companionOf||(w.isInterior?null:w));
     startCompanion(w.companionOf||w,r.action,r.place);
     const c=companion;return c?(c.dest?`${w.p.name} идёт с вами в ${qName(c.dest.n)}`:`${w.p.name} идёт с вами`):null;}
   if(r.action==='stop'&&companion&&companion.w===real){stopCompanion(true);return `${w.p.name} больше не идёт с вами`;}
