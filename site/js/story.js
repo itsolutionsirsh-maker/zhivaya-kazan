@@ -183,9 +183,11 @@ function platesPay(s,sum){const lost=Math.min(sum,Math.max(0,Math.round(player.m
 function platesGuard(s){const id='plates';storyStep(id,'guard');const money=Math.max(0,Math.round(player.money||0));
   sitCard(storyCard({s,icon:'🕴',title:'Охрана',text:`«${storyLine(id,'guard',{sum:s.order.sum})}»`,tone:'alert',
     choices:[{t:money>=s.order.sum?`Ладно, заплачу ${fmtMoney(s.order.sum)}`:`Отдать всё, что есть (${fmtMoney(money)})`,run:()=>platesPay(s,Math.min(money,s.order.sum))},{t:'Позвонить 112',primary:true,run:()=>platesCall(s)},{t:'Не буду',run:()=>platesBeaten(s)}],dflt:()=>platesBeaten(s)}));}
-function platesCall(s){const id='plates';const tea=Math.min(600,Math.max(0,Math.round(player.money||0)));
-  sitCard(storyCard({s,icon:'📞',title:'112',text:`Охранник: «${storyLine(id,'call')}» Через десять минут у входа наряд. Официант вдруг вспоминает, что вы заказывали только чай: ${fmtMoney(tea)}.`,tone:'good',
-    choices:[{t:'Заплатить за чай и дать показания',primary:true,run:()=>{if(tea)player.money-=tea;storyOut(s,'called',`👮 Полиция приняла показания на месте. ${qName(s.v.n)} проверят — вы заплатили только за свой чай.`);}}],dflt:()=>{if(tea)player.money-=tea;storyOut(s,'called','👮 Полиция приняла показания на месте.');}}));}
+function platesCall(s){if(s.ending)return;const place=s.v&&s.v.n||'кафе',who=s.w&&s.w.p&&s.w.p.name||'незнакомка',sum=s.order&&s.order.sum||0;
+  if(typeof policeRide!=='function'){storyOut(s,'called','👮 Полиция приняла показания на месте.');return;}
+  addEvent('📞 112. Наряд забирает вас в УАЗ — по дороге спросят, что случилось.','say');
+  policeRide({place,who,sum,onDone(){const p=storyNearest('police');if(p){const q=toSidewalk(p.x,p.y);player.x=q[0];player.y=q[1];cam.x=player.x;cam.y=player.y;}
+    storyOut(s,'called',`👮 Заявление приняли в отделе. Вас высадили у отделения. ${qName(place)} проверят.`);}});}
 function storyFade(then){let el=$('#storyFade');if(!el){el=document.createElement('div');el.id='storyFade';el.style.cssText='position:fixed;inset:0;background:#000;z-index:220;opacity:0;pointer-events:none;transition:opacity .7s ease';document.body.append(el);}el.hidden=false;el.style.pointerEvents='auto';requestAnimationFrame(()=>{el.style.opacity='1';});setTimeout(()=>{then&&then();setTimeout(()=>{el.style.opacity='0';el.style.pointerEvents='none';},500);},1200);}
 function platesBeaten(s){if(s.ending)return;const lost=Math.max(0,Math.round(player.money||0));player.money=0;
   storyFade(()=>{storyOut(s,'caught',null,{lost,how:'beaten',bill:s.order&&s.order.sum});storyWard();});}
