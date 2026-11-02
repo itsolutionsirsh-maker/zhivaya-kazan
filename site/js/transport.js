@@ -122,7 +122,7 @@ function startWalkNav(d){if(!journeyAvailable())return false;cancelTrip(true);le
 function navPause(){if(player.navDest&&!player.navPaused){player.navPaused=true;updateTripBox();}}
 function navResume(){const d=player.navDest;if(!d)return;player.navPaused=false;followPlayer();walkTo(d.x,d.y,true);updateTripBox();}
 function navTick(){const d=player.navDest;if(!d||player.navPaused)return;if(player.bus||player.vehicle||player.inside){player.navDest=null;updateTripBox();return;}
-  if(dist(player.x,player.y,d.x,d.y)<14){player.navDest=null;player.waypoints=null;addEvent(`Пришли: ${d.n}`);setHint(`Вы на месте: ${d.n}`);updateTripBox();return;}
+  if(dist(player.x,player.y,d.x,d.y)<14){player.navDest=null;player.waypoints=null;if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether()){updateTripBox();return;}addEvent(`Пришли: ${d.n}`);setHint(`Вы на месте: ${d.n}`);updateTripBox();return;}
   if(!player.waypoints&&!player.crossWait){player.navPaused=true;updateTripBox();}}
 function updateTripBox(){const b=$('#tripBox');let t=null;const p=player.busPlan;
   if(taxiCall)t=taxiCall.state==='here'?`🚕 Такси ждёт · ${fmtDist(dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y))}`:`🚕 Такси едет к вам · ${fmtDist(dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y))}`;

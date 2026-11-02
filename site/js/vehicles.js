@@ -90,7 +90,7 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   vmax*=weather.ice?0.65:weather.kind==='snow'?0.75:(weather.kind==='rain'||weather.kind==='fog')?0.85:1;v.onRoad=onRoad;
   if(v.auto){const a=v.auto;const look=s.len>3?5:3;while(a.i<a.wps.length-1&&dist(a.wps[a.i][0],a.wps[a.i][1],v.x,v.y)<look)a.i++;
     const tp=a.wps[a.i];const dT=dist(tp[0],tp[1],v.x,v.y);
-    if(a.i>=a.wps.length-1&&dT<2.5){v.auto=null;v.speed=0;if(v.kind==='taxi'){exitVehicle();return;}setHint('Приехали. E — выйти');}
+    if(a.i>=a.wps.length-1&&dT<2.5){v.auto=null;v.speed=0;if(v.kind==='taxi'||(typeof companion!=='undefined'&&companion&&companion.homeVisit)){exitVehicle();return;}setHint('Приехали. E — выйти');}
     else{const want=Math.atan2(tp[1]-v.y,tp[0]-v.x);const cur=Math.atan2(v.hy,v.hx);const dd=angDiff(cur,want);steer=clamp(dd*2.2,-1,1);
       let lim=Math.min(vmax,Math.abs(dd)>0.8?3.2:Math.abs(dd)>0.35?6.5:vmax);const ahead=obstacleAhead(vehProxy(v),cars.concat(buses),carSee);lim=limitBySpace(lim,ahead);if(a.i>=a.wps.length-2)lim=Math.min(lim,1.5+dT*0.5);
       thr=v.speed<lim-0.3?1:v.speed>lim+0.3?-1:0;if(lim===0&&v.speed<0.2){thr=0;v.speed=0;v.waitT=(v.waitT||0)+dt;}else if(v.speed>1)v.waitT=0;}}

@@ -52,9 +52,16 @@ function makeInterior(kind,name,key,room){
     default:{it.floor='tiles';F('counter',w/2,1.1,5,1.1,{spot:'counter'});NPC(w/2,0.5,{role:'staff',job:'администратор'});for(let i=0;i<4;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});NPC(3+rng()*(w-6),3+rng()*(h-6),{wander:true});}
   }
   return it;}
-function enterInterior(src){insideShot(src);if(window.citySaveShot&&src&&src.kind==='metro')citySaveShot('Метро');const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
-  interior=it;scene='interior';player.inside=true;companionEnter(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
+function enterInterior(src){if(window.citySaveShot&&src&&src.kind==='metro')citySaveShot('Метро');const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
+  interior=it;scene='interior';player.inside=true;companionEnter(it);if(src.together)seatHomeTogether(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};if(!src.together){player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;}player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
   addEvent(`Вы зашли в ${qName(src.name)}`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
+function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.companionOf===companion.w);if(!npc)return;
+  const table=it.furn.find(f=>f.spot==='table'),sofa=it.furn.find(f=>f.t==='sofa');
+  if(table){npc.x=table.x;npc.y=table.y-0.9;npc.seated=true;npc.hx=0;npc.hy=1;npc.tableF=table;table.comp=npc;player.ix=table.x;player.iy=table.y+0.95;player.ihx=0;player.ihy=-1;}
+  else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
+  const line=npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.';
+  setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});},700);}
+function interiorPhoto(it){const k=it&&shotKind(it);return k&&shotImg[k]||null;}
 function exitInterior(){const it=interior;if(!it)return;for(const f of it.furn){f.comp=null;f.ordered=null;}it.npcs=it.npcs.filter(n=>!n.companionOf);if(orderCtx)closeOrder();scene='city';interior=null;player.inside=false;player.x=it.ret.x;player.y=it.ret.y;cam.x=player.x;cam.y=player.y;player.iwp=null;sharedTransition();}
 function blockedInside(x,y,r){const it=interior;
   if(x<0.35+r||x>it.w-0.35-r||y<0.35+r){return true;}
@@ -166,7 +173,10 @@ function interiorView(it,width,height){
   const iz=Math.max(16,Math.min((width-40)/(it.w+1),(height-250)/(it.h+1.5),46));
   return {iz,ox:(width-it.w*iz)/2,oy:Math.max(124,(height-it.h*iz)/2-10)};
 }
-function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);
+function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);
+  const im=typeof interiorPhoto==='function'?interiorPhoto(it):null;
+  if(im){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.fillStyle='rgba(16,22,26,.58)';ctx.fillRect(0,0,W,H);}
+  else{ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);}
   const {iz,ox,oy}=interiorView(it,W,H);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
   // пол
@@ -269,9 +279,7 @@ const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','off
 // фото качаем, когда город уже на экране: при входе 600 КБ картинок мешали карте
 (function shotLater(){const L=$('#loading');if(L&&!L.hidden){setTimeout(shotLater,700);return;}setTimeout(()=>{for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}},1500);})();
 function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';return SHOT_KINDS.includes(src.kind)?src.kind:null;}
-function insideShot(src){const k=shotKind(src);const im=k&&shotImg[k];if(!im)return;const key=src.key||src.name;const now=performance.now();if(now-(shotSeen.get(key)||-1e9)<60000)return;shotSeen.set(key,now);
-  const el=$('#insideShot');el.style.backgroundImage=`url("${im.src}")`;$('#insideShotName').textContent=src.name||'';el.hidden=false;el.classList.remove('out');void el.offsetWidth;el.classList.add('in');
-  clearTimeout(shotT);shotT=setTimeout(hideShot,800);}
+function insideShot(src){/* фото остаётся фоном комнаты, а не вспышкой на несколько секунд */}
 function hideShot(){const el=$('#insideShot');if(el.hidden)return;clearTimeout(shotT);el.classList.remove('in');el.classList.add('out');setTimeout(()=>{el.hidden=true;el.classList.remove('out');},280);}
 $('#insideShot').addEventListener('pointerdown',hideShot);
 window.addEventListener('keydown',e=>{if(!$('#insideShot').hidden&&/^(w|a|s|d|ц|ф|ы|в|Arrow\w+|Escape| )$/i.test(e.key))hideShot();},true);

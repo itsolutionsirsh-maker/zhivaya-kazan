@@ -76,7 +76,7 @@ function guestEnter(){const c=companion;if(!c||!c.dest||!c.dest.guest)return;con
 // фон разговора — картинка квартиры, приглушённая
 function guestChatLook(on){const m=$('#chatModal');if(!m)return;const box=m.querySelector('.box')||m.firstElementChild;if(!box)return;const v=GUEST.visit;
   if(on&&v&&v.pic){box.style.backgroundImage=`linear-gradient(rgba(14,24,20,.86),rgba(14,24,20,.93)),url("${v.pic}")`;box.style.backgroundSize='cover';box.style.backgroundPosition='center';}
-  else{box.style.backgroundImage='';box.style.backgroundSize='';box.style.backgroundPosition='';}}
+  else{box.style.backgroundImage='';box.style.backgroundSize='';box.style.backgroundPosition='';if(typeof placeChatLook==='function')placeChatLook();}}
 if(typeof closeChat==='function'){const cc0=closeChat;window.closeChat=closeChat=function(){guestChatLook(false);return cc0.apply(this,arguments);};}
 // ИИ знает, что вы у хозяина дома и что он рассказывает в этот раз
 if(typeof companionContext==='function'){const cx0=companionContext;window.companionContext=companionContext=function(w){const v=GUEST.visit;

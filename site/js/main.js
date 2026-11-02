@@ -171,8 +171,11 @@ function openChat(w){chatNpc=w;if(typeof folkOnChat==='function')folkOnChat(w);p
   $('#chatOrder').hidden=!(w.companionOf&&w.tableF&&w.tableF.ordered);
   if(w.p.memory.length){for(const m of w.p.memory){const sys=m.role==='user'&&m.content[0]==='[';appendMsg(sys?'sys':m.role==='user'?'me':'npc',sys?m.content.slice(1,-1):m.content);}}else{appendMsg('sys',`${w.p.name} ${w.seated?'поднимает глаза':'останавливается и смотрит на вас'}`);}
   $('#brainLbl').textContent=sampleFn?'думает сам: отвечает ИИ':'реплики по сценарию (без ИИ)';
-  if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}setTimeout(()=>$('#chatInput').focus(),50);}
-function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;}
+  if(!w.isInterior&&!w.companion){w.state='idle';w.ttl=9e9;w.path=null;}if(typeof placeChatLook==='function')placeChatLook();setTimeout(()=>$('#chatInput').focus(),50);}
+function closeChat(){if(!chatNpc)return;if(!chatNpc.isInterior&&!chatNpc.companion)chatNpc.ttl=rnd(2,6);chatNpc=null;player.busy=false;$('#chatModal').hidden=true;if(typeof placeChatLook==='function')placeChatLook();}
+function placeChatLook(){const box=$('#chatModal')&&$('#chatModal').querySelector('.box');if(!box)return;const im=scene==='interior'&&interior&&typeof interiorPhoto==='function'?interiorPhoto(interior):null;
+  if(im){box.style.backgroundImage=`linear-gradient(rgba(14,24,20,.78),rgba(14,24,20,.9)),url("${im.src}")`;box.style.backgroundSize='cover';box.style.backgroundPosition='center';}
+  else if(!(typeof GUEST!=='undefined'&&GUEST.visit)){box.style.backgroundImage='';box.style.backgroundSize='';box.style.backgroundPosition='';}}
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
 async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text||chatBusy||!chatNpc)return;inp.value='';const w=chatNpc;appendMsg('me',text);w.p.memory.push({role:'user',content:text});chatBusy=true;let reply=null;
   let act=null;
