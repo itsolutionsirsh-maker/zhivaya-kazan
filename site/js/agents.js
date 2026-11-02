@@ -173,7 +173,7 @@ function updateRoadPeds(){roadPeds=[];activeCrossings=[];
   if(typeof companion!=='undefined'&&companion&&!companion.w.inside&&onCarriageway(companion.w.x,companion.w.y))roadPeds.push({x:companion.w.x,y:companion.w.y,ref:companion.w});
   for(const w of walkers){if(w.bus)continue;if(w.state==='cross'||w.state==='hurt'){roadPeds.push({x:w.x,y:w.y,ref:w,hurt:w.state==='hurt'});}
     else if(w.state==='walk'&&dist(w.x,w.y,player.x,player.y)<320){world.cgrid.query(w.x-5,w.y-5,w.x+5,w.y+5,c=>{if(onZebra(c,w.x,w.y)&&!activeCrossings.includes(c))activeCrossings.push(c);});}}
-  const h=(clock.minutes/60)%24;carSee=(h<6||h>=21)?11:16;if(weather.kind==='rain'||weather.kind==='snow')carSee-=3;else if(weather.kind==='fog')carSee-=6;}
+  carSee=(typeof isNight==='function'&&isNight())?11:16;if(weather.kind==='rain'||weather.kind==='snow')carSee-=3;else if(weather.kind==='fog')carSee-=6;}
 
 // ---------- происшествия ----------
 let accidentTimer=rnd(40,80);

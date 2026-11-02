@@ -16,12 +16,24 @@ let lampSprite=null,beamSprite=null;
 function makeLightSprites(){lampSprite=document.createElement('canvas');lampSprite.width=lampSprite.height=128;let g=lampSprite.getContext('2d');let gr=g.createRadialGradient(64,64,2,64,64,64);gr.addColorStop(0,'rgba(255,214,140,.75)');gr.addColorStop(0.35,'rgba(255,200,120,.32)');gr.addColorStop(1,'rgba(255,190,100,0)');g.fillStyle=gr;g.fillRect(0,0,128,128);
   beamSprite=document.createElement('canvas');beamSprite.width=160;beamSprite.height=96;g=beamSprite.getContext('2d');gr=g.createLinearGradient(0,0,160,0);gr.addColorStop(0,'rgba(255,245,210,.55)');gr.addColorStop(1,'rgba(255,245,210,0)');g.fillStyle=gr;g.beginPath();g.moveTo(0,40);g.lineTo(160,0);g.lineTo(160,96);g.lineTo(0,56);g.closePath();g.fill();}
 function visiblePois(x0,y0,x1,y1,z){const out=[];const minPrio=z>4.5?6:z>3.2?5:z>2.4?3:2;for(const p of world.pois){const pr=POI_PRIO[p.t]??6;if(pr>minPrio||p.x<x0||p.x>x1||p.y<y0||p.y>y1)continue;out.push(p);}out.sort((a,b)=>(POI_PRIO[a.t]??6)-(POI_PRIO[b.t]??6));return out;}
-function isNight(){const h=(clock.minutes/60)%24;return h<6||h>=21;}
-function nightAmount(){const h=(clock.minutes/60)%24;if(h>=7&&h<18)return 0;if(h>=22||h<5)return 1;if(h>=18&&h<22)return (h-18)/4;return 1-(h-5)/2;}
+// Солнце Казани (55.80° с.ш., 49.11° в.д.). Высота в градусах: 0 — край диска на горизонте, −6 — конец гражданских сумерек.
+function solarEl(utcMs){const lat=55.7964*Math.PI/180,lon=49.1089,n=(utcMs-Date.UTC(2000,0,1,12))/864e5;
+  const g=(357.528+0.9856003*n)*Math.PI/180;let lambda=(280.460+0.9856474*n)+1.915*Math.sin(g)+0.020*Math.sin(2*g);lambda=((lambda%360)+360)%360*Math.PI/180;
+  const eps=(23.439-0.0000004*n)*Math.PI/180,ra=Math.atan2(Math.cos(eps)*Math.sin(lambda),Math.cos(lambda)),dec=Math.asin(Math.sin(eps)*Math.sin(lambda));
+  let gmst=280.46061837+360.98564736629*n;gmst=((gmst%360)+360)%360;const ha=(gmst+lon-ra*180/Math.PI)*Math.PI/180;
+  return Math.asin(Math.max(-1,Math.min(1,Math.sin(lat)*Math.sin(dec)+Math.cos(lat)*Math.cos(dec)*Math.cos(ha))))*180/Math.PI;}
+let sunBook={key:-1,rise:7,set:16.2};
+function sunBookFor(minutes){const t0=typeof GAME_T0==='number'?GAME_T0:Date.UTC(2026,8,30,21,0);const utc=t0+minutes*60000;const key=Math.floor((utc+3*3600e3)/864e5);
+  if(sunBook.key===key)return sunBook;const midnight=key*864e5-3*3600e3;let rise=7,set=16.2,prev=null;
+  for(let m=0;m<1440;m+=2){const el=solarEl(midnight+m*60000);if(prev!=null){if(prev<-0.8&&el>=-0.8)rise=m/60;if(prev>=-0.8&&el<-0.8)set=m/60;}prev=el;}
+  return sunBook={key,rise,set};}
+function clockUtc(){const t0=typeof GAME_T0==='number'?GAME_T0:Date.UTC(2026,8,30,21,0);return t0+(clock.minutes||0)*60000;}
+function isNight(){return nightAmount()>=0.55;}
+function nightAmount(){const el=solarEl(clockUtc());return clamp((1-el)/7,0,1);}
 
 // Один расчёт на кадр. Издалека остаются прежние тени и освещение стен.
 function citySun(minutes,night){
-  const h=((minutes/60)%24+24)%24,a=clamp((h-6)/14,0,1)*Math.PI;
+  const s=sunBookFor(minutes),h=((minutes/60)%24+24)%24,span=Math.max(1,s.set-s.rise),a=clamp((h-s.rise)/span,0,1)*Math.PI;
   const x=-.55*Math.cos(a),y=.26+.12*Math.abs(Math.cos(a)),L=Math.hypot(x,y);
   return {x,y,nx:-x/L,ny:-y/L,alpha:.2-.165*night};
 }

@@ -355,8 +355,11 @@ let dayPhaseAnnounced={};
 function updateClock(dt){const before=clock.minutes;clock.minutes=gameMinutesNow();if(clock.minutes<before&&before-clock.minutes<30)clock.minutes=before;   // поправка с сервера назад — не откатываем
   updateNeeds(dt*clock.scale/60);   // силы и сытость тратятся, только пока играете
   const d=Math.floor(clock.minutes/1440)+1;if(d!==clock.day){clock.day=d;dayPhaseAnnounced={};}
-  const h=(clock.minutes/60)%24;const key=Math.floor(h);const we=typeof isWeekend==='function'&&isWeekend();const marks=we?{7:'Выходной. Город просыпается не спеша',11:'Выходной: на Баумана и у Кремля всё больше гуляющих',14:'Кафе и набережная полны',20:'Зажглись фонари, бары заполняются',23:'Поздний вечер выходного: на Баумана ещё гуляют',2:'Ночь. Такси развозят из баров'}:{6:'Рассвет над Казанкой. Город просыпается',8:'Утренний час пик: на Кольце и Татарстан плотно, на остановках очереди',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',20:'Зажглись фонари',23:'Ночь. Кафе закрываются, остались бары, таксисты и полиция'};
-  if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}}
+  const h=(clock.minutes/60)%24;const key=Math.floor(h);const we=typeof isWeekend==='function'&&isWeekend();const marks=we?{7:'Выходной. Город просыпается не спеша',11:'Выходной: на Баумана и у Кремля всё больше гуляющих',14:'Кафе и набережная полны',23:'Поздний вечер выходного: на Баумана ещё гуляют',2:'Ночь. Такси развозят из баров'}:{8:'Утренний час пик: на Кольце и Татарстан плотно, на остановках очереди',12:'Обед. Кафе на Баумана заполняются',17:'Вечерний час пик',23:'Ночь. Кафе закрываются, остались бары, таксисты и полиция'};
+  if(marks[key]&&!dayPhaseAnnounced[key]&&Math.floor(before/60)%24!==key){dayPhaseAnnounced[key]=true;addEvent(marks[key]);}
+  if(typeof sunBookFor==='function'&&Math.floor(before/60)%24!==key){const s=sunBookFor(clock.minutes);const dawn=Math.round(s.rise),dusk=Math.round(s.set);
+    if(key===dawn&&!dayPhaseAnnounced.dawn){dayPhaseAnnounced.dawn=true;addEvent('Рассвет над Казанкой. Город просыпается');}
+    if(key===dusk&&!dayPhaseAnnounced.dusk){dayPhaseAnnounced.dusk=true;addEvent(we?'Зажглись фонари, бары заполняются':'Зажглись фонари');}}}
 // своя случайная погода — только пока нет настоящей (realworld.js: weather.real)
 function updateWeather(dt){
   if(!weather.real&&typeof skySlot==='function'){const month=new Date(Date.now()+(typeof clockOff==='number'?clockOff:0)+3*3600e3).getUTCMonth()+1;const k=skySlot(clock.minutes,month);
