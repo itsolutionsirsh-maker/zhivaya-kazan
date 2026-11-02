@@ -15,8 +15,8 @@ const STORY_FB={
     venues:[{name:'Лаунж «Сладкий вечер»',kind:'cafe'},{name:'Кафе «Тёплый плед»',kind:'cafe'},{name:'Кафе «Белая скатерть»',kind:'cafe'},{name:'Лаунж «Золотая вилка»',kind:'cafe'},{name:'Лаунж «Кружевной»',kind:'cafe'}],
     menu:[{name:'Устрицы «Морской бриз»',price:9800},{name:'Шампанское, бутылка',price:24000},{name:'Фирменный чай «Императорский»',price:3500},{name:'Фруктовая тарелка',price:6400},{name:'Кальян «Премиум»',price:7900},
       {name:'Салат с камчатским крабом',price:5600},{name:'Коктейль «Для дамы»',price:4200},{name:'Сырная тарелка',price:4800},{name:'Десерт «Золотой»',price:3900},{name:'Вода «Альпийская»',price:1200},{name:'Тартар из тунца',price:6900},{name:'Коньяк, 200 мл',price:11500}],
-    approach:['Извините, вы не подскажете, как пройти к Кремлю? Я тут совсем запуталась…','Ой, привет! Мы с тобой нигде не виделись? Лицо очень знакомое.','Простите, у вас зажигалки нет? Ладно, неважно. Вы местный?','Привет! Ты так уверенно идёшь — сразу видно, город знаешь.'],
-    invite:['Слушай, тут рядом есть очень уютное место. Посидим, познакомимся?','Я как раз хотела выпить кофе. Составишь компанию? Тут за углом хорошее кафе.','Пойдём посидим? Я угощаю… шучу, но место правда хорошее.'],
+    approach:['Привет! Как дела?','Привет. Как ты?','О, привет! Мы не знакомы? Ничего.'],
+    invite:['Ой, я проголодалась. Может, где-нибудь перекусим? И знакомство продолжим уже за столом.','Есть хочется. Пойдём перекусим рядом и спокойно познакомимся?'],
     refused:['Ну и ладно. Скучный ты какой-то.','Как хочешь. Другого найду.','Жаль. А я думала, мы подружимся.'],
     walk:['Тут недалеко, сейчас за угол.','Ты чем занимаешься? Наверное, что-то интересное.','Обожаю это место, там всегда живая музыка.','Не переживай, там недорого.'],
     table:['Какой ты интересный! Рассказывай, кем работаешь?','А у тебя есть машина? Просто интересно.','Здесь так уютно, правда? Я часто сюда хожу.','Ты не против, если я закажу что-нибудь вкусненькое?'],
@@ -80,11 +80,16 @@ const PLATE_GIFS=['img/story/champagne.gif','img/story/oyster.gif'];
 const PLATE_IM={};(function(){const room=new Image();room.src='img/story/lounge.jpg';PLATE_IM.room=room;for(const u of PLATE_LOOKS){const im=new Image();im.src=u;PLATE_IM[u]=im;}})();
 function plateGif(){return PLATE_GIFS[(Math.floor(Date.now()/8000))%PLATE_GIFS.length];}
 function plateFilm(on){let el=$('#plateFilm');if(!el){el=document.createElement('img');el.id='plateFilm';el.alt='';el.style.cssText='position:fixed;left:12px;right:12px;top:64px;height:min(36vh,260px);object-fit:cover;object-position:center 28%;border-radius:16px;z-index:5;pointer-events:none;box-shadow:0 12px 32px rgba(0,0,0,.45)';document.body.append(el);}if(!on){el.hidden=true;if(el._t){clearInterval(el._t);el._t=0;}return;}let i=0;el.hidden=false;el.src=PLATE_GIFS[0];if(el._t)clearInterval(el._t);el._t=setInterval(()=>{if(!interior||String(interior.key||'').indexOf('story:plates')!==0){plateFilm(false);return;}i=1-i;el.src=PLATE_GIFS[i];},8000);}
+function plateMeet(w){const n=(w.p.name||'').split(' ')[0];return pick([
+  ['Привет! Как дела?','Ой, я проголодалась. Может, где-нибудь перекусим?','И знакомство продолжим уже за столом, не на улице.'],
+  [`Привет, я ${n}. Как ты?`,'День длинный, а есть хочется ужасно.','Пойдём перекусим рядом? Поговорим спокойно и познакомимся.'],
+  ['О, привет! Мы не знакомы? Ничего.','Слушай, я с утра на ногах и проголодалась.','Давай найдём кафе. Перекусим и продолжим знакомство уже там.']
+]);}
 function platesDress(it){if(!it)return;const room=PLATE_IM.room;const apply=()=>{if(interior===it&&room.width){it.photoImg=room;if(typeof placeChatLook==='function')placeChatLook();}};if(room.complete&&room.width)apply();else room.addEventListener('load',apply,{once:true});plateFilm(true);}
 function storyPersona(id,name){const p=makePersona('resident');p.name=name;p.female=storyFemale(name.split(' ')[0]);
   if(id==='plates'){p.age=Math.floor(rnd(22,29));p.clothes=pick(['#C2185B','#8E24AA','#D32F2F','#E91E63']);p.bag='#2A2A2A';p.story='charmer';p.hairStyle=pick([1,1,2]);p.look=PLATE_LOOKS[(typeof faceHash==='function'?faceHash(name):name.length)%PLATE_LOOKS.length];p.lookImg=PLATE_IM[p.look];}
   else{p.age=Math.floor(rnd(26,40));p.story='stranger';}
-  p.job='';p.ctx=`Ты — ${name}. Вы только что познакомились с собеседником на улице, и ты зовёшь его посидеть в заведении рядом. Ты весёлый человек, делаешь комплименты, расспрашиваешь о работе. О ценах и о себе говоришь уклончиво.`;return p;}
+  p.job='';p.ctx=id==='plates'?`Ты — ${name}. Только что подошла познакомиться на улице: сначала «привет, как дела», потом честно сказала, что проголодалась, и предложила перекусить и продолжить знакомство за столом. Ты милая и лёгкая. О ценах и о себе говоришь уклончиво.`:`Ты — ${name}. Вы только что познакомились с собеседником на улице, и ты зовёшь его посидеть в заведении рядом. Ты весёлый человек, делаешь комплименты, расспрашиваешь о работе. О ценах и о себе говоришь уклончиво.`;return p;}
 // выдуманное заведение: тротуар у дома в 60–170 м, рядом нет настоящих заведений
 function storyVenue(id){const V=storyList(id,'venues').filter(v=>v&&v.name);const v=pick(V.length?V:STORY_FB[id].venues);
   for(let k=0;k<60;k++){const q=spotNear(60,170+k*4);if(!q)continue;const R0=k<30?30:18;   // в плотном центре — дальше и чуть ближе к соседям
@@ -104,8 +109,17 @@ defSit('story',{title:'История новичка',quiet:true,
     if(s.w2&&s.phase!=='inside'&&s.phase!=='gone'){if(s.phase==='go'){s.w2.x+=(w.x-w.hx*1.2-s.w2.x)*Math.min(1,dt*3);s.w2.y+=(w.y-w.hy*1.2+0.8-s.w2.y)*Math.min(1,dt*3);s.w2.phase+=dt*8;}else stepActor(s.w2,dt);}
     if(s.phase==='come'){s.rt-=dt;if(s.rt<=0){s.rt=1;moveActor(w,player.x,player.y,2.7);}stepActor(w,dt);
       if(s.t>40||scene!=='city'||player.vehicle||player.bus){storyAbort(s);return;}   // не дождалась
-      if(dist(w.x,w.y,player.x,player.y)<2.4&&!SIT.card){w.mv=null;faceTo(w,player.x,player.y);s.phase='ask';const a=storyLine(id,'approach'),b=storyLine(id,'invite');say(w,a,6);
-        sitCard(storyCard({s,icon:id==='plates'?'💃':'🍻',title:w.p.name,text:`«${a}» — «${b}»`,pic:id==='plates'?w.p.look:'',choices:[{t:'Пойдём',primary:true,run:()=>storyGo(s)},{t:'В другой раз',run:()=>storyRefuse(s)}],dflt:()=>storyRefuse(s)}));}
+      if(dist(w.x,w.y,player.x,player.y)<2.4&&!SIT.card){w.mv=null;faceTo(w,player.x,player.y);
+        if(id==='plates'){s.phase='chat';s.beats=plateMeet(w);s.bi=0;s.bt=0.15;return;}
+        s.phase='ask';const a=storyLine(id,'approach'),b=storyLine(id,'invite');say(w,a,6);
+        sitCard(storyCard({s,icon:'🍻',title:w.p.name,text:`«${a}» — «${b}»`,choices:[{t:'Пойдём',primary:true,run:()=>storyGo(s)},{t:'В другой раз',run:()=>storyRefuse(s)}],dflt:()=>storyRefuse(s)}));}
+      return;}
+    if(s.phase==='chat'){faceTo(w,player.x,player.y);
+      if(dist(w.x,w.y,player.x,player.y)>14||scene!=='city'||player.vehicle||player.bus){storyAbort(s);return;}
+      s.bt-=dt;if(s.bt>0)return;
+      if(s.bi<s.beats.length){say(w,s.beats[s.bi],3.4);s.bi++;s.bt=2.4;return;}
+      s.phase='ask';
+      sitCard(storyCard({s,icon:'💃',title:w.p.name,pic:w.p.look,text:s.beats.map(t=>`«${t}»`).join(' '),choices:[{t:'Пойдём перекусим',primary:true,run:()=>storyGo(s)},{t:'В другой раз',run:()=>storyRefuse(s)}],dflt:()=>storyRefuse(s)}));
       return;}
     if(s.phase==='leave'){stepActor(w,dt);s.lt-=dt;if(s.lt<=0)endSit(s);return;}
     if(s.phase==='go'){
@@ -142,7 +156,7 @@ function storyOut(s,out,text,extra){if(s.ending)return;s.ending=true;const id=s.
 
 // ---------- тарелочница: за столом ----------
 function platesTable(s){if(s.ending)return;const id='plates',w=s.w;s.order=platesOrder();
-  sitCard(storyCard({s,icon:'🍽',title:s.v.n,pic:plateGif(),text:`${w.p.name}: «${storyLine(id,'table')}» Она подзывает официанта: «${storyLine(id,'order')}»`,
+  sitCard(storyCard({s,icon:'🍽',title:s.v.n,pic:plateGif(),text:`${w.p.name}: «${pick(['Ну вот, сели. Теперь можно нормально познакомиться.','Так лучше, чем на ветру. Расскажи, как ты.','Я правда есть хотела. Давай закажем и поговорим.'])}» Потом подзывает официанта: «${storyLine(id,'order')}»`,
     choices:[{t:'Спросить, сколько это стоит',primary:true,run:()=>platesAsk(s)},{t:'Ладно, гуляем',run:()=>platesBill(s)},{t:'Мне пора',run:()=>platesLeave(s)}],dflt:()=>platesLeave(s)}));}
 function platesOrder(){const M=storyList('plates','menu').filter(m=>m&&m.name&&m.price>0);const menu=(M.length>=5?M:STORY_FB.plates.menu).slice().sort(()=>Math.random()-0.5);
   const out=[];let sum=0;for(const m of menu){if(sum>=35000)break;if(sum+m.price>46000)continue;out.push({name:m.name,price:m.price});sum+=m.price;}return {items:out,sum,menu};}
