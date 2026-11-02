@@ -62,7 +62,7 @@ function hotelMatch(text){const t=hotelNorm(text);let best=null,bl=0;
     for(const k of keys){if(k.length<4)continue;if(t.includes(k)&&k.length>bl){best=h;bl=k.length;}}}
   return best;}
 function hotelAskText(text){const t=hotelNorm(text);if(!t)return null;const h=hotelMatch(t);
-  const verb=/(пошли|пойдем|пойдем|идем|айда|давай|поехали|заселим|снимем|позови|пригла|хочу)/.test(t);
+  const verb=/(пошли|пойдем|пойдем|идем|айда|давай|поехали|заселим|снимем|позови|приглаш|хочу)/.test(t);
   const generic=/(отел|гостиниц|в номер)/.test(t);
   const toward=/(^|\s)в\s/.test(t);
   if(h){const n=hotelNorm(h.n);const aka=(h.aka||[]).map(hotelNorm).filter(a=>a.length>4);
@@ -74,7 +74,37 @@ function hotelLastAsk(w){const mem=(w&&w.p&&w.p.memory)||[];for(let i=mem.length
 function hotelLine(w,ask){const she=w.p&&w.p.female;if(ask==='young')return 'Мне в гостиницу рано.';
   if(ask==='duty')return 'Я на службе. В гостиницу не пойду.';
   if(ask==='pick')return she?'В гостиницу можно. Выбери, куда: я поеду так же, как ты.':'В гостиницу можно. Выбери, куда. Доедем, как скажешь.';
-  return `${ask.n}? Номер на двоих, ${fmtMoney(ask.price)}. Чай и окно на город. Как добраться — выбирай ты.`;}
+  w.p.dateHotel=ask;
+  return she?`${ask.n}? Идём. Номер на двоих, ${fmtMoney(ask.price)}. Чай, окно на город — и я сяду ближе, не через стол. Как ехать, решай ты.`
+    :`${ask.n}? Идём. Номер на двоих, ${fmtMoney(ask.price)}. Чай и окно. Дорогу выбирай ты.`;}
+function hotelDateOf(w){const who=w&&(w.companionOf||w);if(!who||!who.p)return null;
+  if(typeof companion!=='undefined'&&companion&&companion.w===who&&companion.hotel)return companion.hotel;
+  return who.p.dateHotel||null;}
+function hotelInRoom(w){const who=w&&(w.companionOf||w);return typeof companion!=='undefined'&&companion&&companion.w===who&&companion.inRoom;}
+function hotelFollow(w,text){const h=hotelDateOf(w);if(!h||!h.n)return null;const t=hotelNorm(text);if(!t)return null;
+  if(/(не хочу|отстань|передумал|не пойд|в другой раз|отмена|раздумал)/.test(t)){w.p.dateHotel=null;return w.p.female?'Ну ладно. Тогда без номера. Скажешь, если передумаешь.':'Ладно. Без номера. Скажешь, если передумаешь.';}
+  const about=/(там|делать|будем|номер|чай|дальше|потом|зачем|чего|хочу|нрав|сяд|окн|поцел|обним|дорого|поедем|пошли|идем|ты как|красив|жало|снимем|корт|отел)/.test(t)||t.length<42;
+  if(!about)return null;
+  const she=!!w.p.female,room=hotelInRoom(w);
+  const pool=room?(she?[
+    'Мы уже здесь. Иди сюда, чай стынет. Я на тебя смотрю, не в телефон.',
+    'Делать? Сидеть рядом и не спешить. Город за окном, ты ближе.',
+    'Куртку я уже на стул. Садись ко мне, хватит стоять в дверях.',
+    'Мне с тобой хорошо. Давай без других тем: только этот номер и ты.'
+  ]:[ 
+    'Мы уже в номере. Садись ближе, чай налит.',
+    'Никуда больше не зову. Сидим тут, город за окном.'
+  ]):(she?[
+    `В «${h.n}» сядем у окна. Чай, я сниму куртку, если жарко, и буду смотреть на тебя.`,
+    'Сначала доедем. В номере обниму в дверях и налью чай. Мне этого хочется.',
+    `За ${fmtMoney(h.price)} мы вдвоём, без улицы и спешки. Я уже согласна, не тяни.`,
+    'Там будем просто вместе. Без ярмарок и дел. Ты, я и окно на город.',
+    'Не уходи в сторону. Я сказала да: номер, чай и я рядом. Веди.'
+  ]:[ 
+    `В «${h.n}» сядем у окна, закажем чай. Я уже согласен.`,
+    'Доедем и закроем дверь. Без других дел, только мы.'
+  ]);
+  let line=pick(pool);if(line===w.p.dateSaid)line=pick(pool.filter(x=>x!==line).concat(pool));w.p.dateSaid=line;return line;}
 function hotelPoi(name){if(typeof world==='undefined'||!world.pois)return null;const n=hotelNorm(name);let best=null,bs=0;
   for(const p of world.pois){if(p.t!=='hotel'||!p.n)continue;const pn=hotelNorm(p.n);let s=0;if(pn===n)s=5;else if(pn.includes(n)||n.includes(pn))s=3;if(s>bs){bs=s;best=p;}}return best;}
 function hotelDoor(p){let x=p.x,y=p.y;if(typeof inBuilding==='function'&&inBuilding(x,y)&&typeof toSidewalk==='function'){const q=toSidewalk(x,y);if(q){x=q[0];y=q[1];}}return {x,y};}
@@ -143,8 +173,9 @@ function hotelSyncUi(){const c=typeof companion!=='undefined'?companion:null;con
   else if(c&&c.hotelVisit&&c.dest&&!c.arrived){const left=Math.round(dist(player.x,player.y,c.dest.x,c.dest.y));$('#compLbl').textContent=`🏨 ${c.w.p.name} с вами в «${c.hotel.n}» · ${left} м`;}}
 if(typeof updateCompBox==='function'){const hotelBox0=updateCompBox;updateCompBox=function(){hotelBox0();hotelSyncUi();};}
 if(typeof updateCompanion==='function'){const hotelGo0=updateCompanion;updateCompanion=function(dt){hotelGo0(dt);if(companion&&companion.hotelVisit)maybeEnterHotelTogether();};}
-if(typeof scriptedThink==='function'){const hotelSay0=scriptedThink;scriptedThink=function(w,text){const block=hotelOnDuty(w);const ask=hotelAskText(text);if(ask&&block)return {reply:hotelLine(w,block),action:'none',place:''};if(ask)return {reply:hotelLine(w,ask),action:'follow',place:''};return hotelSay0(w,text);};}
-if(typeof npcThink==='function'){const hotelThink0=npcThink;npcThink=async function(w){const block=hotelOnDuty(w);const ask=hotelLastAsk(w);if(ask&&block)return {reply:hotelLine(w,block),action:'none',place:''};if(ask)return {reply:hotelLine(w,ask),action:'follow',place:''};return hotelThink0.apply(this,arguments);};}
+if(typeof scriptedThink==='function'){const hotelSay0=scriptedThink;scriptedThink=function(w,text){const block=hotelOnDuty(w);const ask=hotelAskText(text);if(ask&&block)return {reply:hotelLine(w,block),action:'none',place:''};if(ask)return {reply:hotelLine(w,ask),action:'follow',place:''};const stay=hotelFollow(w,text);if(stay)return {reply:stay,action:'none',place:''};return hotelSay0(w,text);};}
+if(typeof npcThink==='function'){const hotelThink0=npcThink;npcThink=async function(w){const block=hotelOnDuty(w);const ask=hotelLastAsk(w);if(ask&&block)return {reply:hotelLine(w,block),action:'none',place:''};if(ask)return {reply:hotelLine(w,ask),action:'follow',place:''};const mem=w.p&&w.p.memory||[];let last='';for(let i=mem.length-1;i>=0;i--)if(mem[i].role==='user'){last=mem[i].content;break;}const stay=hotelFollow(w,last);if(stay)return {reply:stay,action:'none',place:''};return hotelThink0.apply(this,arguments);};}
+if(typeof contextForNpc==='function'){const hotelCtx0=contextForNpc;contextForNpc=function(w){let s=hotelCtx0(w);const h=hotelDateOf(w);if(h&&h.n)s+=` Ты уже согласился(ась) ехать в «${h.n}», номер на двоих. Отвечай только про эту договорённость: дорога, номер, чай, сесть ближе, лёгкий флирт. Не зови на ярмарку, работу и другие места. Не меняй тему.`;return s;};}
 if(typeof applyNpcAction==='function'){const hotelAct0=applyNpcAction;applyNpcAction=function(w,r){
   const who0=w.companionOf||w;const ask=hotelLastAsk(who0);const block=hotelOnDuty(who0);
   if(ask&&!block&&(!r||r.action!=='stop')){const note=hotelAct0(w,{reply:r&&r.reply,action:'follow',place:''});const who=(companion&&companion.w)||who0;
