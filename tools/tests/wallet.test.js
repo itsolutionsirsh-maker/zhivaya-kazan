@@ -27,7 +27,7 @@ for(const [name,mk] of Object.entries(backends)){
     // очень богатое старое сохранение — потолок переноса
     r=w.commit('rich',{prior:{money:900000,econ:{dep:50000}},incoming:{money:950000}});assert.equal(r.bal,LIM.migrate);assert.deepEqual([r.init.amt,r.init.req],[LIM.migrate,950000]);
     // новый аккаунт: прежней копии нет — стартовые; деньги гостя сверх стартовых — заработком, под потолок
-    r=w.commit('guest',{prior:null,incoming:{money:12000}});assert.equal(r.bal,12000);assert.equal(r.init.first,9000);
+    r=w.commit('guest',{prior:null,incoming:{money:12000}});assert.equal(r.bal,12000);assert.equal(r.init.first,12000-LIM.start);
     r=w.commit('cheat',{prior:null,incoming:{money:9999999}});assert.equal(r.bal,LIM.start+LIM.winMax,'поддельное сохранение нового аккаунта — только под потолок');
     r=w.commit('poor',{prior:null,incoming:{money:500}});assert.equal(r.bal,500);
     assert.equal(w.commit('bad',{prior:{money:'много'},incoming:null}).bal,LIM.start,'испорченное сохранение — стартовые');

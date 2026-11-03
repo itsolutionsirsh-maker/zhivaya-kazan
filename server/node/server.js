@@ -151,6 +151,7 @@ const store=(()=>{let sqlite=null;try{process.removeAllListeners('warning');sqli
 // ---------- кошелёк: деньги аккаунта на сервере (wallet.js) ----------
 // Изменения денег приходят вместе с сохранением (saveFor) и проводятся только с принятым сохранением, в одной транзакции.
 const wallet=WalletLib.Wallet(store.kind==='sqlite'?WalletLib.sqliteBackend(store.db):WalletLib.jsonBackend(path.join(DATA,'wallet.json'),fs));
+try{const n=wallet.ensureStart();if(n)log('на карте у игроков меньше 20 000 — доложили до стартовых:',n);}catch(e){log('стартовые 20 000:',e.message);}
 setTimeout(()=>{try{wallet.prune();}catch(e){}},60000).unref();setInterval(()=>{try{wallet.prune();}catch(e){}},12*3600e3).unref();
 const territories=TerritoryLib.Territories(store.kind==='sqlite'?TerritoryLib.sqliteBackend(store.db):TerritoryLib.jsonBackend(path.join(DATA,'territories.json'),fs),{onStory:(key,stage)=>store.funnel('foreignyard',stage,sha('yard:'+key).slice(0,16),mskDay())});
 const courtyard=CourtyardLib.create({db:store.db,fs,file:path.join(DATA,'courtyard.json'),auth:token=>accByToken(token),

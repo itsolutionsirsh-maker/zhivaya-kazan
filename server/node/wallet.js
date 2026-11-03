@@ -18,7 +18,7 @@
 // устройство загрузило или сохранило последней), под потолки — утренний платёж по кредиту при запуске не теряется.
 'use strict';
 const crypto=require('crypto');
-const LIM={start:3000,migrate:300000,win:600,winMax:60000,dayMax:300000,op:60000,batch:500,perHour:1500,keepDays:60};
+const LIM={start:20000,migrate:300000,win:600,winMax:60000,dayMax:300000,op:60000,batch:500,perHour:1500,keepDays:60};
 const ID_RE=/^[A-Za-z0-9_-]{6,48}$/;
 const mskDay=t=>new Date(t*1000+3*3600e3).toISOString().slice(0,10);
 const int=v=>v===null||v===undefined||v===''||typeof v==='boolean'||!Number.isFinite(+v)?NaN:Math.trunc(+v);
@@ -32,19 +32,21 @@ function sqliteBackend(db){
   db.exec(`CREATE TABLE IF NOT EXISTS wallet(k TEXT PRIMARY KEY,bal INTEGER NOT NULL,gen INTEGER NOT NULL DEFAULT 0,day TEXT,day_in INTEGER NOT NULL DEFAULT 0,created REAL,updated REAL);
     CREATE TABLE IF NOT EXISTS wops(k TEXT NOT NULL,id TEXT NOT NULL,amt INTEGER NOT NULL,req INTEGER NOT NULL,kind TEXT,why TEXT,peer TEXT,bal INTEGER,t REAL,PRIMARY KEY(k,id)) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS wops_t ON wops(k,t);CREATE INDEX IF NOT EXISTS wops_old ON wops(t);`);
-  const q={get:db.prepare('SELECT k,bal,gen,day,day_in AS dayIn,created,updated FROM wallet WHERE k=?'),
-    put:db.prepare('INSERT INTO wallet(k,bal,gen,day,day_in,created,updated) VALUES(?,?,?,?,?,?,?) ON CONFLICT(k) DO UPDATE SET bal=excluded.bal,gen=excluded.gen,day=excluded.day,day_in=excluded.day_in,updated=excluded.updated'),
+  try{db.exec('ALTER TABLE wallet ADD COLUMN start20 INTEGER NOT NULL DEFAULT 0');}catch(e){}
+  const q={get:db.prepare('SELECT k,bal,gen,day,day_in AS dayIn,created,updated,start20 FROM wallet WHERE k=?'),
+    put:db.prepare('INSERT INTO wallet(k,bal,gen,day,day_in,created,updated,start20) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(k) DO UPDATE SET bal=excluded.bal,gen=excluded.gen,day=excluded.day,day_in=excluded.day_in,updated=excluded.updated,start20=excluded.start20'),
     op:db.prepare('SELECT * FROM wops WHERE k=? AND id=?'),
     add:db.prepare('INSERT INTO wops(k,id,amt,req,kind,why,peer,bal,t) VALUES(?,?,?,?,?,?,?,?,?)'),
     ops:db.prepare('SELECT * FROM wops WHERE k=? ORDER BY t DESC LIMIT ?'),
     gained:db.prepare("SELECT COALESCE(SUM(amt),0) AS n FROM wops WHERE k=? AND kind='local' AND amt>0 AND t>?"),
     count:db.prepare("SELECT COUNT(*) AS n FROM wops WHERE k=? AND kind='local' AND t>?"),
     prune:db.prepare("DELETE FROM wops WHERE t<? AND kind='local'"),del:db.prepare('DELETE FROM wallet WHERE k=?'),delOps:db.prepare('DELETE FROM wops WHERE k=?'),
-    sum:db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(bal),0) AS total FROM wallet')};
+    sum:db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(bal),0) AS total FROM wallet'),
+    all:db.prepare('SELECT k,bal,start20 FROM wallet')};
   let depth=0;
-  return {kind:'sqlite',get:k=>q.get.get(k)||null,put:w=>q.put.run(w.k,w.bal,w.gen||0,w.day,w.dayIn,w.created,w.updated),op:(k,id)=>q.op.get(k,id)||null,
+  return {kind:'sqlite',get:k=>q.get.get(k)||null,put:w=>q.put.run(w.k,w.bal,w.gen||0,w.day,w.dayIn,w.created,w.updated,w.start20?1:0),op:(k,id)=>q.op.get(k,id)||null,
     add:o=>q.add.run(o.k,o.id,o.amt,o.req,o.kind,o.why,o.peer||null,o.bal,o.t),ops:(k,n)=>q.ops.all(k,n),gained:(k,since)=>q.gained.get(k,since).n,count:(k,since)=>q.count.get(k,since).n,
-    prune:before=>Number(q.prune.run(before).changes),del:k=>q.del.run(k),erase:k=>{q.del.run(k);q.delOps.run(k);},summary:()=>q.sum.get(),flush:()=>{},
+    prune:before=>Number(q.prune.run(before).changes),del:k=>q.del.run(k),erase:k=>{q.del.run(k);q.delOps.run(k);},summary:()=>q.sum.get(),all:()=>q.all.all(),flush:()=>{},
     // одна запись — одна транзакция: сохранение и его деньги, перевод — у обоих сразу; ошибка посреди — откат всего
     tx:fn=>{if(depth)return fn();depth++;db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){try{db.exec('ROLLBACK');}catch(_){}throw e;}finally{depth--;}}};}
 // запасное хранилище: журнал по аккаунтам в порядке времени; чистится только по сроку (номера помнятся keepDays),
@@ -60,7 +62,7 @@ function jsonBackend(file,fs){let S={w:{},ops:{}};if(file&&fs){try{S=JSON.parse(
     gained:(k,since)=>{const l=list(k);let s=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local'&&l[i].amt>0)s+=l[i].amt;return s;},
     count:(k,since)=>{const l=list(k);let n=0;for(let i=l.length-1;i>=0&&l[i].t>since;i--)if(l[i].kind==='local')n++;return n;},
     prune:before=>{let n=0;for(const k in S.ops){const l=S.ops[k],m=l.filter(o=>o.t>=before||o.kind!=='local');n+=l.length-m.length;S.ops[k]=m;}if(n)dirty=true;return n;},
-    del:k=>{delete S.w[k];dirty=true;},erase:k=>{delete S.w[k];delete S.ops[k];dirty=true;},summary:()=>{const v=Object.values(S.w);return {n:v.length,total:v.reduce((s,w)=>s+w.bal,0)};},tx:fn=>fn(),flush};}
+    del:k=>{delete S.w[k];dirty=true;},erase:k=>{delete S.w[k];delete S.ops[k];dirty=true;},summary:()=>{const v=Object.values(S.w);return {n:v.length,total:v.reduce((s,w)=>s+w.bal,0)};},all:()=>Object.values(S.w).map(w=>({k:w.k,bal:w.bal,start20:w.start20?1:0})),tx:fn=>fn(),flush};}
 
 // ---------- сам кошелёк ----------
 // opt.now() — секунды (тесты подменяют); opt.limits — свои потолки
@@ -77,7 +79,7 @@ function Wallet(be,opt){opt=opt||{};const L=Object.assign({},LIM,opt.limits||{})
   function create(k,prior,incoming,t){const p=stateTotal(prior);const req=p==null?L.start:p;const amt=Math.max(0,Math.min(req,L.migrate));
     const w={k,bal:amt,gen:0,day:mskDay(t),dayIn:0,created:t,updated:t};journal(w,{id:opId('i:'),amt,req,kind:'init',why:p==null?'стартовые деньги':'перенос денег из сохранения'},t);
     const inc=stateTotal(incoming);let first=0;if(inc!=null&&inc!==req)first=local(w,opId('f:'),inc-req,t);
-    be.put(w);w.migrated={amt,req,first,firstReq:inc!=null?inc-req:0};return w;}
+    w.start20=1;be.put(w);w.migrated={amt,req,first,firstReq:inc!=null?inc-req:0};return w;}
   // новых операций (не повторов) — не больше perHour в час: честное устройство шлёт ~120 и одну пачку после долгого
   // офлайна; сверх — не проводим и не отвечаем, устройство пришлёт их позже (журнал не раздувается)
   function applyOps(w,ops,res,t){let room=L.perHour-be.count(w.k,t-3600);for(const o of ops.slice(0,L.batch)){
@@ -111,14 +113,16 @@ function Wallet(be,opt){opt=opt||{};const L=Object.assign({},LIM,opt.limits||{})
       const w=be.get(k);if(!w)return {err:'no_wallet'};const a=amt<0?Math.max(amt,-w.bal):amt;w.bal+=a;w.updated=t;journal(w,{id:sid,amt:a,req:amt,kind:kind||'grant',why},t);be.put(w);return {ok:1,amt:a,bal:w.bal};});}
   // «Начать заново»: стартовые деньги и новое поколение — операции прежней игры больше не проводятся.
   // write() — сброс сохранения, в той же транзакции. Кошелька ещё не было — его заведёт первое сохранение (стартовые)
-  function reset(k,write,why){return be.tx(()=>{const t=now();const w=be.get(k);if(write)write();if(!w)return {ok:1,bal:null};const amt=L.start-w.bal;w.bal=L.start;w.gen=(w.gen||0)+1;w.dayIn=0;w.updated=t;
+  function reset(k,write,why){return be.tx(()=>{const t=now();const w=be.get(k);if(write)write();if(!w)return {ok:1,bal:null};const amt=L.start-w.bal;w.bal=L.start;w.start20=1;w.gen=(w.gen||0)+1;w.dayIn=0;w.updated=t;
     journal(w,{id:opId('r:'),amt,kind:'reset',why:why||'начать заново'},t);be.put(w);return {ok:1,bal:w.bal};});}
   function info(k,n){const w=be.get(k);return {ok:1,bal:w?w.bal:null,day:w?w.day:null,dayIn:w?w.dayIn:0,gen:w?w.gen||0:0,
     ops:w?be.ops(k,Math.max(1,Math.min(200,n||30))).map(o=>({id:o.id,amt:o.amt,req:o.req,kind:o.kind,why:o.why,peer:o.peer,bal:o.bal,t:o.t})):[]};}
   // старые операции с устройств больше не нужны для повторов; начальные, переводы и начисления храним
+  function ensureStart(){return be.tx(()=>{const t=now();let n=0;for(const row of be.all()){if(row.start20)continue;const w=be.get(row.k);if(!w||w.start20)continue;
+    const gift=Math.max(0,L.start-w.bal);if(gift){w.bal=L.start;n++;journal(w,{id:'g:start20',amt:gift,req:gift,kind:'grant',why:'стартовые 20 000'},t);}w.start20=1;w.updated=t;be.put(w);}return n;});}
   function prune(){return be.prune(now()-L.keepDays*86400);}
   // удалить аккаунт по просьбе игрока (privacy.html): баланс и весь журнал
   function erase(k){return be.tx(()=>{be.erase(k);return {ok:1};});}
-  return {commit,transfer,grant,reset,erase,info,prune,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
+  return {commit,transfer,grant,reset,erase,info,prune,ensureStart,who:k=>{const w=be.get(k);return w?whoOf(k,w.gen):null;},summary:()=>be.summary(),flush:()=>be.flush(),LIM:L};}
 
 module.exports={Wallet,sqliteBackend,jsonBackend,LIM,mskDay,stateTotal};

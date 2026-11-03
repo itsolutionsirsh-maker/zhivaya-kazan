@@ -253,7 +253,7 @@ async function acctSyncOnBoot(){if(!acct||Net.syncing||Net.syncReady)return;if(a
 function acctConflict(){Net.syncReady=false;const m=$('#otherDevModal');if(!m||!m.hidden)return;m.hidden=false;player.busy=true;}
 if($('#otherDevGo'))$('#otherDevGo').addEventListener('click',async()=>{$('#otherDevGo').disabled=true;try{const j=await acctCall('load',{token:acct.token});if(j.ok){acctApply(j);return;}}catch(e){}$('#otherDevGo').disabled=false;setHint('Нет связи с сервером — попробуйте ещё раз');});
 // своя игра в браузере: персонаж создан и деньги или время ушли от стартовых
-function localHasGame(){let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}return !!localStorage.getItem('zk.profile')&&!!local&&(local.money!==3000||(local.minutes||0)>10*60);}
+function localHasGame(){let local=null;try{local=JSON.parse(localStorage.getItem('zk.state')||'null');}catch(e){}return !!localStorage.getItem('zk.profile')&&!!local&&(local.money!==20000||(local.minutes||0)>10*60);}
 
 async function netInit(){
   if(window.claude&&window.claude.use){

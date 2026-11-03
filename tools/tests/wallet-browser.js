@@ -59,53 +59,53 @@ const api = (a, body, head) => fetch(`${BASE}/api.php`, {method: 'POST', headers
     // 3) миллион из консоли: засчитан только остаток потолка за 10 минут (деньги гостя и смена — уже в нём)
     await A.evaluate(() => { player.money += 1000000; }); await save(A);
     s = await st(A); w = await server(); console.log('3) читерская сумма:', JSON.stringify(s), 'сервер', w.bal);
-    assert.equal(w.bal, 3000 + 60000); assert.equal(s.total, w.bal); assert.ok(s.feed.some(t => /не засчитал/.test(t)));
+    assert.equal(w.bal, 72000); assert.equal(s.total, w.bal); assert.ok(s.feed.some(t => /не засчитал/.test(t)));
     // 4) ответ на сохранение потерялся: сервер провёл −700, устройство об этом не знает. Следующее сохранение — «на сервере новее»,
     // «Играть здесь» — игра с сервера, −700 ровно один раз
     await A.evaluate(() => { const real = acctCall; window.acctCall = async (a, body) => { const r = await real(a, body); if (a === 'save') { window.acctCall = real; throw new Error('ответ потерялся'); } return r; }; player.money -= 700; });
-    await save(A); w = await server(); assert.equal(w.bal, 62300, 'сервер провёл');
+    await save(A); w = await server(); assert.equal(w.bal, 71300, 'сервер провёл');
     await save(A); assert.equal(await A.evaluate('Net.syncReady'), false, 'следующее — конфликт');
     await A.evaluate(() => document.querySelector('#otherDevGo').click()); await sleep(1500); await settle(A, 'Алсу');
-    s = await st(A); w = await server(); console.log('4) потерянный ответ:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 62300); assert.equal(s.total, 62300);
+    s = await st(A); w = await server(); console.log('4) потерянный ответ:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 71300); assert.equal(s.total, 71300);
     // 5) положили на вклад — денег столько же
     await A.evaluate(() => { player.money -= 10000; ECON.dep = (ECON.dep || 0) + 10000; }); await save(A);
-    s = await st(A); w = await server(); console.log('5) вклад:', JSON.stringify(s)); assert.equal(s.dep, 10000); assert.equal(w.bal, 62300); assert.equal(s.total, 62300);
+    s = await st(A); w = await server(); console.log('5) вклад:', JSON.stringify(s)); assert.equal(s.dep, 10000); assert.equal(w.bal, 71300); assert.equal(s.total, 71300);
     // 6) потратили и сразу закрыли/перезагрузили: ушло с сохранением при закрытии (sendBeacon)
     await A.evaluate(() => { player.money -= 300; }); await A.reload(); await sleep(1500); await settle(A, 'Алсу');
-    s = await st(A); w = await server(); console.log('6) закрытие вкладки:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 62000); assert.equal(s.total, 62000); assert.equal(s.dep, 10000);
+    s = await st(A); w = await server(); console.log('6) закрытие вкладки:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 71000); assert.equal(s.total, 71000); assert.equal(s.dep, 10000);
     // 7) второе устройство: вход по имени и PIN — деньги с сервера; трата там доходит
     const B = await open('Гость'); await login(B, 'Гость');
-    s = await st(B); console.log('7) второе устройство:', JSON.stringify(s)); assert.equal(s.total, 62000);
-    await B.evaluate(() => { sitMoney(-1000, 'Кофе'); }); await save(B); w = await server(); assert.equal(w.bal, 61000);
+    s = await st(B); console.log('7) второе устройство:', JSON.stringify(s)); assert.equal(s.total, 71000);
+    await B.evaluate(() => { sitMoney(-1000, 'Кофе'); }); await save(B); w = await server(); assert.equal(w.bal, 70000);
     // 8) модератор начислил (двойной клик — один раз) — в игре «Зачислено»
     const g = await api('mod', {do: 'grant', name: NAME, amt: 777, why: 'компенсация', id: 'mtest0001'}, {'X-Mod-Token': MOD});
     await api('mod', {do: 'grant', name: NAME, amt: 777, why: 'компенсация', id: 'mtest0001'}, {'X-Mod-Token': MOD});
     await save(B); s = await st(B); console.log('8) модератор:', g.bal, JSON.stringify(s));
-    assert.equal(g.bal, 61777); assert.equal(s.total, 61777); assert.ok(s.feed.some(t => /Зачислено на карту: 777/.test(t.replace(/\s/g, ' '))));
+    assert.equal(g.bal, 70777); assert.equal(s.total, 70777); assert.ok(s.feed.some(t => /Зачислено на карту: 777/.test(t.replace(/\s/g, ' '))));
     // 9) устаревшее устройство A тратит 4000 и закрывается: его сохранение отвергнуто — и трата не проведена
     await A.evaluate(() => { player.money -= 4000; }); await A.goto('about:blank'); await sleep(1500);
-    w = await server(); console.log('9) устаревшее устройство закрылось:', w.bal); assert.equal(w.bal, 61777);
+    w = await server(); console.log('9) устаревшее устройство закрылось:', w.bal); assert.equal(w.bal, 70777);
     // 10) A открывается снова: игра и деньги — с сервера
-    await A.goto(BASE + '/'); await settle(A, 'Алсу'); s = await st(A); console.log('10) A снова открыта:', JSON.stringify(s)); assert.equal(s.total, 61777);
+    await A.goto(BASE + '/'); await settle(A, 'Алсу'); s = await st(A); console.log('10) A снова открыта:', JSON.stringify(s)); assert.equal(s.total, 70777);
     // 11) кредит на устаревшем устройстве B (A теперь новее): сохранение отвергнуто, следующий тик берёт игру с сервера — ни денег, ни долга
     await B.evaluate(() => { ECON.loan = {sum: 30000, left: 33000, daily: 1100, over: 0, day: clock.day}; player.money += 30000; }); await save(B);
     assert.equal(await B.evaluate('Net.syncReady'), false); await save(B).catch(() => {}); await sleep(1500); await settle(B, 'Гость');
-    s = await st(B); w = await server(); console.log('11) кредит на устаревшем:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 61777); assert.equal(s.total, 61777); assert.equal(s.loan, false);
+    s = await st(B); w = await server(); console.log('11) кредит на устаревшем:', JSON.stringify(s), 'сервер', w.bal); assert.equal(w.bal, 70777); assert.equal(s.total, 70777); assert.equal(s.loan, false);
     // 12) на A висит заработок (сохранение отвергнуто: B новее), на B «Начать заново»; A — «Играть здесь»: стартовые, без старых денег
     await A.evaluate(() => { player.money += 20000; }); await save(A); assert.equal(await A.evaluate('Net.syncReady'), false);
     await B.evaluate(() => { const x = document.querySelector('#resetBtn'); x.click(); x.click(); }); await sleep(1500); await settle(B, 'Заново');
     await A.evaluate(() => document.querySelector('#otherDevGo').click()); await sleep(1500); await settle(A, 'Алсу');
     await save(A); s = await st(A); w = await server(); const sb = await st(B);
-    console.log('12) начать заново:', JSON.stringify(s), JSON.stringify(sb), 'сервер', w.bal); assert.equal(w.bal, 3000); assert.equal(s.total, 3000); assert.equal(sb.total, 3000);
+    console.log('12) начать заново:', JSON.stringify(s), JSON.stringify(sb), 'сервер', w.bal); assert.equal(w.bal, 20000); assert.equal(s.total, 20000); assert.equal(sb.total, 20000);
     // 13) старая версия игры (открыта во время обновления) сохраняет без поля wallet: её траты сервер считает сам — разницей
     await A.evaluate(() => { window.__wo = walletOut; window.walletOut = () => undefined; player.money -= 1000; }); await save(A);
     await A.evaluate(() => { window.walletOut = window.__wo; }); w = await server(); s = await st(A);
-    console.log('13) старая версия:', w.bal, JSON.stringify(s)); assert.equal(w.bal, 2000); assert.equal(s.total, 2000);
+    console.log('13) старая версия:', w.bal, JSON.stringify(s)); assert.equal(w.bal, 19000); assert.equal(s.total, 19000);
     // 14) «Начать заново» без связи с сервером: здесь ничего не стёрто, игра идёт дальше
     await A.evaluate(() => { player.money -= 500; window.__ac = acctCall; window.acctCall = async (a, body) => a === 'reset' ? {err: 'busy'} : window.__ac(a, body); const x = document.querySelector('#resetBtn'); x.click(); x.click(); });
     await sleep(800); const rf = await A.evaluate(() => ({money: player.money, noSave: !!window.zkNoSave, state: !!localStorage.getItem('zk.state')})); await A.evaluate(() => { window.acctCall = window.__ac; });
-    console.log('14) сброс без связи:', JSON.stringify(rf)); assert.equal(rf.noSave, false); assert.equal(rf.state, true); assert.equal(rf.money, 1500);
-    await save(A); w = await server(); assert.equal(w.bal, 1500, 'игра продолжилась, трата дошла');
+    console.log('14) сброс без связи:', JSON.stringify(rf)); assert.equal(rf.noSave, false); assert.equal(rf.state, true); assert.equal(rf.money, 18500);
+    await save(A); w = await server(); assert.equal(w.bal, 18500, 'игра продолжилась, трата дошла');
   } finally { await b.close(); srv.kill(); fs.rmSync(DATA, {recursive: true, force: true}); }
   const wl = srvLog.split('\n').filter(l => /кошел|ошибк/i.test(l)); if (wl.length) console.log(wl.join('\n'));
   console.log(errors.length ? errors.join('\n') : 'no page errors');

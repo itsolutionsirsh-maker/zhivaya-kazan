@@ -121,7 +121,7 @@ const mod=body=>api('mod',body,{'x-mod-token':MOD});
     const rB=await B.evaluate(()=>({card:!!(SIT.card&&/Капучино/.test(SIT.card.title)),ev:__ev.filter(t=>/начата заново/.test(t))}));
     check(rs.ok&&(await evs(A,'Игру начали заново')).length===1&&rB.ev.length===1&&!rB.card,`«Начать заново» — заказ отменён у обоих: ${JSON.stringify(rB)}`);
     await B.evaluate(id=>wsSock.send(JSON.stringify({t:'bar',k:'pay',id,yes:true})),oid);await sleep(1500);
-    const wR=await mod({do:'wallet',name:'bar-b-'+tag});check(wR.bal===3000&&wR.ops[0]&&wR.ops[0].kind==='reset',`оплата со старого устройства не прошла: баланс ${wR.bal} (стартовые после сброса, было ${balR0})`);
+    const wR=await mod({do:'wallet',name:'bar-b-'+tag});check(wR.bal===20000&&wR.ops[0]&&wR.ops[0].kind==='reset',`оплата со старого устройства не прошла: баланс ${wR.bal} (стартовые после сброса, было ${balR0})`);
     check(!errors.length,'без ошибок в консоли'+(errors.length?': '+errors.slice(0,3).join(' | '):''));
   }catch(e){console.log('FAIL',e.message);fails++;}
   finally{await b.close();srv.kill();try{fs.rmSync(DATA,{recursive:true,force:true});}catch(e){}}
