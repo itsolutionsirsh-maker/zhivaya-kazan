@@ -192,7 +192,42 @@ function hotelSyncUi(){const c=typeof companion!=='undefined'?companion:null;con
   else if(c&&c.hotelVisit&&c.dest&&!c.arrived){const left=Math.round(dist(player.x,player.y,c.dest.x,c.dest.y));$('#compLbl').textContent=`🏨 ${c.w.p.name} с вами в «${c.hotel.n}» · ${left} м`;}}
 if(typeof updateCompBox==='function'){const hotelBox0=updateCompBox;updateCompBox=function(){hotelBox0();hotelSyncUi();};}
 if(typeof updateCompanion==='function'){const hotelGo0=updateCompanion;updateCompanion=function(dt){hotelGo0(dt);if(companion&&companion.hotelVisit)maybeEnterHotelTogether();};}
+function stayInviteText(t){return /(в номер|ко мне в номер|в мой номер|пошли в номер|пойдём в номер|пойдем в номер|позови в номер|забирайся ко мне)/.test(hotelNorm(t));}
+function inviteToMyRoom(w){
+  const s=typeof stayLive==='function'?stayLive():null;if(!s){setHint('Сначала снимите номер');return null;}
+  const who=w&&(w.companionOf||w);if(!who||!who.p)return null;
+  const block=hotelOnDuty(who);
+  if(block==='young'){setHint('Им в гостиницу рано');return 'young';}
+  if(block==='duty'){setHint(who.p.female?'Она на службе':'Он на службе');return 'duty';}
+  if(who.role==='staff'||/админ|ресепш|официант|бармен/.test(String(who.p.job||'').toLowerCase())){setHint('Это персонал. Позовите знакомого с улицы.');return 'staff';}
+  if(companion&&companion.w!==who)stopCompanion(true);
+  if(!companion||companion.w!==who){if(typeof startCompanion==='function')startCompanion(who,'follow',null,true);}
+  const c=companion;if(!c)return null;
+  c.mode='follow';c.dest={x:s.x,y:s.y,n:s.name,hotel:true,stayGuest:true};c.homeVisit=true;
+  c.hotel={n:s.name,price:0,style:s.style||'classic'};c.hotelVisit=true;c.hotelPaid=true;c.hotelBroke=false;c.inRoom=false;c.staysInRoom=false;c.arrived=false;c.route=null;
+  if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();
+  if(player.inside&&interior&&interior.kind==='hotelroom'&&typeof staySame==='function'&&staySame(interior.name)){
+    c.hotelVisit=false;c.homeVisit=false;c.arrived=true;c.inRoom=true;
+    if(typeof companionEnter==='function')companionEnter(interior);
+    if(typeof seatHomeTogether==='function')seatHomeTogether(interior);
+    paintHotelFaces(interior,{n:s.name,style:s.style||'classic',price:0},who);
+    addEvent(`${who.p.name} заходит в номер.`,'say');
+    if(typeof updateCompBox==='function')updateCompBox();
+    return 'in';
+  }
+  addEvent(`🏨 ${who.p.name} едет к вам в «${s.name}». Номер уже оплачен.`,'say');
+  if(!player.inside&&dist(player.x,player.y,s.x,s.y)>26&&typeof openRouteModal==='function')openRouteModal(c.dest);
+  else if(!player.inside)maybeEnterHotelTogether();
+  if(typeof updateCompBox==='function')updateCompBox();
+  return 'go';
+}
+function stayInviteSync(){const b=document.getElementById('chatStay');if(!b)return;const w=typeof chatNpc!=='undefined'?chatNpc:null;const who=w&&(w.companionOf||w);
+  const ok=!!(typeof stayLive==='function'&&stayLive()&&who&&who.p&&!hotelOnDuty(who)&&who.role!=='staff'&&!/админ|ресепш/.test(String(who.p.job||'').toLowerCase())&&!(companion&&companion.inRoom&&companion.w===who));
+  b.hidden=!ok;}
 function hotelReply(w,text){const last=text!=null?text:hotelLastUser(w);const block=hotelOnDuty(w);const ask=hotelAskText(last);const she=!!(w.p&&w.p.female);
+  if(typeof stayLive==='function'&&stayLive()&&stayInviteText(last)){if(block)return {reply:hotelLine(w,block),action:'none',place:''};
+    const who=w.companionOf||w;const you=hotelYou();setTimeout(()=>inviteToMyRoom(who),40);
+    return {reply:she?`В номер? Да${you?', '+you:''}. Чай, диван, я сяду ближе. Второй раз не платим — номер уже твой.`:`В номер можно. Посидим, поесть там входит. Едем.`,action:'none',place:''};}
   if(ask&&block)return {reply:hotelLine(w,block),action:'none',place:''};
   const dated=hotelDateOf(w);
   if(ask==='pick')return {reply:hotelLine(w,'pick'),action:'follow',place:''};
@@ -213,6 +248,9 @@ if(typeof applyNpcAction==='function'){const hotelAct0=applyNpcAction;applyNpcAc
   if(p&&p.dateHotel&&(hotelGoText(last)||(r&&(r.action==='follow'||r.action==='go')))){p.dateArmed=true;const who=(companion&&companion.w)||who0;hotelAct0(w,{reply:r&&r.reply,action:'follow',place:''});return beginHotelTrip(who,p.dateHotel)||null;}
   if(p&&p.dateHotel)return null;
   return hotelAct0(w,r);};}
+if(typeof openChat==='function'){const stayOpen0=openChat;openChat=function(w){stayOpen0(w);stayInviteSync();};}
+if(typeof closeChat==='function'){const stayClose0=closeChat;closeChat=function(){const r=stayClose0();stayInviteSync();return r;};}
+const chatStayBtn=document.getElementById('chatStay');if(chatStayBtn)chatStayBtn.addEventListener('click',()=>{const w=typeof chatNpc!=='undefined'&&chatNpc&&(chatNpc.companionOf||chatNpc);if(w)inviteToMyRoom(w);});
 const hotelBye=$('#compBye');if(hotelBye)hotelBye.addEventListener('click',e=>{if(!companion)return;if((companion.inRoom&&player.inside)||companion.staysInRoom){e.stopImmediatePropagation();hotelCompanionLeaves();}},true);
 const hotelQ=$('#hotelQ');if(hotelQ)hotelQ.addEventListener('input',renderHotelList);
 const hotelClose=$('#hotelClose');if(hotelClose)hotelClose.addEventListener('click',closeHotelPicker);

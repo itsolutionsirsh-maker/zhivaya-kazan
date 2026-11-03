@@ -173,18 +173,20 @@ function stayLive(){const s=player.stay;if(!s||!s.name||!(s.until>clock.minutes)
 function staySame(name){const s=stayLive();if(!s)return false;const a=String(s.name).toLowerCase(),b=String(name||'').toLowerCase();return !!b&&(a===b||a.includes(b)||b.includes(a));}
 function stayDoor(name,x,y){if(!staySame(name))return null;const s=stayLive();if(Math.hypot((s.x||0)-x,(s.y||0)-y)>80)return null;return {label:`В свой номер · ${s.name}`,run:()=>openOwnRoom()};}
 function rememberStay(it,o){player.stay={name:it&&it.name?it.name:'Гостиница',x:player.x,y:player.y,title:o.title||'номер',id:o.id||'std',style:o.style||'classic',until:stayTill(clock.minutes)};if(typeof saveState==='function')saveState();}
+function stayWelcome(){const s=stayLive();if(!s||s.fed)return;s.fed=1;player.food=clamp((player.food||0)+42,0,100);player.mood=clamp((player.mood||0)+12,0,100);player.energy=clamp((player.energy||0)+10,0,100);addEvent('В номер принесли ужин и чай. Это входит в стоимость.','say');if(typeof saveState==='function')saveState();}
 function openOwnRoom(){const s=stayLive();if(!s)return;
   if(scene==='interior'&&interior&&interior.kind==='hotelroom'&&staySame(interior.name)){setHint('Вы уже в номере. Кровать — поспать.');return;}
   if(scene==='interior'&&typeof exitInterior==='function')exitInterior();
   if(typeof interiorCache!=='undefined')interiorCache.delete('stay:'+s.name+':'+s.id);
-  enterInterior({kind:'hotelroom',name:s.name+' · '+(s.title||'номер'),key:'stay:'+s.name+':'+s.id,x:s.x,y:s.y});
-  if(interior&&typeof paintHotelFaces==='function')paintHotelFaces(interior,{n:s.name,style:s.style||'classic',price:0},null);
-  setHint('Вы в своём номере. Кровать — поспать. Если выйдете на улицу, ключ до 12:00 останется.');}
+  enterInterior({kind:'hotelroom',name:s.name+' · '+(s.title||'номер'),key:'stay:'+s.name+':'+s.id,x:s.x,y:s.y,together:!!(typeof companion!=='undefined'&&companion&&companion.hotelPaid)});
+  if(interior&&typeof paintHotelFaces==='function')paintHotelFaces(interior,{n:s.name,style:s.style||'classic',price:0},(typeof companion!=='undefined'&&companion&&companion.hotelPaid)?companion.w:null);
+  stayWelcome();
+  setHint('Вы в своём номере. Ужин уже здесь, на столе можно добавки. Знакомого позовите: «пошли в номер».');}
 function counterEnterStay(it,o){
   const name=it&&it.name?it.name:'Гостиница';
   rememberStay(it,o);
   openOwnRoom();
-  setHint('Номер ваш до 12:00. Кровать — поспать. Выход на улицу ключ не забирает.');
+  setHint('Номер ваш до 12:00. Ужин входит в стоимость. Если выйдете — ключ останется. Знакомого можно позвать в номер.');
 }
 let counterLock=0;
 function counterFulfill(w,place,o){
