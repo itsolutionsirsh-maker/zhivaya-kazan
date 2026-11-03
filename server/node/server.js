@@ -175,10 +175,14 @@ const benches=BenchesLib.Benches({fs,file:path.join(DATA,'benches.json'),bad:t=>
 function payOrigin(req){const pub=String(ENV.PUBLIC_URL||'https://kazan.lifegorod.com').replace(/\/$/,'');const host=String((req.headers&&(req.headers['x-forwarded-host']||req.headers.host))||'');
   if(!host||/localhost|127\.0\.0\.1/.test(host))return pub;const proto=String((req.headers['x-forwarded-proto']||'https')).split(',')[0].trim();return proto+'://'+host.split(',')[0].trim();}
 async function payFor(req,body){const a=accByToken(body.token);if(!a)return {err:'auth'};
-  if(body.check)return {ok:1,bal:platega.balance(a.k),items:platega.owned(a.k),tops:platega.tops()};
+  if(body.check){let fresh=[];try{fresh=await platega.pull(a.k);}catch(e){fresh=[];}const got=takeTops(a.k,fresh);return {ok:1,bal:platega.balance(a.k),items:platega.owned(a.k),tops:platega.tops(),rate:PlategaLib.RATE,card:wallet.info(a.k).bal,got};}
   if(!allow('pay:'+a.k,8,600))return {err:'rate_limited'};
   if(body.top){const origin=payOrigin(req);try{return await platega.create(a.k,'top-'+String(body.top),{ok:origin+'/?pay=back',fail:origin+'/?pay=fail'},ipOf(req));}catch(e){log('platega: счёт не создался');return {err:'platega'};}}
   const r=platega.spend(a.k,String(body.item||'').slice(0,40));if(r&&r.ok)grantPaid(a.k);return r;}
+function playMoney(k,rub,id,why,sign){const op=PlategaLib.opId(sign<0?'cb':'pay',id);if(!op)return {err:'id'};
+  if(wallet.info(k).bal==null)wallet.commit(k,{});
+  return wallet.grant(k,(sign<0?-1:1)*rub*PlategaLib.RATE,op,why,'pay');}
+function takeTops(k,rows){const got=[];for(const row of rows||[]){if(!row||!row.rub)continue;const g=playMoney(k,row.rub,row.id,row.back?'Возврат '+row.rub+' ₽':'Пополнение '+row.rub+' ₽',row.back?-1:1);if(g&&g.ok&&!g.dup)got.push({rub:row.rub,game:Math.abs(g.amt||0),bal:g.bal});}return got;}
 function grantPaid(k){const a=store.get(k);if(!a)return;const prev=a.state&&typeof a.state==='object'?a.state:{};const next=platega.apply(k,prev);if(next!==prev)store.save(k,next,a.profile,a.city);}
 function rolePl(p){return p?{id:p.id,name:p.meta&&typeof p.meta.n==='string'?p.meta.n:'Игрок',room:p.room||null,acc:p.acc||null}:null;}
 function barSend(list){for(const e of list||[]){const p=players.get(e.to);if(p)wsSend(p,e.m);}}
@@ -283,10 +287,11 @@ function tgWebhook(req,body){const got=String(req.headers['x-telegram-bot-api-se
     text:(name?name+', добро':'Добро')+' пожаловать в «Живую Казань»!\n\nНастоящий центр Казани: Баумана, Кремль, метро, кафе. Жители живут своей жизнью, вы — своей: работа, квартира, банк, знакомства. Все игроки — в одном городе.\n\nЖмите «Играть» 👇',
     reply_markup:{inline_keyboard:[[{text:'▶️ Играть',web_app:{url}}],[{text:'💳 Кошелёк',callback_data:'paymenu'}]]}}];}
 function payMenu(from,chat){const id=String(from&&from.id||'');const k=id?store.tgGet(id):null;
-  if(!k)return [200,{method:'sendMessage',chat_id:chat,text:'Сначала нажмите «Играть» и войдите. Кошелёк один на аккаунт: и в Телеге, и на сайте.'}];
+  if(!k)return [200,{method:'sendMessage',chat_id:chat,text:'Сначала нажмите «Играть» и войдите. Карта одна на аккаунт: и в Телеге, и на сайте.'}];
   if(!platega.on())return [200,{method:'sendMessage',chat_id:chat,text:'Пополнение ещё не включено.'}];
-  return [200,{method:'sendMessage',chat_id:chat,text:'Кошелёк: '+platega.balance(k)+' ₽.\nС него покупается одежда. Игровые рубли это не пополняет. Сумма одна и в Телеге, и на сайте.',
-    reply_markup:{inline_keyboard:[[{text:'100 ₽',callback_data:'top:100'},{text:'300 ₽',callback_data:'top:300'}],[{text:'500 ₽',callback_data:'top:500'},{text:'1000 ₽',callback_data:'top:1000'}]]}}];}
+  const card=wallet.info(k).bal;const have=card==null?'карта откроется после входа в игру':card.toLocaleString('ru-RU')+' игровых ₽';
+  return [200,{method:'sendMessage',chat_id:chat,text:'Пополнение карты. Сейчас: '+have+'.\n1 ₽ = 100 в игре. 100 ₽ → 10 000, 1 000 ₽ → 100 000. Вывести нельзя.',
+    reply_markup:{inline_keyboard:[[{text:'100 ₽ → 10 000',callback_data:'top:100'},{text:'300 ₽ → 30 000',callback_data:'top:300'}],[{text:'500 ₽ → 50 000',callback_data:'top:500'},{text:'1000 ₽ → 100 000',callback_data:'top:1000'}]]}}];}
 async function tgPayCallback(cq,req){const data=String(cq.data||'');
   if(data==='paymenu')return payMenu(cq.from,cq.message&&cq.message.chat&&cq.message.chat.id);
   const top=/^top:(\d+)$/.exec(data);
@@ -641,7 +646,7 @@ async function handleReq(req,res){
     if(a==='story')return send(res,200,storyReport(body,ip));
     if(a==='tgwebpoll')return send(res,200,tgWebPoll(body.poll,ip,body.ref));
     if(a==='pay')return send(res,200,await payFor(req,body));
-    if(a==='platega'){const r=await platega.callback(req.headers,body);if(r.k)grantPaid(r.k);return send(res,r.code||200,r.err&&r.code!==200?{err:r.err}:{ok:1});}
+    if(a==='platega'){const r=await platega.callback(req.headers,body);if(r&&r.k&&r.top&&r.game&&!r.back)takeTops(r.k,[{id:r.id,rub:r.rub,game:r.game}]);if(r&&r.k&&r.back)takeTops(r.k,[{id:r.id,rub:r.rub,game:r.game,back:1}]);if(r.k)grantPaid(r.k);return send(res,r.code||200,r.err&&r.code!==200?{err:r.err}:{ok:1});}
     return send(res,404,{err:'unknown_action'});}
   if(u.pathname==='/setup'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex'});return res.end(TG_TOKEN?SETUP_HTML.replace('<script>','<script>window.__configured=true;'):SETUP_HTML);}
   if(u.pathname==='/health'){const dt=Math.max(1,now()-stats.since);return send(res,200,{ok:1,online:players.size,accounts:store.count(),store:store.kind,outKBs:Math.round(stats.bytesOut/dt/1024),msgsPerS:Math.round(stats.msgsOut/dt),tickMs:+stats.tickMs.toFixed(2),peakOnline:stats.peak||0,llmToday:llmDay.total,uptime:Math.round(process.uptime()),sys:sysStats(),city:(()=>{const st=realworld.status();return {weather:st.weatherAt,alertSource:st.alertSourceOk,alertErrors:st.alertErrors,alerts:realworld.snapshot().alerts.length,incidents:sev.count()};})(),roles:{baristas:roles.onDuty(),orders:roles.count(),rides:taxi.count()}});}

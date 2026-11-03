@@ -1,10 +1,10 @@
-// Один кошелёк на аккаунт. Пополнение — через Platega (сайт и Телега), покупки списываются с него.
-// Сумму задаёт сервер. На баланс попадает только CONFIRMED после повторной проверки у Platega.
-// Это не игровые рубли: их нельзя перевести другому игроку и нельзя вывести.
+// Пополнение карты через Platega. 1 настоящий рубль = 100 игровых, начисляет сервер после CONFIRMED.
+// В кошелёк одежды эти деньги не кладутся и другому игроку не уходят. Вывести нельзя.
 'use strict';
 const crypto=require('crypto');
 const API='https://app.platega.io';
 const TOPS=[100,300,500,1000];
+const RATE=100;
 
 function same(a,b){a=String(a||'');b=String(b||'');if(a.length!==b.length||!a.length)return false;return crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));}
 function readShop(text){
@@ -24,7 +24,7 @@ function Platega(o){
   load();
   function item(id){
     const m=/^top-(\d+)$/.exec(String(id||''));
-    if(m){const rub=+m[1];return TOPS.includes(rub)?{id:'top-'+rub,title:'Пополнение кошелька на '+rub+' ₽',rub,top:true}:null;}
+    if(m){const rub=+m[1];return TOPS.includes(rub)?{id:'top-'+rub,title:rub+' ₽ = '+(rub*RATE)+' в игре',rub,top:true,game:rub*RATE}:null;}
     return shop.find(s=>s&&s.id===id&&s.rub>0)||null;
   }
   function order(id){return db.orders.find(x=>x.id===id)||null;}
@@ -67,9 +67,11 @@ function Platega(o){
     return {ok:1,url:j.url,id,bal:balance(k)};
   }
   function credit(row){
-    if(row.status==='paid')return;
+    if(row.status==='paid')return false;
     row.status='paid';row.paidAt=now();
-    if(row.kind==='top')db.bal[row.k]=(db.bal[row.k]||0)+row.rub;
+    if(row.kind==='top')row.game=row.rub*RATE;
+    else db.bal[row.k]=(db.bal[row.k]||0)+row.rub;
+    return true;
   }
   function spend(k,itemId){
     const it=item(itemId);if(!it||it.top)return {err:'no_item'};
@@ -89,11 +91,26 @@ function Platega(o){
     const amount=live&&live.paymentDetails?+live.paymentDetails.amount:NaN;
     const cur=live&&live.paymentDetails?live.paymentDetails.currency:'';
     if(live.payload&&live.payload!==row.id)return {err:'payload',code:200};
-    if(live.status==='CONFIRMED'&&cur==='RUB'&&amount===row.rub){credit(row);flush();return {ok:1,code:200,k:row.k,item:row.item,top:row.kind==='top',bal:balance(row.k)};}
-    if(live.status==='CHARGEBACKED'&&row.kind==='top'&&row.status==='paid'){row.status='chargeback';db.bal[row.k]=Math.max(0,(db.bal[row.k]||0)-row.rub);flush();return {ok:1,code:200,k:row.k,back:1,bal:balance(row.k)};}
+    if(live.status==='CONFIRMED'&&cur==='RUB'&&amount===row.rub){const fresh=credit(row);flush();return {ok:1,code:200,k:row.k,id:row.id,item:row.item,rub:row.rub,top:row.kind==='top',game:row.kind==='top'?row.rub*RATE:0,fresh:fresh?1:0,bal:balance(row.k)};}
+    if(live.status==='CHARGEBACKED'&&row.kind==='top'&&row.status==='paid'){row.status='chargeback';flush();return {ok:1,code:200,k:row.k,id:row.id,rub:row.rub,back:1,game:row.game||row.rub*RATE,bal:balance(row.k)};}
     if(live.status==='CANCELED'&&row.status==='pending'){row.status='canceled';flush();}
     return {ok:1,code:200,status:live.status||'',bal:balance(row.k)};
   }
-  return {on:()=>!!(merchant&&secret),item,owned,apply,create,spend,callback,balance,tops:()=>TOPS.slice(),orders:()=>db.orders};
+  async function pull(k){
+    const due=db.orders.filter(x=>x.k===k&&x.kind==='top'&&x.status==='pending'&&x.tx).slice(-5);
+    const fresh=[];let changed=false;
+    for(const row of due){
+      let live;try{live=await remote(row.tx);}catch(e){continue;}
+      const amount=live&&live.paymentDetails?+live.paymentDetails.amount:NaN;
+      const cur=live&&live.paymentDetails?live.paymentDetails.currency:'';
+      if(live&&live.payload&&live.payload!==row.id)continue;
+      if(live&&live.status==='CONFIRMED'&&cur==='RUB'&&amount===row.rub){if(credit(row)){fresh.push(row);changed=true;}}
+      else if(live&&live.status==='CANCELED'&&row.status==='pending'){row.status='canceled';changed=true;}
+    }
+    if(changed)flush();
+    return fresh;
+  }
+  return {on:()=>!!(merchant&&secret),item,owned,apply,create,spend,callback,pull,balance,tops:()=>TOPS.slice(),orders:()=>db.orders};
 }
-module.exports={Platega,readShop,TOPS};
+function opId(prefix,id){const s=(String(prefix||'')+String(id||'').replace(/[^A-Za-z0-9]/g,'')).slice(0,48);return s.length>=6?s:null;}
+module.exports={Platega,readShop,TOPS,RATE,opId};
