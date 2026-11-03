@@ -119,7 +119,7 @@ defSit('lifeShops',{title:'Покупки для жизни',quiet:true,always:t
     return null;}});
 
 // ---------- сон дома: соседи шумят ----------
-function trySleep(h){if(!canSleep()){sleep(h);return;}const night=gHour()>=21||gHour()<6;const home=interior&&interior.kind==='home';if(home&&night&&Math.random()<0.3&&(SIT.cool.neighbors||0)<sitNow()){startSit('neighbors',{h});return;}sleep(h);if(player.cold&&Math.random()<0.6){player.cold=false;addEvent('Выспались — простуда прошла','say');}}
+function trySleep(h){if(!canSleep())return sleep(h);const night=gHour()>=21||gHour()<6;const home=interior&&interior.kind==='home';if(home&&night&&Math.random()<0.3&&(SIT.cool.neighbors||0)<sitNow()){startSit('neighbors',{h});return false;}const ok=sleep(h);if(ok&&player.cold&&Math.random()<0.6){player.cold=false;addEvent('Выспались — простуда прошла','say');}return ok;}
 defSit('neighbors',{title:'Шумные соседи',quiet:true,cool:900,
   start(s){sitCard({s,icon:'🔊',tone:'alert',title:'Соседи сверху шумят',text:`${fmtTime()}. Сверху грохочет музыка и кто-то топает. Уснуть невозможно.`,ttl:0,
     choices:[{t:'Постучать по батарее',primary:true,run:()=>{if(Math.random()<0.5){addEvent('Музыку сделали тише');nbSleep(s,1);}else{addEvent('Не помогло — до трёх ночи «тынц-тынц»');nbSleep(s,0.7,-8);}}},

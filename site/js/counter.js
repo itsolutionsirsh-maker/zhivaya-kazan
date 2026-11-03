@@ -168,12 +168,23 @@ function counterEffect(o){
   if(o.full)player.energy=100;
   if(o.min&&typeof spendTime==='function')spendTime(o.min);
 }
+function stayTill(min){const day=Math.floor(min/1440),h=(min/60)%24,noon=day*1440+12*60;return h<12?noon:noon+1440;}
+function stayLive(){const s=player.stay;if(!s||!s.name||!(s.until>clock.minutes)){if(s)player.stay=null;return null;}return s;}
+function staySame(name){const s=stayLive();if(!s)return false;const a=String(s.name).toLowerCase(),b=String(name||'').toLowerCase();return !!b&&(a===b||a.includes(b)||b.includes(a));}
+function stayDoor(name,x,y){if(!staySame(name))return null;const s=stayLive();if(Math.hypot((s.x||0)-x,(s.y||0)-y)>80)return null;return {label:`В свой номер · ${s.name}`,run:()=>openOwnRoom()};}
+function rememberStay(it,o){player.stay={name:it&&it.name?it.name:'Гостиница',x:player.x,y:player.y,title:o.title||'номер',id:o.id||'std',style:o.style||'classic',until:stayTill(clock.minutes)};if(typeof saveState==='function')saveState();}
+function openOwnRoom(){const s=stayLive();if(!s)return;
+  if(scene==='interior'&&interior&&interior.kind==='hotelroom'&&staySame(interior.name)){setHint('Вы уже в номере. Кровать — поспать.');return;}
+  if(scene==='interior'&&typeof exitInterior==='function')exitInterior();
+  if(typeof interiorCache!=='undefined')interiorCache.delete('stay:'+s.name+':'+s.id);
+  enterInterior({kind:'hotelroom',name:s.name+' · '+(s.title||'номер'),key:'stay:'+s.name+':'+s.id,x:s.x,y:s.y});
+  if(interior&&typeof paintHotelFaces==='function')paintHotelFaces(interior,{n:s.name,style:s.style||'classic',price:0},null);
+  setHint('Вы в своём номере. Кровать — поспать. Если выйдете на улицу, ключ до 12:00 останется.');}
 function counterEnterStay(it,o){
   const name=it&&it.name?it.name:'Гостиница';
-  const x=player.x,y=player.y;
-  enterInterior({kind:'hotelroom',name:name+' · '+o.title,key:'stay:'+name+':'+o.id,x,y});
-  if(interior&&typeof paintHotelFaces==='function')paintHotelFaces(interior,{n:name,style:o.style||'classic',price:o.price},null);
-  setHint('Вы в номере. Кровать — поспать до утра, выход внизу.');
+  rememberStay(it,o);
+  openOwnRoom();
+  setHint('Номер ваш до 12:00. Кровать — поспать. Выход на улицу ключ не забирает.');
 }
 let counterLock=0;
 function counterFulfill(w,place,o){
@@ -181,11 +192,15 @@ function counterFulfill(w,place,o){
   const gate=o.kind==='stay'||o.kind==='bank'||(o.kind==='metro'&&o.id==='map');
   if(gate&&Date.now()<counterLock)return 'Секунду, уже оформляю.';
   if(o.kind==='stay'){
+    const it=place.it;
+    if(staySame(place.name)||staySame(it&&it.name)){
+      setTimeout(()=>{if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();openOwnRoom();},400);
+      return 'Ключ уже у вас, второй раз не беру. Провожаю в номер.';
+    }
     if(player.money<o.price)return `«${o.short}» — ${fmtMoney(o.price)}. На карте ${fmtMoney(player.money)}, не хватает ${fmtMoney(o.price-player.money)}. Как будет сумма — скажите «беру», оформлю сразу.`;
     player.money-=o.price;
     counterLock=Date.now()+2000;
     addEvent(`«${place.name}»: ${o.title} −${fmtMoney(o.price)}. На карте ${fmtMoney(player.money)}`,'say');
-    const it=place.it;
     setTimeout(()=>{if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();counterEnterStay(it,o);},650);
     return `${she?'Оформляю':'Оформляю'} ${o.title}, ${fmtMoney(o.price)}. Ключ ваш, провожаю в номер. На карте осталось ${fmtMoney(player.money)}.`;
   }
@@ -283,6 +298,7 @@ function counterInstall(){
   if(typeof closeChat==='function'){const prev=closeChat;closeChat=function(){const bar=typeof document!=='undefined'&&document.getElementById('chatOffers');if(bar){bar.hidden=true;bar.innerHTML='';}return prev();};}
   if(typeof spotAction==='function'){const prev=spotAction;spotAction=function(f,it){
     if(f&&it&&f.spot==='reception'&&it.kind==='hotel'&&String(it.key||'').indexOf('story:')!==0){
+      if(typeof staySame==='function'&&staySame(it.name))return {label:'В свой номер',run:()=>openOwnRoom()};
       const h=counterHotel(it.name),p=h.price;
       return {label:`Снять стандарт · ${fmtMoney(p)}`,run:()=>{
         if(player.money<p){setHint(`Нужно ${fmtMoney(p)}`);return;}
