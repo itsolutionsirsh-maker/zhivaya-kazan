@@ -1,11 +1,26 @@
 // Бани и термы Казани: настоящие адреса, пар, бассейн и чай входят в визит.
 const BATHS=[
-  {n:'Термы «Пляж»',ll:[55.7248,49.1943],price:2800,style:'pool',aka:['пляж','термы пляж']},
-  {n:'Распарье',ll:[55.7884545,49.1075746],price:2200,style:'steam',aka:['распарье']},
-  {n:'Деревенька',ll:[55.7887356,49.1146507],price:1600,style:'steam',aka:['деревенька']},
-  {n:'Рыжий берег',ll:[55.7806328,49.2341288],price:1500,style:'lounge',aka:['рыжий берег','рыжий']},
-  {n:'Казанский банный комплекс',ll:[55.8470182,49.1399327],price:1800,style:'hammam',aka:['казанский банный','кадышев']},
-  {n:'Баня №7',ll:[55.7757118,49.1364613],price:900,style:'steam',aka:['баня №7','баня n7','павлюхин']}
+  {n:'Термы «Пляж»',ll:[55.7248,49.1943],price:2800,style:'pool',aka:['пляж','термы пляж'],note:'Большие термы: несколько парных и бассейны. Всё это входит во вход.'},
+  {n:'Распарье',ll:[55.7884545,49.1075746],price:2200,style:'steam',aka:['распарье'],note:'Дровяной пар в центре. Веник, бассейн и чай входят.'},
+  {n:'Деревенька',ll:[55.7887356,49.1146507],price:1600,style:'steam',aka:['деревенька'],note:'Общественная баня высшего разряда. Мужское и женское отделения, чай входит.'},
+  {n:'Рыжий берег',ll:[55.7806328,49.2341288],price:1500,style:'lounge',aka:['рыжий берег','рыжий'],note:'После пара — халаты и чай у окна. Бассейн входит.'},
+  {n:'Казанский банный комплекс',ll:[55.8470182,49.1399327],price:1800,style:'hammam',aka:['казанский банный','кадышев'],note:'Русская парная и хаммам. Чай с мёдом уже налит.'},
+  {n:'Баня №7',ll:[55.7757118,49.1364613],price:900,style:'steam',aka:['баня №7','баня n7','павлюхин'],note:'Городская баня на Павлюхина. Недорого, пар настоящий.'},
+  {n:'Баня №5',ll:[55.812026,49.064234],price:700,style:'steam',aka:['баня №5','баня n5','первого мая','1 мая'],note:'Общественная на Первого Мая. Пар, душ и чай входят.'},
+  {n:'Латыши',ll:[55.756082,49.165819],price:1800,style:'steam',aka:['латыши'],note:'Дрова, берёзовый веник и тихий бассейн.'},
+  {n:'Деревяшки',ll:[55.817253,49.078409],price:1900,style:'steam',aka:['деревяшки'],note:'Всё из дерева: полки, стены, запах липы. Чай входит.'},
+  {n:'Жемчужина',ll:[55.757226,49.206876],price:2200,style:'pool',aka:['жемчужина'],note:'Тёплый бассейн и парная. После жара сюда, не спеша.'},
+  {n:'Дельфин',ll:[55.747417,49.211213],price:2000,style:'pool',aka:['дельфин'],note:'Бассейн сразу от входа. Пар и чай входят.'},
+  {n:'Царицыно',ll:[55.809734,49.208207],price:3200,style:'lounge',aka:['царицыно'],note:'Тихий зал, халаты и крепкий чай. Пар и бассейн входят.'},
+  {n:'Магнат',ll:[55.767399,49.176369],price:2800,style:'lounge',aka:['магнат','гвардейская'],note:'На Гвардейской. Мягкий свет, пар и бассейн уже оплачены входом.'},
+  {n:'Фараон',ll:[55.751758,49.187363],price:2600,style:'hammam',aka:['фараон'],note:'Тёплый камень и хаммам, не жёсткий русский жар. Чай входит.'},
+  {n:'Жара',ll:[55.813161,49.086195],price:1700,style:'steam',aka:['жара','проточная'],note:'На Проточной. Пар крепкий, потом бассейн и мёд.'},
+  {n:'Парная №1',ll:[55.813089,49.196188],price:1100,style:'steam',aka:['парная №1','парная номер 1','ново-азинская'],note:'Простая городская парная. Веник можно взять у банщика.'},
+  {n:'Клеопатра',ll:[55.778821,49.114924],price:2400,style:'hammam',aka:['клеопатра'],note:'На Тукая. Хаммам, тёплые полки и чай в медных пиалах.'},
+  {n:'Курбановские бани',ll:[55.790736,49.256730],price:1600,style:'steam',aka:['курбановские','курбанов'],note:'Семейный пар на дровах. Бассейн небольшой, чай с травами.'},
+  {n:'Аквазона',ll:[55.787164,49.162444],price:2100,style:'pool',aka:['аквазона','красная позиция'],note:'На Красной Позиции. Сначала пар, потом вода.'},
+  {n:'Нега',ll:[55.829355,49.132027],price:2500,style:'lounge',aka:['нега'],note:'Тихо, халаты и низкий свет. Пар, бассейн и чай входят.'},
+  {n:'Айс Пар',ll:[55.767824,49.254358],price:2300,style:'pool',aka:['айс пар','айс'],note:'Горячий пар и прохладный бассейн рядом. Чай входит.'}
 ];
 const BATH_STILL={steam:'img/baths/steam.jpg',pool:'img/baths/pool.jpg',hammam:'img/baths/hammam.jpg',lounge:'img/baths/lounge.jpg'};
 const BATH_LOOK={
@@ -22,7 +37,7 @@ function bathByName(name){const n=bathNorm(name);if(!n)return null;
   return BATHS.find(b=>bathNorm(b.n)===n||n.includes(bathNorm(b.n))||bathNorm(b.n).includes(n)||(b.aka||[]).some(a=>n.includes(bathNorm(a))))||null;}
 function bathPaid(b){return !!(b&&player.bathAt===b.n&&player.bathTill>clock.minutes);}
 function bathPay(b){if(!b)return false;if(bathPaid(b))return true;if(player.money<b.price){setHint(`Нужно ${fmtMoney(b.price)}`);return false;}
-  player.money-=b.price;player.bathAt=b.n;player.bathTill=clock.minutes+150;player.bathUse={};addEvent(`«${b.n}»: −${fmtMoney(b.price)}. Пар, бассейн и чай входят.`,'say');if(typeof saveState==='function')saveState();return true;}
+  player.money-=b.price;player.bathAt=b.n;player.bathTill=clock.minutes+150;player.bathUse={};addEvent(`«${b.n}»: −${fmtMoney(b.price)}. ${b.note||'Пар, бассейн и чай входят.'}`,'say');if(typeof saveState==='function')saveState();return true;}
 function bathPaint(it,b){const style=(b&&b.style)||'steam';const im=bathImg[style]||bathImg.steam;if(!it||!im)return;
   const draw=()=>{if(!im.width)return;const c=document.createElement('canvas');c.width=1280;c.height=720;const g=c.getContext('2d');
     const s=Math.max(1280/im.width,720/im.height),dw=im.width*s,dh=im.height*s;g.drawImage(im,(1280-dw)/2,(720-dh)/2,dw,dh);
