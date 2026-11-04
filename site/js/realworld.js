@@ -18,7 +18,6 @@ function rwWeather(w){
   if(!w){if(weather.real){weather.real=false;weather.t=null;weather.ice=false;weather.wind=null;weather.ttl=rnd(120,300);}return;}
   const first=!weather.real,was=weather.kind,wasKey=rwWeatherKey();
   weather.real=true;weather.t=w.t;weather.ice=!!w.ice;weather.wind=w.wind;weather.thunder=!!w.thunder;weather.kind=w.kind;weather.at=w.at;
-  if(!RW.credited){RW.credited=true;const bs=$('#brandSub');if(bs&&!/MET Norway/.test(bs.textContent))bs.textContent+=' · погода: MET Norway';}
   const key=rwWeatherKey();if(first){RW.firstPending=true;rwFirst();return;}
   if(was===w.kind&&wasKey===key)return;
   const k=key&&RW_FEED[key]?key:w.kind;const own=rwLines(['feed',k]);

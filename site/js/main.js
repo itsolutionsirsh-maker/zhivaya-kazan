@@ -466,7 +466,7 @@ async function boot(){
     $('#loadMsg').textContent='Строим улицы…';const data=await res.json();bt('base');
     await new Promise(r=>setTimeout(r,30));buildWorld(data);bt('build');
     if(data.meta.chunks){$('#loadMsg').textContent='Строим дома вокруг…';const pts=[startPoint()];try{const s=JSON.parse(localStorage.getItem('zk.state')||'null');if(s&&isFinite(s.x)&&isFinite(s.y))pts.push([s.x,s.y]);if(s&&s.home&&isFinite(s.home.x)&&isFinite(s.home.y))pts.push([s.home.x,s.home.y]);}catch(e){}
-      await loadChunksAround(pts,1200);bt('chunks');initLandmarks(data);const bs=$('#brandSub');if(bs)bs.textContent='вся Казань · © участники OpenStreetMap';}
+      await loadChunksAround(pts,1200);bt('chunks');initLandmarks(data);}
     $('#loadMsg').textContent='Выпускаем жителей и транспорт…';await new Promise(r=>setTimeout(r,30));
     spawnAll();const prof=loadProfile();if(prof)applyProfile(prof);loadState();
     const rl=$('#routesLbl');rl.innerHTML='';for(const r of world.routes){const c=document.createElement('span');c.className='chip '+r.type;c.textContent=(r.type==='tram'?'Т':r.type==='trolleybus'?'Тб':'А')+' '+r.ref;c.title=r.name;rl.append(c);}
