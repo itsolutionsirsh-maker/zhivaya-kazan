@@ -1,9 +1,9 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
-const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',default:'помещение'};
+const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',bath:'баня',default:'помещение'};
 function makeInterior(kind,name,key,room){
   const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
-  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],hotelroom:[12,8],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],default:[12,9]};
+  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],hotelroom:[12,8],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],bath:[16,11],default:[12,9]};
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
@@ -35,6 +35,7 @@ function makeInterior(kind,name,key,room){
     case 'museum':{it.floor='marble';for(let i=0;i<6;i++)F('painting',1.6+i*(w-3.2)/5,0.35,1.6,0.4,{spot:'exhibit',c:i});for(let i=0;i<4;i++)F('pedestal',3+i*(w-6)/3,h/2,1,1,{spot:'exhibit',c:i+6});NPC(w-1.2,h-1.4,{role:'guard',job:'смотритель'});for(let i=0;i<3;i++)NPC(2+rng()*(w-4),2.5+rng()*(h-5),{wander:true});break;}
     case 'hotel':{it.floor='carpet';F('counter',w/2,1.1,6,1.2,{spot:'reception'});NPC(w/2,0.5,{role:'staff',job:'администратор'});F('sofa',3,h/2,3,1.2,{spot:'sofa'});F('sofa',w-3,h/2,3,1.2,{spot:'sofa'});plant(0.9,0.9);plant(w-0.9,0.9);const g=NPC(3,h/2,{seated:true});g.hy=-1;break;}
     case 'hotelroom':{it.floor='carpet';it.spawn={x:w*0.38,y:4.6,hx:0,hy:-1};F('window',w/2,0.15,4.2,0.3);F('bed',w*0.72,2.3,3.1,1.5,{spot:'bed'});F('table',w/2,h-3.5,1.15,1.15,{spot:'table'});F('sofa',w/2,h-2.15,3.2,1.05,{spot:'sofa'});plant(0.7,0.85);break;}
+    case 'bath':{it.floor='wood';it.spawn={x:w/2,y:h-1.5,hx:0,hy:-1};F('counter',w/2,1.15,5.2,1,{spot:'bathdesk'});NPC(w/2,0.55,{role:'staff',job:'банщик'});F('sofa',3.4,3.6,4.2,1.2,{spot:'steam'});F('pool',w-4.2,4.6,5,2.6,{spot:'pool',walkable:true});F('table',w/2,h-2.8,1.2,1.2,{spot:'bathtea',round:true});plant(0.8,0.9);break;}
     case 'hospital':{it.floor='tiles';F('counter',w/2,1.1,6,1.1,{spot:'reception'});NPC(w/2,0.5,{role:'staff',job:'врач'});for(let i=0;i<6;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});const q=NPC(3.4,h-2.2,{seated:true});q.hy=-1;F('bed',w-2.5,3.4,2.2,1.2,{});F('bed',w-2.5,5.4,2.2,1.2,{});break;}
     case 'university':case 'school':case 'library':{it.floor='wood';if(kind==='library'){for(let i=0;i<Math.floor((w-2)/2.2);i++)F('shelf',1.8+i*2.2,1.1,1.6,0.7,{spot:'books',goods:1,horiz:true});NPC(w-1.4,h-1.4,{role:'staff',job:'библиотекарь'});}else{F('board',w/2,0.25,5,0.4);F('desk',w/2,1.8,2,0.8,{});NPC(w/2,1.1,{role:'staff',job:kind==='school'?'учитель':'преподаватель'});}
       const cols=Math.floor((w-2)/2.6),rows=Math.floor((h-4)/1.8);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=1.5+c*2.6+1.1,y=3.4+r*1.8;F('desk',x,y,1.8,0.7,{spot:'study'});F('chair',x-0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});F('chair',x+0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});if(rng()<0.45){const n=NPC(x-0.45,y+0.75,{seated:true,job:'студент'});n.hy=-1;n.hx=0;}}break;}
@@ -127,6 +128,10 @@ function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainA
     case 'wardrobe':return {label:'Переодеться / сменить фото',run:()=>showProfile()};
     case 'kitchen':if(player.noWater===clock.day)return {label:'Воды нет — мастер из УК придёт завтра',run:()=>setHint('Можно поесть в кафе или заказать доставку')};return {label:player.pantry>0?'Приготовить ужин (продукты есть)':'Приготовить ужин · 150 ₽ (доставка)',run:()=>{const fn=()=>{player.food=clamp(player.food+40,0,100);player.mood=clamp(player.mood+4,0,100);spendTime(40);addEvent('Приготовили ужин. Сытость +40');};if(player.pantry>0){player.pantry--;fn();}else spend(150,fn);}};
     case 'pc':return {label:'Поработать удалённо 3 ч · +2 000 ₽',run:()=>{if(player.energy<20){setHint('Слишком устали для работы');return;}if(!busyFor('pc',180))return;player.money+=2000;player.energy=clamp(player.energy-25,0,100);player.food=clamp(player.food-15,0,100);addEvent('Три часа удалёнки: +2 000 ₽');}};
+    case 'bathdesk':return {label:'Что входит',run:()=>setHint('Пар, бассейн и чай с мёдом уже в стоимости. Знакомого можно позвать: «пошли в баню».')};
+    case 'steam':return typeof bathDo==='function'?bathDo('steam'):null;
+    case 'pool':return typeof bathDo==='function'?bathDo('pool'):null;
+    case 'bathtea':return typeof bathDo==='function'?bathDo('tea'):null;
     default:return null;}}
 
 // ---------- отрисовка интерьера ----------
@@ -143,7 +148,7 @@ const ROOM_FINISH={
 function interiorFinish(kind,name=''){
   if(typeof venueLook==='function')return venueLook({kind,name});
   if(kind==='home'||kind==='guest')return ROOM_FINISH.home;
-  if(kind==='cafe'||kind==='library'||kind==='hotel')return ROOM_FINISH.warm;
+  if(kind==='cafe'||kind==='library'||kind==='hotel'||kind==='bath')return ROOM_FINISH.warm;
   if(kind==='bar'||kind==='theatre')return ROOM_FINISH.night;
   if(kind==='metro'||kind==='bank'||kind==='hospital'||kind==='pharmacy')return ROOM_FINISH.public;
   return ROOM_FINISH.neutral;
@@ -257,6 +262,7 @@ function drawFurniture(f,it,t){const x=f.x-f.w/2,y=f.y-f.h/2;
     case 'atm':ctx.fillStyle='#2E8B57';rrect(ctx,x,y,f.w,f.h,0.06);ctx.fill();ctx.fillStyle='#CFE';ctx.fillRect(x+0.15,y+0.12,0.5,0.25);break;
     case 'pew':ctx.fillStyle='#8B5E3C';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();ctx.fillStyle='#6E4B2F';ctx.fillRect(x,y,f.w,0.12);break;
     case 'altar':ctx.fillStyle='#D1B36B';rrect(ctx,x,y,f.w,f.h,0.1);ctx.fill();break;
+    case 'pool':ctx.fillStyle='#1C6E8C';ctx.beginPath();ctx.ellipse(f.x,f.y,f.w/2,f.h/2,0,0,TAU);ctx.fill();ctx.fillStyle='rgba(190,235,255,.4)';ctx.beginPath();ctx.ellipse(f.x-0.3,f.y-0.2,f.w/3.2,f.h/3.4,0,0,TAU);ctx.fill();break;
     default:ctx.fillStyle='#999';ctx.fillRect(x,y,f.w,f.h);}}
 
 // ===== Меню кафе и бара: поесть и выпить — одному или вместе со спутником (можно угостить) =====
