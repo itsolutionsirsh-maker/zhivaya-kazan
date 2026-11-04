@@ -6,6 +6,11 @@ const VENUE_STYLES={
   tatar:{wall:'#E6D9BE',trim:'#356955',counter:'#386A58',top:'#D5B384',wood:'#BE955F',seat:'#729884',accent:'#BC7646',floor:['#D6C19C','#C8B28D'],motif:'tulip'},
   bakery:{wall:'#EFE0C8',trim:'#9C7151',counter:'#A26D4D',top:'#EAD9BD',wood:'#C39969',seat:'#B99572',accent:'#B7653D',floor:['#DFCEB2','#D1BFA4'],motif:'tile'},
   bar:{wall:'#66514A',trim:'#3E4544',counter:'#4A5551',top:'#9B7954',wood:'#795A3E',seat:'#784C3E',accent:'#C6A468',floor:['#706051','#635447'],motif:'brick'},
+  barpub:{wall:'#6B5344',trim:'#3E342C',counter:'#5C4636',top:'#C4A574',wood:'#8A6240',seat:'#6E4634',accent:'#E0B56A',floor:['#6A5344','#5C483C'],motif:'brick'},
+  barneon:{wall:'#2C3338',trim:'#1C2428',counter:'#243038',top:'#3D4A46',wood:'#1E2826',seat:'#1A2422',accent:'#C6A15A',floor:['#2A3130','#232A29'],motif:'panels'},
+  barlounge:{wall:'#4A4038',trim:'#2E2924',counter:'#3A342C',top:'#CDB892',wood:'#6E5438',seat:'#5C4638',accent:'#E2C48A',floor:['#5A4C40','#4E4238'],motif:'panels'},
+  barsport:{wall:'#3E4650',trim:'#2A3138',counter:'#34404A',top:'#8AA0B0',wood:'#5C4634',seat:'#2E3A34',accent:'#D4A24A',floor:['#3A403C','#323834'],motif:'tile'},
+  barwine:{wall:'#4A342E',trim:'#2C201C',counter:'#3A2824',top:'#A87858',wood:'#6A4030',seat:'#4A3028',accent:'#E0B070',floor:['#4A3830','#3E302A'],motif:'panels'},
   retail:{wall:'#E1E5DA',trim:'#527567',counter:'#486F60',top:'#DFDFD3',wood:'#B09B79',seat:'#60766C',accent:'#B96947',floor:['#D4D5C8','#C4C8BC'],motif:'tile'},
   pharmacy:{wall:'#E4EEEA',trim:'#4F8B83',counter:'#76A79B',top:'#F2F3E7',wood:'#CBD6CD',seat:'#71A59D',accent:'#397D75',floor:['#E3E6DE','#D5DFD8'],motif:'tile'},
   market:{wall:'#D4C3A4',trim:'#7D654B',counter:'#8C7151',top:'#D5BA8A',wood:'#9E7B4E',seat:'#757750',accent:'#50755A',floor:['#C7BEA9','#BBB19A'],motif:'brick'},
@@ -28,6 +33,7 @@ function venueStyleId(it){
     return 'coffee';
   }
   if(k==='worship'&&/мечет|кул.?шариф|нур[уы]лла|апанаев|галеев|закабан|иске таш/.test(n))return 'mosque';
+  if(k==='bar'){const s=typeof barStyleOf==='function'?barStyleOf(it.name):'';return {pub:'barpub',cocktail:'barneon',lounge:'barlounge',sport:'barsport',wine:'barwine'}[s]||'bar';}
   return ({shop:'retail',bank:'office',hospital:'pharmacy',university:'office',school:'office',library:'coffee',police:'office',prosecutor:'office',default:'office'})[k]||(VENUE_STYLES[k]?k:'office');
 }
 function venueLook(it){return VENUE_STYLES[venueStyleId(it)];}
@@ -86,7 +92,7 @@ function drawVenueArchitecture(c,it,p,night=0){
   c.restore();
   // Настенные бра; световой ореол остаётся на стене, ниже нет ложных препятствий.
   for(const x of [w*.12,w*.88]){const g=c.createRadialGradient(x,-.7,.02,x,-.7,.55);g.addColorStop(0,'rgba(255,236,171,.65)');g.addColorStop(1,'rgba(255,236,171,0)');venueBox(c,x-.55,-1.22,1.1,1.04,g);venueBox(c,x-.07,-.87,.14,.36,p.accent,.04);venueDot(c,x,-.72,.08,'#FFF2CC');}
-  const sign=({cafe:id==='tatar'?'ЧАЙ · ВЫПЕЧКА':id==='bakery'?'СВЕЖАЯ ВЫПЕЧКА':'КОФЕ · ДЕСЕРТЫ',bar:'БАР · КУХНЯ',shop:'ПРОДУКТЫ',pharmacy:'АПТЕКА',market:'РЫНОК',bank:'ОБСЛУЖИВАНИЕ',hotel:'РЕГИСТРАЦИЯ',hospital:'РЕГИСТРАТУРА',museum:'ЭКСПОЗИЦИЯ',library:'ЧИТАЛЬНЫЙ ЗАЛ',school:'КЛАСС',university:'АУДИТОРИЯ',police:'ДЕЖУРНАЯ ЧАСТЬ',prosecutor:'ПРИЁМНАЯ',office:'ОФИС'})[k];
+  const sign=({cafe:id==='tatar'?'ЧАЙ · ВЫПЕЧКА':id==='bakery'?'СВЕЖАЯ ВЫПЕЧКА':'КОФЕ · ДЕСЕРТЫ',bar:id==='barpub'?'КРАНЫ · КУХНЯ':id==='barneon'?'КОКТЕЙЛИ':id==='barlounge'?'ЛАУНЖ':id==='barsport'?'МАТЧ · БАР':id==='barwine'?'ВИНО':'БАР · КУХНЯ',shop:'ПРОДУКТЫ',pharmacy:'АПТЕКА',market:'РЫНОК',bank:'ОБСЛУЖИВАНИЕ',hotel:'РЕГИСТРАЦИЯ',hospital:'РЕГИСТРАТУРА',museum:'ЭКСПОЗИЦИЯ',library:'ЧИТАЛЬНЫЙ ЗАЛ',school:'КЛАСС',university:'АУДИТОРИЯ',police:'ДЕЖУРНАЯ ЧАСТЬ',prosecutor:'ПРИЁМНАЯ',office:'ОФИС'})[k];
   if(sign){const sw=Math.min(w*.55,7.5);venueBox(c,w/2-sw/2,-.98,sw,.57,p.trim,.07);venueText(c,id==='ward'?'ПАЛАТА · ТИХИЙ ЧАС':sign,w/2,-.68,.24,'#F7EEDC',sw-.3);}
   if(id==='ward'){
     for(const x of [4.65,9.35]){venueBox(c,x,-.08,.4,1.15,'#C7D7C7',.04);venueLine(c,[[x+.12,0],[x+.12,1]],'#94B3A5',.035);}
