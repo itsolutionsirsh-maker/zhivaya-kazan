@@ -45,15 +45,15 @@ function spawnRentals(cx,cy){
 function placeOwnCar(){if(!player.home||player.hasCar===false)return;const hx=player.home.cx,hy=player.home.cy;
   let s=null;const n0=nearestNode(hx,hy,world.carAdj,90);if(n0>=0)s=curbSpot(n0);
   if(!s){const n=nearestNode(hx,hy,world.carAdj,220);if(n>=0)s=curbSpot(n);if(!s){const p=world.nodes[n>=0?n:pick(world.carNodes)];s={x:p[0],y:p[1],hx:1,hy:0};}}
-  ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:wornCarColor()||player.carColor||'#C62828',parked:true,towed:false,paidTill:0,rate:0};
+  ownCar={kind:'own',x:s.x,y:s.y,hx:s.hx,hy:s.hy,color:wornCarColor()||player.carColor||'#C62828',parked:true,towed:false,paidTill:0,rate:0,model:player.carName||'',brand:player.carBrand||'',price:player.carPrice||0,len:player.carLen||0,wid:player.carWid||0};
   if(typeof syncOwnCarPin==='function')syncOwnCarPin();}
 function ownCarXY(){if(player.vehicle&&player.vehicle.kind==='own')return [player.vehicle.x,player.vehicle.y];
   if(ownCar&&ownCar.towed&&ownCar.lot)return [ownCar.lot.x,ownCar.lot.y];if(ownCar)return [ownCar.x,ownCar.y];return null;}
 function syncOwnCarPin(){if(typeof mark!=='function')return;if(!player.hasCar){if(typeof unmark==='function')unmark('mycar');return;}
   const p=ownCarXY();if(!p||!Number.isFinite(p[0])){if(typeof unmark==='function')unmark('mycar');return;}
-  const towed=!!(ownCar&&ownCar.towed);let label=towed?'Машина на штрафстоянке':'Ваша машина';
-  if(!towed&&ownCar&&ownCar.rate&&!(ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill))label='Ваша машина · парковка не оплачена';
-  else if(!towed&&ownCar&&ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill)label='Ваша машина · парковка оплачена';
+  const towed=!!(ownCar&&ownCar.towed);let label=towed?'Машина на штрафстоянке':(ownCar&&ownCar.model?ownCar.model:'Ваша машина');
+  if(!towed&&ownCar&&ownCar.rate&&!(ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill))label=(ownCar.model||'Ваша машина')+' · парковка не оплачена';
+  else if(!towed&&ownCar&&ownCar.paidTill&&typeof clock!=='undefined'&&clock.minutes<ownCar.paidTill)label=(ownCar.model||'Ваша машина')+' · парковка оплачена';
   mark(null,'mycar',p[0],p[1],'🚗',label,{arrow:true,color:towed?'#2D4A9E':'#C62828'});}
 let rentalTimer=0;
 function updateRentals(dt){rentalTimer-=dt;if(rentalTimer>0)return;rentalTimer=2;const px=player.x,py=player.y;
@@ -72,6 +72,7 @@ function enterVehicle(obj){const kind=obj.kind;const spec=VEH[kind];const dr=pla
   cancelTrip(true);JOURNEY.rental=jp;
   if(kind!=='own'){const i=rentals.indexOf(obj);if(i>=0)rentals.splice(i,1);player.money-=spec.start;}else ownCar.parked=false;
   player.vehicle={kind,x:obj.x,y:obj.y,hx:obj.hx,hy:obj.hy,speed:0,spec,startMin:typeof playMinutesNow==='function'?playMinutesNow():clock.minutes,auto:null,damaged:0,color:obj.color,crashedLook:false};
+  if(kind==='own'&&(obj.len||obj.wid))player.vehicle.spec=Object.assign({},spec,{len:obj.len||spec.len,wid:obj.wid||spec.wid});
   journeyHint('boarding',obj,player.x,player.y,obj.x,obj.y);player.x=obj.x;player.y=obj.y;
   if(window.citySaveShot)citySaveShot(kind==='bike'?'Велосипед':kind==='scooter'?'Самокат':kind==='own'?'Своя машина':'Каршеринг');
   player.waypoints=null;player.waitingStop=null;player.talkTarget=null;player.navDest=null;
