@@ -8,7 +8,7 @@ const faceImg={};
 function faceHash(s){let h=2166136261;s=String(s||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function faceBand(age){age=+age||30;return age<32?0:age<52?1:2;}
 function npcFaceId(p){if(!p)return null;const g=p.female?'f':'m';const band=FACE_BANDS[g][faceBand(p.age)];return band[faceHash((p.name||'')+'|'+g)%band.length];}
-function npcFaceUrl(p){if(p&&p.look)return p.look;const id=npcFaceId(p);return id?'img/faces/'+id+'.jpg':null;}
+function npcFaceUrl(p){if(p&&typeof p.photo==='string'&&p.photo)return p.photo;if(p&&typeof p.look==='string')return p.look;const id=npcFaceId(p);return id?'img/faces/'+id+'.jpg':null;}
 function npcFaceImg(p){if(p&&p.lookImg&&p.lookImg.width)return p.lookImg;const id=npcFaceId(p);return id&&faceImg[id]||null;}
 (function loadFaces(){const ids=[].concat(...FACE_BANDS.f,...FACE_BANDS.m);for(const id of ids){const im=new Image();im.onload=()=>{faceImg[id]=im;};im.src='img/faces/'+id+'.jpg';}})();
 function paintNpcFace(p){const f=$('#npcFace');if(!f||!p)return;const url=npcFaceUrl(p);

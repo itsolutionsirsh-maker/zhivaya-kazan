@@ -32,7 +32,8 @@ function folkPersona(f){const r=seeded(hashStr('folk:'+f.id));const P=(a)=>a[Mat
   if(f.id==='fidania'){p.hair='#B8B8B8';p.hairStyle=2;}
   // свои люди из folk3.js: типаж, фразы, одежда и предмет в руках (рисует render.js: p.item)
   if(f.type)p.type=f.type;if(Array.isArray(f.lines)&&f.lines.length)p.lines=f.lines;
-  const lk=f.look;if(lk){if(/^#[0-9a-f]{6}$/i.test(lk.coat||''))p.clothes=lk.coat;if(lk.hat==='cap')p.hat={k:'cap',c:shade(p.clothes,0.7)};else if(lk.hat==='beanie')p.hat={k:'knit',c:P(['#5A6B8C','#8C3A32','#3F6B4A','#6E7378'])};if(lk.item&&lk.item!=='none')p.item=lk.item;}
+  const lk=f.look;if(lk&&typeof lk==='object'){if(/^#[0-9a-f]{6}$/i.test(lk.coat||''))p.clothes=lk.coat;if(lk.hat==='cap')p.hat={k:'cap',c:shade(p.clothes,0.7)};else if(lk.hat==='beanie')p.hat={k:'knit',c:P(['#5A6B8C','#8C3A32','#3F6B4A','#6E7378'])};if(lk.item&&lk.item!=='none')p.item=lk.item;}
+  if(typeof f.photo==='string'&&f.photo){p.photo=f.photo;const key='ph:'+f.id;let im=(typeof faceImg!=='undefined')?faceImg[key]:null;if(!im){im=new Image();im.src=f.photo;if(typeof faceImg!=='undefined')faceImg[key]=im;}p.lookImg=im;}
   return p;}
 // ---------- места ----------
 function nearestPoi(x,y,test,maxD){let best=null,bd=maxD||1e9;for(const p of world.pois){const dx=p.x-x,dy=p.y-y;if(dx>bd||dx<-bd||dy>bd||dy<-bd||!test(p))continue;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=p;}}return best;}
@@ -202,7 +203,7 @@ const FOLK_HI=['Привет, {n}!','О, {n}! Как сам?','{n}, здравс
 const FOLK_HI_F={fidania:['Улым, здравствуй! Покушал сегодня?','Ой, сосед! Как дела?'],lenar:['{n}! Послушай, новую выучил ♪','Братан, привет!'],marat:['Э, {n}! Куда едем?','Салям, {n}! Опять пробки…'],alsu:['Зай, привет. Заходи вечером','{n}, живой? Привет'],zulfiya:['Здравствуйте, {n}!'],gulnara:['Здравствуйте, {n}. Как самочувствие?'],ildar:['{n}! Наши сегодня играют, ты в курсе?'],rinat:['{n}! Голодный? Заходи']};
 const BUSK=['♪ Казан, Казан, син минем җаным… ♪','♪ (перебирает струны) ♪','♪ Ещё одну для хороших людей ♪','Спасибо, люди добрые!'];
 // жители районов (folk2.js → window.cityFolk2): появляются, когда игрок впервые оказывается рядом с их районом (там уже подгружены дома и места)
-function folkDistrictTick(){const t0=performance.now();const ext=[...(window.cityFolk2||[]),...(window.cityFolk3||[])];if(!ext.length||!FOLK.ready)return;let added=0;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;let A0=null;
+function folkDistrictTick(){const t0=performance.now();const ext=[...(window.cityFolk2||[]),...(window.cityFolk3||[]),...(window.cityFolkColor||[])];if(!ext.length||!FOLK.ready)return;let added=0;const have=new Set(FOLK.list.map(f=>f.id));const ds=window.cityDistricts||[];const m=world.meta;let A0=null;
   for(const src of ext){if(have.has(src.id))continue;const d=ds.find(x=>x.id===src.district);if(!d||!Array.isArray(d.center))continue;
     const c=[(d.center[1]-m.lon0)*m.mlon,-(d.center[0]-m.lat0)*m.mlat];if(dist(c[0],c[1],player.x,player.y)>2200)continue;
     A0=A0||folkAnchors();const A=src.district==='vahitovsky'?A0:{freedom:c,kremlin:c,bauman:c,stadium:c,yard:[c[0]+40,c[1]+30]};A[src.district]=c;
