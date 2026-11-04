@@ -12,7 +12,9 @@ function counterPlace(){
   if(/парикмах|барбер/.test(low))kind='barber';
   else if(/цветоч/.test(low))kind='flower';
   else if(/фитнес|спортзал|тренаж/.test(low))kind='gym';
-  else if(/пекар|булоч/.test(low))kind='bakery';
+  else if(/пекар|булоч|добропек|жар свежар|хлебушко|цар|колобок|покровск|к чаю/.test(low))kind='bakery';
+  else if(/столовая|столовка/.test(low))kind='canteen';
+  else if(/блинн/.test(low))kind='blin';
   else if(/шаурм|донер|döner|doner|кебаб|kebab|ханума|исфара|wаурма|shaurma|тёрка|хочу шаурму/.test(low))kind='shawarma';
   else if(/кофе|coffee|кофейн|skuratov|скуратов|шоколадниц|cofix|бинхарт/.test(low))kind='coffee';
   else if(/чайхан|ресторан/.test(low))kind='restaurant';
@@ -75,6 +77,18 @@ function counterOffers(place){
     counterDish('Капучино',220,4,6,8,12,['капучино','кофе']),
     counterDish('Флэт уайт и круассан',390,22,8,8,18,['флэт','круассан']),
     counterDish('Фильтр и чизкейк',420,24,8,6,20,['фильтр','чизкейк','десерт'])
+  ];
+  if(k==='canteen')return [
+    counterDish('Суп и хлеб',160,28,3,2,15,['суп'],{def:true}),
+    counterDish('Котлета с пюре',240,42,4,3,20,['котлет','пюре']),
+    counterDish('Комплексный обед',280,50,5,4,25,['обед','комплекс']),
+    counterDish('Компот',60,2,2,2,5,['компот'])
+  ];
+  if(k==='blin')return [
+    counterDish('Блины с маслом',180,22,5,3,12,['масло','блин'],{def:true}),
+    counterDish('Блины с мясом',280,36,5,3,15,['мяс']),
+    counterDish('Блины с вареньем',220,24,6,3,12,['варень']),
+    counterDish('Чайник чая',90,2,4,3,10,['чай'])
   ];
   if(k==='restaurant')return [
     counterDish('Суп и чай',420,30,5,3,25,['суп'],{def:true}),
