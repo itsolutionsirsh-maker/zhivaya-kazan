@@ -13,6 +13,8 @@ function counterPlace(){
   else if(/цветоч/.test(low))kind='flower';
   else if(/фитнес|спортзал|тренаж/.test(low))kind='gym';
   else if(/пекар|булоч/.test(low))kind='bakery';
+  else if(/шаурм|донер|döner|doner|кебаб|kebab|ханума|исфара|wаурма|shaurma|тёрка|хочу шаурму/.test(low))kind='shawarma';
+  else if(/кофе|coffee|кофейн|skuratov|скуратов|шоколадниц|cofix|бинхарт/.test(low))kind='coffee';
   else if(/чайхан|ресторан/.test(low))kind='restaurant';
   else if(/чайный/.test(low))kind='tea';
   return {kind,name:interior.name||'заведение',it:interior};
@@ -61,6 +63,18 @@ function counterOffers(place){
     counterDish('Эчпочмак',90,14,3,2,8,['эчпочмак'],{def:true}),
     counterDish('Булочка и чай',140,16,4,4,10,['булоч','чай','выпеч']),
     counterDish('Пирог с капустой',160,22,4,2,12,['пирог'])
+  ];
+  if(k==='shawarma')return [
+    counterDish('Шаурма классическая',250,48,6,4,12,['классич','шаурм'],{def:true}),
+    counterDish('Шаурма острая',280,48,4,4,12,['остр']),
+    counterDish('Донер в тарелке',340,52,5,3,18,['донер','тарелк']),
+    counterDish('Айран',90,4,2,3,5,['айран'])
+  ];
+  if(k==='coffee')return [
+    counterDish('Эспрессо',140,0,4,10,8,['эспрессо'],{def:true}),
+    counterDish('Капучино',220,4,6,8,12,['капучино','кофе']),
+    counterDish('Флэт уайт и круассан',390,22,8,8,18,['флэт','круассан']),
+    counterDish('Фильтр и чизкейк',420,24,8,6,20,['фильтр','чизкейк','десерт'])
   ];
   if(k==='restaurant')return [
     counterDish('Суп и чай',420,30,5,3,25,['суп'],{def:true}),
