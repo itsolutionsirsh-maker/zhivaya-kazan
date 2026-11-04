@@ -28,6 +28,7 @@ function venueStyleId(it){
   if(it.kind==='guest')return 'home';   // в гостях у жителя — как дома
   const k=it.kind,n=String(it.name||'').toLowerCase();
   if(k==='cafe'){
+    if(typeof restStyleOf==='function'){const s=restStyleOf(it.name);if(s==='tatar'||s==='geo')return 'tatar';if(s==='grill')return 'bakery';if(s==='euro')return 'hotel';if(s==='day')return 'coffee';}
     if(/т[юүу]бет[еэ]й|tubat[aä]y|tubetey|кыстыбый|дом чая|ашхан/.test(n))return 'tatar';
     if(/пекар|добропек|жар.?свежар|булоч|кондитер|cinnabon/.test(n))return 'bakery';
     return 'coffee';
