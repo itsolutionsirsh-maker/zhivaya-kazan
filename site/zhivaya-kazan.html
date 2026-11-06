@@ -2,6 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>window.zkBase=fetch('map/base.json',{cache:'no-cache'}).catch(function(){return null;});</script>
 <style>
+[hidden]{display:none!important}
 /* шрифты лежат у нас (site/fonts, лицензия OFL): раньше брались с Google — это внешний сервер, и пока он не ответит, страница и скрипты стояли */
 @font-face{font-family:'Unbounded';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/unbounded-cyrillic-500-normal.woff2?v=5.1.0) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
 @font-face{font-family:'Unbounded';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/unbounded-latin-500-normal.woff2?v=5.1.0) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
@@ -38,7 +39,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 .clock{padding:8px 12px;display:flex;align-items:center;gap:12px}
 .clock .t{font-family:var(--font-mono);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
 .clock .meta{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
-.btn{font:inherit;font-weight:600;font-size:12px;color:var(--fg);background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:9px;padding:6px 10px;cursor:pointer;pointer-events:auto;transition:background .15s}
+.hud-extra{display:flex;gap:6px;align-items:center;padding:6px 8px;flex:none}
+.hud-extra .btn{font-size:14px;padding:8px 12px;min-height:36px}
 .btn:hover{background:rgba(255,255,255,.14)}
 .btn:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
@@ -68,6 +70,15 @@ body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 #acctHud{min-height:32px;height:32px;padding:0 10px;font-size:13px;line-height:1;border-radius:999px;flex:none}
 .needs .money b{color:var(--gold);font-size:15px;font-weight:500}
 .online{font-size:11px;color:var(--muted)}
+#adminNums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#adminNums div{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+#adminNums b{display:block;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.2}
+#adminNums span{color:var(--muted);font-size:11px}
+#adminDays{display:flex;flex-direction:column;gap:4px;max-height:168px;overflow:auto}
+#adminDays .d{display:grid;grid-template-columns:58px 1fr 24px;gap:8px;align-items:center;font-size:12px}
+#adminDays .d span:first-child{color:var(--muted)}
+#adminDays .d i{display:block;height:8px;border-radius:4px;background:var(--accent)}
+#adminDays .d em{font-style:normal;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 .mid{position:relative;display:flex;justify-content:flex-end;align-items:flex-start;gap:10px}
 #feed{display:flex;flex-direction:column;gap:5px;width:min(250px,52vw);pointer-events:none}
 #feed .ev{background:rgba(14,24,20,.72);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:11.5px;line-height:1.3;display:flex;gap:8px;align-items:flex-start;animation:pop .25s ease-out;box-shadow:var(--shadow)}
@@ -136,12 +147,13 @@ body.chat-open #joy{display:none!important}
 @media (max-width:640px){.brand{display:none}.clock{gap:6px;padding:6px 8px}.clock .meta{display:none}.clock .btn{padding:6px 7px;min-width:34px}.needs{margin-left:auto}.brand small{display:none}.brand h1{font-size:13px}#mini{display:none}.needs{min-width:160px;font-size:11px}#feed{width:min(260px,58vw)}#feed .ev{font-size:11.5px;padding:5px 8px}.clock .t{font-size:18px}}
 .order-list{display:flex;flex-direction:column;gap:8px}.order-item{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}.order-item:hover:not(:disabled){border-color:rgba(43,176,98,.7);background:rgba(43,176,98,.1)}.order-item:disabled{opacity:.45;cursor:not-allowed}.order-item span{display:block;font-size:14px}.order-item i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}.order-item b{white-space:nowrap;font-size:14px}.order-treat{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.order-treat input{width:16px;height:16px;accent-color:#2BB062}
 .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,10,8,.62);pointer-events:auto;padding:16px;box-sizing:border-box;z-index:20}
+.modal[hidden]{display:none!important}
 .modal .box{background:var(--panel-solid);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:min(100%,480px);max-height:min(92vh,780px);overflow:auto;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
 .modal h2{font-family:var(--font-display);font-size:17px;margin:0;font-weight:700;text-wrap:balance}
 .modal p{margin:0;color:var(--muted);font-size:13px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-input[type=text],textarea,select{font:inherit;color:var(--fg);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;box-sizing:border-box}
+input[type=text],input[type=password],textarea,select{font:inherit;color:var(--fg);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;box-sizing:border-box}
 /* выпадающий список рисует система: без тёмной схемы на Windows и Android он белый, а текст в нём наш светлый — не видно */
 select{color-scheme:dark}select option,select optgroup{background:#16211C;color:#EEF3EE}select optgroup{color:#9FB3A8;font-weight:600}
 input[type=color]{width:36px;height:28px;border:1px solid var(--line);border-radius:7px;background:none;padding:0;cursor:pointer}
@@ -194,7 +206,7 @@ html.tg body{overscroll-behavior:none}:where(html.tg) .btn{min-height:40px}
   #hud{inset:0 0 auto;height:var(--ui-height);padding:calc(var(--ui-top) + 8px) calc(var(--ui-right) + 8px) calc(var(--ui-bottom) + 8px) calc(var(--ui-left) + 8px);gap:6px}
   .card{background:rgba(14,24,20,.94)}
   .top{position:relative;display:flex;flex-direction:column;gap:4px;flex-wrap:nowrap}
-  .brand,#mini{display:none}.clock{box-sizing:border-box;width:100%;padding:3px 5px;display:grid;grid-template-columns:minmax(44px,1fr) repeat(6,44px);gap:0;border-radius:12px}
+  .brand,#mini{display:none}.hud-extra{width:100%;box-sizing:border-box}.hud-extra .btn{flex:1;min-height:40px}.clock{box-sizing:border-box;width:100%;padding:3px 5px;display:grid;grid-template-columns:minmax(44px,1fr) repeat(6,44px);gap:0;border-radius:12px}
   .clock .t{font-size:17px;text-align:center}.clock .meta{display:none}
   .clock .btn{width:44px;min-width:44px;height:44px;padding:0;font-size:17px;background:transparent;border-color:transparent}
   .needs{box-sizing:border-box;min-width:0;width:100%;min-height:44px;margin:0;padding:6px 8px;display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:10px;position:relative}
@@ -398,6 +410,10 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <div id="hud">
   <div class="top">
     <div class="card brand"><h1>Живая Казань</h1></div>
+    <div class="card hud-extra">
+      <button class="btn primary" id="homeBtn" type="button">🏠 Домой</button>
+      <button class="btn" id="analyticsBtn" type="button">Аналитика</button>
+    </div>
     <div class="card clock">
       <div class="t" id="clock">08:30</div>
       <div class="meta"><span id="dayLbl">день 1</span><span id="weatherLbl">☀️ ясно</span></div>
@@ -603,7 +619,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 
 <div class="modal" id="menuModal" hidden>
   <div class="box">
-    <h2>Живая Казань</h2>
+    <h2 id="menuTitle">Живая Казань</h2>
     <div class="row"><button class="btn primary" id="neighbourStoryBtn">📚 История соседки</button><button class="btn" id="territoryBtn">🗺 Районы и группировки</button></div>
     <div class="row"><button class="btn primary" id="yardStoryBtn">🏀 Чужой двор · история двух районов</button></div>
     <p>Казань целиком: настоящие улицы, дома и маршруты, жители, транспорт и другие игроки. Не только центр.</p>
@@ -625,9 +641,29 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div id="ignBox"><h3 class="sub">Скрытые игроки</h3><div id="ignList"></div></div>
     <div class="routes" id="routesLbl"></div>
     <p id="statsLbl"></p>
+    <div class="row"><button class="btn" id="adminBtn" type="button">Аналитика</button></div>
     <div class="row menu-options"><button class="btn" id="changeChar">Сменить персонажа</button><button class="btn" id="wearBtn">Мои вещи</button><button class="btn" id="courtyardBtn">🏡 Свой двор</button><button class="btn primary" id="inviteBtn">Позвать друга</button><button class="btn danger" id="resetBtn">Начать заново</button></div>
     <div class="row"><button class="btn" id="menuClose">Закрыть</button><button class="btn" id="howtoBtn">Как играть</button></div>
     <p class="legal"><a href="privacy.html" target="_blank" rel="noopener">Правила и конфиденциальность</a> · помощь и удаление аккаунта — в боте <a href="https://t.me/zhivaya_kazan_bot" target="_blank" rel="noopener">@zhivaya_kazan_bot</a></p>
+  </div>
+</div>
+
+<div class="modal" id="adminModal" hidden style="z-index:50">
+  <div class="box">
+    <h2>Служебное</h2>
+    <div id="adminLock">
+      <p>Это только для автора города.</p>
+      <div class="row"><input id="adminCode" type="password" maxlength="40" autocomplete="current-password" placeholder="Код" style="flex:1;min-width:0"><button class="btn primary" id="adminEnter" type="button">Войти</button></div>
+      <p class="online" id="adminLockMsg"></p>
+    </div>
+    <div id="adminBody" hidden>
+      <p id="adminLead">Это живые открытия игры, не персонажи на улицах.</p>
+      <div id="adminNums"></div>
+      <h3 class="sub">14 дней · люди</h3>
+      <div id="adminDays"></div>
+      <p class="online" id="adminNote"></p>
+    </div>
+    <div class="row"><button class="btn primary" id="adminRefresh" type="button" hidden>Обновить</button><button class="btn" id="adminClose" type="button">Закрыть</button></div>
   </div>
 </div>
 
@@ -685,13 +721,13 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/world.js"></script><script src="js/chunks.js"></script>
 <script src="js/agents.js"></script>
 <script src="js/vehicles.js"></script>
-<script src="js/interior-look.js?v=3"></script>
-<script src="js/venue-room.js"></script><script src="js/shared-venues.js"></script>
-<script src="js/interior.js?v=7"></script>
-<script src="js/rally.js"></script>
+<script src="js/interior-look.js?v=5"></script>
+<script src="js/venue-room.js?v=4"></script><script src="js/shared-venues.js?v=2"></script>
+<script src="js/interior.js?v=10"></script>
+<script src="js/rally.js?v=2"></script>
 <script src="js/modcore.js"></script>
 <script src="js/moderation.js"></script>
-<script src="js/net.js?v=2"></script>
+<script src="js/net.js?v=3"></script>
 <script src="js/tg.js"></script>
 <script src="js/wallet.js"></script>
 <script src="js/chat.js"></script>
@@ -716,11 +752,24 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/events.js"></script>
 <script src="js/people.js?v=2"></script>
 <script src="js/story-ui.js"></script><script src="js/phone.js"></script>
-<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk-color.js?v=1"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/pay.js?v=2"></script><script src="js/render.js"></script>
+<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk-color.js?v=1"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/pay.js?v=2"></script><script src="js/render.js?v=3"></script>
 <script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/gangs.js"></script><script src="js/realworld-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
 <script src="js/police-ride.js"></script>
 <script src="js/ambulance-ride.js"></script>
 <template id="zkLater"><script src="js/folk3.js"></script></template>
-<script src="js/faces.js?v=2"></script><script src="js/sky-slot.js"></script><script src="js/main.js?v=10"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js?v=2"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js"></script><script src="js/street-look.js"></script><script src="js/hotels.js?v=5"></script><script src="js/counter.js?v=5"></script><script src="js/baths.js?v=2"></script><script src="js/bars.js?v=2"></script><script src="js/eats.js?v=1"></script><script src="js/bites.js?v=1"></script><script src="js/cafes.js?v=1"></script><script src="js/chains.js?v=1"></script><script src="js/dealers.js?v=1"></script>
+<script src="js/faces.js?v=2"></script><script src="js/sky-slot.js"></script><script src="js/main.js?v=13"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js?v=2"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js?v=2"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js?v=2"></script><script src="js/street-look.js?v=3"></script><script src="js/hotels.js?v=5"></script><script src="js/counter.js?v=5"></script><script src="js/baths.js?v=2"></script><script src="js/bars.js?v=2"></script><script src="js/eats.js?v=1"></script><script src="js/bites.js?v=1"></script><script src="js/cafes.js?v=1"></script><script src="js/chains.js?v=1"></script><script src="js/dealers.js?v=1"></script>
+<script src="js/moto.js"></script>
+<script src="js/services.js"></script>
+<script src="js/clubs.js?v=5"></script>
+<script src="js/city-plus.js?v=1"></script>
+<script src="js/halls.js?v=5"></script>
+<script src="js/alerts.js?v=9"></script>
+<script src="js/homes.js?v=3"></script>
+<script src="js/spas.js?v=2"></script>
+<script src="js/malls.js?v=2"></script>
+<script src="js/rally-mass.js?v=3"></script>
+<script src="js/cortege.js?v=7"></script>
+<script src="js/patrols.js?v=4"></script>
+<script src="js/visits.js?v=5"></script>

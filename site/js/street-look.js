@@ -27,12 +27,12 @@ const DOG_SHOTS=[
   {src:'img/scenes/park-dogs.jpg',title:'Собаки в парке',text:'Рыжий и светлый идут по листве. Хвосты вверх, людей не боятся. Можно погладить, если подойти ближе.'},
   {src:'img/scenes/dogs.gif',title:'Двое по тропе',text:'Бегут по осенней дорожке, нюхают листья и виляют. Это парковые, не потеряшка с объявления.'}
 ];
-function streetPick(list){return list[Math.floor(Math.random()*list.length)];}
+function streetPick(list){if(!list||!list.length)return null;return list[Math.floor(Math.random()*list.length)];}
 function streetLookNow(){if(typeof player==='undefined'||scene!=='city'||player.inside)return null;
   const sick=typeof sitActive==='function'?sitActive('sick'):null;
-  if(sick&&sick.w&&dist(sick.w.x,sick.w.y,player.x,player.y)<14){if(!sick.shot)sick.shot=streetPick(SICK_SHOTS);const who=sick.w.p?` ${sick.w.p.name}, ${sick.w.p.age}.`:'';return {src:sick.shot.src,title:sick.shot.title,text:sick.shot.text+who};}
+  if(sick&&sick.w&&dist(sick.w.x,sick.w.y,player.x,player.y)<14){if(!sick.shot)sick.shot=streetPick(SICK_SHOTS);if(!sick.shot)return null;const who=sick.w.p?` ${sick.w.p.name}, ${sick.w.p.age}.`:'';return {src:sick.shot.src,title:sick.shot.title,text:sick.shot.text+who};}
   const fa=typeof sitActive==='function'?sitActive('folkAct'):null;
-  if(fa&&fa.f&&fa.f.type==='homeless'&&fa.w&&dist(fa.w.x,fa.w.y,player.x,player.y)<8){if(!fa.shot)fa.shot=streetPick(fa.f.female?ASK_F:ASK_M);const nm=fa.w.p?fa.w.p.name:'';return {src:fa.shot.src,title:fa.shot.title+(nm?' · '+nm:''),text:fa.shot.text};}
+  if(fa&&fa.f&&fa.f.type==='homeless'&&fa.w&&dist(fa.w.x,fa.w.y,player.x,player.y)<8){if(!fa.shot)fa.shot=streetPick(fa.f.female?ASK_F:ASK_M);if(!fa.shot)return null;const nm=fa.w.p?fa.w.p.name:'';return {src:fa.shot.src,title:fa.shot.title+(nm?' · '+nm:''),text:fa.shot.text};}
   if(typeof parkNear!=='function')return null;const n=parkNear(7);if(!n)return null;
-  if(n.kind==='dog'){if(!n.o.shot)n.o.shot=streetPick(DOG_SHOTS);return {src:n.o.shot.src,title:n.o.shot.title+' · '+n.o.name,text:n.o.shot.text};}
-  if(!n.o.shot){const pool=QUAD_SHOTS[n.o.talk]||QUAD_SHOTS.cat;n.o.shot=streetPick(pool);}return n.o.shot;}
+  if(n.kind==='dog'){if(!n.o.shot)n.o.shot=streetPick(DOG_SHOTS);if(!n.o.shot)return null;return {src:n.o.shot.src,title:n.o.shot.title+' · '+n.o.name,text:n.o.shot.text};}
+  if(!n.o.shot){const pool=QUAD_SHOTS[n.o.talk]||QUAD_SHOTS.cat;n.o.shot=streetPick(pool);}if(!n.o.shot)return null;return n.o.shot;}

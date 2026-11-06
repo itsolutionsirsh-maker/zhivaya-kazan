@@ -35,6 +35,7 @@ function venueStyleId(it){
   }
   if(k==='worship'&&/мечет|кул.?шариф|нур[уы]лла|апанаев|галеев|закабан|иске таш/.test(n))return 'mosque';
   if(k==='bar'){const s=typeof barStyleOf==='function'?barStyleOf(it.name):'';return {pub:'barpub',cocktail:'barneon',lounge:'barlounge',sport:'barsport',wine:'barwine'}[s]||'bar';}
+  if(k==='mall')return 'retail';
   return ({shop:'retail',bank:'office',hospital:'pharmacy',university:'office',school:'office',library:'coffee',police:'office',prosecutor:'office',default:'office'})[k]||(VENUE_STYLES[k]?k:'office');
 }
 function venueLook(it){return VENUE_STYLES[venueStyleId(it)];}
@@ -75,6 +76,14 @@ function venueTulip(c,x,y,s,color){
   c.strokeStyle=color;c.lineWidth=.045*s;c.beginPath();c.moveTo(x,y+.2*s);c.lineTo(x,y-.05*s);c.moveTo(x,y+.14*s);c.quadraticCurveTo(x-.25*s,y+.1*s,x-.2*s,y-.04*s);c.moveTo(x,y+.1*s);c.quadraticCurveTo(x+.25*s,y+.06*s,x+.2*s,y-.08*s);c.stroke();
   c.fillStyle=color;c.beginPath();c.moveTo(x,y-.05*s);c.bezierCurveTo(x-.25*s,y-.08*s,x-.19*s,y-.28*s,x-.17*s,y-.3*s);c.lineTo(x,y-.2*s);c.lineTo(x+.17*s,y-.3*s);c.bezierCurveTo(x+.19*s,y-.28*s,x+.25*s,y-.08*s,x,y-.05*s);c.fill();
 }
+function venueSign(it,k,id){
+  if((k==='shop'||k==='office'||k==='townhall')&&typeof shotKind==='function'){
+    const s=shotKind(it);
+    const map={clothes:'ОДЕЖДА',beauty:'КРАСОТА',barber:'СТРИЖКА',flower:'ЦВЕТЫ',alcohol:'ВИНО',hardware:'ИНСТРУМЕНТЫ',electronics:'ТЕХНИКА',books:'КНИГИ',bakery:'ВЫПЕЧКА',butcher:'МЯСО',jewelry:'УКРАШЕНИЯ',gift:'СУВЕНИРЫ',furniture:'МЕБЕЛЬ',pharmacy:'АПТЕКА',tobacco:'ТАБАК',workshop:'СЕРВИС',mall:'ГАЛЕРЕЯ',farewell:'РИТУАЛ',tea:'ЧАЙ',gym:'СПОРТ',optics:'ОПТИКА',pet:'ЗООТОВАРЫ',hall:'ПРИЁМНАЯ',court:'ЗАЛ',station:'ВОКЗАЛ',sports:'ЗАЛ',fire:'ДЕЖУРКА'};
+    if(map[s])return map[s];
+  }
+  return ({cafe:id==='tatar'?'ЧАЙ · ВЫПЕЧКА':id==='bakery'?'СВЕЖАЯ ВЫПЕЧКА':'КОФЕ · ДЕСЕРТЫ',bar:id==='barpub'?'КРАНЫ · КУХНЯ':id==='barneon'?'КОКТЕЙЛИ':id==='barlounge'?'ЛАУНЖ':id==='barsport'?'МАТЧ · БАР':id==='barwine'?'ВИНО':'БАР · КУХНЯ',shop:'ПРОДУКТЫ',pharmacy:'АПТЕКА',market:'РЫНОК',bank:'ОБСЛУЖИВАНИЕ',hotel:'РЕГИСТРАЦИЯ',hospital:'РЕГИСТРАТУРА',museum:'ЭКСПОЗИЦИЯ',library:'ЧИТАЛЬНЫЙ ЗАЛ',school:'КЛАСС',university:'АУДИТОРИЯ',police:'ДЕЖУРНАЯ ЧАСТЬ',prosecutor:'ПРИЁМНАЯ',office:'ОФИС',townhall:'ПРИЁМНАЯ',court:'ЗАЛ',station:'ВОКЗАЛ',sports:'ЗАЛ',workshop:'СЕРВИС',fire:'ДЕЖУРКА',mall:'ГАЛЕРЕЯ'})[k];
+}
 function drawVenueArchitecture(c,it,p,night=0){
   if(venueHospitality(it)){drawHospitalityArchitecture(c,it,p,night);return;}
   const w=it.w,h=it.h,k=it.kind,id=venueStyleId(it);
@@ -93,7 +102,7 @@ function drawVenueArchitecture(c,it,p,night=0){
   c.restore();
   // Настенные бра; световой ореол остаётся на стене, ниже нет ложных препятствий.
   for(const x of [w*.12,w*.88]){const g=c.createRadialGradient(x,-.7,.02,x,-.7,.55);g.addColorStop(0,'rgba(255,236,171,.65)');g.addColorStop(1,'rgba(255,236,171,0)');venueBox(c,x-.55,-1.22,1.1,1.04,g);venueBox(c,x-.07,-.87,.14,.36,p.accent,.04);venueDot(c,x,-.72,.08,'#FFF2CC');}
-  const sign=({cafe:id==='tatar'?'ЧАЙ · ВЫПЕЧКА':id==='bakery'?'СВЕЖАЯ ВЫПЕЧКА':'КОФЕ · ДЕСЕРТЫ',bar:id==='barpub'?'КРАНЫ · КУХНЯ':id==='barneon'?'КОКТЕЙЛИ':id==='barlounge'?'ЛАУНЖ':id==='barsport'?'МАТЧ · БАР':id==='barwine'?'ВИНО':'БАР · КУХНЯ',shop:'ПРОДУКТЫ',pharmacy:'АПТЕКА',market:'РЫНОК',bank:'ОБСЛУЖИВАНИЕ',hotel:'РЕГИСТРАЦИЯ',hospital:'РЕГИСТРАТУРА',museum:'ЭКСПОЗИЦИЯ',library:'ЧИТАЛЬНЫЙ ЗАЛ',school:'КЛАСС',university:'АУДИТОРИЯ',police:'ДЕЖУРНАЯ ЧАСТЬ',prosecutor:'ПРИЁМНАЯ',office:'ОФИС'})[k];
+  const sign=venueSign(it,k,id);
   if(sign){const sw=Math.min(w*.55,7.5);venueBox(c,w/2-sw/2,-.98,sw,.57,p.trim,.07);venueText(c,id==='ward'?'ПАЛАТА · ТИХИЙ ЧАС':sign,w/2,-.68,.24,'#F7EEDC',sw-.3);}
   if(id==='ward'){
     for(const x of [4.65,9.35]){venueBox(c,x,-.08,.4,1.15,'#C7D7C7',.04);venueLine(c,[[x+.12,0],[x+.12,1]],'#94B3A5',.035);}

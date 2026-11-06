@@ -111,6 +111,8 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
       thr=v.speed<lim-0.3?1:v.speed>lim+0.3?-1:0;if(lim===0&&v.speed<0.2){thr=0;v.speed=0;v.waitT=(v.waitT||0)+dt;}else if(v.speed>1)v.waitT=0;}}
   if(thr>0)v.speed+=s.acc*dt*Math.min(1,thr);else if(thr<0)v.speed-=s.brake*dt*Math.min(1,-thr);else v.speed-=Math.sign(v.speed)*Math.min(Math.abs(v.speed),1.8*dt);
   v.speed=clamp(v.speed,-3.5,vmax);
+  if(v.cortegeBrake===2)v.speed=0;
+  else if(v.cortegeBrake===1&&Math.abs(v.speed)>1.3)v.speed=Math.sign(v.speed||1)*1.3;
   if(Math.abs(v.speed)>0.05){const ang=Math.atan2(v.hy,v.hx)+steer*s.turn*dt*Math.min(1,Math.abs(v.speed)/7)*Math.sign(v.speed);v.hx=Math.cos(ang);v.hy=Math.sin(ang);}
   const nx=v.x+v.hx*v.speed*dt,ny=v.y+v.hy*v.speed*dt;const L=s.len*0.5;
   if(inBuilding(nx+v.hx*L,ny+v.hy*L)||inBuilding(nx-v.hx*L,ny-v.hy*L)||inBuilding(nx,ny)){if(Math.abs(v.speed)>5){addEvent('Бум! Вы въехали в здание');player.mood=clamp(player.mood-3,0,100);shake=0.5;}v.speed=-v.speed*0.15;v.auto=null;return;}

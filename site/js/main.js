@@ -134,19 +134,42 @@ function findAction(){
   if(player.home&&dist(player.home.cx,player.home.cy,player.x,player.y)<Math.max(24,(player.home.bb[2]-player.home.bb[0])/2+8,(player.home.bb[3]-player.home.bb[1])/2+8)){return actTarget({label:'Зайти домой',run:()=>enterInterior({kind:'home',name:typeof housingHomeName==='function'?housingHomeName():'Ваша квартира',key:typeof housingHomeKey==='function'?housingHomeKey():'home',x:player.x,y:player.y})},{x:player.home.cx,y:player.home.cy},'home',player.home);}
   for(const ac of accidents){if(dist(ac.x,ac.y,player.x,player.y)<14&&!ac.reported&&!ac.playerCar){return actTarget({label:'Помочь на месте ДТП',run:()=>{ac.reported=true;player.mood=clamp(player.mood+12,0,100);addEvent('Вы помогли пострадавшим и дали показания. Настроение +12');}},ac,'accident');}}
   if(companion&&!companion.w.inside&&dist(companion.w.x,companion.w.y,player.x,player.y)<6&&!inBuildingNear(player.x,player.y))return actTarget({label:`Поговорить: ${companion.w.p.name}`,run:()=>openChat(companion.w)},companion.w,'person');
-  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n){const own=typeof stayDoor==='function'?stayDoor(b.n,player.x,player.y):null;if(own)return actTarget(own,{x:b.cx,y:b.cy},'building',b);const src={kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y,venueAt:{x:b.cx,y:b.cy}};return actTarget(venueDoor(`Зайти в «${b.n}»`,src),{x:b.cx,y:b.cy},'building',b);}
+  const b=inBuildingNear(player.x,player.y);if(b&&b.n){const ca=closedAction({t:kindFromBuilding(b),n:b.n,i:b.i},'b'+b.i);if(ca)return actTarget(ca,{x:b.cx,y:b.cy},'building',b);}if(b&&b.n){const own=typeof stayDoor==='function'?stayDoor(b.n,player.x,player.y):null;if(own)return actTarget(own,{x:b.cx,y:b.cy},'building',b);const src={kind:kindFromBuilding(b),name:b.n,key:'b'+b.i,x:player.x,y:player.y,venueAt:{x:b.cx,y:b.cy},place:b.t||''};return actTarget(venueDoor(`Зайти в «${b.n}»`,src),{x:b.cx,y:b.cy},'building',b);}
   return null;}
 // заведение внутри здания (бар в подвале, магазин во дворе): зайти можно от любой стены этого дома, а не только с точки на карте
 function poiBuilding(poi){if(poi._b===undefined)poi._b=inBuilding(poi.x,poi.y)||null;return poi._b;}
 function polyEdgeDist(p,x,y){let m=1e9;for(let k=0;k<p.length;k+=2){const ax=p[k],ay=p[k+1],bx=p[(k+2)%p.length],by=p[(k+3)%p.length];const vx=bx-ax,vy=by-ay,L2=vx*vx+vy*vy||1;const t=clamp(((x-ax)*vx+(y-ay)*vy)/L2,0,1);const d=Math.hypot(ax+vx*t-x,ay+vy*t-y);if(d<m)m=d;}return m;}
 function poiDist(poi,x,y){let d=dist(poi.x,poi.y,x,y);if(d>9&&d<45){const b=poiBuilding(poi);if(b&&b!==player.home&&!(player.home&&b.i===player.home.i)&&x>b.bb[0]-5&&x<b.bb[2]+5&&y>b.bb[1]-5&&y<b.bb[3]+5&&polyEdgeDist(b.p,x,y)<4)d=Math.min(d,9+d*0.01);}return d;}
-function kindFromBuilding(b){const t=b.t;if(/church|mosque|cathedral|worship/.test(t))return 'worship';if(/retail|shop|commercial|mall|supermarket/.test(t))return 'shop';if(/office/.test(t))return 'office';if(/university|college/.test(t))return 'university';if(/school/.test(t))return 'school';if(/hospital|clinic/.test(t))return 'hospital';if(/hotel/.test(t))return 'hotel';if(/theatre|cinema/.test(t))return 'theatre';if(/museum/.test(t))return 'museum';if(/police/.test(t))return 'police';return 'default';}
+function kindFromBuilding(b){const t=String(b.t||''),n=String(b.n||'').toLowerCase().replace(/ё/g,'е');
+  if(/church|mosque|cathedral|worship|presbytery|chapel/.test(t)||/мечет|церков|собор|храм/.test(n))return 'worship';
+  if(/library/.test(t)||/библиотек/.test(n))return 'library';
+  if(/museum|arts_centre/.test(t)||/музей|галере|выставк|занимательн/.test(n))return 'museum';
+  if(/theatre|cinema/.test(t)||/театр|кино|опера|дворец культуры/.test(n))return 'theatre';
+  if(/bank/.test(t)||/банк/.test(n))return 'bank';
+  if(/marketplace|market/.test(t)||/рынок|базар/.test(n))return 'market';
+  if(/university|college/.test(t)||/университет|институт|колледж|академи/.test(n))return 'university';
+  if(/school|kindergarten|music_school|dancing_school/.test(t)||/школ|лицей|гимназ|детск/.test(n))return 'school';
+  if(/hospital|clinic|doctors|nursing/.test(t)||/больниц|поликлиник|клиник/.test(n))return 'hospital';
+  if(/hotel/.test(t)||/гостиниц|отель/.test(n))return 'hotel';
+  if(/police/.test(t)||/полици|мвд/.test(n))return 'police';
+  if(/sports_centre|stadium/.test(t)||/фитнес|спортзал|манеж|баскет|единобор|бассейн|уникс|водных видов|ледов|дворец спорта/.test(n))return 'sports';
+  if(/train_station|bus_station/.test(t)||/вокзал/.test(n))return 'station';
+  if(/courthouse/.test(t)||/(^|[^а-яё])суд([^а-яё]|$)|арбитраж/.test(n))return 'court';
+  if(/townhall/.test(t)||/ратуш|мэри|госсовет|министерств|администрац|загс|консульств|казначей/.test(n))return 'townhall';
+  if(/fire/.test(t)||/пожар/.test(n))return 'fire';
+  if(/bar/.test(t)||/бар\b/.test(n))return 'bar';
+  if(/cafe|restaurant|fast_food|ice_cream/.test(t))return 'cafe';
+  if(/retail|shop|commercial|mall|supermarket/.test(t))return 'shop';
+  if(/dormitory|apartments|residential|house|mansion|detached/.test(t))return 'hotel';
+  if(/industrial|warehouse|garages|manufacture|parking|service|fuel/.test(t))return 'workshop';
+  if(/office|public|civic|community|government/.test(t))return 'townhall';
+  return 'office';}
 function inBuildingNear(x,y){let hit=null;world.bgrid.query(x-6,y-6,x+6,y+6,b=>{if(hit||!b.n)return;if(dist(b.cx,b.cy,x,y)<Math.max(14,(b.bb[2]-b.bb[0])/2+6))hit=b;});return hit;}
 function routesAtStop(s){return world.routes.filter(r=>r.stops.some(st=>{const p=routePoint(r,st.s);return dist(p[0],p[1],s.x,s.y)<32;}));}
 function routePoint(r,s){let i=0;while(i<r.cum.length-2&&r.cum[i+1]<s)i++;const L=r.cum[i+1]-r.cum[i]||1;const t=(s-r.cum[i])/L;return [r.pts[i][0]+(r.pts[i+1][0]-r.pts[i][0])*t,r.pts[i][1]+(r.pts[i+1][1]-r.pts[i][1])*t];}
 const ENTERABLE=/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school|prosecutor)$/;
 function poiAction(poi){const n=poi.n?`«${poi.n}»`:'';
-  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}const src={kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y,venueAt:{x:poi.x,y:poi.y}};return venueDoor(`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,src);}
+  if(ENTERABLE.test(poi.t)){if(poi.t==='office'&&!poi.n)return null;const nm=poi.n||KIND_RU[poi.t];{const ca=closedAction(poi,poiKey(poi));if(ca)return poi.t==='bank'?{label:`Банкомат у «${poi.n||'банка'}»: карта и вклад (отделение ${opensText(poi)})`,run:()=>openBank('atm')}:ca;}const src={kind:poi.t,name:nm,key:poiKey(poi),x:player.x,y:player.y,venueAt:{x:poi.x,y:poi.y},st:poi.st||''};return venueDoor(`Зайти в ${poi.n?n:KIND_RU[poi.t]}`,src);}
   switch(poi.t){
     case 'atm':return {label:`Банкомат ${n}: карта и вклад`,run:()=>openBank('atm')};
     case 'sight':return {label:`Осмотреть ${n||'достопримечательность'}`,run:()=>{spendTime(30);player.mood=clamp(player.mood+8,0,100);addEvent(`Вы осмотрели ${n||'достопримечательность'}. Настроение +8`);}};
@@ -407,7 +430,8 @@ function updateWeather(dt){
   if(fall&&!reduceMotion&&scene==='city'){const snow=weather.kind==='snow';weather.flakes=snow;while(weather.rain.length<(snow?120:160))weather.rain.push([Math.random(),Math.random(),rnd(0.5,1)]);if(weather.rain.length>(snow?120:160))weather.rain.length=snow?120:160;
     for(const r of weather.rain){if(snow){r[1]+=dt*0.16*r[2];r[0]+=dt*0.03*Math.sin(r[1]*9+r[2]*20);}else{r[1]+=dt*1.2*r[2];r[0]+=dt*0.15*r[2];}if(r[1]>1.05){r[1]=-0.05;r[0]=Math.random();}}}else weather.rain.length=0;}
 function weatherLabel(){const k=weather.kind,t=weather.t;const ic=k==='rain'?'🌧':k==='snow'?'❄️':k==='fog'?'🌫':k==='cloudy'?'☁️':isNight()?'🌙':'☀️';
-  return ic+' '+({rain:'дождь',snow:'снег',fog:'туман',cloudy:'пасмурно'}[k]||'ясно')+(t!=null?' '+(t>0?'+':t<0?'−':'')+Math.abs(t)+'°':'')+(weather.ice?' · гололёд':'');}
+  const season=typeof seasonLookNow==='undefined'?'':({winter:'зима',thaw:'оттепель',spring:'весна',early:'осень',gold:'осень',bare:'осень',summer:'лето'}[seasonLookNow]||'');
+  return ic+' '+({rain:'дождь',snow:'снег',fog:'туман',cloudy:'пасмурно'}[k]||'ясно')+(t!=null?' '+(t>0?'+':t<0?'−':'')+Math.abs(t)+'°':'')+(weather.ice?' · гололёд':'')+(season?' · '+season:'');}
 
 let last=performance.now(),hudTimer=0,saveTimer=0,presTimer=0;
 // следующий кадр заказываем сразу: если в кадре что-то упадёт, игра не замрёт (раньше ошибка останавливала весь цикл — экран вставал)

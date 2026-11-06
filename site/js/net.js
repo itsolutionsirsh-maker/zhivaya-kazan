@@ -60,7 +60,7 @@ let wsSock=null,wsFails=0,wsLastPush=0,wsLastMeta='';const wsPeers=new Map();
 let wsLastP=null;
 // координаты — только если сдвинулся или повернулся, а стоя на месте — раз в 3 секунды (раньше ~7 раз в секунду всегда: трафик и батарея)
 function wsPush(){const t=performance.now();if(!wsSock||wsSock.readyState!==1||t-wsLastPush<140)return;const p=buildPresence();
-  const m={n:p.n,r:p.r,c:p.c,w:p.w,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a},ms=JSON.stringify(m);
+  const m={n:p.n,r:p.r,c:p.c,w:p.w,v:p.v,vc:p.vc,sy:p.sy,g:p.g,a:p.a,hk:p.hk,ho:p.ho,hn:p.hn},ms=JSON.stringify(m);
   const pos={x:p.x,y:p.y,hx:p.hx,hy:p.hy,b:p.b,room:p.room,ix:p.ix,iy:p.iy,ihx:p.ihx,ihy:p.ihy},ps=JSON.stringify(pos);
   if(ps===wsLastP&&ms===wsLastMeta&&t-wsLastPush<3000)return;wsLastPush=t;
   // Position first: the server must know the room before accepting its speech.

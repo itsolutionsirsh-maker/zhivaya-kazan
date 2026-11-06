@@ -1,6 +1,6 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
-const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',bath:'баня',default:'помещение'};
+const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',bath:'баня',townhall:'ратуша',court:'суд',station:'вокзал',sports:'спорт',workshop:'мастерская',fire:'пожарная часть',default:'помещение'};
 function makeInterior(kind,name,key,room){
   const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
   const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],bank:[14,9],office:[18,12],theatre:[20,14],museum:[18,12],hotel:[14,10],hotelroom:[12,8],pharmacy:[11,8],hospital:[14,10],university:[16,11],library:[16,11],worship:[16,12],police:[12,9],prosecutor:[13,9],metro:[22,10],market:[18,12],school:[16,11],home:[11,8],guest:[11,8],bath:[16,11],default:[12,9]};
@@ -55,7 +55,7 @@ function makeInterior(kind,name,key,room){
   }
   return it;}
 function enterInterior(src){if(window.citySaveShot&&src&&src.kind==='metro')citySaveShot('Метро');const key=src.key,room=sharedVenueKey(src),cacheKey=room||key;let it=interiorCache.get(cacheKey);if(!it){it=makeInterior(src.kind,src.name,key,room);interiorCache.set(cacheKey,it);}it.room=room;refreshCrowd(it);folkInterior(it);homeItemsSync(it);
-  interior=it;scene='interior';player.inside=true;companionEnter(it);if(src.together)seatHomeTogether(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};if(!src.together){player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;}player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
+  interior=it;scene='interior';player.inside=true;it.st=src&&src.st||it.st||'';it.place=src&&src.place||it.place||'';companionEnter(it);if(src.together)seatHomeTogether(it);sitOnEnter(it);it.ret={x:player.x,y:player.y,hx:player.hx,hy:player.hy};if(!src.together){player.ix=it.spawn?it.spawn.x:it.w/2;player.iy=it.spawn?it.spawn.y:it.h-1.1;player.ihx=it.spawn?it.spawn.hx:0;player.ihy=it.spawn?it.spawn.hy:-1;}player.iwp=null;player.waypoints=null;player.talkTarget=null;sharedTransition();
   addEvent(`Вы зашли в ${qName(src.name)}`);if(!flags.enteredOnce){flags.enteredOnce=true;setHint('Внутри: подойдите к столику, стойке или человеку и нажмите E. Выход — внизу');}}
 function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.companionOf===companion.w);if(!npc)return;
   const table=it.furn.find(f=>f.spot==='table'),sofa=it.furn.find(f=>f.t==='sofa');
@@ -196,7 +196,7 @@ function interiorView(it,width,height){
 }
 function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0,0);
   const im=typeof interiorPhoto==='function'?interiorPhoto(it):null;
-  if(im){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.fillStyle=im instanceof HTMLCanvasElement?'rgba(16,22,26,.28)':'rgba(16,22,26,.58)';ctx.fillRect(0,0,W,H);}
+  if(im){const s=Math.max(W/im.width,H/im.height),dw=im.width*s,dh=im.height*s;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);const homePic=it.kind==='home'&&!(im instanceof HTMLCanvasElement);ctx.fillStyle=im instanceof HTMLCanvasElement?'rgba(16,22,26,.28)':homePic?'rgba(10,14,16,.32)':'rgba(16,22,26,.58)';ctx.fillRect(0,0,W,H);}
   else{ctx.fillStyle='#10161A';ctx.fillRect(0,0,W,H);}
   const {iz,ox,oy}=interiorView(it,W,H);it.iz=iz;it.ox=ox;it.oy=oy;
   ctx.setTransform(DPR*iz,0,0,DPR*iz,DPR*ox,DPR*oy);
@@ -216,7 +216,7 @@ function renderInterior(){const it=interior;LOD=2;ctx.setTransform(DPR,0,0,DPR,0
   // люди
   for(const n of it.npcs)drawPerson(n.x,n.y,n.hx,n.hy,n.p,n.phase,{scale:0.55,seated:n.seated,moving:!n.seated&&n.tx!=null&&Math.hypot(n.tx-n.x,n.ty-n.y)>0.12,time:t});
   drawSharedPeople();
-  drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true,moving:!!player.stepping,time:t,lying:it.key==='story:ward'&&it.spawn&&dist(player.ix,player.iy,it.spawn.x,it.spawn.y)<.55});
+  drawPerson(player.ix,player.iy,player.ihx,player.ihy,myLook(),player.phase,{scale:0.55,ring:true,moving:!!player.stepping,time:t,seated:it.kind==='home'&&!player.stepping&&!player.iwp&&Math.hypot(player.ix-3.2,player.iy-(it.h-1.9))<1.7,lying:it.key==='story:ward'&&it.spawn&&dist(player.ix,player.iy,it.spawn.x,it.spawn.y)<.55});
   if(player.iwp){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.06;ctx.beginPath();ctx.arc(player.iwp[0],player.iwp[1],0.35+Math.sin(t*6)*0.06,0,TAU);ctx.stroke();}
   // подпись
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='700 15px "Unbounded",sans-serif';ctx.fillStyle='#EEF3EE';
@@ -312,10 +312,78 @@ $('#chatOrder').addEventListener('click',()=>{const w=chatNpc;if(!w||!w.tableF||
 
 // ===== Кадр на входе: короткое фото заведения (site/img/inside/*.jpg), потом обычная комната =====
 // Нет файла — ничего не показываем. Клик или движение пропускают кадр. В то же место второй раз за минуту не повторяем.
-const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school','worship','police','market','bakery','tea','barber','flower','gym'];const shotImg={};const shotSeen=new Map();let shotT=null;
+const SHOT_KINDS=['cafe','bar','restaurant','shop','pharmacy','home','bank','office','theatre','museum','hotel','hospital','university','library','metro','school','worship','police','market','bakery','tea','barber','flower','gym','hall','clothes','beauty','alcohol','hardware','electronics','books','station','court','sports','workshop','mall','butcher','jewelry','gift','furniture','fire','farewell','tobacco','optics','pet'];const shotImg={};const shotSeen=new Map();let shotT=null;
 // фото качаем, когда город уже на экране: при входе 600 КБ картинок мешали карте
 (function shotLater(){const L=$('#loading');if(L&&!L.hidden){setTimeout(shotLater,700);return;}setTimeout(()=>{for(const k of SHOT_KINDS){const im=new Image();im.onload=()=>{shotImg[k]=im;};im.onerror=()=>{};im.src='img/inside/'+k+'.jpg';}},1500);})();
-function shotKind(src){const n=String(src.name||'').toLowerCase();if(/ресторан|чайхан/.test(n))return 'restaurant';if(/пекар|булоч/.test(n))return 'bakery';if(/чайный/.test(n))return 'tea';if(/парикмах|барбер/.test(n))return 'barber';if(/цветоч/.test(n))return 'flower';if(/фитнес|спортзал|тренаж/.test(n))return 'gym';if(src.kind==='market')return 'market';if(src.kind==='guest'||src.kind==='hotelroom')return 'home';if(src.kind==='prosecutor')return 'office';return SHOT_KINDS.includes(src.kind)?src.kind:(src.kind?'shop':null);}
+const SHOT_ST={
+  clothes:'clothes',shoes:'clothes',bag:'clothes',fabric:'clothes',tailor:'clothes',second_hand:'clothes',
+  beauty:'beauty',cosmetics:'beauty',perfumery:'beauty',massage:'beauty',tattoo:'beauty',chemist:'beauty',
+  hairdresser:'barber',florist:'flower',
+  supermarket:'shop',convenience:'shop',greengrocer:'shop',seafood:'shop',beverages:'shop',
+  bakery:'bakery',confectionery:'bakery',butcher:'butcher',alcohol:'alcohol',
+  tobacco:'tobacco','e-cigarette':'tobacco',
+  hardware:'hardware',doityourself:'hardware',paint:'hardware',doors:'hardware',flooring:'hardware',
+  furniture:'furniture',kitchen:'furniture',houseware:'furniture',interior_decoration:'furniture',bathroom_furnishing:'furniture',
+  mobile_phone:'electronics',electronics:'electronics',books:'books',stationery:'books',
+  medical_supply:'pharmacy',optician:'optics',
+  car:'workshop',car_parts:'workshop',car_repair:'workshop',tyres:'workshop',
+  copyshop:'office',travel_agency:'office',ticket:'office',dry_cleaning:'office',bookmaker:'office',outpost:'office',
+  money_lender:'bank',pawnbroker:'bank',
+  gift:'gift',toys:'gift',variety_store:'gift',jewelry:'jewelry',pet:'pet',sports:'gym',mall:'mall',
+  funeral_directors:'farewell',ice_cream:'cafe'
+};
+const SHOT_PLACE={
+  townhall:'hall',government:'hall',civic:'hall',public:'hall',community_centre:'hall',courthouse:'court',
+  sports_centre:'sports',stadium:'sports',arts_centre:'museum',train_station:'station',bus_station:'station',
+  library:'library',bank:'bank',marketplace:'market',cinema:'theatre',restaurant:'restaurant',
+  fast_food:'cafe',cafe:'cafe',bar:'bar',ice_cream:'cafe',doctors:'hospital',clinic:'hospital',nursing_home:'hospital',
+  dormitory:'hotel',apartments:'hotel',residential:'hotel',house:'hotel',mansion:'hotel',detached:'hotel',
+  industrial:'workshop',warehouse:'workshop',garages:'workshop',manufacture:'workshop',parking:'workshop',service:'workshop',fuel:'workshop',recycling:'workshop',
+  kindergarten:'school',school:'school',college:'university',university:'university',training:'school',music_school:'school',dancing_school:'school',
+  church:'worship',mosque:'worship',cathedral:'worship',place_of_worship:'worship',presbytery:'worship',chapel:'worship',
+  police:'police',hotel:'hotel',theatre:'theatre',museum:'museum',shop:'shop',retail:'shop',commercial:'shop',supermarket:'shop',mall:'mall',
+  fire_station:'fire',ruins:'museum',tower:'museum',monument:'museum',construction:'office',shelter:'office'
+};
+function shotKind(src){
+  if(!src)return null;
+  const n=String(src.name||'').toLowerCase().replace(/ё/g,'е');
+  const st=String(src.st||'').toLowerCase();
+  const place=String(src.place||'').toLowerCase();
+  const k=src.kind||'';
+  const civic=k!=='shop';
+  if(st==='funeral_directors'||/ритуал|похорон/.test(n))return 'farewell';
+  if(civic&&/казанская ратуша|мэри|госсовет|государственн[а-яё]* совет|министерств|администрац|казначей|росимуществ|консульств|загс|дом дружбы|центр семьи/.test(n))return 'hall';
+  if(civic&&/^ратуша$/.test(n.trim()))return 'hall';
+  if(civic&&/(^|[^а-яё])суд([^а-яё]|$)|арбитраж/.test(n))return 'court';
+  if(civic&&/вокзал|пассажирская|пригородный вокзал/.test(n))return 'station';
+  if(/библиотек/.test(n))return 'library';
+  if(/музей|галере[яи]|выставк|изобразительн|занимательн/.test(n))return 'museum';
+  if(/театр|опера|кинотеатр|\bкино\b|дворец культуры|сайдаш/.test(n))return 'theatre';
+  if(k!=='shop'&&/рынок|базар/.test(n))return 'market';
+  if(/фитнес|спортзал|тренаж/.test(n))return 'gym';
+  if(civic&&/дворец спорта|манеж|баскет|единобор|уникс|водных видов|бассейн|ледов|уск /.test(n))return 'sports';
+  if(/пожар/.test(n))return 'fire';
+  if(/ресторан|чайхан/.test(n))return 'restaurant';
+  if(/пекар|булоч|хлебозавод|жар свежар|добропек/.test(n))return 'bakery';
+  if(/чайный|дом чая/.test(n))return 'tea';
+  if(/парикмах|барбер|стрижк|бигуди/.test(n))return 'barber';
+  if(/цветоч|букет|флорист/.test(n))return 'flower';
+  if(/аптек/.test(n))return 'pharmacy';
+  if(SHOT_ST[st])return SHOT_ST[st];
+  if(k==='market')return 'market';
+  if(k==='guest'||k==='hotelroom')return 'home';
+  if(k==='prosecutor')return 'office';
+  if(k==='townhall')return (place==='townhall'||place==='community_centre'||/ратуш|мэри|госсовет|государственн[а-яё]* совет|министерств|администрац|загс|консульств|казначей|дружб|дворец|центр семьи/.test(n))?'hall':'office';
+  if(k==='court')return 'court';
+  if(k==='station')return 'station';
+  if(k==='sports')return 'sports';
+  if(k==='workshop')return 'workshop';
+  if(k==='fire')return 'fire';
+  if(SHOT_PLACE[place])return SHOT_PLACE[place];
+  if(SHOT_KINDS.includes(k))return k;
+  if(k==='shop')return 'shop';
+  return 'office';
+}
 function insideShot(src){/* фото остаётся фоном комнаты, а не вспышкой на несколько секунд */}
 function hideShot(){const el=$('#insideShot');if(el.hidden)return;clearTimeout(shotT);el.classList.remove('in');el.classList.add('out');setTimeout(()=>{el.hidden=true;el.classList.remove('out');},280);}
 $('#insideShot').addEventListener('pointerdown',hideShot);

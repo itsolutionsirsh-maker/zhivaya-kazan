@@ -1,9 +1,9 @@
 // Versioned public-room identity and bounds, shared by the browser and Node server.
-// Homes and transport deliberately have no shared room in this protocol.
+// Квартира — маленькая общая комната: хозяин и гости видят один и тот же зал.
 (function(root){
   'use strict';
-  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],market:[18,12],pharmacy:[11,8],library:[16,11],museum:[18,12],theatre:[20,14],hotel:[14,10],bank:[14,9],office:[18,12],hospital:[14,10],university:[16,11],school:[16,11],worship:[16,12],police:[12,9]};
-  const caps={cafe:40,bar:30,shop:25,market:50,pharmacy:15,library:40,museum:50,theatre:60,hotel:30,bank:20,office:30,hospital:25,university:40,school:40,worship:40,police:15};
+  const sizes={cafe:[16,11],bar:[14,10],shop:[15,10],market:[18,12],pharmacy:[11,8],library:[16,11],museum:[18,12],theatre:[20,14],hotel:[14,10],bank:[14,9],office:[18,12],hospital:[14,10],university:[16,11],school:[16,11],worship:[16,12],police:[12,9],home:[11,8],spa:[16,11],mall:[22,15]};
+  const caps={cafe:40,bar:30,shop:25,market:50,pharmacy:15,library:40,museum:50,theatre:60,hotel:30,bank:20,office:30,hospital:25,university:40,school:40,worship:40,police:15,home:6,spa:8,mall:40};
   function key(kind,at,name){
     if(!Object.hasOwn(sizes,kind)||!at||!Number.isFinite(at.x)||!Number.isFinite(at.y)||Math.abs(at.x)>100000||Math.abs(at.y)>100000)return null;
     let h=2166136261;for(const c of String(name||'').normalize('NFC').trim().toLowerCase())h=Math.imul(h^c.charCodeAt(0),16777619);

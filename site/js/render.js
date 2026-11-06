@@ -4,12 +4,32 @@ const canvas=$('#map'),ctx=canvas.getContext('2d');
 const mini=$('#mini'),mctx=mini.getContext('2d');
 function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);canvas.style.width=W+'px';canvas.style.height=H+'px';}
 window.addEventListener('resize',resize);resize();
-const GROUND='#E7E1D2';
+let GROUND='#E7E1D2';
 const AREA_FILL={water:'#7EB4D4',land:GROUND,park:'#A8CE8A',grass:'#C6DDA8',forest:'#7EAA68',cemetery:'#C6D4B4',pitch:'#90C078',plaza:'#E4DAC6',parking:'#D3CFC4'};
 const ASPHALT=['#A6A5A0','#A6A5A0','#ABAAA5','#B0AFAA','#B4B3AE','#B9B8B2','#B9B8B2','#BEBDB7','#C6C5BF'];
 const TREE_C=['#4E7A3C','#5C8C46','#6B9A52'];const TREE_HI=['#86C072','#96CC82','#A6D892'];
-const POI_PRIO={police:0,prosecutor:1,hospital:0,theatre:1,museum:1,sight:1,university:1,worship:1,market:1,school:2,library:2,bank:2,hotel:2,pharmacy:3,fuel:3,bar:4,cafe:4,shop:5,atm:6,office:6};
-const POI_GLYPH={cafe:'☕',bar:'🍺',shop:'🛍',police:'👮',hospital:'🏥',pharmacy:'💊',bank:'🏦',atm:'🏧',school:'🎒',university:'🎓',theatre:'🎭',museum:'🏛',worship:'🕌',fuel:'⛽',market:'🧺',hotel:'🏨',library:'📚',office:'🏢',sight:'⭐',prosecutor:'⚖️'};
+// Месяц — настоящий, по Москве. Ноябрь голый, декабрь–февраль в снегу, а если снег пошёл раньше — шапки на деревьях сразу.
+const SEASON_LOOK={
+  summer:{ground:'#E7E1D2',water:'#7EB4D4',park:'#A8CE8A',grass:'#C6DDA8',forest:'#7EAA68',cemetery:'#C6D4B4',pitch:'#90C078',tree:['#4E7A3C','#5C8C46','#6B9A52'],hi:['#86C072','#96CC82','#A6D892']},
+  early:{ground:'#E6E0CE',water:'#7EACC8',park:'#C2BE78',grass:'#D2D09A',forest:'#8A9848',cemetery:'#C8C6A8',pitch:'#B4C484',tree:['#7A8638','#C4A044','#6A7430'],hi:['#E2CC6A','#D4B858','#C6A848']},
+  gold:{ground:'#E6DCC8',water:'#7AA6C0',park:'#D4A45A',grass:'#E0C488',forest:'#C48438',cemetery:'#C8B898',pitch:'#C6A868',tree:['#C46828','#E09C30','#8C4C22'],hi:['#F0C868','#E8B050','#D49840']},
+  bare:{ground:'#E6D7B8',water:'#8AADC4',park:'#E0B04A',grass:'#D4A85A',forest:'#C46A28',cemetery:'#C2B090',pitch:'#C89848',tree:['#D45A1C','#E89020','#A85018'],hi:['#F6D060','#F0B040','#E09030']},
+  thaw:{ground:'#E3DDD4',water:'#A8C0CE',park:'#C8C2B2',grass:'#D4D0C4',forest:'#9A8A78',cemetery:'#C8C4BA',pitch:'#C2BEB2',tree:['#6A5648','#7A6554','#5C4A3E'],hi:['#E4E0D6','#D8D2C8','#CFC6BA']},
+  spring:{ground:'#E6E3D4',water:'#86B4D0',park:'#B7C98A',grass:'#D2E0B0',forest:'#8AAA62',cemetery:'#C6D0BC',pitch:'#A8C484',tree:['#6A8A48','#8AAA58','#5E7A40'],hi:['#C6DE9A','#D4E8A8','#B6D090']},
+  winter:{ground:'#E6E8EA',water:'#C5D6E2',park:'#E7EEF2',grass:'#F4F7F8',forest:'#D5E0E6',cemetery:'#E4E8EA',pitch:'#E8EEF1',tree:['#4A3C34','#5C4A3E','#3E342C'],hi:['#F7FBFD','#EEF3F6','#FFFFFF']}
+};
+let seasonLookNow='summer';
+function cityMonthReal(){const d=new Date(Date.now()+(typeof clockOff==='number'?clockOff:0)+3*3600e3);return d.getUTCMonth()+1;}
+function seasonLookKey(){const m=cityMonthReal();if(m===12||m<=2)return 'winter';if(m===3)return 'thaw';if(m===4)return 'spring';if(m===9)return 'early';if(m===10)return 'gold';if(m===11)return 'bare';return 'summer';}
+function seasonSnowing(){return typeof weather!=='undefined'&&!!(weather.kind==='snow'||weather.ice);}
+function seasonRoofSnow(){return seasonLookNow==='winter'||(seasonSnowing()&&seasonLookNow!=='summer'&&seasonLookNow!=='spring');}
+function applySeasonPalette(key){const p=SEASON_LOOK[key]||SEASON_LOOK.summer;
+  GROUND=p.ground;AREA_FILL.land=p.ground;AREA_FILL.water=p.water;AREA_FILL.park=p.park;AREA_FILL.grass=p.grass;AREA_FILL.forest=p.forest;AREA_FILL.cemetery=p.cemetery;AREA_FILL.pitch=p.pitch;
+  for(let i=0;i<3;i++){TREE_C[i]=p.tree[i];TREE_HI[i]=p.hi[i];}}
+function syncSeasonLook(){const k=seasonLookKey();if(syncSeasonLook.ready&&k===seasonLookNow)return;seasonLookNow=k;applySeasonPalette(k);miniBg=null;overview=null;if(typeof OVT!=='undefined'&&OVT.tiles)OVT.tiles.clear();syncSeasonLook.ready=true;}
+function seasonAreaColor(k){if(seasonSnowing()&&seasonLookNow!=='winter'){const w=SEASON_LOOK.winter;if(k==='park'||k==='grass'||k==='forest'||k==='pitch'||k==='cemetery')return w[k];}return AREA_FILL[k]||'#ddd';}
+const POI_PRIO={police:0,prosecutor:1,hospital:0,theatre:1,museum:1,sight:1,university:1,worship:1,market:1,school:2,library:2,bank:2,hotel:2,pharmacy:3,fuel:3,bar:4,cafe:4,spa:2,shop:5,atm:6,office:6};
+const POI_GLYPH={cafe:'☕',bar:'🍺',shop:'🛍',police:'👮',hospital:'🏥',pharmacy:'💊',bank:'🏦',atm:'🏧',school:'🎒',university:'🎓',theatre:'🎭',museum:'🏛',worship:'🕌',fuel:'⛽',market:'🧺',hotel:'🏨',library:'📚',office:'🏢',sight:'⭐',prosecutor:'⚖️',spa:'💆',bath:'♨️'};
 let shake=0;const winDark=[],winLit=[],winLitB=[];
 let cityAnimT=0;
 let lampSprite=null,beamSprite=null;
@@ -41,6 +61,7 @@ let facadeSun=null;
 
 function fillWin(list){if(!list.length)return;ctx.beginPath();for(const q of list){ctx.moveTo(q[0],q[1]);ctx.lineTo(q[2],q[3]);ctx.lineTo(q[4],q[5]);ctx.lineTo(q[6],q[7]);}ctx.fill();}
 function render(){
+  syncSeasonLook();
   const z=cam.z;LOD=z>8?2:z>3?1:0;const t=performance.now()/1000;cityAnimT=t;const night=nightAmount();
   facadeSun=z>=3?citySun(clock.minutes,night):null;
   let shx=0,shy=0;if(shake>0){shake-=0.016;shx=(Math.random()-0.5)*shake*14;shy=(Math.random()-0.5)*shake*14;}
@@ -52,7 +73,7 @@ function render(){
   if(z<0.75){renderOverview(z,t,toS,vx0,vy0,vx1,vy1,night);return;}
   const pois=z>1.5?visiblePois(vx0,vy0,vx1,vy1,z):[]; // один список для входов и подписей
   // ---- площади
-  for(const a of world.areas){if(a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;ctx.fillStyle=AREA_FILL[a.k]||'#ddd';poly(a.p);ctx.fill();
+  for(const a of world.areas){if(a.bb[2]<vx0||a.bb[0]>vx1||a.bb[3]<vy0||a.bb[1]>vy1)continue;ctx.fillStyle=seasonAreaColor(a.k);poly(a.p);ctx.fill();
     if(a.k==='water'&&z>1.2){ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=0.6;ctx.stroke();
       if(!reduceMotion&&z>1.8){ctx.save();ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=0.4;ctx.setLineDash([1.7,2.5]);ctx.lineDashOffset=-(cityAnimT*1.8+(a.bb[0]%9));ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=0.25;ctx.lineDashOffset=-(cityAnimT*0.7);ctx.stroke();ctx.restore();}}}
   drawKremlinGround(vx0,vy0,vx1,vy1);
@@ -80,8 +101,9 @@ function render(){
   if(z>0.9){const tv=[];world.tgrid.query(vx0,vy0,vx1,vy1,tr=>{if(tr.x<vx0||tr.x>vx1||tr.y<vy0||tr.y>vy1)return;tv.push(tr);});
     if(z>1.4){const sun=facadeSun;ctx.fillStyle=sun?`rgba(40,50,35,${sun.alpha})`:'rgba(40,50,25,.22)';ctx.beginPath();for(const tr of tv){const sx=tr.r*(sun?sun.x:.4),sy=tr.r*(sun?sun.y:.35);ctx.moveTo(tr.x+sx+tr.r,tr.y+sy);ctx.arc(tr.x+sx,tr.y+sy,tr.r,0,TAU);}ctx.fill();}
     if(z>2.2){ctx.fillStyle='#6E4E34';ctx.beginPath();for(const tr of tv){const w=Math.max(0.16,tr.r*0.2);ctx.rect(tr.x-w*0.5,tr.y+tr.r*0.05,w,tr.r*0.72);}ctx.fill();}
-    for(let c=0;c<3;c++){ctx.fillStyle=TREE_C[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;ctx.moveTo(tr.x+tr.r,tr.y);ctx.arc(tr.x,tr.y,tr.r,0,TAU);}ctx.fill();
-      if(z>2.2){const gust=!reduceMotion?Math.sin(cityAnimT*1.15+c)*0.42:0,gustY=!reduceMotion?Math.cos(cityAnimT*0.9+c)*0.22:0;ctx.fillStyle=TREE_HI[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;const r2=tr.r*0.55;const hx=tr.x-tr.r*0.2+gust,hy=tr.y-tr.r*0.25+gustY;ctx.moveTo(hx+r2,hy);ctx.arc(hx,hy,r2,0,TAU);}ctx.fill();}}}
+    const snowCap=seasonSnowing()&&seasonLookNow!=='winter',treeC=snowCap?SEASON_LOOK.winter.tree:TREE_C,treeH=snowCap?SEASON_LOOK.winter.hi:TREE_HI;
+    for(let c=0;c<3;c++){ctx.fillStyle=treeC[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;ctx.moveTo(tr.x+tr.r,tr.y);ctx.arc(tr.x,tr.y,tr.r,0,TAU);}ctx.fill();
+      if(z>2.2){const gust=!reduceMotion?Math.sin(cityAnimT*1.15+c)*0.42:0,gustY=!reduceMotion?Math.cos(cityAnimT*0.9+c)*0.22:0;ctx.fillStyle=treeH[c];ctx.beginPath();for(const tr of tv){if(tr.c!==c)continue;const r2=tr.r*0.55;const hx=tr.x-tr.r*0.2+gust,hy=tr.y-tr.r*0.25+gustY;ctx.moveTo(hx+r2,hy);ctx.arc(hx,hy,r2,0,TAU);}ctx.fill();}}}
   drawWalls(z,vx0,vy0,vx1,vy1);
   // ---- здания
   bvis.sort((a,b)=>a.bb[3]-b.bb[3]);
@@ -266,7 +288,7 @@ function facadeKind(b){
   return (facadeSeed(b)>>>0)%2?0:2;
 }
 function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=0;
-  if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
+  if(z<=1.4||b.hm<0.5){ctx.fillStyle=b.roof;poly(p);ctx.fill();if(seasonRoofSnow()){ctx.fillStyle='rgba(246,250,252,.62)';ctx.fill();}if(z>1)ctx.strokeStyle='rgba(60,50,40,.35)',ctx.lineWidth=0.25,ctx.stroke();return;}
   const ex=EXT[0]*b.hm,ey=EXT[1]*b.hm;const win=z>4.2&&b.h>=1;const lit=night>0.3&&b.lit;
   for(let i=0;i<n;i+=2){const j=(i+2)%n;const ax=p[i],ay=p[i+1],bx=p[j],by=p[j+1];const dx=bx-ax,dy=by-ay;const L=Math.hypot(dx,dy)||1;const nx=b.sgn*dy/L,ny=-b.sgn*dx/L;
     if(nx*EXT[0]+ny*EXT[1]>=0)continue;const sun=facadeSun,light=sun ? .68+.32*(1-night)*Math.max(0,nx*sun.nx+ny*sun.ny) : .62+.38*Math.max(0,nx*-.62+ny*-.78);
@@ -274,7 +296,7 @@ function drawBuilding(b,z,night){const p=b.p;const n=p.length;let detailedWalls=
     // Один фасад на дом, 16 на кадр. Карниз, цоколь или пилястры — только на близком плане.
     if(LOD>=2&&L>5&&b.hm>2&&detailedWalls<1&&facadeWallsLeft>0){drawFacadeDetail(ax,ay,bx,by,ex,ey,facadeKind(b));detailedWalls++;facadeWallsLeft--;}
     if(win&&L>3.2){const lv=Math.min(b.h,14);const ux=dx/L,uy=dy/L;const cols=Math.floor((L-1.2)/2.4);const gap=(L-1.2-cols*2.4)/2+0.6+0.7;const ws=(b.dash%1.5);for(let k=0;k<lv;k++){const v0=(k+0.3)/lv,v1=(k+0.72)/lv;const list=(lit&&((k*7+b.i)%5!==0))?(((b.i+k)&1)?winLitB:winLit):winDark;for(let c=0;c<cols;c++){const s0=gap+c*2.4+ws,s1=s0+1.0;list.push([ax+ux*s0+ex*v0,ay+uy*s0+ey*v0,ax+ux*s1+ex*v0,ay+uy*s1+ey*v0,ax+ux*s1+ex*v1,ay+uy*s1+ey*v1,ax+ux*s0+ex*v1,ay+uy*s0+ey*v1]);}}}}
-  ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
+  ctx.fillStyle=b.roof;ctx.beginPath();ctx.moveTo(p[0]+ex,p[1]+ey);for(let i=2;i<n;i+=2)ctx.lineTo(p[i]+ex,p[i+1]+ey);ctx.closePath();ctx.fill();if(seasonRoofSnow()){ctx.fillStyle='rgba(246,250,252,.55)';ctx.fill();}ctx.strokeStyle='rgba(50,40,30,.4)';ctx.lineWidth=0.25;ctx.stroke();
   if(z>4.8){ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=0.18;ctx.stroke();}
   if(z>4.5&&b.n&&b.area>400){ctx.save();ctx.font='500 1.6px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(40,30,20,.6)';ctx.fillText(b.n,b.cx+ex,b.cy+ey);ctx.restore();}}
 function drawFacadeDetail(ax,ay,bx,by,ex,ey,kind){
@@ -312,7 +334,7 @@ function cafeDoorTemplates(){
 }
 function drawCafeEntrances(pois){
   if(LOD<2)return;let considered=0,created=0;
-  for(const p of pois){if(p.t!=='cafe'&&p.t!=='bar')continue;if(considered++>=6)break;
+  for(const p of pois){if(p.t!=='cafe'&&p.t!=='bar'&&p.t!=='club')continue;if(considered++>=8)break;
     let e=cafeEntryCache.get(p);const known=p._b;
     if(!e||known!==undefined&&e.b!==known||e.b&&e.polygon!==e.b.p){if(created>=2)continue;created++;
       e=cafeEntry(p,poiBuilding(p));}
@@ -320,7 +342,7 @@ function drawCafeEntrances(pois){
     const ex=EXT[0]*Math.min(3,e.b.hm),ey=EXT[1]*Math.min(3,e.b.hm);
     const paths=cafeDoorTemplates();ctx.save();ctx.transform(e.ux,e.uy,ex,ey,e.x,e.y);
     ctx.fillStyle='#355753';ctx.fill(paths[0]);ctx.fillStyle='#A8C9C1';ctx.fill(paths[1]);
-    ctx.fillStyle=p.t==='bar'?'#9C634D':'#467D69';ctx.fill(paths[2]);
+    ctx.fillStyle=p.t==='club'?'#6E2E58':p.t==='bar'?'#9C634D':'#467D69';ctx.fill(paths[2]);
     ctx.fillStyle='#EDE0BA';ctx.fill(paths[3]);ctx.restore();
   }
 }
@@ -508,7 +530,7 @@ function drawSkyWash(night){if(night<0.08)return;const dusk=night<0.62,a=dusk?Ma
   else{g.addColorStop(0,`rgba(12,20,48,${a})`);g.addColorStop(0.7,`rgba(18,28,62,${a*0.35})`);g.addColorStop(1,'rgba(12,20,48,0)');}
   ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle=g;ctx.fillRect(0,0,W,H*0.62);ctx.restore();}
 function drawSkyBirds(night){
-  if(reduceMotion||LOD<1||night>0.72)return;const w=typeof weather!=='undefined'&&weather.kind;if(w==='rain'||w==='snow'||w==='fog')return;
+  if(reduceMotion||LOD<1||night>0.72||seasonLookNow==='winter'||seasonLookNow==='bare')return;const w=typeof weather!=='undefined'&&weather.kind;if(w==='rain'||w==='snow'||w==='fog')return;
   ctx.save();ctx.strokeStyle='rgba(28,36,32,.72)';ctx.lineWidth=1.7;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
   const t=cityAnimT;for(let i=0;i<5;i++){const x=((t*(22+i*9)+i*180)%(W+140))-70;const y=128+(i*97)%Math.max(140,Math.floor(H*0.5))+Math.sin(t*0.8+i)*12;const flap=Math.sin(t*6+i*1.7)*6;ctx.moveTo(x-8,y-flap);ctx.lineTo(x,y);ctx.lineTo(x+8,y-flap);}ctx.stroke();ctx.restore();
 }
