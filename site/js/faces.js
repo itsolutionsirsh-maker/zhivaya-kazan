@@ -1,8 +1,16 @@
 // Портреты жителей: один и тот же человек всегда с одним лицом.
 // Компания за столом: общий кадр из фото тех, кто сидит рядом.
 const FACE_BANDS={
-  f:[['f-23','f-27'],['f-36','f-44'],['f-58','f-70']],
-  m:[['m-23','m-29'],['m-37','m-46'],['m-60','m-72']]
+  f:[
+    ['f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/veronika','color/yulduz','color/zaynab','color/sufiya','core/alsu','core/fidania','core/gulnara','core/zulfiya'],
+    ['f-36','f-44','color/camilla','color/sufiya','core/gulnara'],
+    ['f-58','f-70']
+  ],
+  m:[
+    ['m-23','m-29','color/mark','color/timur','color/iskander','color/nail','color/farhad','color/gleb','color/edgar','color/hakim','core/ildar','core/lenar','core/marat','core/rinat'],
+    ['m-37','m-46','color/robert','color/iskander','core/marat'],
+    ['m-60','m-72','color/pavel']
+  ]
 };
 const faceImg={};
 function faceHash(s){let h=2166136261;s=String(s||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}

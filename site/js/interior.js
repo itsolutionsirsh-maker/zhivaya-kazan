@@ -1,5 +1,32 @@
 // ===== Интерьеры: кафе, магазины, офисы, дом =====
 let scene='city';let interior=null;const interiorCache=new Map();
+let roomTone=0;
+const ROOM_F=['Аделя','Алия','Диана','Камила','Милана','Софья','Ясмина','Алина','Регина','Полина','Зиля','Лиля','Карина','Элина','Дарина','Амина','Инзира','Чулпан'];
+const ROOM_M=['Камиль','Тимур','Марк','Ильяс','Булат','Артур','Эмиль','Данил','Ринат','Ильнур','Саша','Антон','Радик','Ленар','Фарид','Ильдар','Степан','Наиль'];
+function dressForRoom(p,kind,o){
+  const job=String((o&&o.job)||p.job||'');
+  const staff=(o&&(o.role==='staff'||o.role==='police'||o.role==='guard'))||/преподав|учител|лектор/.test(job);
+  const student=kind==='university'&&/студент/.test(job);
+  const pupil=kind==='school'&&!staff;
+  if(!(student||pupil||staff&&/преподав|учител/.test(job))){
+    if((kind==='cafe'||kind==='bar')&&staff)p.age=Math.floor(rnd(21,40));
+    else if((kind==='shop'||kind==='pharmacy'||kind==='market')&&staff)p.age=Math.floor(rnd(22,52));
+    else if(kind==='hospital'&&staff)p.age=Math.floor(rnd(28,58));
+    else if(kind==='office')p.age=Math.floor(rnd(24,55));
+    else if(kind==='police'||(o&&o.role==='police'))p.age=Math.floor(rnd(24,48));
+    return;
+  }
+  const f=student||pupil?(roomTone++%2)===0:Math.random()<0.5;
+  p.female=f;p.name=pick(f?ROOM_F:ROOM_M);
+  p.age=pupil?Math.floor(rnd(16,18)):student?Math.floor(rnd(18,24)):Math.floor(rnd(32,55));
+  p.job=pupil?(f?'школьница':'школьник'):student?(f?'студентка':'студент'):(kind==='school'?(f?'учительница':'учитель'):(f?'преподавательница':'преподаватель'));
+  p.hairStyle=f?1:(p.age>50&&Math.random()<0.25?3:0);
+  p.hair=pick(['#2B1B12','#4A2E1C','#1A1A1A','#6B4A2E','#C9A86A','#8C4A32']);
+  p.clothes=pick(CLOTHES);p.skin=pick(SKINS);
+  p.pants=f?pick(['#6B3A4A','#3A3058','#1F3A5A','#2B2F3A']):pick(['#2B2F3A','#1F1F1F','#3C4A62','#4A3A2A']);
+  p.bag=(student||pupil)?'#243044':null;p.backpack=!!p.bag;p.build=null;
+  if(!f&&staff)p.tie=Math.random()<0.6?'#1E3A5F':null;
+}
 const KIND_RU={guest:'в гостях',cafe:'кафе',bar:'бар',shop:'магазин',bank:'банк',office:'офис',theatre:'театр',museum:'музей',hotel:'гостиница',hotelroom:'номер',pharmacy:'аптека',hospital:'клиника',university:'университет',library:'библиотека',worship:'храм',police:'отдел полиции',prosecutor:'приёмная прокурора',metro:'метро',market:'рынок',school:'школа',home:'ваш дом',bath:'баня',townhall:'ратуша',court:'суд',station:'вокзал',sports:'спорт',workshop:'мастерская',fire:'пожарная часть',default:'помещение'};
 function makeInterior(kind,name,key,room){
   const rng=seeded(hashStr(room||key));const R=(a,b)=>a+rng()*(b-a);
@@ -7,7 +34,7 @@ function makeInterior(kind,name,key,room){
   const [w,h]=sizes[kind]||sizes.default;
   const it={kind,name,key,w,h,furn:[],npcs:[],door:{x:w/2,y:h},floor:'wood'};
   const F=(t,x,y,fw,fh,extra)=>{const f=Object.assign({t,x,y,w:fw,h:fh},extra||{});it.furn.push(f);return f;};
-  const NPC=(x,y,o)=>{const p=makePersona((o&&o.role)||'resident');if(o&&o.job)p.job=o.job;const n=Object.assign({p,x,y,hx:0,hy:1,seated:false,phase:rng()*6,role:'resident',isInterior:true,state:'idle',memory:p.memory},o||{});it.npcs.push(n);return n;};
+  const NPC=(x,y,o)=>{const p=makePersona((o&&o.role)||'resident');if(o&&o.job)p.job=o.job;dressForRoom(p,kind,o||{});const n=Object.assign({p,x,y,hx:0,hy:1,seated:false,phase:rng()*6,role:'resident',isInterior:true,state:'idle',memory:p.memory},o||{});it.npcs.push(n);return n;};
   const plant=(x,y)=>F('plant',x,y,0.8,0.8);
   if(kind==='hospital'&&key==='story:ward'){
     it.floor='tiles';it.spawn={x:3,y:3,hx:0,hy:-1};
@@ -38,7 +65,7 @@ function makeInterior(kind,name,key,room){
     case 'bath':{it.floor='wood';it.spawn={x:w/2,y:h-1.5,hx:0,hy:-1};F('counter',w/2,1.15,5.2,1,{spot:'bathdesk'});NPC(w/2,0.55,{role:'staff',job:'банщик'});F('sofa',3.4,3.6,4.2,1.2,{spot:'steam'});F('pool',w-4.2,4.6,5,2.6,{spot:'pool',walkable:true});F('table',w/2,h-2.8,1.2,1.2,{spot:'bathtea',round:true});plant(0.8,0.9);break;}
     case 'hospital':{it.floor='tiles';F('counter',w/2,1.1,6,1.1,{spot:'reception'});NPC(w/2,0.5,{role:'staff',job:'врач'});for(let i=0;i<6;i++)F('chair',2.2+i*1.2,h-2.2,0.5,0.5,{ang:-Math.PI/2});const q=NPC(3.4,h-2.2,{seated:true});q.hy=-1;F('bed',w-2.5,3.4,2.2,1.2,{});F('bed',w-2.5,5.4,2.2,1.2,{});break;}
     case 'university':case 'school':case 'library':{it.floor='wood';if(kind==='library'){for(let i=0;i<Math.floor((w-2)/2.2);i++)F('shelf',1.8+i*2.2,1.1,1.6,0.7,{spot:'books',goods:1,horiz:true});NPC(w-1.4,h-1.4,{role:'staff',job:'библиотекарь'});}else{F('board',w/2,0.25,5,0.4);F('desk',w/2,1.8,2,0.8,{});NPC(w/2,1.1,{role:'staff',job:kind==='school'?'учитель':'преподаватель'});}
-      const cols=Math.floor((w-2)/2.6),rows=Math.floor((h-4)/1.8);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=1.5+c*2.6+1.1,y=3.4+r*1.8;F('desk',x,y,1.8,0.7,{spot:'study'});F('chair',x-0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});F('chair',x+0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});if(rng()<0.45){const n=NPC(x-0.45,y+0.75,{seated:true,job:'студент'});n.hy=-1;n.hx=0;}}break;}
+      const cols=Math.floor((w-2)/2.6),rows=Math.floor((h-4)/1.8);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=1.5+c*2.6+1.1,y=3.4+r*1.8;F('desk',x,y,1.8,0.7,{spot:'study'});F('chair',x-0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});F('chair',x+0.45,y+0.75,0.5,0.5,{ang:-Math.PI/2});if(rng()<0.72){const n=NPC(x-0.45,y+0.75,{seated:true,job:'студент'});n.hy=-1;n.hx=0;if(rng()<0.58){const n2=NPC(x+0.45,y+0.75,{seated:true,job:'студент'});n2.hy=-1;n2.hx=0;}}}break;}
     case 'worship':{it.floor='rug';for(let r=0;r<5;r++)F('pew',w/2,3.2+r*1.8,w-4,0.6,{spot:'pew'});F('altar',w/2,1.1,3,1.2,{});NPC(w/2,2.2,{role:'staff',job:'служитель'});const a=NPC(3.5,6.2,{seated:true});a.hy=-1;const b=NPC(w-3.5,8,{seated:true});b.hy=-1;break;}
     case 'police':{it.floor='tiles';F('desk',w/2,1.8,3,1,{spot:'duty'});NPC(w/2,1.05,{role:'police',job:'дежурный'});for(let i=0;i<4;i++)F('chair',1.6+i*1,h-2,0.5,0.5,{ang:-Math.PI/2});F('board',1.8,0.25,3,0.4);const q=NPC(2.6,h-2,{seated:true});q.hy=-1;break;}
     case 'prosecutor':{it.floor='carpet';F('window',w/2,0.15,4,0.3);F('desk',w/2,1.95,3.6,1.1,{});F('box',w/2+1.15,1.8,0.6,0.42,{});F('board',1.6,0.25,2.2,0.4);plant(0.9,h-0.9);plant(w-0.9,0.9);   // прокурор за столом — prosSeat (prosecutor.js)
@@ -100,6 +127,29 @@ function findActionInterior(){{const sa=sitActionInterior();if(sa)return sa;}con
   if(best)return best;
   if(dist(px,py,it.door.x,it.door.y)<1.8)return {label:it.kind==='hotelroom'&&typeof stayLive==='function'&&stayLive()?'Выйти на улицу, ключ до 12:00':'Выйти на улицу',run:exitInterior};
   return null;}
+function openClass(it){
+  const lib=it&&it.kind==='library';
+  const slides=lib?[
+    {title:'Читальный зал',img:'img/inside/library.jpg',text:'Час с книгой. В Казани Толстой поступил в университет в 1844 году и ушёл без диплома. Лобачевский в этом же университете доказал, что через точку вне прямой проходит больше одной параллельной.'},
+    {title:'Полка',img:'img/inside/books.jpg',text:'Возьмите то, что открыто. На полях можно ничего не писать. Через час книга вернётся на место, настроение останется.'}
+  ]:[
+    {title:'Казанский университет',img:'img/inside/museum.jpg',text:'Императорский Казанский университет открыли в 1804 году, рядом с Кремлём. Здесь учился Лобачевский и несколько лет числился Лев Толстой. Сегодня это КФУ: пары, дворы и коридор, где все ищут нужный корпус.'},
+    {title:'Что на доске',img:'img/inside/library.jpg',text:'Квадратное уравнение ax²+bx+c=0. Если дискриминант больше нуля — два корня, ноль — один, меньше нуля — в обычных числах корней нет. Преподаватель просит не списывать у соседа, а записать хотя бы дискриминант.'},
+    {title:'После пары',img:'img/inside/books.jpg',text:'Пара идёт полтора часа. Потом все выходят во двор. Конспект можно дописать в кафе напротив: дома телевизор обычно громче лекции.'}
+  ];
+  let box=document.getElementById('classModal');
+  if(!box){
+    box=document.createElement('div');box.id='classModal';box.className='modal';
+    box.innerHTML='<div class="box" style="max-width:440px"><h2 id="classTitle"></h2><img id="classImg" alt="" style="width:100%;height:210px;object-fit:cover;border-radius:12px;margin:8px 0"><p id="classText" class="hint"></p><div class="row"><button class="btn primary" id="classNext" type="button">Дальше</button><button class="btn" id="classClose" type="button">Встать</button></div></div>';
+    document.body.append(box);
+  }
+  let i=0,done=false;
+  const paint=()=>{const s=slides[i];box.querySelector('#classTitle').textContent=s.title;const im=box.querySelector('#classImg');im.src=s.img;im.alt=s.title;box.querySelector('#classText').textContent=s.text;box.querySelector('#classNext').hidden=i>=slides.length-1;};
+  const finish=()=>{if(done)return;done=true;box.hidden=true;if(typeof player!=='undefined')player.busy=false;spendTime(lib?40:90);player.mood=clamp(player.mood+6,0,100);player.energy=clamp(player.energy-6,0,100);addEvent(lib?'Почитали в зале. Настроение +6':'Пара кончилась. Настроение +6','say');};
+  box.querySelector('#classNext').onclick=()=>{if(i<slides.length-1){i++;paint();}};
+  box.querySelector('#classClose').onclick=finish;
+  paint();box.hidden=false;if(typeof player!=='undefined')player.busy=true;
+}
 function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainAction();if(f.spot==='scheme')return {label:'Схема линии метро',run:metroScheme};const price=it.kind==='bar'?500:350;
   switch(f.spot){
     case 'table':if(it.kind==='hotelroom'){const s=typeof stayLive==='function'?stayLive():null;if(!s)return {label:'Номер уже сдан',run:()=>setHint('Ключ до 12:00 кончился')};if(!s.plate)return {label:'Поесть — входит в номер',run:()=>{s.plate=1;player.food=clamp(player.food+38,0,100);player.mood=clamp(player.mood+8,0,100);spendTime(20);addEvent('Поели в номере. Входит в стоимость.','say');if(typeof saveState==='function')saveState();}};return {label:s.tea?'Чайник пуст до утра':'Чай в номер',run:()=>{if(s.tea){setHint('Чайник пуст. Можно лечь или посидеть на диване.');return;}s.tea=1;player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy+4,0,100);if(typeof saveState==='function')saveState();setHint('Чай горячий. Кухня до утра больше не готовит.');}};}
@@ -120,7 +170,7 @@ function spotAction(f,it){const n=it.name;if(f.spot==='train')return metroTrainA
     case 'exhibit':return {label:'Рассмотреть экспонат',run:()=>{if(!f.seen){f.seen=true;player.mood=clamp(player.mood+3,0,100);spendTime(8);setHint('Интересно. Настроение +3');}else setHint('Вы это уже видели');}};
     case 'reception':if(it.kind==='hotel')return {label:'Снять номер на ночь · 3 500 ₽',run:()=>{if(!canSleep()){sleep(8);return;}spend(3500,()=>sleep(8));}};if(it.kind==='hospital')return {label:'Пройти осмотр · 800 ₽',run:()=>spend(800,()=>{player.energy=100;addEvent('Осмотр пройден, энергия восстановлена');})};return null;
     case 'sofa':if(it.kind==='hotelroom')return {label:'Посидеть на диване',run:()=>{spendTime(15);player.mood=clamp(player.mood+10,0,100);player.energy=clamp(player.energy+6,0,100);setHint('Тихо. Город за окном, в номере тепло.');}};return {label:it.kind==='home'?'Посмотреть телевизор (1 ч)':'Посидеть на диване',run:()=>{const home=it.kind==='home';spendTime(home?60:15);player.mood=clamp(player.mood+(home?8:3),0,100);setHint('Настроение +'+(home?8:3));}};
-    case 'study':return {label:it.kind==='library'?'Почитать час':'Послушать лекцию (1,5 ч)',run:()=>{spendTime(it.kind==='library'?60:90);player.mood=clamp(player.mood+4,0,100);player.energy=clamp(player.energy-6,0,100);setHint('Настроение +4');}};
+    case 'study':return {label:it.kind==='library'?'Почитать':'Послушать лекцию',run:()=>openClass(it)};
     case 'books':return {label:'Полистать книги',run:()=>{spendTime(20);player.mood=clamp(player.mood+3,0,100);setHint('Настроение +3');}};
     case 'pew':return {label:'Посидеть в тишине',run:()=>{spendTime(20);player.mood=clamp(player.mood+6,0,100);setHint('Тишина и покой. Настроение +6');}};
     case 'duty':return {label:'Спросить о происшествиях',run:()=>setHint(accidents.length?`Дежурный: «Сейчас на выезде — ${accidents[0].kind==='ped'?'сбили пешехода':'ДТП'}${accidents[0].road?', '+accidents[0].road:''}»`:'Дежурный: «В городе спокойно»')};

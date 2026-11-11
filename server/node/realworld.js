@@ -15,7 +15,7 @@ const WEATHER_URL=`https://api.met.no/weatherapi/locationforecast/2.0/compact?la
 const ALERT_URL='https://listmax.ru/channels/detail/mchs_tatarstan';
 const SOURCE={name:'ГУ МЧС России по Республике Татарстан',channel:'https://max.ru/mchs_tatarstan'};
 const UA='ZhivayaKazan/1.0 (+https://kazan.lifegorod.com)';
-const ALERT_MAX_MS=3*3600e3;      // тревога без отбоя дольше трёх часов — гаснет
+const ALERT_MAX_MS=12*3600e3;    // без отбоя держим день: утреннее сообщение ещё действует вечером
 const ENDED_SHOW_MS=30*60e3;      // «отбой» показываем ещё полчаса
 const WEATHER_STALE_MS=3*3600e3;  // погода старше трёх часов — игра возвращается к своей
 const TITLES={drone:'Беспилотная опасность',missile:'Ракетная опасность'};
@@ -57,10 +57,13 @@ function parsePosts(html){const out=[];const re=/<article\b[\s\S]*?<\/article>/g
     if(!tm||!p)continue;const at=parseRuTime(decode(tm[1]));if(!at)continue;out.push({at,text:decode(p[1]).slice(0,600)});}
   return out;}
 // только короткие официальные сообщения о режиме, не памятки «что делать при…»
-function classify(text){const t=String(text||'').replace(/ё/g,'е').replace(/Ё/g,'Е');if(t.length>400||!/татарстан/i.test(t))return null;
-  const kind=/ракетн\S*\s+опасн/i.test(t)?'missile':/беспилотн\S*\s+опасн/i.test(t)?'drone':null;if(!kind)return null;
-  if(/опасность[»"]?\s+(снят|отмен)|режим\S*\s+[^.]{0,40}(снят|отменен)|отбой/i.test(t))return {kind,on:false};
-  if(/(введен|объявлен)\s+режим|режим[^.]{0,40}\s(введен|объявлен)\b/i.test(t))return {kind,on:true};
+function classify(text){const t=String(text||'').replace(/ё/g,'е').replace(/Ё/g,'Е');if(t.length>500||!/татарстан/i.test(t))return null;
+  const head=t.slice(0,80);
+  const kind=/беспилотн\S*\s+опасн/i.test(head)?'drone':/ракетн\S*\s+опасн/i.test(head)?'missile':/беспилотн\S*\s+опасн/i.test(t)?'drone':/ракетн\S*\s+опасн/i.test(t)?'missile':null;
+  if(!kind)return null;
+  if(/отмена|отбой|снят|снята|отменен|отменена/i.test(t))return {kind,on:false};
+  if(/(введен|объявлен)\s+режим|режим[^.]{0,60}(введен|объявлен)/i.test(t))return {kind,on:true};
+  if(/^[«"\s]*(беспилотн\S*|ракетн\S*)\s+опасн/i.test(t))return {kind,on:true};
   return null;}
 function alertsFrom(posts,now,override){
   // posts — новые сверху; при равном времени (минуты) берётся тот, что выше на странице

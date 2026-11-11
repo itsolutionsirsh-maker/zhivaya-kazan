@@ -372,7 +372,8 @@ function drawJourneyHints(now,x0,y0,x1,y1){
 function drawPerson(x,y,hx,hy,p,phase,o){
   if(LOD>0&&p.story&&p.story!=='stranger'&&!(o&&o.lying))return drawStoryPerson(x,y,hx,hy,p,phase,o);
   o=o||{};const S=o.scale||1;const hi=LOD>=2&&!o.lying;ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(hy,hx)+(o.lying?Math.PI/2:0));ctx.scale(S,S);
-  const hv=p.build==='heavy',bw=hv?0.54:0.42,bl=hv?0.78:0.56,ha=hv?0.88:0.66;   // грузный: шире плечи и живот
+  const fem=!!p.female&&p.role!=='police';
+  const hv=p.build==='heavy',bw=hv?0.54:(fem?0.34:0.48),bl=hv?0.78:(fem?0.5:0.58),ha=hv?0.88:0.66;
   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(0.1,0.15,o.lying?1.1:hv?0.95:0.75,hv?0.75:0.55,0,0,TAU);ctx.fill();
   if(o.ring){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.12;ctx.beginPath();ctx.arc(0,0,0.82,0,TAU);ctx.stroke();}
   const near=LOD>=1&&!o.lying;const still=o.moving===false||o.seated||o.lying;const animate=near&&!reduceMotion;
@@ -382,8 +383,9 @@ function drawPerson(x,y,hx,hy,p,phase,o){
   const nowT=o.time!=null?o.time:cityAnimT;
   const handX=o.waving?0.4+Math.sin(nowT*9)*.25:filming?0.9:sw,handY=o.waving?-ha*1.5:filming?-ha*0.8:-ha;
   if(o.bench){ctx.fillStyle='#C4A574';ctx.fillRect(-1.05,-0.22,2.1,0.36);ctx.fillStyle='#A8845A';ctx.fillRect(-1.05,-0.22,2.1,0.08);}
-  if(near&&!o.seated&&(!still||hi)){ctx.fillStyle=p.pants||'#2B2F3A';ctx.beginPath();ctx.ellipse(sw*1.1,-0.22,0.22,0.13,0,0,TAU);ctx.ellipse(-sw*1.1,0.22,0.22,0.13,0,0,TAU);ctx.fill();
-    ctx.fillStyle='#1A1A1A';ctx.beginPath();ctx.ellipse(sw*1.1+0.16,-0.22,0.16,0.08,0,0,TAU);ctx.ellipse(-sw*1.1+0.16,0.22,0.16,0.08,0,0,TAU);ctx.fill();}
+  if(near&&!o.seated&&(!still||hi)){if(fem){ctx.fillStyle=p.pants||'#6B3A58';ctx.beginPath();ctx.moveTo(-0.02,-0.18);ctx.lineTo(-0.02,0.18);ctx.lineTo(-0.5,0.46);ctx.lineTo(-0.5,-0.46);ctx.closePath();ctx.fill();}
+    else{ctx.fillStyle=p.pants||'#2B2F3A';ctx.beginPath();ctx.ellipse(sw*1.1,-0.22,0.22,0.13,0,0,TAU);ctx.ellipse(-sw*1.1,0.22,0.22,0.13,0,0,TAU);ctx.fill();
+    ctx.fillStyle='#1A1A1A';ctx.beginPath();ctx.ellipse(sw*1.1+0.16,-0.22,0.16,0.08,0,0,TAU);ctx.ellipse(-sw*1.1+0.16,0.22,0.16,0.08,0,0,TAU);ctx.fill();}}
   if((near&&(!still||o.waving))||hi||filming){ctx.strokeStyle=p.clothes;ctx.lineWidth=hv?0.26:0.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-0.05,-bl+0.06);ctx.lineTo(handX,handY);ctx.moveTo(-0.05,bl-0.06);ctx.lineTo(-sw,ha);ctx.stroke();}
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(handX,handY,0.16,0,TAU);ctx.arc(-sw,ha,0.16,0,TAU);ctx.fill();
   if(p.watch){ctx.fillStyle='#E8B830';ctx.beginPath();ctx.arc(handX-0.14,handY+0.02,0.09,0,TAU);ctx.fill();if(hi){ctx.fillStyle='#FFF3C4';ctx.beginPath();ctx.arc(handX-0.16,handY,0.035,0,TAU);ctx.fill();}}   // часы на руке — видно издалека
@@ -396,7 +398,7 @@ function drawPerson(x,y,hx,hy,p,phase,o){
   if(p.role==='courier'){ctx.fillStyle='#2B2B2B';rrect(ctx,-0.52,-0.3,0.32,0.6,0.06);ctx.fill();}
   if(p.scarf){ctx.fillStyle=p.scarf;ctx.beginPath();ctx.ellipse(0.02,0,0.26,0.46,0,0,TAU);ctx.fill();if(hi){rrect(ctx,-0.46,0.14,0.36,0.14,0.05);ctx.fill();}}
   ctx.fillStyle=p.skin;ctx.beginPath();ctx.arc(0.05,0,hv?0.37:0.34,0,TAU);ctx.fill();
-  const hs=p.hairStyle||0;
+  const hs=fem&&p.hairStyle!==3&&p.hairStyle!==4?1:(p.hairStyle!=null?p.hairStyle:0);
   if(hs===4){ctx.fillStyle='#1E3480';ctx.beginPath();ctx.arc(0,0,0.36,0,TAU);ctx.fill();ctx.fillStyle='#E53935';ctx.fillRect(-0.05,-0.36,0.1,0.72);ctx.fillStyle='#0F1E55';ctx.beginPath();ctx.arc(0.22,0,0.2,0,TAU);ctx.fill();}
   else if(hs===3){ctx.fillStyle=shade(p.skin,0.92);ctx.beginPath();ctx.arc(-0.1,0,0.25,0,TAU);ctx.fill();}
   else if(hs===1){ctx.fillStyle=p.hair;ctx.beginPath();ctx.ellipse(-0.22,0,0.34,0.38,0,0,TAU);ctx.fill();ctx.beginPath();ctx.arc(-0.05,0,0.3,0,TAU);ctx.fill();}

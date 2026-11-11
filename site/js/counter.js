@@ -141,7 +141,7 @@ function counterOffers(place){
     {id:'tix',title:'входной билет',short:'Билет',price:400,def:true,kind:'mood',mood:8,min:40,keys:['билет','вход','экскурс']}
   ];
   if(k==='library'||k==='university'||k==='school')return [
-    {id:'read',title:k==='library'?'час с книгой':'послушать занятие',short:k==='library'?'Почитать':'Занятие',price:0,def:true,kind:'mood',mood:4,min:k==='library'?40:50,keys:['читать','книг','занят','лекц','посидеть','урок']}
+    {id:'read',title:k==='library'?'час с книгой':'лекция',short:k==='library'?'Почитать':'Лекция',price:0,def:true,kind:'class',mood:6,min:k==='library'?40:90,keys:['читать','книг','занят','лекц','посидеть','урок','пару']}
   ];
   if(k==='worship')return [
     {id:'candle',title:'свеча',short:'Свеча',price:100,def:true,kind:'mood',mood:6,min:10,keys:['свеч','постав','помол']}
@@ -243,6 +243,11 @@ function counterFulfill(w,place,o){
     if(o.id==='map'&&typeof metroScheme==='function'){counterLock=Date.now()+1200;setTimeout(()=>{if(typeof closeChat==='function'&&chatNpc)closeChat();metroScheme();},400);}
     if(o.id==='fare')return `Турникет берёт ${typeof METRO!=='undefined'&&METRO.fare?METRO.fare:46} ₽ сам, когда спускаетесь. Отсюда билет не нужен — вы уже на станции.`;
     return 'Схему открываю. Первая линия: от «Авиастроительной» до «Дубравной».';
+  }
+  if(o.kind==='class'){
+    counterLock=Date.now()+900;
+    setTimeout(()=>{if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();if(typeof openClass==='function')openClass(place.it);},350);
+    return 'Садитесь. Тема на доске, сейчас включу.';
   }
   if(o.kind==='police'){
     const a=typeof accidents!=='undefined'&&accidents&&accidents[0];
