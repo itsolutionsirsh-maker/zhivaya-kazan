@@ -33,7 +33,7 @@ function taxiReveal(){const m=taxiMate();return taxiPick(m?[
 function taxiRideBegan(v){if(!v||v.talk)return;
   const names=['Ринат','Фарид','Марат','Ильдар','Равиль','Наиль','Рустем'];
   const name=v.driver||names[Math.floor(Math.random()*names.length)];
-  const age=40+(typeof faceHash==='function'?faceHash(name)%14:6);
+  const age=30+(typeof faceHash==='function'?faceHash(name)%8:4);
   const p={name,age,female:false,job:'бомбила',mood:'усталое',role:'staff',clothes:'#2A2E33',hair:'#3E2723',skin:'#E8C4A0',trait:'сначала жалуется на тяжёлую жизнь и просит чаевые, потом честно говорит, что свои бизнесы уже есть, а таксует для души',memory:[],lines:[]};
   const w={p,taxiRide:true,isInterior:true,x:player.x,y:player.y,seated:true,stage:0,tipped:0,closed:false};
   v.talk=w;v.driver=name;

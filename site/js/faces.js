@@ -16,8 +16,13 @@ const faceImg={};
 function faceHash(s){let h=2166136261;s=String(s||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function faceBand(age){age=+age||30;return age<32?0:age<52?1:2;}
 function npcFaceId(p){if(!p)return null;const g=p.female?'f':'m';const band=FACE_BANDS[g][faceBand(p.age)];return band[faceHash((p.name||'')+'|'+g)%band.length];}
-function npcFaceUrl(p){if(p&&typeof p.photo==='string'&&p.photo)return p.photo;if(p&&typeof p.look==='string')return p.look;const id=npcFaceId(p);return id?'img/faces/'+id+'.jpg':null;}
-function npcFaceImg(p){if(p&&p.lookImg&&p.lookImg.width)return p.lookImg;const id=npcFaceId(p);return id&&faceImg[id]||null;}
+const FACE_OLD=/fidania|\/f-58|\/f-70|gen-f7|gen-f18|gen-f19|gen-f27|\/pavel|\/edgar|\/marat|\/m-60|\/m-72|gen-m13|gen-m19/;
+function faceTooOld(url,age){return (+age||30)<45&&FACE_OLD.test(String(url||''));}
+function npcFaceUrl(p){if(!p)return null;const age=+p.age||30;
+  if(typeof p.photo==='string'&&p.photo&&!faceTooOld(p.photo,age))return p.photo;
+  if(typeof p.look==='string'&&p.look&&!faceTooOld(p.look,age))return p.look;
+  const id=npcFaceId(p);return id?'img/faces/'+id+'.jpg':null;}
+function npcFaceImg(p){if(p&&p.lookImg&&p.lookImg.width&&!faceTooOld(p.lookImg.src||p.photo||'',p.age))return p.lookImg;const id=npcFaceId(p);return id&&faceImg[id]||null;}
 (function loadFaces(){const ids=[].concat(...FACE_BANDS.f,...FACE_BANDS.m);for(const id of ids){const im=new Image();im.onload=()=>{faceImg[id]=im;};im.src='img/faces/'+id+'.jpg';}})();
 function paintNpcFace(p){const f=$('#npcFace');if(!f||!p)return;const url=npcFaceUrl(p);
   if(url){f.style.backgroundImage=`url("${url}")`;f.style.backgroundSize='cover';f.style.backgroundPosition='center 18%';f.style.backgroundColor='#24302a';f.textContent='';f.classList.add('photo');}

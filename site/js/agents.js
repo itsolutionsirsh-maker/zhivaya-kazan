@@ -13,9 +13,11 @@ function makePersona(role){const f=Math.random()<0.5;const name=pick(f?NAMES_F:N
   const clothes=role==='police'?'#2B3F8C':role==='guard'?'#1E1E1E':role==='courier'?'#F4B400':pick(CLOTHES);
   const roll=Math.random();
   let age=roll<0.7?Math.floor(rnd(20,36)):roll<0.9?Math.floor(rnd(36,50)):Math.floor(rnd(50,68));
-  if(/студент/.test(job))age=Math.floor(rnd(18,24));
+  if(/студент|школьн/.test(job))age=Math.floor(rnd(18,24));
   if(/пенсионер/.test(job))age=Math.floor(rnd(64,74));
   if(/декрет/.test(job))age=Math.floor(rnd(24,34));
+  if(/учител|преподав|врач|фармацевт/.test(job)&&age<28)age=Math.floor(rnd(30,48));
+  if(/таксист|трамвая|сантехник|юрист|риелтор/.test(job)&&age<28)age=Math.floor(rnd(30,46));
   const hairStyle=role==='police'?4:(f?1:(age>60&&Math.random()<0.35?3:pick([0,0,0,2])));
   return {id:nextId++,name,job,trait:pick(TRAITS),mood:pick(MOODS),age,clothes,skin:pick(SKINS),hair:pick(HAIRS),female:f,role,memory:[],hairStyle,bag:Math.random()<0.35?pick(['#3A3A3A','#7A4A2A','#C24A3A','#2A4A7A']):null,pants:pick(['#2B2F3A','#3C3C3C','#4A5A7A','#6B5A4A','#1F1F1F','#5A6B8C'])};}
 
