@@ -104,12 +104,13 @@ class Car{
     if(this.state!=='drive')return;
     const a=this.path[this.seg],b=this.path[this.seg+1];const pa=world.nodes[a],pb=world.nodes[b];const L=dist(pa[0],pa[1],pb[0],pb[1])||1;const dx=(pb[0]-pa[0])/L,dy=(pb[1]-pa[1])/L;
     const r=edgeRoad(this.siren()?world.emAdj:world.carAdj,a,b);
-    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(this.taxiFor)vlim=Math.max(vlim,9);if(!this.siren()&&!this.taxiFor)vlim*=typeof roadSlow==='function'?roadSlow(r):(weather.kind==='rain'?0.85:1);if(r&&r.jam&&!this.siren()&&!this.taxiFor)vlim=Math.min(vlim,2.5);   // день матча: подъезды к арене стоят (matchday.js)
+    let vlim=Math.min(this.vmax,r?r.speed||6:6);if(this.siren())vlim=Math.max(vlim*1.45,11);if(this.taxiFor)vlim=Math.max(vlim,9);if(this.ferz)vlim=Math.max(vlim,15);if(!this.siren()&&!this.taxiFor&&!this.ferz)vlim*=typeof roadSlow==='function'?roadSlow(r):(weather.kind==='rain'?0.85:1);if(r&&r.jam&&!this.siren()&&!this.taxiFor&&!this.ferz)vlim=Math.min(vlim,2.5);
     const rem=L-this.t;if(rem<14&&this.seg+2<this.path.length){const pc=world.nodes[this.path[this.seg+2]];const L2=dist(pb[0],pb[1],pc[0],pc[1])||1;const d2x=(pc[0]-pb[0])/L2,d2y=(pc[1]-pb[1])/L2;const cos=dx*d2x+dy*d2y;if(cos<0.85)vlim=Math.min(vlim,(this.siren()?6.5:4)+cos*3);}
     // спецмашина у места ДТП: встаёт рядом, даже если впереди зеваки или сам пострадавший
     if(this.siren()&&this.sceneXY&&dist(this.x,this.y,this.sceneXY[0],this.sceneXY[1])<16){this.speed=0;this.path=null;this.onArrive();return;}
     const ahead=obstacleAhead(this,vehicles,carSee);vlim=limitBySpace(vlim,ahead);if(this.taxiFor&&vlim<1&&(this.waitT||0)>2)vlim=6;
     this.waitT=(vlim===0&&this.speed<0.1)?(this.waitT||0)+dt:0;
+    if(this.ferz&&this.waitT>2&&!this.siren()){this.waitT=0;this.path=null;this.state='idle';this.ttl=0.05;this.ferzDetour=(this.ferzDetour||0)+1;return;}
     // улицу перекрыло ДТП — разворачиваемся и едем в объезд (маршрут обходит перекрытую улицу)
     if(this.acBlock&&this.waitT>5&&this.target==null&&!this.siren()&&this.kind!=='tow'&&this.path){const a0=this.path[this.seg],b0=this.path[this.seg+1];const q1=world.nodes[a0],q2=world.nodes[b0];const L0=dist(q1[0],q1[1],q2[0],q2[1]);this.path=[b0,a0];this.seg=0;this.t=Math.max(0,L0-this.t);this.waitT=0;this.hx=-this.hx;this.hy=-this.hy;const ac=this.acBlock;if(!ac.detourMsg&&dist(ac.x,ac.y,player.x,player.y)<350){ac.detourMsg=true;addEvent(`ДТП перекрыло ${ac.road||'улицу'} — машины разворачиваются и едут в объезд`);}return;}
     if(vlim===0&&this.speed<0.1){this.stuck+=dt;if(this.stuck>25&&(this.kind==='car'||this.kind==='taxi')){this.stuck=0;if(this.taxiFor||this.target!=null){this.state='idle';this.ttl=0.4;this.path=null;return;}this.state='idle';this.ttl=0.1;this.node=this.pickNode();return;}}else this.stuck=0;

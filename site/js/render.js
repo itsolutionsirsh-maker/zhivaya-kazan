@@ -124,7 +124,7 @@ function render(){
   // ---- происшествия: обломки, конусы
   for(const ac of accidents){if(ac.medical)continue;ctx.fillStyle='rgba(40,30,20,.5)';for(let i=0;i<6;i++){ctx.beginPath();ctx.arc(ac.x+Math.cos(i*1.3)*(1+i*0.5),ac.y+Math.sin(i*1.7)*(1+i*0.4),0.3,0,TAU);ctx.fill();}if(ac.police&&ac.police.state==='scene'){ctx.fillStyle='#F2651F';for(let i=0;i<4;i++){const an=i*1.57+0.7;ctx.beginPath();ctx.arc(ac.x+Math.cos(an)*7,ac.y+Math.sin(an)*7,0.5,0,TAU);ctx.fill();}}}
   // ---- машины и транспорт
-  for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;drawCarSprite(c.x,c.y,c.hx,c.hy,c.len,c.wid,c.color,c.kind,t,{crashed:c.crashed,flash:c.flash&&!c.crashed&&(c.target!=null||c.state==='scene'),roll:c.crashed?0:(c.speed||0)}); }
+  for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;drawCarSprite(c.x,c.y,c.hx,c.hy,c.len,c.wid,c.color,c.kind,t,{crashed:c.crashed,flash:c.flash&&!c.crashed&&(c.target!=null||c.state==='scene'),roll:c.crashed?0:(c.speed||0)});if(c.ferz&&typeof ferzMark==='function')ferzMark(c);}
   for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBusSprite(b);}
   drawRallyWorld(z,t);
   if(window.cityCourtyard)cityCourtyard.draw(z,vx0,vy0,vx1,vy1,night);
@@ -586,7 +586,8 @@ function drawBicycle(x,y,hx,hy){ctx.save();ctx.translate(x,y);ctx.rotate(Math.at
 function drawPlayerWorld(x,y,hx,hy,veh,persona,t,me){
   if(veh){if(veh.kind==='scooter'){drawScooter(x,y,hx,hy);drawPerson(x-hx*0.1,y-hy*0.1,hx,hy,persona,0,{moving:false,ring:me,scale:1.3});}
     else if(veh.kind==='bike'){drawBicycle(x,y,hx,hy);drawPerson(x-hx*.15,y-hy*.15,hx,hy,persona,0,{moving:false,ring:me,scale:1.15});}
-    else drawCarSprite(x,y,hx,hy,veh.kind==='own'?(veh.spec&&veh.spec.len||4.6):4.5,veh.kind==='own'?(veh.spec&&veh.spec.wid||1.9):1.9,veh.kind==='taxi'?'#F4C542':(veh.color||'#C62828'),veh.kind==='own'?'own':veh.kind==='taxi'?'taxi':'share',t,{crashed:veh.crashed,roll:veh.crashed?0:(veh.speed||0)});
+    else drawCarSprite(x,y,hx,hy,veh.kind==='own'?(veh.spec&&veh.spec.len||4.6):4.5,veh.kind==='own'?(veh.spec&&veh.spec.wid||1.9):1.9,veh.ferz?'#141414':(veh.kind==='taxi'?'#F4C542':(veh.color||'#C62828')),veh.kind==='own'?'own':veh.kind==='taxi'?'taxi':'share',t,{crashed:veh.crashed,roll:veh.crashed?0:(veh.speed||0)});
+    if(veh.ferz&&typeof ferzMark==='function')ferzMark({x,y,hx,hy,wid:veh.spec&&veh.spec.wid||2.1,plate:veh.plate||'ХАН 999',who:me?'Вы · Ферзь':'Ферзь'});
     if(me){ctx.strokeStyle='rgba(43,176,98,.9)';ctx.lineWidth=0.25;ctx.beginPath();ctx.arc(x,y,veh.kind==='scooter'||veh.kind==='bike'?1.3:3.1,0,TAU);ctx.stroke();}return;}
   if(player.state==='hurt'&&me){drawPerson(x,y,hx,hy,persona,0,{lying:true,scale:1.5});return;}
   if(me&&window.cityBenchSit){drawPerson(x,y,hx,hy,persona,0,{moving:false,seated:true,bench:true,ring:me,scale:1.8});return;}

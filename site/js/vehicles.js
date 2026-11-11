@@ -103,6 +103,7 @@ function updateVehicle(dt){const v=player.vehicle;if(!v)return;const s=v.spec;
   const boost=(keys.shift||keys.ShiftLeft)&&!v.auto;   // Shift — «газ в пол»: можно превысить, а камеры это заметят
   if(!isLightVehicle(v.kind)){vmax=onRoad?(boost?Math.min(vmax*1.45,(ns.seg.r.speed||8)*1.75+3):Math.min(vmax,(ns.seg.r.speed||8)*1.3+2)):3.5;}else if(onRoad&&ns.seg.r.c<=4)vmax=5.5;
   vmax*=weather.ice?0.65:weather.kind==='snow'?0.75:(weather.kind==='rain'||weather.kind==='fog')?0.85:1;v.onRoad=onRoad;
+  if(v.ferz||(v.kind==='own'&&typeof ferzOn==='function'&&ferzOn())){v.ferz=true;vmax=Math.max(vmax,16);if(ns&&ns.seg.r&&ns.seg.r.jam)vmax=Math.max(vmax,14);}
   if(v.auto&&v.auto.wps&&v.auto.wps.length){const a=v.auto;const look=s.len>3?8:4;let guard=0;while(a.i<a.wps.length-1&&guard++<80){const wp=a.wps[a.i],nx=a.wps[a.i+1];if(!wp||!nx){a.i++;continue;}const d=dist(wp[0],wp[1],v.x,v.y),dn=dist(nx[0],nx[1],v.x,v.y);if(d<look||dn+1<d)a.i++;else break;}
     const tp=a.wps[a.i];const dT=dist(tp[0],tp[1],v.x,v.y);
     if(a.i>=a.wps.length-1&&dT<2.5){v.auto=null;v.speed=0;if(v.kind==='taxi'||(typeof companion!=='undefined'&&companion&&companion.homeVisit)){try{exitVehicle();}catch(e){player.vehicle=null;player.busy=false;setHint('Вы вышли из такси');}return;}setHint('Приехали. E — выйти');}
