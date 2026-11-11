@@ -52,9 +52,10 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     if(!c.route){const s0=nearestNode(w.x,w.y,world.pedAdj,120),g0=nearestNode(c.dest.x,c.dest.y,world.pedAdj,150);const path=astar(world.pedAdj,s0,g0,pedCost);c.route=path?pathToWaypoints(path,world.pedAdj,'ped'):[];c.route.push([c.dest.x,c.dest.y]);c.ri=0;}
     const R=c.route;let best=c.ri,bd=dist(w.x,w.y,R[c.ri][0],R[c.ri][1]);for(let i=c.ri+1;i<Math.min(R.length,c.ri+6);i++){const d=dist(w.x,w.y,R[i][0],R[i][1]);if(d<bd){bd=d;best=i;}}c.ri=best;
     if(bd<1.5&&c.ri<R.length-1)c.ri++;
-    if(pd>11){look();updateCompBox();return;}   // ждёт, пока игрок догонит
+    if(pd>11&&!c.autoIn){look();updateCompBox();return;}   // ждёт, пока игрок догонит
     stepTo(w,R[c.ri],pd>5?WALK_SPEED*1.1:WALK_SPEED*0.9,dt,true);   // ведёт в темпе игрока
-    if(dist(w.x,w.y,c.dest.x,c.dest.y)<10&&pd<16){c.arrived=true;if(c.dest.host){addEvent(`Вы с ${w.p.name} у вашего подъезда. Заходите домой вместе`,'say');setHint('E — зайти домой');}else if(c.dest.guest){addEvent(`Вы с ${w.p.name} у ${w.p.female?'её':'его'} подъезда. Заходите — чай уже ждёт`,'say');setHint('E — зайти в гости');}else{addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}}
+    if(c.autoIn&&dist(w.x,w.y,c.dest.x,c.dest.y)<16&&pd<32){enterHangout();return;}
+    if(!c.autoIn&&dist(w.x,w.y,c.dest.x,c.dest.y)<14&&pd<26){c.arrived=true;if(c.dest.host){addEvent(`Вы с ${w.p.name} у вашего подъезда. Заходите домой вместе`,'say');setHint('E — зайти домой');}else if(c.dest.guest){addEvent(`Вы с ${w.p.name} у ${w.p.female?'её':'его'} подъезда. Заходите — чай уже ждёт`,'say');setHint('E — зайти в гости');}else{addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}}
     updateCompBox();return;}
   else{T=[player.x-player.hx*1.6,player.y-player.hy*1.6];if(pd<2.6)T=null;}
   if(!T||dist(w.x,w.y,T[0],T[1])<stop){look();updateCompBox();return;}
@@ -63,6 +64,13 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
   else{w.repath-=dt;if(!w.cwps||w.repath<=0||w.wi>=w.cwps.length){w.repath=6;const s=nearestNode(w.x,w.y,world.pedAdj,120),g=nearestNode(T[0],T[1],world.pedAdj,120);const path=astar(world.pedAdj,s,g,pedCost);w.cwps=path?pathToWaypoints(path,world.pedAdj,'ped'):null;if(w.cwps){w.cwps.push(T);let bi=0,bd=1e9;for(let i=0;i<Math.min(6,w.cwps.length);i++){const d=dist(w.x,w.y,w.cwps[i][0],w.cwps[i][1]);if(d<bd){bd=d;bi=i;}}w.wi=bd<8?bi+1:bi;}else w.wi=0;}
     if(w.cwps&&w.wi<w.cwps.length){const q=w.cwps[w.wi];if(dist(w.x,w.y,q[0],q[1])<0.8)w.wi++;else stepTo(w,q,spd,dt,true);}else stepTo(w,T,spd,dt);}
   updateCompBox();}
+function enterHangout(){const c=companion;if(!c||!c.dest||c.knock)return;c.knock=true;c.autoIn=false;player.escort=false;player.waypoints=null;
+  const poi=c.dest.poi||{};const kind=poi.t==='cafe'?'cafe':'bar';
+  const src={kind,name:c.dest.n,key:kind+':'+(poi.i!=null?poi.i:c.dest.n),x:c.dest.x,y:c.dest.y,together:true,st:poi.st||''};
+  const p=wNear(c.dest.x,c.dest.y);player.x=p[0];player.y=p[1];c.w.x=p[0]+0.7;c.w.y=p[1];
+  if(typeof enterInterior==='function')enterInterior(src);
+  c.arrived=true;}
+function wNear(x,y){if(typeof nearestNode==='function'&&world&&world.pedAdj){const n=nearestNode(x,y,world.pedAdj,60);if(n>=0&&typeof sidewalkPos==='function')return sidewalkPos(n);}return [x,y];}
 function stepTo(w,T,spd,dt,force){const d=dist(w.x,w.y,T[0],T[1]);if(d<0.01)return;const st=Math.min(d,spd*dt);w.hx=(T[0]-w.x)/d;w.hy=(T[1]-w.y)/d;const nx=w.x+w.hx*st,ny=w.y+w.hy*st;if(unsafeStep(w.x,w.y,nx+w.hx*1.2,ny+w.hy*1.2))return;if(force||!inBuilding(nx,ny)){w.x=nx;w.y=ny;}else w.cwps=null;w.phase+=dt*8;}
 // при входе в помещение спутник заходит следом и садится рядом
 function companionEnter(it){if(!companion)return;const w=companion.w;if(it.npcs.some(n=>n.companionOf===w))return;
@@ -197,6 +205,7 @@ function applyNpcAction(w,r){const real=w.companionOf||w;
       nw.inside=true;w.companionOf=nw;}
     if(homeAsk)return walkHomeTogether(w.companionOf||(w.isInterior?null:w));
     startCompanion(w.companionOf||w,r.action,r.place);
-    const c=companion;return c?(c.dest?`${w.p.name} идёт с вами в ${qName(c.dest.n)}`:`${w.p.name} идёт с вами`):null;}
+    const c=companion;if(c&&c.dest&&c.dest.poi&&/^(bar|cafe|pub)$/.test(c.dest.poi.t||'')){c.autoIn=true;player.escort=true;if(typeof followPlayer==='function')followPlayer();if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();setHint('Идёте вдвоём. У двери зайдёте сами');addEvent(`${c.w.p.name} ведёт в ${qName(c.dest.n)}. Идёте вдвоём`,'say');}
+    return c?(c.dest?`${w.p.name} идёт с вами в ${qName(c.dest.n)}`:`${w.p.name} идёт с вами`):null;}
   if(r.action==='stop'&&companion&&companion.w===real){stopCompanion(true);return `${w.p.name} больше не идёт с вами`;}
   return null;}

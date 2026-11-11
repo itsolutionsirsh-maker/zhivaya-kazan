@@ -91,7 +91,11 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
   else if(table){npc.x=table.x;npc.y=table.y-0.9;npc.seated=true;npc.hx=0;npc.hy=1;npc.tableF=table;table.comp=npc;player.ix=table.x;player.iy=table.y+0.95;player.ihx=0;player.ihy=-1;}
   else if(sofa){npc.x=sofa.x-0.55;npc.y=sofa.y;npc.seated=true;npc.hx=1;npc.hy=0;player.ix=sofa.x+0.55;player.iy=sofa.y;player.ihx=-1;player.ihy=0;}
   const why=npc.p.homeWhy||'';
-  const line=it.kind==='hotelroom'
+  const line=it.kind==='bar'
+    ?(npc.p.female?`Ну вот, мы в «${it.name}». Сели. Что берёшь — пиво?`:`Ну вот, мы в «${it.name}». Сели. Пиво? Я не против светлого.`)
+    :it.kind==='cafe'
+    ?(npc.p.female?`Сели в «${it.name}». Кофе или чай — и поговорим.`:`Сели в «${it.name}». Закажем и спокойно поговорим.`)
+    :it.kind==='hotelroom'
     ?(npc.p.female?'Номер наш. Садись, отсюда город видно. Поговорим.':'Номер наш. Садись, поговорим спокойно.')
     :why==='repair'
     ?(npc.p.female?'Я на месте. Покажи, где под раковиной, — гайку гляну. Потом договорим здесь.':'Я на месте. Покажи, где течёт. Потом договорим здесь.')
