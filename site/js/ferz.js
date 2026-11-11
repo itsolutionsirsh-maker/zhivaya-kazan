@@ -3,6 +3,14 @@
 const FERZ={car:null,guest:null,cool:12,rideT:0};
 function ferzOn(){return !!(player&&player.ferzTill&&player.ferzTill>Date.now());}
 function ferzGrant(ms){player.ferzTill=Date.now()+Math.max(60000,ms||86400000);if(typeof saveState==='function')saveState();return player.ferzTill;}
+function ferzAura(x,y,r){if(typeof ctx==='undefined'||!Number.isFinite(x)||!Number.isFinite(y))return;
+  const pulse=0.72+0.28*Math.sin((typeof performance!=='undefined'?performance.now():0)/480);
+  ctx.save();
+  const g=ctx.createRadialGradient(x,y,r*0.15,x,y,r);
+  g.addColorStop(0,`rgba(255,214,120,${0.34*pulse})`);
+  g.addColorStop(0.45,`rgba(212,168,74,${0.16*pulse})`);
+  g.addColorStop(1,'rgba(212,168,74,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore();}
 function ferzMark(c){if(!c)return;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(Math.atan2(c.hy||0,c.hx||1));
   ctx.fillStyle='#C6A15B';ctx.fillRect(-1.15,-(c.wid||2)/2-0.22,2.3,0.16);
   ctx.fillStyle='#F4C542';rrect(ctx,-1.35,-0.38,2.7,0.62,0.1);ctx.fill();
@@ -32,11 +40,34 @@ setTimeout(()=>{if(typeof findAction==='function'&&!findAction.ferz){const ferzA
 function ferzPlayerRide(){const w=FERZ.playerGuest;if(!w)return;FERZ.playerT=(FERZ.playerT||0)+1;
   if(!player.vehicle||!ferzOn()||FERZ.playerT>40){w.ferzRide=false;if(w.state==='companion')w.state='idle';w.x=player.x+2;w.y=player.y;const t='Спасибо, что прокатил.';w.say={t,ttl:5};addEvent(`${w.p.name}: ${t}`,'say');FERZ.playerGuest=null;return;}
   w.x=player.x-(player.hy||0)*0.2;w.y=player.y+(player.hx||0)*0.2;w.state='companion';}
-function ferzTick(){ferzPlayerRide();if(typeof scene!=='undefined'&&scene!=='city')return;if(!FERZ.car||FERZ.car.crashed||!cars.includes(FERZ.car)){FERZ.car=null;FERZ.guest=null;ferzBoot();return;}
+function ferzPersona(){const p=typeof makePersona==='function'?makePersona('resident'):{name:'Ферзь',clothes:'#141414',skin:'#E8C4A0',hair:'#1A1A1A',memory:[],pants:'#111',hairStyle:0};
+  p.name='Ферзь';p.age=32;p.female=false;p.job='ездит, где хочет';p.clothes='#141414';p.pants='#1A1408';p.hair='#111';p.hairStyle=0;p.ferz=true;p.mood='отличное';p.trait='ему правила не писаны';return p;}
+function ferzWalkTo(w,x,y){if(!w||typeof nearestNode!=='function'||typeof requestPath!=='function')return;
+  const g=nearestNode(x,y,world.pedAdj,90);const s=nearestNode(w.x,w.y,world.pedAdj,40);
+  if(s>=0)w.node=s;if(g<0||s<0){w.state='idle';w.ttl=4;return;}
+  w.state='routing';requestPath(w,world.pedAdj,s,g,pedCost,path=>{if(!FERZ.man||FERZ.man!==w)return;if(!path||path.length<2){w.state='idle';w.ttl=3;return;}w.path=path;w.seg=0;w.t=0;w.state='walk';});}
+function ferzStepOut(){const c=FERZ.car;if(!c||FERZ.man||FERZ.guest||typeof Walker!=='function')return;
+  const spots=(world.pois||[]).filter(p=>p&&/bar|cafe|club/.test(p.t||'')&&dist(p.x,p.y,c.x,c.y)<420);
+  if(!spots.length)return;
+  const spot=pick(spots);c.path=null;c.state='idle';c.speed=0;c.ttl=90;
+  const n=typeof nearestNode==='function'?nearestNode(c.x,c.y,world.pedAdj,50):-1;if(n<0)return;
+  const w=new Walker('resident',n);w.p=ferzPersona();w.ferzMan=true;w.keep=true;w.x=c.x-(c.hy||0)*2.6;w.y=c.y+(c.hx||1)*2.6;w.hx=-(c.hy||0);w.hy=c.hx||1;
+  walkers.push(w);FERZ.man=w;FERZ.spot=spot;FERZ.phase='out';ferzWalkTo(w,spot.x,spot.y);
+  if(dist(c.x,c.y,player.x,player.y)<100)addEvent(`Ферзь вышел. Урус стоит, сам идёт в «${spot.n||'бар'}».`,'say');}
+function ferzManTick(){const w=FERZ.man,c=FERZ.car;if(!w)return;
+  if(!walkers.includes(w)){FERZ.man=null;FERZ.phase='';return;}
+  if(c){c.path=null;c.state='idle';c.speed=0;c.ttl=30;}
+  if(FERZ.phase==='out'){if(w.state==='idle'&&!(w.ttl>0)){FERZ.phase='stay';FERZ.stay=7;}
+    else if(FERZ.spot&&dist(w.x,w.y,FERZ.spot.x,FERZ.spot.y)<18){FERZ.phase='stay';FERZ.stay=7;w.state='idle';w.ttl=7;w.path=null;}}
+  else if(FERZ.phase==='stay'){FERZ.stay-=1;w.state='companion';if(FERZ.stay<=0&&c){FERZ.phase='back';w.state='idle';ferzWalkTo(w,c.x,c.y);}}
+  else if(FERZ.phase==='back'&&c&&dist(w.x,w.y,c.x,c.y)<7){const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);FERZ.man=null;FERZ.phase='';c.ttl=0.4;if(dist(c.x,c.y,player.x,player.y)<90)addEvent('Ферзь сел обратно. Номера те же, ХАН 999.','say');}}
+function ferzTick(){ferzPlayerRide();if(typeof scene!=='undefined'&&scene!=='city')return;if(!FERZ.car||FERZ.car.crashed||!cars.includes(FERZ.car)){FERZ.car=null;FERZ.guest=null;if(FERZ.man){const i=walkers.indexOf(FERZ.man);if(i>=0)walkers.splice(i,1);}FERZ.man=null;ferzBoot();return;}
+  if(FERZ.man){ferzManTick();return;}
   const c=FERZ.car;if(dist(c.x,c.y,player.x,player.y)>1600&&!FERZ.guest){const n=nodeNear(world.carNodes,[player.x,player.y],280);if(n>=0){c.node=n;const p=world.nodes[n];c.x=p[0];c.y=p[1];c.path=null;c.state='idle';c.ttl=0.2;}}
   if(FERZ.guest){FERZ.rideT+=1;const w=FERZ.guest;if(!w.p||w.state==='hurt'||FERZ.rideT>55||(c.state==='idle'&&FERZ.rideT>8)){ferzDrop();return;}
     w.x=c.x-(c.hy||0)*0.15;w.y=c.y+(c.hx||0)*0.15;w.hx=c.hx;w.hy=c.hy;w.state='companion';return;}
   FERZ.cool-=1;if(FERZ.cool>0)return;FERZ.cool=rnd(18,36);
+  if(Math.random()<0.4){ferzStepOut();return;}
   const list=ferzWomen();if(!list.length)return;const w=pick(list);ferzBoard(w,Math.random()<0.45);}
 function ferzCard(){const on=ferzOn();const left=on?Math.max(1,Math.round((player.ferzTill-Date.now())/3600000))+' ч':'не куплен';
   const text=on?`Статус ваш ещё ${left}. Чёрный Урус, номера ХАН 999, пробки объезжаете. Девушки рядом могут попросить прокатить.`
