@@ -121,7 +121,7 @@ function callTaxi(dest){if(!journeyAvailable()||!journeyDest(dest)){setHint('С�
   cancelTrip(true);let car=null,bd=1e9;for(const c of cars){if(c.kind!=='taxi'||c.crashed||c.target!=null||c.taxiFor||c.state==='scene')continue;const d=dist(c.x,c.y,player.x,player.y);if(d<bd&&d<220){bd=d;car=c;}}
   const pickup=nearestNode(player.x,player.y,world.carAdj,200);car=taxiSend(car,pickup);if(!car){setHint('Рядом нет улицы для такси');return false;}
   taxiCall={car,dest,state:'coming',t:0,mark:dist(car.x,car.y,player.x,player.y),markT:0};if(errand)taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало. Садимся и едем.');if(!boardTaxi(true))setHint('Такси на месте, но сесть не вышло — подойдите и нажмите E');updateTripBox();}};
-  addEvent(`Вызвали такси ${taxiRideWhere(dest)}. Сначала машина едет к вам, сядете по E — и она сама довезёт.`);updateTripBox();return true;}
+  addEvent(`Вызвали такси ${taxiRideWhere(dest)}. Машина едет к вам, сядете сами и она довезёт.`);updateTripBox();return true;}
 function boardTaxi(auto){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvailable())return false;const c=tc.car;
   if(!c||c.remove||!cars.includes(c)){setHint('Машина уже уехала. Вызовите другую');cancelTrip(true);return false;}
   if(c.crashed){setHint('Машина не доехала');return false;}
@@ -171,7 +171,7 @@ function startWalkNav(d){if(!journeyAvailable())return false;cancelTrip(true);le
 function navPause(){if(player.navDest&&!player.navPaused){player.navPaused=true;updateTripBox();}}
 function navResume(){const d=player.navDest;if(!d)return;player.navPaused=false;followPlayer();walkTo(d.x,d.y,true);updateTripBox();}
 function navTick(){const d=player.navDest;if(!d||player.navPaused)return;if(player.bus||player.vehicle||player.inside){player.navDest=null;updateTripBox();return;}
-  if(dist(player.x,player.y,d.x,d.y)<14){player.navDest=null;player.waypoints=null;if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether()){updateTripBox();return;}if(typeof maybeEnterHotelTogether==='function'&&maybeEnterHotelTogether()){updateTripBox();return;}addEvent(`Пришли: ${d.n}`);setHint(`Вы на месте: ${d.n}`);updateTripBox();return;}
+  if(dist(player.x,player.y,d.x,d.y)<28){player.navDest=null;player.waypoints=null;if(typeof guestEnter==='function'&&typeof companion!=='undefined'&&companion&&companion.dest&&companion.dest.guest){guestEnter();if(player.inside){updateTripBox();return;}}if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether()){updateTripBox();return;}if(typeof maybeEnterHotelTogether==='function'&&maybeEnterHotelTogether()){updateTripBox();return;}addEvent(`Пришли: ${d.n}`);setHint(`Вы на месте: ${d.n}`);updateTripBox();return;}
   if(!player.waypoints&&!player.crossWait){player.navPaused=true;updateTripBox();}}
 function taxiRideWhere(dest){const n=dest&&dest.n?String(dest.n):'';if(/^домой/i.test(n))return 'домой';return n?`к «${n}»`:'по выбранному адресу';}
 function taxiEta(m){const sec=Math.max(0,m)/8;if(sec<45)return 'меньше минуты';const min=Math.max(1,Math.round(sec/60));return `≈ ${min} мин`;}

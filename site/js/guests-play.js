@@ -48,7 +48,10 @@ function guestGo(w){const f=guestFolk(w);if(!f||!guestCan(f))return null;const h
   const real=w.companionOf||w;if(chatNpc)closeChat();
   startCompanion(real,'follow');const c=companion;if(!c||c.w!==real)return null;
   c.mode='go';c.dest={x:h.x,y:h.y,n:'дом '+real.p.name,guest:f.id};c.route=null;c.arrived=false;player.escort=true;GUEST.invited=null;
-  addEvent(`🏠 ${real.p.name} ведёт вас к себе на ${(g.treat&&g.treat.name)||'чай'}`,'say');setHint('Идёте к подъезду. Зайдёте сами, без кнопки');updateCompBox();
+  addEvent(`🏠 ${real.p.name} ведёт вас к себе на ${(g.treat&&g.treat.name)||'чай'}`,'say');
+  if(dist(player.x,player.y,h.x,h.y)>80&&typeof agreedRide==='function')agreedRide(c.dest);
+  else setHint('Идёте к подъезду. Зайдёте сами, без кнопки');
+  updateCompBox();
   return `${real.p.name} ведёт вас к себе в гости`;}
 // E у подъезда
 function guestAction(){if(scene!=='city'||!companion)return null;const c=companion;if(!c.dest||!c.dest.guest||player.vehicle||player.bus)return null;

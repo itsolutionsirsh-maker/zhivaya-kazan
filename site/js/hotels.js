@@ -131,10 +131,9 @@ function beginHotelTrip(who,hotel){const poi=hotelPoi(hotel.n);if(!poi){setHint(
   if(!companion||companion.w!==who){if(typeof startCompanion==='function')startCompanion(who,'follow',null,true);}
   const c=companion;if(!c)return null;const d=hotelDoor(poi);
   c.mode='follow';c.dest={x:d.x,y:d.y,n:hotel.n,hotel:true};c.homeVisit=true;c.hotel=hotel;c.hotelVisit=true;c.hotelBroke=false;c.inRoom=false;c.staysInRoom=false;c.arrived=false;c.route=null;c.toldRide=null;player.escort=false;
-  addEvent(`🏨 ${who.p.name} едет с вами в «${hotel.n}». Номер ${fmtMoney(hotel.price)}. Выберите, как добраться`,'say');
-  setHint('Пешком, самокат, такси или автобус — выбор за вами');
+  addEvent(`🏨 ${who.p.name} едет с вами в «${hotel.n}». Номер ${fmtMoney(hotel.price)}. Маршрут уже построен`,'say');
   if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();
-  if(typeof openRouteModal==='function')openRouteModal(c.dest);if(typeof updateCompBox==='function')updateCompBox();
+  if(typeof agreedRide==='function')agreedRide(c.dest);else if(typeof openRouteModal==='function')openRouteModal(c.dest);if(typeof updateCompBox==='function')updateCompBox();
   return `${who.p.name} едет с вами в «${hotel.n}»`;}
 function openHotelPicker(who){hotelPickerWho=who;const m=$('#hotelModal');if(!m)return;m.hidden=false;player.busy=true;const q=$('#hotelQ');if(q)q.value='';renderHotelList();setTimeout(()=>{if(q)q.focus();},30);}
 function closeHotelPicker(){const m=$('#hotelModal');if(m)m.hidden=true;if(typeof chatNpc==='undefined'||!chatNpc)player.busy=false;hotelPickerWho=null;}
@@ -179,7 +178,7 @@ function hotelCompanionLeaves(){const c=companion;if(!c)return;const w=c.w,she=w
   addEvent(`${w.p.name} ${she?'вышла':'вышел'} из номера`,'say');
   if(it&&player.inside&&interior===it)paintHotelFaces(it,hotel,null);}
 function hotelReturn(){const c=companion;if(!c||!c.staysInRoom||!c.dest)return;
-  if(dist(player.x,player.y,c.dest.x,c.dest.y)>28){c.hotelVisit=true;c.homeVisit=true;c.arrived=false;c.route=null;openRouteModal(c.dest);setHint('Снова к гостинице — номер уже оплачен');return;}
+  if(dist(player.x,player.y,c.dest.x,c.dest.y)>28){c.hotelVisit=true;c.homeVisit=true;c.arrived=false;c.route=null;if(typeof agreedRide==='function')agreedRide(c.dest);else openRouteModal(c.dest);setHint('Снова к гостинице — номер уже оплачен');return;}
   enterHotelRoom(c);}
 function hotelSyncUi(){const c=typeof companion!=='undefined'?companion:null;const box=$('#compBox');if(!box)return;
   let out=$('#hotelOut'),back=$('#hotelBack');
@@ -215,8 +214,9 @@ function inviteToMyRoom(w){
     if(typeof updateCompBox==='function')updateCompBox();
     return 'in';
   }
-  addEvent(`🏨 ${who.p.name} едет к вам в «${s.name}». Номер уже оплачен.`,'say');
-  if(!player.inside&&dist(player.x,player.y,s.x,s.y)>26&&typeof openRouteModal==='function')openRouteModal(c.dest);
+  addEvent(`🏨 ${who.p.name} едет к вам в «${s.name}». Номер уже оплачен. Маршрут построен`,'say');
+  if(!player.inside&&dist(player.x,player.y,s.x,s.y)>26&&typeof agreedRide==='function')agreedRide(c.dest);
+  else if(!player.inside&&dist(player.x,player.y,s.x,s.y)>26&&typeof openRouteModal==='function')openRouteModal(c.dest);
   else if(!player.inside)maybeEnterHotelTogether();
   if(typeof updateCompBox==='function')updateCompBox();
   return 'go';

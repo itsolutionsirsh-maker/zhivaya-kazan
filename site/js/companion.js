@@ -184,14 +184,18 @@ function paintHomeTogether(it){if(!it||!companion)return;const bg=shotImg.homeSo
   it.photoImg=cnv;if(typeof placeChatLook==='function')placeChatLook();}
 (function(){const im=new Image();im.onload=()=>{shotImg.homeSofa=im;};im.src='img/inside/room-sofa.jpg';})();
 const chatGoBtn=$('#chatGo');if(chatGoBtn)chatGoBtn.addEventListener('click',pressGoHome);
+function agreedRide(dest){if(!dest)return;const far=dist(player.x,player.y,dest.x,dest.y);
+  if(far<80){if(!(companion&&companion.mode==='go'&&player.escort)&&typeof startWalkNav==='function')startWalkNav(dest);setHint('Идёте сами. На месте зайдёте, и откроется разговор');return;}
+  if(companion){companion.mode='follow';player.escort=false;}
+  if(typeof callTaxi==='function'&&callTaxi(dest)){setHint('Такси само подъедет. Сядете и доедете, на месте откроется разговор');return;}
+  if(typeof startWalkNav==='function')startWalkNav(dest);}
 function walkHomeTogether(who){if(!who||who.isInterior||!player.home)return null;startCompanion(who,'follow',null,true);const c=companion;if(!c||c.w!==who)return null;
   const b=player.home;let x=b.cx,y=b.cy;if(typeof inBuilding==='function'&&inBuilding(x,y)&&typeof toSidewalk==='function'){const q=toSidewalk(x,y);if(q){x=q[0];y=q[1];}}
   const street=typeof nearestRoadName==='function'?(nearestRoadName(b.cx,b.cy)||''):'';
   c.mode='follow';c.dest={x,y,n:street?('Дом · '+street):'Домой',host:true};c.homeVisit=true;c.route=null;c.arrived=false;c.toldRide=null;player.escort=false;
   if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();
-  addEvent(`🏠 ${who.p.name} согласна зайти. Пункт — ваш дом${street?' · '+street:''}. Выберите, как добраться: ${who.p.female?'она поедет':'он поедет'} тем же способом`,'say');
-  setHint('Пешком, самокат, такси или автобус — выбор за вами');
-  if(typeof openRouteModal==='function')openRouteModal(c.dest);updateCompBox();
+  addEvent(`🏠 ${who.p.name} едет с вами домой${street?' · '+street:''}. Маршрут уже построен`,'say');
+  if(typeof agreedRide==='function')agreedRide(c.dest);updateCompBox();
   return `${who.p.name} едет с вами домой`;}
 function maybeEnterHomeTogether(){const c=companion;if(!c||!c.homeVisit||!player.home||player.inside||player.vehicle||player.bus)return false;
   const b=player.home,reach=Math.max(28,(b.bb&&b.bb[2]-b.bb[0])/2+12||0,(b.bb&&b.bb[3]-b.bb[1])/2+12||0);
