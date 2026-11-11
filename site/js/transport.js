@@ -120,11 +120,15 @@ function callTaxi(dest){if(!journeyAvailable()||!journeyDest(dest)){setHint('С�
   if(!errand&&player.money<TAXI.base){setHint('Не хватает денег даже на подачу такси');return false;}
   cancelTrip(true);let car=null,bd=1e9;for(const c of cars){if(c.kind!=='taxi'||c.crashed||c.target!=null||c.taxiFor||c.state==='scene')continue;const d=dist(c.x,c.y,player.x,player.y);if(d<bd&&d<220){bd=d;car=c;}}
   const pickup=nearestNode(player.x,player.y,world.carAdj,200);car=taxiSend(car,pickup);if(!car){setHint('Рядом нет улицы для такси');return false;}
-  taxiCall={car,dest,state:'coming',t:0,mark:dist(car.x,car.y,player.x,player.y),markT:0};if(errand)taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало');setHint('Такси ждёт: подойдите и нажмите E');updateTripBox();}};
+  taxiCall={car,dest,state:'coming',t:0,mark:dist(car.x,car.y,player.x,player.y),markT:0};if(errand)taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало. Садимся и едем.');if(!boardTaxi(true))setHint('Такси на месте, но сесть не вышло — подойдите и нажмите E');updateTripBox();}};
   addEvent(`Вызвали такси ${taxiRideWhere(dest)}. Сначала машина едет к вам, сядете по E — и она сама довезёт.`);updateTripBox();return true;}
-function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvailable())return false;const c=tc.car;
+function boardTaxi(auto){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvailable())return false;const c=tc.car;
   if(!c||c.remove||!cars.includes(c)){setHint('Машина уже уехала. Вызовите другую');cancelTrip(true);return false;}
-  if(c.crashed||dist(c.x,c.y,player.x,player.y)>9){setHint('Машина ждёт у обочины — подойдите ближе');return false;}
+  if(c.crashed){setHint('Машина не доехала');return false;}
+  const away=dist(c.x,c.y,player.x,player.y);
+  if(!auto&&away>9){setHint('Машина ждёт у обочины — подойдите ближе');return false;}
+  if(auto&&away>160){setHint('Такси ждёт у обочины — подойдите и нажмите E');return false;}
+  if(player.inside){setHint('Выйдите на улицу — такси уже здесь');return false;}
   const route=vehiclePath({kind:'taxi',x:c.x,y:c.y},tc.dest.x,tc.dest.y,true);if(!route)return false;
   if(player.money<(tc.fixedFare==null?TAXI.base:tc.fixedFare)&&!tc.errandRide){roadMoney('на посадку в такси');if(player.money<(tc.fixedFare==null?TAXI.base:tc.fixedFare)){setHint('Не хватает денег на посадку');return false;}}
   const i=cars.indexOf(c);if(i>=0)cars.splice(i,1);taxiCall=null;cancelTrip(true);
@@ -154,6 +158,7 @@ function updateTransport(dt){const p=player.busPlan;
   if(p&&p.stage==='walk'&&!player.bus&&!player.vehicle&&!player.inside&&dist(player.x,player.y,p.stopPt[0],p.stopPt[1])<7){p.stage='wait';player.waypoints=null;player.waitingStop={x:p.stopPt[0],y:p.stopPt[1],n:p.fromName};setHint(`Ждём ${busWord(p.route.type).toLowerCase()} ${p.route.ref} на «${p.fromName}»`);updateTripBox();}
   if(p&&p.stage==='wait'&&player.bus){p.stage='ride';updateTripBox();}
   if(taxiCall){taxiCall.t+=dt;const c=taxiCall.car;if(!c||c.crashed||c.remove||(taxiCall.state==='coming'&&taxiCall.t>150)){addEvent('Таксист не смог подъехать — вызовите ещё раз');cancelTrip(true);}
+    else if(taxiCall.state==='here'&&taxiCall.t-(taxiCall.tryT||0)>1.5){taxiCall.tryT=taxiCall.t;boardTaxi(true);}
     else if(taxiCall.state==='coming'){const d=dist(c.x,c.y,player.x,player.y);if(taxiCall.mark==null||d<taxiCall.mark-12){taxiCall.mark=d;taxiCall.markT=taxiCall.t;}
       if(taxiCall.t-(taxiCall.markT||0)>5){const pickup=c.target!=null&&c.target>=0?c.target:nearestNode(player.x,player.y,world.carAdj,200);taxiSend(c,pickup);taxiCall.mark=dist(c.x,c.y,player.x,player.y);taxiCall.markT=taxiCall.t;}}}
   tripTimer-=dt;if(tripTimer<=0){tripTimer=0.5;journeyTick();navTick();updateTripBox();}}
@@ -173,8 +178,8 @@ function taxiEta(m){const sec=Math.max(0,m)/8;if(sec<45)return 'меньше м�
 function updateTripBox(){const b=$('#tripBox');let t=null;const p=player.busPlan;
   if(taxiCall&&taxiCall.car){const d=dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y),where=taxiRideWhere(taxiCall.dest);
     t=taxiCall.state==='here'
-      ?(d<12?`🚕 Такси здесь. Нажмите E — сядете и поедете ${where}`:`🚕 Такси ждёт в ${fmtDist(d)}. Подойдите и нажмите E — поедете ${where}`)
-      :`🚕 Ваше такси едет к вам · ${fmtDist(d)} · ${taxiEta(d)}. Потом E — сесть и ехать ${where}`;}
+      ?`🚕 Такси на месте. Садимся и едем ${where}`
+      :`🚕 Ваше такси едет к вам · ${fmtDist(d)} · ${taxiEta(d)}. Как подъедет — сядете сами и поедете ${where}`;}
   else if(player.vehicle&&player.vehicle.kind==='taxi'){const where=taxiRideWhere(player.vehicle.dest);t=`🚕 Уже едем ${where} · осталось ${fmtDist(dist(player.x,player.y,player.vehicle.dest.x,player.vehicle.dest.y))}. Само довезёт`;}
   else if(player.navDest)t=player.navPaused?`🚶 Пауза: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`:`🚶 Идём: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`;
   else if(p)t=p.stage==='walk'?`🚌 Идём к остановке «${p.fromName}» (${p.route.ref})`:p.stage==='wait'?`🚌 Ждём ${p.route.ref} на «${p.fromName}»`:`🚌 ${p.route.ref} · выходим на «${p.toName}»`;

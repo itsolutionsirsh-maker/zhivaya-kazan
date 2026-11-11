@@ -40,11 +40,11 @@ function raidApplyPhase(next){
 }
 function raidSpawn(kind,lane,spread){
   lane=lane==null?RAID.seq++:lane;
-  const y=72+(lane%2)*36;
+  const y=28+(lane%2)*22;
   const speed=kind==='flamingo'?46:54;
   const fromLeft=lane%2===0;
   const x=fromLeft?-80:W+80;
-  return {kind,x,y,baseY:y,vx:(fromLeft?1:-1)*speed,vy:0,state:'fly',fall:0,spin:Math.random()<0.5?-1:1,flap:lane*1.3,size:kind==='flamingo'?0.72:0.62,style:'wing',lucky:false,wobble:lane};
+  return {kind,x,y,baseY:y,vx:(fromLeft?1:-1)*speed,vy:0,state:'fly',fall:0,spin:Math.random()<0.5?-1:1,flap:lane*1.3,size:kind==='flamingo'?0.72:1,style:'wing',lucky:false,wobble:lane};
 }
 function raidSeed(kind,n){for(let i=0;i<n;i++)RAID.craft.push(raidSpawn(kind,i,true));}
 function raidStart(){}
@@ -52,7 +52,7 @@ function raidDropButton(){const b=document.getElementById('raidBtn');if(b)b.remo
 function raidSyncBats(){
   if(!RAID.bats.length)RAID.bats.push({cool:2.4,aim:-Math.PI/2});
   RAID.bats.length=1;
-  RAID.bats[0].x=W*0.5;RAID.bats[0].y=Math.min(H*0.72,H-120);
+  RAID.bats[0].x=46;RAID.bats[0].y=H-28;
 }
 function raidShoot(dt){
   raidSyncBats();
@@ -145,12 +145,16 @@ function raidTick(dt){
 function raidDrawDrone(c,t){
   ctx.save();ctx.translate(c.x,c.y);
   const dir=c.vx>=0?1:-1;ctx.scale(dir*c.size,c.size);
-  if(c.state==='hit'){ctx.globalAlpha=Math.max(0,1-c.fall/1.6);ctx.rotate(c.fall*c.spin);}
-  ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(0,10,16,3,0,0,6.3);ctx.fill();
-  ctx.fillStyle='#3a424c';ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(-18,-7);ctx.lineTo(-26,-2);ctx.lineTo(-18,0);ctx.lineTo(-26,2);ctx.lineTo(-18,7);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#5c6772';ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(-6,-16);ctx.lineTo(-10,-14);ctx.lineTo(-2,0);ctx.lineTo(-10,14);ctx.lineTo(-6,16);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#d5dde6';ctx.fillRect(16,-1.1,5,2.2);
-  ctx.fillStyle='#c23b3b';ctx.fillRect(-4,-1,3,2);
+  if(c.state==='hit'){ctx.globalAlpha=Math.max(0,1-c.fall/1.6);ctx.rotate(c.fall*c.spin*0.35);}
+  ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(0,16,26,3.2,0,0,6.3);ctx.fill();
+  ctx.fillStyle='#4e564c';ctx.beginPath();
+  ctx.moveTo(4,-3.2);ctx.lineTo(-6,-32);ctx.lineTo(2,-31);ctx.lineTo(4,-3.2);
+  ctx.moveTo(4,3.2);ctx.lineTo(-6,32);ctx.lineTo(2,31);ctx.lineTo(4,3.2);ctx.fill();
+  ctx.fillStyle='#2c322e';ctx.beginPath();ctx.ellipse(2,0,24,4.6,0,0,6.3);ctx.fill();
+  ctx.fillStyle='#3c443e';ctx.beginPath();ctx.moveTo(26,0);ctx.lineTo(16,-3.4);ctx.lineTo(16,3.4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#3a413c';ctx.beginPath();ctx.moveTo(-14,-1.6);ctx.lineTo(-30,-11);ctx.lineTo(-26,-11);ctx.lineTo(-12,0);ctx.lineTo(-26,11);ctx.lineTo(-30,11);ctx.lineTo(-14,1.6);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(220,224,214,.7)';ctx.lineWidth=1.1;ctx.beginPath();ctx.ellipse(27,0,1.2,8,t*24,0,6.3);ctx.stroke();
+  ctx.fillStyle='#7f949c';ctx.beginPath();ctx.ellipse(8,0,4.2,2.1,0,0,6.3);ctx.fill();
   ctx.restore();
 }
 function raidDrawFlamingo(c,t){
@@ -195,8 +199,7 @@ function raidDraw(){
     g.addColorStop(0,`rgba(120,16,28,${0.16+pulse*0.08})`);
     g.addColorStop(0.45,'rgba(120,16,28,0)');
     g.addColorStop(1,`rgba(80,10,16,${0.05+pulse*0.04})`);
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle=`rgba(226,48,62,${0.28+pulse*0.45})`;ctx.lineWidth=5;ctx.strokeRect(3,3,W-6,H-6);
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,Math.min(70,H*0.12));
   }
   raidSyncBats();
   for(const b of RAID.bats)raidDrawBattery(b,t);
