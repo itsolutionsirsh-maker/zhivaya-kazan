@@ -97,11 +97,13 @@ function seatHomeTogether(it){if(!companion)return;const npc=it.npcs.find(n=>n.c
     ?(npc.p.female?`Сели в «${it.name}». Кофе или чай — и поговорим.`:`Сели в «${it.name}». Закажем и спокойно поговорим.`)
     :it.kind==='hotelroom'
     ?(npc.p.female?'Номер наш. Садись, отсюда город видно. Поговорим.':'Номер наш. Садись, поговорим спокойно.')
-    :why==='repair'
-    ?(npc.p.female?'Я на месте. Покажи, где под раковиной, — гайку гляну. Потом договорим здесь.':'Я на месте. Покажи, где течёт. Потом договорим здесь.')
-    :why==='tea'
-    ?(npc.p.female?'Садись. Чайник ставлю, и спокойно поговорим.':'Садись. Чай поставлю, и поговорим.')
-    :(npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.');
+    :(it.kind==='home'||it.kind==='guest')
+    ?(why==='repair'
+      ?(npc.p.female?'Я на месте. Покажи, где под раковиной, — гайку гляну. Потом договорим здесь.':'Я на месте. Покажи, где течёт. Потом договорим здесь.')
+      :why==='tea'
+      ?(npc.p.female?'Садись. Чайник ставлю, и спокойно поговорим.':'Садись. Чай поставлю, и поговорим.')
+      :(npc.p.female?'Ну вот, мы дома. Садись, я чайник поставлю.':'Ну вот, мы дома. Садись, рассказывай.'))
+    :`Мы на месте, «${it.name}». Здесь и поговорим.`;
   setTimeout(()=>{if(scene!=='interior'||interior!==it)return;openChat(npc);appendMsg('npc',line);npc.p.memory.push({role:'assistant',content:line});
     const warm=typeof weather!=='undefined'&&weather&&weather.t!=null?weather.t>=16:true;
     if(it.kind==='home'&&warm&&!npc.p.coatOff)setTimeout(()=>{if(scene!=='interior'||interior!==it)return;const coat=npc.p.female?pick(['Жарко тут. Куртку сниму, ладно? В свитере даже уютнее. Можно сяду ближе?','Ну и тепло у тебя. Повешу куртку. В свитере я вроде ничего, скажи честно.','Сейчас куртку сниму, а то запарюсь. И давай уже говорить нормально, не как в подъезде.']):pick(['Жарко. Куртку сниму и сяду ближе, если не против.','Печка у тебя. Куртку повешу. В свитере как-то живее, да?']);npc.p.coatOff=true;npc.p.memory.push({role:'assistant',content:coat});if(chatNpc===npc&&!$('#chatModal').hidden)appendMsg('npc',coat);else addEvent(`${npc.p.name}: ${coat}`,'say');},3200);

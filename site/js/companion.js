@@ -54,6 +54,7 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     if(bd<1.5&&c.ri<R.length-1)c.ri++;
     if(pd>11&&!c.autoIn){look();updateCompBox();return;}   // ждёт, пока игрок догонит
     stepTo(w,R[c.ri],pd>5?WALK_SPEED*1.1:WALK_SPEED*0.9,dt,true);   // ведёт в темпе игрока
+    if(c.dest.guest&&dist(w.x,w.y,c.dest.x,c.dest.y)<16&&pd<34){c.arrived=true;player.escort=false;if(typeof guestEnter==='function')guestEnter();updateCompBox();return;}
     if(c.autoIn&&dist(w.x,w.y,c.dest.x,c.dest.y)<16&&pd<32){enterHangout();return;}
     if(!c.autoIn&&dist(w.x,w.y,c.dest.x,c.dest.y)<14&&pd<26){c.arrived=true;if(c.dest.host){addEvent(`Вы с ${w.p.name} у вашего подъезда. Заходите домой вместе`,'say');setHint('E — зайти домой');}else if(c.dest.guest){addEvent(`Вы с ${w.p.name} у ${w.p.female?'её':'его'} подъезда. Заходите — чай уже ждёт`,'say');setHint('E — зайти в гости');}else{addEvent(`Вы с ${w.p.name} пришли: ${qName(c.dest.n)}. Заходите — ${w.p.female?'она зайдёт':'он зайдёт'} с вами`,'say');setHint(`Пришли в ${qName(c.dest.n)}. E у входа — зайти вместе`);}}
     updateCompBox();return;}
@@ -65,7 +66,8 @@ function updateCompanion(dt){if(!companion)return;const c=companion,w=c.w;c.t+=d
     if(w.cwps&&w.wi<w.cwps.length){const q=w.cwps[w.wi];if(dist(w.x,w.y,q[0],q[1])<0.8)w.wi++;else stepTo(w,q,spd,dt,true);}else stepTo(w,T,spd,dt);}
   updateCompBox();}
 function enterHangout(){const c=companion;if(!c||!c.dest||c.knock)return;c.knock=true;c.autoIn=false;player.escort=false;player.waypoints=null;
-  const poi=c.dest.poi||{};const kind=poi.t==='cafe'?'cafe':'bar';
+  const poi=c.dest.poi||{};let kind=poi.t==='pub'?'bar':(poi.t||'cafe');
+  if(!/^(cafe|bar|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school|prosecutor)$/.test(kind))kind='cafe';
   const src={kind,name:c.dest.n,key:kind+':'+(poi.i!=null?poi.i:c.dest.n),x:c.dest.x,y:c.dest.y,together:true,st:poi.st||''};
   const p=wNear(c.dest.x,c.dest.y);player.x=p[0];player.y=p[1];c.w.x=p[0]+0.7;c.w.y=p[1];
   if(typeof enterInterior==='function')enterInterior(src);
@@ -118,10 +120,13 @@ function beerPlan(w){if(w.p&&w.p.age<18)return {reply:'Пиво мне рано.
   return goSpot(w,bar,'По пиву — да.');}
 function cafePlan(w){const c=spotKind(w,['cafe'])||spotKind(w,['bar']);if(!c)return {reply:'Кафе рядом не вижу. Назови, какое — провожу.',action:'follow',place:'',sure:true};return goSpot(w,c,'Кофе — можно.');}
 function foodPlan(w){const c=spotKind(w,['cafe'])||spotKind(w,['bar'])||spotKind(w,['market']);if(!c)return {reply:'Поесть я не против, но заведения рядом не вижу. Куда пойдём?',action:'none',place:'',sure:true};return goSpot(w,c,'Поесть — давай.');}
+const HANG_KINDS=[['аптек','pharmacy','В аптеку — да.'],['музе','museum','В музей — да.'],['библиотек','library','В библиотеку — да.'],['универ|кфу|вуз','university','В универ — да.'],['театр','theatre','В театр — да.'],['магаз|продукт','shop','В магазин — да.'],['рынок|базар','market','На рынок — да.'],['больниц|поликлиник','hospital','В больницу — да.'],['банк','bank','В банк — да.']];
+function hangPlan(w,t){for(const row of HANG_KINDS){if(new RegExp(row[0]).test(t)){const p=spotKind(w,[row[1]]);if(!p)return {reply:'Рядом такого места не вижу. Назови, какое — и пойдём.',action:'follow',place:'',sure:true};return goSpot(w,p,row[2]);}}return null;}
 function answerWhere(w,t){const blob=talkBlob(w)+' '+t;
   if(beerAsk(blob))return beerPlan(w);
   if(cafeAsk(blob))return cafePlan(w);
   if(foodAsk(blob))return foodPlan(w);
+  const hang=hangPlan(w,blob);if(hang)return hang;
   if(/домой|ко мне/.test(blob))return {reply:player.home?'Домой — так домой. Веди, я с тобой.':'Домой можно, только сначала покажи, где твой дом.',action:'follow',place:'',sure:true};
   if(typeof companion!=='undefined'&&companion&&companion.w&&(companion.w===w||companion.w===w.companionOf)&&companion.dest&&companion.dest.n)return {reply:'Мы идём в «'+companion.dest.n+'».',action:'none',place:'',sure:true};
   return {reply:'Куда именно? Скажи: бар, кафе, Кремль — и я отвечу, иду или нет.',action:'none',place:'',sure:true};}
@@ -131,13 +136,14 @@ function scriptedThink(w,text){const t=norm(text);if(!t)return null;const she=sh
   if(beerAsk(t)&&(inviteAsk(t)||/хочу|давай|можно|по пив/.test(t)||t.length<40))return beerPlan(w);
   if(cafeAsk(t)&&inviteAsk(t))return cafePlan(w);
   if(foodAsk(t)&&(inviteAsk(t)||/хочу|давай|можно/.test(t)))return foodPlan(w);
+  const hang=hangPlan(w,t);if(hang&&(inviteAsk(t)||whereAsk(t)||t.length<48))return hang;
   if(inviteAsk(t))return {reply:'Иду. Только скажи куда — сам не угадаю.',action:'follow',place:'',sure:true};
   if(/^(привет|здравств|здорово|салам|исенме|добрый|доброе|хай)( |$)/.test(t))return {reply:'Привет. Я '+name+', '+((w.p&&w.p.job)||'живу тут')+'.',action:'none',place:'',sure:true};
   if(/как дела|как ты|как сам|как сама|как жизнь|как настроен/.test(t))return {reply:'Нормально, настроение '+(w.p&&w.p.mood||'ровное')+'. А у тебя?',action:'none',place:'',sure:true};
   if(/как зовут|кто ты|ты кто|чем занима|кем работ|где учиш|студент/.test(t))return {reply:'Я '+name+', '+((w.p&&w.p.age)?w.p.age+' лет, ':'')+((w.p&&w.p.job)||'местный')+'.',action:'none',place:'',sure:true};
   if(/спасибо|благодар|рахмат|рәхмәт/.test(t))return {reply:'Не за что.',action:'none',place:'',sure:true};
   if(/погод|дожд|снег|холодн|жаркий|тепло/.test(t))return {reply:'Сейчас '+(typeof weatherText==='function'?weatherText():'как обычно')+'.',action:'none',place:'',sure:true};
-  if(/^(да|ок|окей|хорошо|ладно|го|ага|угу|конечно)$/.test(t)){const blob=talkBlob(w);if(beerAsk(blob))return beerPlan(w);if(cafeAsk(blob))return cafePlan(w);if(foodAsk(blob))return foodPlan(w);return {reply:'Хорошо. Куда тогда?',action:'none',place:'',sure:true};}
+  if(/^(да|ок|окей|хорошо|ладно|го|ага|угу|конечно)$/.test(t)){const blob=talkBlob(w);if(beerAsk(blob))return beerPlan(w);if(cafeAsk(blob))return cafePlan(w);if(foodAsk(blob))return foodPlan(w);const hang=hangPlan(w,blob);if(hang)return hang;return {reply:'Хорошо. Куда тогда?',action:'none',place:'',sure:true};}
   if(/почему|зачем/.test(t))return {reply:'Про что именно? Если про дорогу — скажи, куда идём.',action:'none',place:'',sure:true};
   if(/^(что|как|когда|кто|сколько|зачем|почему)( |$)/.test(t)||/\?/.test(String(text)))return {reply:'Уточни вопрос: куда идём, как дела или кто я. Так я отвечу по делу, а не мимо.',action:'none',place:'',sure:false};
   return {reply:'Слышу. Если зовёшь куда-то — скажи куда. Если просто разговор — я на связи.',action:'none',place:'',sure:false};}
@@ -205,7 +211,7 @@ function applyNpcAction(w,r){const real=w.companionOf||w;
       nw.inside=true;w.companionOf=nw;}
     if(homeAsk)return walkHomeTogether(w.companionOf||(w.isInterior?null:w));
     startCompanion(w.companionOf||w,r.action,r.place);
-    const c=companion;if(c&&c.dest&&c.dest.poi&&/^(bar|cafe|pub)$/.test(c.dest.poi.t||'')){c.autoIn=true;player.escort=true;if(typeof followPlayer==='function')followPlayer();if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();setHint('Идёте вдвоём. У двери зайдёте сами');addEvent(`${c.w.p.name} ведёт в ${qName(c.dest.n)}. Идёте вдвоём`,'say');}
+    const c=companion;if(c&&c.dest&&c.dest.poi&&/^(bar|cafe|pub|shop|bank|office|theatre|museum|hotel|pharmacy|hospital|university|library|worship|police|market|school|prosecutor)$/.test(c.dest.poi.t||'')){c.autoIn=true;player.escort=true;if(typeof followPlayer==='function')followPlayer();if(typeof closeChat==='function'&&typeof chatNpc!=='undefined'&&chatNpc)closeChat();setHint('Идёте вдвоём. У двери зайдёте сами');addEvent(`${c.w.p.name} ведёт в ${qName(c.dest.n)}. Идёте вдвоём`,'say');}
     return c?(c.dest?`${w.p.name} идёт с вами в ${qName(c.dest.n)}`:`${w.p.name} идёт с вами`):null;}
   if(r.action==='stop'&&companion&&companion.w===real){stopCompanion(true);return `${w.p.name} больше не идёт с вами`;}
   return null;}
