@@ -32,7 +32,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);fo
 #hud{position:fixed;inset:0;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:grid;grid-template-rows:auto 1fr auto;gap:8px}
 #hud > *{min-width:0}
 .top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
-.card{background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);pointer-events:auto}
+.card{background:rgba(14,24,20,.48);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:auto;color:var(--fg)}
+.card h1,.card .t,.card .lbl,.card .money,.card .meta,.card .online{text-shadow:0 1px 2px rgba(0,0,0,.85)}
 .brand{padding:8px 14px 9px;display:flex;flex-direction:column;gap:1px}
 .brand h1{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.01em;margin:0;line-height:1.2}
 .brand small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
@@ -204,7 +205,7 @@ html.tg body{overscroll-behavior:none}:where(html.tg) .btn{min-height:40px}
 @media (max-width:640px),(pointer:coarse) and (max-height:500px){
   html,body{width:100%;max-width:100%;height:var(--ui-height);overflow:hidden;padding:0}
   #hud{inset:0 0 auto;height:var(--ui-height);padding:calc(var(--ui-top) + 8px) calc(var(--ui-right) + 8px) calc(var(--ui-bottom) + 8px) calc(var(--ui-left) + 8px);gap:6px}
-  .card{background:rgba(14,24,20,.94)}
+  .card{background:rgba(14,24,20,.52)}
   .top{position:relative;display:flex;flex-direction:column;gap:4px;flex-wrap:nowrap}
   .brand,#mini{display:none}.hud-extra{width:100%;box-sizing:border-box}.hud-extra .btn{flex:1;min-height:40px}.clock{box-sizing:border-box;width:100%;padding:3px 5px;display:grid;grid-template-columns:minmax(44px,1fr) repeat(6,44px);gap:0;border-radius:12px}
   .clock .t{font-size:17px;text-align:center}.clock .meta{display:none}
@@ -343,7 +344,8 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 @media(max-width:680px){#territoryModal .box{width:100%}.territory-layout{grid-template-columns:1fr;gap:14px}#territoryMap{max-height:260px}#territoryList{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#territoryModal .ui-sheet-body{padding-bottom:16px}}
 /* Настоящая тревога МЧС (realworld.js): поверх всего, сворачивается в плашку */
 #alertBar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);z-index:400;max-width:640px;margin:0 auto;
-  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;background:#9E1C1C;color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:auto}
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;background:rgba(158,28,28,.72);color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.28);pointer-events:auto;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#alertBar b,#alertBar #alertText,#alertTitle{text-shadow:0 1px 2px rgba(0,0,0,.75)}
 #alertBar[hidden]{display:none}
 #alertBar.stale{filter:saturate(.45)}
 #alertTitle{font-size:15px;cursor:pointer}

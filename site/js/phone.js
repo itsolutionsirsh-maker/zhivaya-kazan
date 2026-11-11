@@ -87,7 +87,7 @@
 
   const btn=document.createElement('button');
   btn.type='button'; btn.id='zkToday'; btn.textContent='Сегодня';
-  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:19;border:0;border-radius:999px;padding:12px 16px;min-height:44px;min-width:44px;background:#132019;color:#EEF3EE;border:1px solid rgba(255,255,255,.12);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer';
+  btn.style.cssText='position:fixed;left:16px;top:78px;z-index:19;border:0;border-radius:999px;padding:12px 16px;min-height:44px;min-width:44px;background:rgba(19,32,25,.5);color:#EEF3EE;border:1px solid rgba(255,255,255,.16);font:600 14px/1.2 "IBM Plex Sans",system-ui;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-shadow:0 1px 2px rgba(0,0,0,.8)';
   const panel=document.createElement('section');
   panel.id='zkTodayPanel';
   panel.hidden=true;
