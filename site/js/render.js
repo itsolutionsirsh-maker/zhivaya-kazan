@@ -124,7 +124,7 @@ function render(){
   // ---- происшествия: обломки, конусы
   for(const ac of accidents){if(ac.medical)continue;ctx.fillStyle='rgba(40,30,20,.5)';for(let i=0;i<6;i++){ctx.beginPath();ctx.arc(ac.x+Math.cos(i*1.3)*(1+i*0.5),ac.y+Math.sin(i*1.7)*(1+i*0.4),0.3,0,TAU);ctx.fill();}if(ac.police&&ac.police.state==='scene'){ctx.fillStyle='#F2651F';for(let i=0;i<4;i++){const an=i*1.57+0.7;ctx.beginPath();ctx.arc(ac.x+Math.cos(an)*7,ac.y+Math.sin(an)*7,0.5,0,TAU);ctx.fill();}}}
   // ---- машины и транспорт
-  for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;if(c.ferz&&typeof ferzAura==='function')ferzAura(c.x,c.y,4.6);drawCarSprite(c.x,c.y,c.hx,c.hy,c.len,c.wid,c.color,c.kind,t,{crashed:c.crashed,flash:c.flash&&!c.crashed&&(c.target!=null||c.state==='scene'),roll:c.crashed?0:(c.speed||0)});if(c.ferz&&typeof ferzMark==='function')ferzMark(c);}
+  for(const c of cars){if(c.x<vx0-10||c.x>vx1+10||c.y<vy0-10||c.y>vy1+10)continue;if(c.ferz&&typeof ferzAura==='function')ferzAura(c.x,c.y,8);drawCarSprite(c.x,c.y,c.hx,c.hy,c.len,c.wid,c.color,c.kind,t,{crashed:c.crashed,flash:c.flash&&!c.crashed&&(c.target!=null||c.state==='scene'),roll:c.crashed?0:(c.speed||0)});if(c.ferz&&typeof ferzMark==='function')ferzMark(c);}
   for(const b of buses){if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20)continue;drawBusSprite(b);}
   drawRallyWorld(z,t);
   if(window.cityCourtyard)cityCourtyard.draw(z,vx0,vy0,vx1,vy1,night);

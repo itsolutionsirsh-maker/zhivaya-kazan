@@ -16,7 +16,13 @@ function ferzMark(c){if(!c)return;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(M
   ctx.fillStyle='#F4C542';rrect(ctx,-1.35,-0.38,2.7,0.62,0.1);ctx.fill();
   ctx.fillStyle='#1A1408';ctx.font='700 0.38px "IBM Plex Sans",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(c.plate||'ХАН 999',0,-0.07);
   ctx.restore();
-  ctx.save();ctx.translate(c.x,c.y);ctx.font='700 1.5px "IBM Plex Sans",sans-serif';ctx.textAlign='center';ctx.fillStyle='#F4C542';ctx.fillText(c.who||'Ферзь',0,-3.1);ctx.restore();}
+  if(typeof cam==='undefined'||typeof W==='undefined')return;
+  const z=cam.z||1,sx=(c.x-cam.x)*z+W/2,sy=(c.y-cam.y)*z+H/2-22;
+  if(sx<-50||sy<-20||sx>W+50||sy>H+20)return;
+  ctx.save();ctx.setTransform(typeof DPR!=='undefined'?DPR:1,0,0,typeof DPR!=='undefined'?DPR:1,0,0);
+  ctx.font='700 12px "IBM Plex Sans",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  const tw=ctx.measureText('ФЕРЗЬ').width;ctx.fillStyle='rgba(28,20,6,.9)';rrect(ctx,sx-tw/2-8,sy-9,tw+16,18,8);ctx.fill();
+  ctx.fillStyle='#F4C542';ctx.fillText('ФЕРЗЬ',sx,sy);ctx.restore();}
 function ferzBoot(){if(FERZ.car||typeof world==='undefined'||!world||!world.carNodes||!world.carNodes.length||typeof Car!=='function')return;
   const n=typeof nodeNear==='function'?nodeNear(world.carNodes,[player.x,player.y],500):world.carNodes[0];
   const c=new Car('car',n>=0?n:world.carNodes[0]);c.ferz=true;c.color='#141414';c.len=5.15;c.wid=2.15;c.vmax=18;c.plate='ХАН 999';c.who='Ферзь';c.ttl=0.4;cars.push(c);FERZ.car=c;}
@@ -62,8 +68,11 @@ function ferzManTick(){const w=FERZ.man,c=FERZ.car;if(!w)return;
   else if(FERZ.phase==='stay'){FERZ.stay-=1;w.state='companion';if(FERZ.stay<=0&&c){FERZ.phase='back';w.state='idle';ferzWalkTo(w,c.x,c.y);}}
   else if(FERZ.phase==='back'&&c&&dist(w.x,w.y,c.x,c.y)<7){const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);FERZ.man=null;FERZ.phase='';c.ttl=0.4;if(dist(c.x,c.y,player.x,player.y)<90)addEvent('Ферзь сел обратно. Номера те же, ХАН 999.','say');}}
 function ferzTick(){ferzPlayerRide();if(typeof scene!=='undefined'&&scene!=='city')return;if(!FERZ.car||FERZ.car.crashed||!cars.includes(FERZ.car)){FERZ.car=null;FERZ.guest=null;if(FERZ.man){const i=walkers.indexOf(FERZ.man);if(i>=0)walkers.splice(i,1);}FERZ.man=null;ferzBoot();return;}
-  if(FERZ.man){ferzManTick();return;}
-  const c=FERZ.car;if(dist(c.x,c.y,player.x,player.y)>1600&&!FERZ.guest){const n=nodeNear(world.carNodes,[player.x,player.y],280);if(n>=0){c.node=n;const p=world.nodes[n];c.x=p[0];c.y=p[1];c.path=null;c.state='idle';c.ttl=0.2;}}
+  if(FERZ.man){ferzManTick();ferzPin();return;}
+  const c=FERZ.car;
+  if(!FERZ.guest&&dist(c.x,c.y,player.x,player.y)>480){const n=nodeNear(world.carNodes,[player.x+rnd(-30,30),player.y+rnd(70,160)],220);if(n>=0){const p=world.nodes[n];c.node=n;c.x=p[0];c.y=p[1];c.path=null;c.state='idle';c.ttl=0.2;}}
+  if(!FERZ.hi&&dist(c.x,c.y,player.x,player.y)<320){FERZ.hi=1;addEvent('Мимо едет Ферзь: чёрный Урус, номера ХАН 999. На карте золотая метка.','say');}
+  ferzPin();
   if(FERZ.guest){FERZ.rideT+=1;const w=FERZ.guest;if(!w.p||w.state==='hurt'||FERZ.rideT>55||(c.state==='idle'&&FERZ.rideT>8)){ferzDrop();return;}
     w.x=c.x-(c.hy||0)*0.15;w.y=c.y+(c.hx||0)*0.15;w.hx=c.hx;w.hy=c.hy;w.state='companion';return;}
   FERZ.cool-=1;if(FERZ.cool>0)return;FERZ.cool=rnd(18,36);
@@ -79,4 +88,7 @@ if(typeof enterVehicle==='function'){const ferzIn0=enterVehicle;enterVehicle=fun
   if(player.vehicle&&player.vehicle.kind==='own'&&ferzOn()){player.vehicle.ferz=true;player.vehicle.color='#141414';player.vehicle.plate='ХАН 999';player.vehicle.spec=Object.assign({},player.vehicle.spec,{len:5.15,wid:2.15,vmax:20});addEvent('Вы за рулём Уруса. Номера ХАН 999. Пробки не ваши.');}
   return r;};}
 document.getElementById('ferzBtn')&&document.getElementById('ferzBtn').addEventListener('click',()=>{const m=document.getElementById('menuModal');if(m)m.hidden=true;if(typeof player!=='undefined')player.busy=false;ferzCard();});
+function ferzPin(){const c=FERZ.car;if(!c||typeof mark!=='function')return;const w=FERZ.man;mark(null,'ferz',w?w.x:c.x,w?w.y:c.y,'👑',w?'Ферзь пешком':'Ферзь · ХАН 999',{arrow:true,color:'#C6A15B'});}
+if(typeof Car==='function'&&Car.prototype.newGoal&&!Car.prototype.newGoal.ferz){const g0=Car.prototype.newGoal;const wrapped=function(goalNode){if(this.ferz&&(goalNode==null||goalNode<0)&&player&&typeof nodeNear==='function'){const j=nodeNear(world.carNodes,[player.x+rnd(-240,240),player.y+rnd(-240,240)],300);if(j>=0)goalNode=j;}return g0.call(this,goalNode);};wrapped.ferz=1;Car.prototype.newGoal=wrapped;
+  const p0=Car.prototype.pickNode;Car.prototype.pickNode=function(){if(this.ferz&&player){const n=nodeNear(world.carNodes,[player.x+rnd(-60,60),player.y+rnd(-140,140)],200);if(n>=0){const p=world.nodes[n];this.x=p[0];this.y=p[1];return n;}}return p0.call(this);};}
 window.ferzOn=ferzOn;window.ferzGrant=ferzGrant;
