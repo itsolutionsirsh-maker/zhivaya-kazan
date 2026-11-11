@@ -2,14 +2,14 @@
 // Компания за столом: общий кадр из фото тех, кто сидит рядом.
 const FACE_BANDS={
   f:[
-    ['f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/veronika','color/yulduz','color/zaynab','color/sufiya','core/alsu','core/fidania','core/gulnara','core/zulfiya'],
-    ['f-36','f-44','color/camilla','color/sufiya','core/gulnara'],
-    ['f-58','f-70']
+    ['gen-f1','gen-f2','gen-f3','gen-f4','gen-f5','f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/veronika','color/yulduz','color/zaynab','color/sufiya','core/alsu','core/fidania','core/gulnara','core/zulfiya'],
+    ['gen-f4','gen-f6','f-36','f-44','color/camilla','color/sufiya','core/gulnara'],
+    ['gen-f6','gen-f7','f-44']
   ],
   m:[
-    ['m-23','m-29','color/mark','color/timur','color/iskander','color/nail','color/farhad','color/gleb','color/edgar','color/hakim','core/ildar','core/lenar','core/marat','core/rinat'],
-    ['m-37','m-46','color/robert','color/iskander','core/marat'],
-    ['m-60','m-72','color/pavel']
+    ['gen-m1','gen-m2','gen-m3','m-23','m-29','color/mark','color/timur','color/iskander','color/nail','color/farhad','color/gleb','color/edgar','color/hakim','core/ildar','core/lenar','core/marat','core/rinat'],
+    ['gen-m3','gen-m4','m-37','m-46','color/robert','color/iskander','core/marat'],
+    ['gen-m4','gen-m5','m-46']
   ]
 };
 const faceImg={};
