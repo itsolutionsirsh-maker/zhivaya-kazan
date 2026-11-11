@@ -171,7 +171,7 @@
     for(const c of convoy)close=Math.min(close,dist(c.x,c.y,player.x,player.y));
     if(close<85&&!nearTold){
       nearTold=1;
-      setHint('Кортеж: '+run.role.title+'. Дорога перекрыта — на тротуар.');
+      setHint(player.vehicle?'Кортеж: '+run.role.title+'. Такси притормозит и пропустит, само не выходите.':'Кортеж: '+run.role.title+'. Дорога перекрыта — на тротуар.');
       addEvent('Сирена. ГАИ кричит сойти на тротуар. '+run.role.title+' едет по встречке и смотрит в никуда.');
     }
     barkT-=dt;
@@ -183,8 +183,12 @@
     if(run.barkTtl>0)run.barkTtl-=dt;
     const light=player.vehicle&&typeof isLightVehicle==='function'&&isLightVehicle(player.vehicle.kind);
     if(player.vehicle&&!light){
-      if(close<7){player.vehicle.cortegeBrake=2;player.vehicle.speed=0;setHint('Кортеж не объехать. Стойте, пока проедут.');}
-      else if(close<18)player.vehicle.cortegeBrake=1;
+      if(close<7){
+        player.vehicle.holdT=(player.vehicle.holdT||0)+dt;
+        if(player.vehicle.kind==='taxi'&&player.vehicle.holdT>4){run.speed=Math.max(run.speed,13);player.vehicle.cortegeBrake=0;setHint('Кортеж проехал. Такси едет дальше.');}
+        else{player.vehicle.cortegeBrake=2;player.vehicle.speed=0;setHint('Кортеж рядом. Несколько секунд стоим, потом едем.');}
+      }
+      else{if(close>=18)player.vehicle.holdT=0;if(close<18)player.vehicle.cortegeBrake=1;}
     }
     if(typeof cars!=='undefined'){
       for(const c of cars){

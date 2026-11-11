@@ -98,16 +98,30 @@ function busPlanExit(bus,stop){const p=player.busPlan;return !!(p&&p.stage==='ri
 function busPlanArrived(){const p=player.busPlan;if(!p)return;player.busPlan=null;addEvent(`Вышли на «${p.toName}»`);journeyFinishFoot(p.dest);updateTripBox();}
 
 // ---------- такси ----------
+function taxiSpot(pickup,px,py){const ids=[];world.ngrid.query(px-190,py-190,px+190,py+190,i=>{if(!hasAdj(world.carAdj,i)||i===pickup)return;const p=world.nodes[i];const d=Math.hypot(p[0]-px,p[1]-py);if(d>=80&&d<=175)ids.push(i);});
+  for(let n=ids.length-1;n>0;n--){const j=Math.floor(Math.random()*(n+1));const t=ids[n];ids[n]=ids[j];ids[j]=t;}
+  for(let k=0;k<6&&k<ids.length;k++){const path=astar(world.carAdj,ids[k],pickup,carCost,8000);if(path&&path.length>=2)return {node:ids[k],path};}
+  return null;}
+// машина сразу получает путь. Если до неё нет проезда или она стоит — ставим её на улицу в 80–175 м и она едет
+function taxiSend(car,pickup){const px=player.x,py=player.y;const near=car&&dist(car.x,car.y,px,py)<220&&car.node!=null;
+  let path=near&&pickup>=0?astar(world.carAdj,car.node,pickup,carCost,8000):null;
+  if(!path||path.length<2){const spot=pickup>=0?taxiSpot(pickup,px,py):null;
+    if(!car){car=new Car('taxi',spot?spot.node:(pickup>=0?pickup:nodeNear(world.carNodes,[px,py],350)));cars.push(car);}
+    if(spot){car.node=spot.node;const p=world.nodes[spot.node];car.x=p[0];car.y=p[1];car.path=null;car.speed=0;path=spot.path;}}
+  if(!car)return null;
+  car.taxiFor=true;car.target=pickup;car.vmax=16;car.crashed=false;
+  if(path&&path.length>=2){car.path=path;car.seg=0;car.t=0;car.state='drive';car.speed=8;car.routeWait=0;}
+  else{car.path=null;car.state='idle';car.ttl=0.05;}
+  return car;}
 function callTaxi(dest){if(!journeyAvailable()||!journeyDest(dest)){setHint('Сначала завершите текущую поездку');return false;}
   const len=pathLen(world.carAdj,player.x,player.y,dest.x,dest.y,carCost);if(!Number.isFinite(len)){setHint('Нет маршрута для такси');return false;}
   const errand=typeof errandCityRide==='function'&&errandCityRide('taxi');
   if(!errand&&player.money<TAXI.base)roadMoney('на такси');
   if(!errand&&player.money<TAXI.base){setHint('Не хватает денег даже на подачу такси');return false;}
-  cancelTrip(true);let car=null,bd=1e9;for(const c of cars){if(c.kind!=='taxi'||c.crashed||c.target!=null||c.taxiFor||c.state==='scene')continue;const d=dist(c.x,c.y,player.x,player.y);if(d<bd&&d<900){bd=d;car=c;}}
-  if(!car){car=new Car('taxi',nodeNear(world.carNodes,[player.x,player.y],350));cars.push(car);bd=dist(car.x,car.y,player.x,player.y);}
-  const pickup=nearestNode(player.x,player.y,world.carAdj,200);car.taxiFor=true;car.target=pickup;car.path=null;car.state='idle';car.ttl=0.05;car.vmax=14;
-  taxiCall={car,dest,state:'coming',t:0};if(typeof errandCityRide==='function'&&errandCityRide('taxi'))taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало');setHint('Такси ждёт: подойдите и нажмите E');updateTripBox();}};
-  addEvent(`Вызвали такси: ${dest.n}. Подача ≈ ${fmtMin(bd/9+20)}`);updateTripBox();return true;}
+  cancelTrip(true);let car=null,bd=1e9;for(const c of cars){if(c.kind!=='taxi'||c.crashed||c.target!=null||c.taxiFor||c.state==='scene')continue;const d=dist(c.x,c.y,player.x,player.y);if(d<bd&&d<220){bd=d;car=c;}}
+  const pickup=nearestNode(player.x,player.y,world.carAdj,200);car=taxiSend(car,pickup);if(!car){setHint('Рядом нет улицы для такси');return false;}
+  taxiCall={car,dest,state:'coming',t:0,mark:dist(car.x,car.y,player.x,player.y),markT:0};if(errand)taxiCall.errandRide=true;car.onScene=()=>{if(taxiCall&&taxiCall.car===car){taxiCall.state='here';addEvent('Такси подъехало');setHint('Такси ждёт: подойдите и нажмите E');updateTripBox();}};
+  addEvent(`Вызвали такси ${taxiRideWhere(dest)}. Сначала машина едет к вам, сядете по E — и она сама довезёт.`);updateTripBox();return true;}
 function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvailable())return false;const c=tc.car;
   if(!c||c.remove||!cars.includes(c)){setHint('Машина уже уехала. Вызовите другую');cancelTrip(true);return false;}
   if(c.crashed||dist(c.x,c.y,player.x,player.y)>9){setHint('Машина ждёт у обочины — подойдите ближе');return false;}
@@ -120,17 +134,28 @@ function boardTaxi(){const tc=taxiCall;if(!tc||tc.state!=='here'||!journeyAvaila
   if(window.citySaveShot)citySaveShot('Такси');
   if(tc.folkDriver&&typeof folkTaxiStart==='function')folkTaxiStart(tc.folkDriver,v);
   player.waypoints=null;player.waitingStop=null;player.vehicle.auto={wps:route,i:0};addEvent(`Едем на такси: ${tc.dest.n}`);updateTripBox();return true;}
-function taxiExit(){const v=player.vehicle;const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);if(v.errandRide)addEvent(`Такси по поручению: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ оплатил город`);else{journeyCharge(fare,'Оплата такси');addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);}const c=new Car('taxi',nearestNode(v.x,v.y,world.carAdj,120));c.x=v.x;c.y=v.y;c.hx=v.hx;c.hy=v.hy;c.ttl=2;cars.push(c);if(Math.random()<0.15)startSit('forgot',{car:c});
-  let ex=v.x-v.hy*1.8,ey=v.y+v.hx*1.8;if(inBuilding(ex,ey)){ex=v.x+v.hy*1.8;ey=v.y-v.hx*1.8;}player.x=ex;player.y=ey;const dest=v.dest;player.vehicle=null;
-  journeyHint('exiting',v,v.x,v.y,player.x,player.y);if(typeof folkTaxiEnd==='function')folkTaxiEnd(v);
-  if(dest)journeyFinishFoot(dest);updateTripBox();}
+function taxiExit(){const v=player.vehicle;if(!v)return;
+  const km=(v.odo||0)/1000;const fare=v.fixedFare!=null?v.fixedFare:Math.round(TAXI.base+km*TAXI.km);
+  const dest=v.dest;v.auto=null;v.cortegeBrake=0;player.vehicle=null;player.busy=false;
+  let ex=v.x-(v.hy||0)*1.8,ey=v.y+(v.hx||1)*1.8;
+  try{if(inBuilding(ex,ey)){ex=v.x+(v.hy||0)*1.8;ey=v.y-(v.hx||1)*1.8;}if(inBuilding(ex,ey)&&typeof toSidewalk==='function'){const q=toSidewalk(v.x,v.y);if(q){ex=q[0];ey=q[1];}}}catch(e){}
+  player.x=ex;player.y=ey;player.hx=v.hx||0;player.hy=v.hy||1;
+  try{if(v.errandRide)addEvent(`Такси по поручению: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ оплатил город`);else{journeyCharge(fare,'Оплата такси');addEvent(v.fixedFare!=null?`Бомбила ${v.driver||''}: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽ — как договорились`:`Такси: ${km.toFixed(1).replace('.',',')} км, ${fare} ₽`);}}catch(e){}
+  try{const n=nearestNode(v.x,v.y,world.carAdj,180);if(n>=0){const c=new Car('taxi',n);c.x=v.x;c.y=v.y;c.hx=v.hx||1;c.hy=v.hy||0;c.ttl=2;cars.push(c);}}catch(e){}
+  try{journeyHint('exiting',v,v.x,v.y,player.x,player.y);}catch(e){}
+  try{if(typeof folkTaxiEnd==='function')folkTaxiEnd(v);}catch(e){}
+  if(dest){try{journeyFinishFoot(dest);}catch(e){}}
+  try{updateTripBox();}catch(e){}
+  setHint('Вы вышли из такси');}
 function cancelTrip(silent){JOURNEY.rental=null;JOURNEY.resume=null;if(!player.vehicle&&!player.bus)player.waypoints=null;if(taxiCall){const c=taxiCall.car;c.taxiFor=false;c.target=null;c.onScene=null;c.state='idle';c.ttl=0.5;taxiCall=null;if(!silent)addEvent('Такси отменено');}
   if(player.busPlan){player.busPlan=null;player.waitingStop=null;if(!silent)addEvent('Поездка на автобусе отменена');}
   if(player.navDest){player.navDest=null;player.navPaused=false;player.waypoints=null;if(!silent)addEvent('Маршрут отменён');}updateTripBox();}
 function updateTransport(dt){const p=player.busPlan;
   if(p&&p.stage==='walk'&&!player.bus&&!player.vehicle&&!player.inside&&dist(player.x,player.y,p.stopPt[0],p.stopPt[1])<7){p.stage='wait';player.waypoints=null;player.waitingStop={x:p.stopPt[0],y:p.stopPt[1],n:p.fromName};setHint(`Ждём ${busWord(p.route.type).toLowerCase()} ${p.route.ref} на «${p.fromName}»`);updateTripBox();}
   if(p&&p.stage==='wait'&&player.bus){p.stage='ride';updateTripBox();}
-  if(taxiCall){taxiCall.t+=dt;const c=taxiCall.car;if(c.crashed||c.remove||(taxiCall.state==='coming'&&taxiCall.t>150)){addEvent('Таксист не смог подъехать — вызовите ещё раз');cancelTrip(true);}}
+  if(taxiCall){taxiCall.t+=dt;const c=taxiCall.car;if(!c||c.crashed||c.remove||(taxiCall.state==='coming'&&taxiCall.t>150)){addEvent('Таксист не смог подъехать — вызовите ещё раз');cancelTrip(true);}
+    else if(taxiCall.state==='coming'){const d=dist(c.x,c.y,player.x,player.y);if(taxiCall.mark==null||d<taxiCall.mark-12){taxiCall.mark=d;taxiCall.markT=taxiCall.t;}
+      if(taxiCall.t-(taxiCall.markT||0)>5){const pickup=c.target!=null&&c.target>=0?c.target:nearestNode(player.x,player.y,world.carAdj,200);taxiSend(c,pickup);taxiCall.mark=dist(c.x,c.y,player.x,player.y);taxiCall.markT=taxiCall.t;}}}
   tripTimer-=dt;if(tripTimer<=0){tripTimer=0.5;journeyTick();navTick();updateTripBox();}}
 let tripTimer=0;
 // ---------- пешком на автопилоте: идёт сам; джойстик или WASD — пауза, идёте сами; «Продолжить» — снова ведёт ----------
@@ -143,16 +168,36 @@ function navResume(){const d=player.navDest;if(!d)return;player.navPaused=false;
 function navTick(){const d=player.navDest;if(!d||player.navPaused)return;if(player.bus||player.vehicle||player.inside){player.navDest=null;updateTripBox();return;}
   if(dist(player.x,player.y,d.x,d.y)<14){player.navDest=null;player.waypoints=null;if(typeof maybeEnterHomeTogether==='function'&&maybeEnterHomeTogether()){updateTripBox();return;}if(typeof maybeEnterHotelTogether==='function'&&maybeEnterHotelTogether()){updateTripBox();return;}addEvent(`Пришли: ${d.n}`);setHint(`Вы на месте: ${d.n}`);updateTripBox();return;}
   if(!player.waypoints&&!player.crossWait){player.navPaused=true;updateTripBox();}}
+function taxiRideWhere(dest){const n=dest&&dest.n?String(dest.n):'';if(/^домой/i.test(n))return 'домой';return n?`к «${n}»`:'по выбранному адресу';}
+function taxiEta(m){const sec=Math.max(0,m)/8;if(sec<45)return 'меньше минуты';const min=Math.max(1,Math.round(sec/60));return `≈ ${min} мин`;}
 function updateTripBox(){const b=$('#tripBox');let t=null;const p=player.busPlan;
-  if(taxiCall)t=taxiCall.state==='here'?`🚕 Такси ждёт · ${fmtDist(dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y))}`:`🚕 Такси едет к вам · ${fmtDist(dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y))}`;
-  else if(player.vehicle&&player.vehicle.kind==='taxi')t=`🚕 Едем: ${player.vehicle.dest.n} · ${fmtDist(dist(player.x,player.y,player.vehicle.dest.x,player.vehicle.dest.y))}`;
+  if(taxiCall&&taxiCall.car){const d=dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y),where=taxiRideWhere(taxiCall.dest);
+    t=taxiCall.state==='here'
+      ?(d<12?`🚕 Такси здесь. Нажмите E — сядете и поедете ${where}`:`🚕 Такси ждёт в ${fmtDist(d)}. Подойдите и нажмите E — поедете ${where}`)
+      :`🚕 Ваше такси едет к вам · ${fmtDist(d)} · ${taxiEta(d)}. Потом E — сесть и ехать ${where}`;}
+  else if(player.vehicle&&player.vehicle.kind==='taxi'){const where=taxiRideWhere(player.vehicle.dest);t=`🚕 Уже едем ${where} · осталось ${fmtDist(dist(player.x,player.y,player.vehicle.dest.x,player.vehicle.dest.y))}. Само довезёт`;}
   else if(player.navDest)t=player.navPaused?`🚶 Пауза: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`:`🚶 Идём: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`;
   else if(p)t=p.stage==='walk'?`🚌 Идём к остановке «${p.fromName}» (${p.route.ref})`:p.stage==='wait'?`🚌 Ждём ${p.route.ref} на «${p.fromName}»`:`🚌 ${p.route.ref} · выходим на «${p.toName}»`;
   if(!t)t=journeyText();if(!t){b.hidden=true;return;}b.hidden=false;$('#tripLbl').textContent=t;$('#tripCancel').textContent=player.vehicle?'Выйти здесь':'Отменить';const rs=$('#tripResume');if(rs){rs.hidden=!(player.navDest&&player.navPaused)&&!JOURNEY.resume;rs.textContent=JOURNEY.resume?'Выбрать транспорт':'Продолжить';}}
-$('#tripCancel').addEventListener('click',()=>{if(player.vehicle){player.vehicle.dest=null;exitVehicle();return;}cancelTrip();});
+$('#tripCancel').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();try{if(player.vehicle){if(player.vehicle.kind==='taxi')player.vehicle.dest=null;exitVehicle();}else cancelTrip();}catch(err){player.vehicle=null;player.busy=false;if(typeof chatNpc!=='undefined')chatNpc=null;const m=$('#chatModal');if(m)m.hidden=true;setHint('Вы вышли');try{updateTripBox();}catch(e2){}}});
 $('#tripResume').addEventListener('click',()=>{if(JOURNEY.resume)openRouteModal(JOURNEY.resume);else navResume();});
 if($('#moneyLbl')){$('#moneyLbl').title='Если на такси не хватает — нажмите, придут деньги на дорогу';$('#moneyLbl').style.cursor='pointer';
   $('#moneyLbl').addEventListener('click',()=>{if(player.money>=5000){setHint(`На карте ${fmtMoney(player.money)}`);return;}if(!roadMoney('чтобы хватило на такси'))setHint('Сегодня деньги на дорогу уже приходили. Заработать можно сменой или поручением');});}
-function routeOverlay(toS){const d=(player.vehicle&&player.vehicle.dest)||(taxiCall&&taxiCall.dest)||(player.busPlan&&player.busPlan.dest);if(!d)return;const [sx,sy]=toS(d.x,d.y);
-  if(sx<0||sx>W||sy<0||sy>H)return;ctx.save();ctx.fillStyle='rgba(43,176,98,.95)';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-7,sy-14);ctx.arc(sx,sy-16,7,Math.PI*0.8,Math.PI*0.2);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx,sy-16,2.8,0,TAU);ctx.fill();
-  if(taxiCall){const [cx,cy]=toS(taxiCall.car.x,taxiCall.car.y);ctx.strokeStyle='#F4C542';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,10,0,TAU);ctx.stroke();}ctx.restore();}
+function routeOverlay(toS){const d=(player.vehicle&&player.vehicle.dest)||(taxiCall&&taxiCall.dest)||(player.busPlan&&player.busPlan.dest);
+  ctx.save();
+  if(d){const [sx,sy]=toS(d.x,d.y);
+    if(sx>=0&&sx<=W&&sy>=0&&sy<=H){ctx.fillStyle='rgba(43,176,98,.95)';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-7,sy-14);ctx.arc(sx,sy-16,7,Math.PI*0.8,Math.PI*0.2);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx,sy-16,2.8,0,TAU);ctx.fill();}}
+  // вызванное такси видно всегда: на карте — жёлтая метка и пунктир, за краем экрана — стрелка
+  if(taxiCall&&taxiCall.car&&typeof scene!=='undefined'&&scene==='city'){const c=taxiCall.car,[cx,cy]=toS(c.x,c.y),[px,py]=toS(player.x,player.y);
+    ctx.setLineDash([7,6]);ctx.strokeStyle='rgba(244,197,66,.95)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(cx,cy);ctx.stroke();ctx.setLineDash([]);
+    const word=taxiCall.state==='here'?'ждёт':'едет';const where=taxiRideWhere(taxiCall.dest);const label='🚕 '+word+' '+where+' · '+fmtDist(dist(c.x,c.y,player.x,player.y));
+    ctx.font='700 12px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline='middle';const tw=ctx.measureText(label).width+16;
+    const on=cx>20&&cx<W-20&&cy>96&&cy<H-64;
+    if(on){ctx.fillStyle='#F4C542';ctx.beginPath();ctx.arc(cx,cy,12,0,TAU);ctx.fill();ctx.strokeStyle='#2B2200';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='rgba(28,22,8,.92)';rrect(ctx,cx-tw/2,cy-36,tw,20,8);ctx.fill();ctx.fillStyle='#FFE58A';ctx.fillText(label,cx,cy-26);}
+    else{const dx=cx-W/2,dy=cy-H/2,an=Math.atan2(dy,dx);
+      const m=Math.min((W/2-40)/Math.max(0.2,Math.abs(Math.cos(an))),(H/2-130)/Math.max(0.2,Math.abs(Math.sin(an))));
+      const ex=clamp(W/2+Math.cos(an)*m,40,W-40),ey=clamp(H/2+Math.sin(an)*m,120,H-88);
+      ctx.translate(ex,ey);ctx.rotate(an);ctx.fillStyle='#F4C542';ctx.beginPath();ctx.moveTo(16,0);ctx.lineTo(-8,-9);ctx.lineTo(-8,9);ctx.closePath();ctx.fill();ctx.strokeStyle='#2B2200';ctx.lineWidth=1.5;ctx.stroke();ctx.rotate(-an);
+      ctx.fillStyle='rgba(28,22,8,.92)';rrect(ctx,-tw/2,-34,tw,20,8);ctx.fill();ctx.fillStyle='#FFE58A';ctx.fillText(label,0,-24);}}
+  ctx.restore();}

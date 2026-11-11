@@ -88,7 +88,7 @@ body.drunk #drunkFx{opacity:.75}body.wasted #drunkFx{opacity:1}
 #logList{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}#logList .ev{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;display:flex;gap:8px}#logList .ev .tm{font-family:var(--font-mono);color:var(--muted);font-size:11px;flex:none;padding-top:1px}#logList .ev.alert{border-color:rgba(220,58,68,.6)}#logList .ev.rally{border-color:rgba(142,68,173,.7)}
 #logBtn.ping{box-shadow:0 0 0 2px var(--gold)}
 #feed .ev.say,#logList .ev.say{border-color:rgba(43,176,98,.55)}
-#tripBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(244,197,66,.7);pointer-events:auto}#tripBox .btn{padding:3px 8px;font-size:11px}
+#tripBox{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel);padding:4px 6px 4px 10px;border-radius:9px;border:1px solid rgba(244,197,66,.7);pointer-events:auto;position:relative;z-index:8}#tripBox .btn{padding:3px 8px;font-size:11px;pointer-events:auto}
 #taxiRide{position:fixed;left:12px;bottom:96px;z-index:6;width:132px;aspect-ratio:3/4;border:0;padding:0;border-radius:16px;overflow:hidden;cursor:pointer;background:#1a2420 center 18%/cover no-repeat url("img/faces/taxi-driver.jpg");box-shadow:0 10px 28px rgba(0,0,0,.4)}
 #taxiRide[hidden]{display:none}#taxiRide span{position:absolute;left:0;right:0;bottom:0;padding:22px 8px 8px;background:linear-gradient(transparent,rgba(0,0,0,.78));color:#fff;font:600 12px "IBM Plex Sans",sans-serif;text-align:left}
 #rideShot{position:fixed;left:12px;bottom:96px;z-index:6;width:132px;aspect-ratio:3/4;border-radius:16px;overflow:hidden;pointer-events:none;background:#1a2420 center/cover no-repeat;box-shadow:0 10px 28px rgba(0,0,0,.4)}
@@ -613,7 +613,7 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
     <div class="persona"><div class="face" id="npcFace">А</div><div><b id="npcName">Айрат</b><span id="npcJob">студент</span></div><div class="face" id="meFace" hidden title="Вы"></div></div>
     <div class="chat" id="chatLog"></div>
     <div class="row"><input type="text" id="chatInput" placeholder="Скажите что-нибудь…" maxlength="200" style="flex:1"><button class="btn primary" id="chatSend">Сказать</button></div>
-    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl"></span><span style="display:flex;gap:8px"><button class="btn primary" id="chatGo" hidden>Поехать домой</button><button class="btn primary" id="chatStay" hidden>В номер</button><button class="btn" id="chatBath" hidden>В баню</button><button class="btn" id="taxiTip" hidden>На чай 200 ₽</button><button class="btn" id="chatOrder" hidden>🍽 Заказать ещё</button><button class="btn" id="chatClose">Попрощаться</button></span></div>
+    <div class="row" style="justify-content:space-between"><span class="online" id="brainLbl" hidden></span><span style="display:flex;gap:8px"><button class="btn primary" id="chatGo" hidden>Поехать домой</button><button class="btn primary" id="chatStay" hidden>В номер</button><button class="btn" id="chatBath" hidden>В баню</button><button class="btn" id="taxiTip" hidden>На чай 200 ₽</button><button class="btn" id="chatOrder" hidden>🍽 Заказать ещё</button><button class="btn" id="chatClose">Попрощаться</button></span></div>
   </div>
 </div>
 
@@ -719,12 +719,12 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 
 <script src="js/util.js"></script><script src="js/platform.js"></script>
 <script src="js/world.js"></script><script src="js/chunks.js"></script>
-<script src="js/agents.js"></script>
-<script src="js/vehicles.js"></script>
+<script src="js/agents.js?v=3"></script>
+<script src="js/vehicles.js?v=3"></script>
 <script src="js/interior-look.js?v=5"></script>
 <script src="js/venue-room.js?v=4"></script><script src="js/shared-venues.js?v=2"></script>
 <script src="js/interior.js?v=10"></script>
-<script src="js/rally.js?v=2"></script>
+<script src="js/rally.js?v=3"></script>
 <script src="js/modcore.js"></script>
 <script src="js/moderation.js"></script>
 <script src="js/net.js?v=3"></script>
@@ -732,10 +732,10 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/wallet.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/talk.js"></script>
-<script src="js/companion.js"></script>
-<script src="js/transport.js"></script><script src="js/journey.js"></script>
+<script src="js/companion.js?v=2"></script>
+<script src="js/transport.js?v=4"></script><script src="js/journey.js"></script>
 <script src="js/rhythm.js?v=2"></script>
-<script src="js/folk.js?v=3"></script>
+<script src="js/folk.js?v=4"></script>
 <script src="js/drunk.js"></script>
 <script src="js/situations.js"></script>
 <script src="js/sit-street.js"></script>
@@ -752,14 +752,14 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/events.js"></script>
 <script src="js/people.js?v=2"></script>
 <script src="js/story-ui.js"></script><script src="js/phone.js"></script>
-<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk-color.js?v=1"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/pay.js?v=2"></script><script src="js/render.js?v=3"></script>
-<script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/gangs.js"></script><script src="js/realworld-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
+<script src="js/fixtures.js"></script><script src="js/landmarks.js"></script><script src="js/roles.js"></script><script src="js/season.js"></script><script src="js/tutorial.js"></script><script src="js/folk2.js"></script><script src="js/folk-color.js?v=1"></script><script src="js/home-spots.js"></script><script src="js/engine.js"></script><script src="js/season-run.js"></script><script src="js/pay.js?v=3"></script><script src="js/render.js?v=3"></script>
+<script src="js/city-people.js"></script><script src="js/city-texts.js"></script><script src="js/prosecutor.js"></script><script src="js/folk-acts.js?v=2"></script><script src="js/neighbour-story.js"></script><script src="js/flats.js"></script><script src="js/housing.js"></script><script src="js/paper.js"></script><script src="js/gossip.js"></script><script src="js/weather-lines.js"></script><script src="js/gangs.js"></script><script src="js/realworld-lines.js"></script><script src="js/citymemory.js"></script><script src="js/fans.js"></script><script src="js/matchday.js"></script>
 <script src="js/stories.js"></script>
 <script src="js/story.js"></script>
 <script src="js/police-ride.js"></script>
 <script src="js/ambulance-ride.js"></script>
 <template id="zkLater"><script src="js/folk3.js"></script></template>
-<script src="js/faces.js?v=2"></script><script src="js/sky-slot.js"></script><script src="js/main.js?v=13"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js?v=2"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js?v=2"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js?v=2"></script><script src="js/street-look.js?v=3"></script><script src="js/hotels.js?v=5"></script><script src="js/counter.js?v=5"></script><script src="js/baths.js?v=2"></script><script src="js/bars.js?v=2"></script><script src="js/eats.js?v=1"></script><script src="js/bites.js?v=1"></script><script src="js/cafes.js?v=1"></script><script src="js/chains.js?v=1"></script><script src="js/dealers.js?v=1"></script>
+<script src="js/faces.js?v=2"></script><script src="js/sky-slot.js"></script><script src="js/main.js?v=15"></script><script src="js/errands.js"></script><script src="js/errand-run.js"></script><script src="js/guests.js"></script><script src="js/territories.js"></script><script src="js/yard-story.js"></script><script src="js/objectives.js"></script><script src="js/first-neighbor.js"></script><script src="js/courtyard-data.js"></script><script src="js/courtyard.js"></script><script src="js/realworld.js?v=2"></script><script src="js/shared-events.js"></script><script src="js/shared-layer.js"></script><script src="js/barista.js"></script><script src="js/taxi-players.js"></script><script src="js/court-life.js"></script><script src="js/ui.js?v=2"></script><script src="js/park-life.js"></script><script src="js/city-bits.js"></script><script src="js/guests-play.js"></script><script src="js/taxi-talk.js?v=3"></script><script src="js/ride-frame.js"></script><script src="js/scene-look.js?v=2"></script><script src="js/street-look.js?v=3"></script><script src="js/hotels.js?v=5"></script><script src="js/counter.js?v=5"></script><script src="js/baths.js?v=2"></script><script src="js/bars.js?v=2"></script><script src="js/eats.js?v=1"></script><script src="js/bites.js?v=1"></script><script src="js/cafes.js?v=1"></script><script src="js/chains.js?v=1"></script><script src="js/dealers.js?v=1"></script>
 <script src="js/moto.js"></script>
 <script src="js/services.js"></script>
 <script src="js/clubs.js?v=5"></script>
@@ -770,6 +770,6 @@ body.story-open,body:has(#zkTodayPanel:not([hidden])){touch-action:pan-y}
 <script src="js/spas.js?v=2"></script>
 <script src="js/malls.js?v=2"></script>
 <script src="js/rally-mass.js?v=3"></script>
-<script src="js/cortege.js?v=7"></script>
+<script src="js/cortege.js?v=8"></script>
 <script src="js/patrols.js?v=4"></script>
 <script src="js/visits.js?v=5"></script>

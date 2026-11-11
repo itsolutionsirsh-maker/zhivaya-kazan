@@ -89,7 +89,9 @@ async function npcThink(w,extra){const base=w.isInterior&&interior?interior.ret:
   const turns=mem.map((m,i)=>i===mem.length-1?{role:'user',content:sys+'\n\nРеплика собеседника: '+m.content}:m);
   const res=await sampleFn.json(turns,{cache:false,modelTier:'quick'});
   const action=['follow','go','stop'].includes(res&&res.action)||(res&&res.action==='home'&&typeof guestHomeOk==='function'&&guestHomeOk(w))?res.action:'none';
-  return {reply:String((res&&res.reply)||'').trim()||'…',action,place:String((res&&res.place)||'').slice(0,80)};}
+  let reply=String((res&&res.reply)||'').trim()||'…';
+  if(typeof tooMuchTatar==='function'&&tooMuchTatar(reply)){try{const fix=await sampleFn.json([{role:'user',content:'Перепиши реплику целиком по-русски. Смысл сохрани. Татарских слов не больше одного, и только короткое: рәхмәт, айда, яхшы, эчпочмак. Татарских предложений нельзя.\nРеплика: '+reply+'\nJSON: {"reply":"..."}'}],{cache:false,modelTier:'quick'});const n=String((fix&&fix.reply)||'').trim();reply=n&&!tooMuchTatar(n)?n:'Скажу проще: я тебя понял.';}catch(e){reply='Скажу проще: я тебя понял.';}}
+  return {reply,action,place:String((res&&res.place)||'').slice(0,80)};}
 function scriptedThink(w,text){const t=norm(text);if(/(пойд[её]м|идем|пошли|айда|проводи|покажи дорогу|давай со мной|за мной)/.test(t))return {reply:pick(['Пойдём, мне как раз по пути!','Давай, веди!','Айда!']),action:'follow',place:''};
   if(/(пока|до свидания|сау бул|мне пора)/.test(t))return {reply:'Сау бул! Ещё увидимся.',action:'stop',place:''};return null;}
 function playerAskedHome(w){const mem=(w.p&&w.p.memory)||[];let t='';for(let i=mem.length-1;i>=0;i--)if(mem[i].role==='user'){t=norm(mem[i].content);break;}

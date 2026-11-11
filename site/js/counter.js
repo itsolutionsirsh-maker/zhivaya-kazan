@@ -313,7 +313,7 @@ function counterOnOpen(w){
   const place=counterStaff(w);
   if(!place){const bar=document.getElementById('chatOffers');if(bar){bar.hidden=true;bar.innerHTML='';}return;}
   counterButtons(w);
-  const lbl=document.getElementById('brainLbl');if(lbl)lbl.textContent='на смене: услуга и оплата сразу';
+  const lbl=document.getElementById('brainLbl');if(lbl){lbl.hidden=false;lbl.textContent='на смене: услуга и оплата сразу';}
   const greeted=(w.p.memory||[]).some(m=>m.counter);
   if(!greeted){
     const line=counterPitch(w,place,counterOffers(place),'привет');

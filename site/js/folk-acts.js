@@ -42,7 +42,7 @@ function faCanStart(){return scene==='city'&&!player.busy&&!player.vehicle&&!pla
 // реплика: ИИ в его манере под ситуацию, без ИИ — своя фраза или запасная
 async function faLine(w,situation,fallback){const f=faFolkOf(w);
   if(typeof sampleFn==='function'&&sampleFn&&sampleFn.json){try{const ctx=contextForNpc(w).replace(' Отвечай на реплику ниже.','');
-      const r=await Promise.race([sampleFn.json([{role:'user',content:`${ctx}\nСитуация: ${situation}\nСкажи одну короткую реплику (до 15 слов) в своей манере, обращаясь к собеседнику. Без мата, без политики. Ответ — JSON {"reply":"..."}.`}]),new Promise((_,j)=>setTimeout(()=>j('timeout'),4500))]);
+      const r=await Promise.race([sampleFn.json([{role:'user',content:`${ctx}\nСитуация: ${situation}\nСкажи одну короткую реплику (до 15 слов) по-русски. Татарских слов не больше одного. Без мата, без политики. Ответ — JSON {"reply":"..."}.`}]),new Promise((_,j)=>setTimeout(()=>j('timeout'),4500))]);
       const t=r&&typeof r.reply==='string'?r.reply.trim().slice(0,160):'';if(t)return t;}catch(e){}}
   return fallback||(f&&f.lines?pick(f.lines):'Здравствуйте!');}
 function faSay(s,situation,fallback){const w=s.w;const fb=fallback||pick(w.p.lines||['Здравствуйте!']);say(w,fb,6);
