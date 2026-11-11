@@ -2,14 +2,14 @@
 // Компания за столом: общий кадр из фото тех, кто сидит рядом.
 const FACE_BANDS={
   f:[
-    ['gen-f1','gen-f2','gen-f3','gen-f4','gen-f5','f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/veronika','color/yulduz','color/zaynab','color/sufiya','core/alsu','core/fidania','core/gulnara','core/zulfiya'],
-    ['gen-f4','gen-f6','f-36','f-44','color/camilla','color/sufiya','core/gulnara'],
-    ['gen-f6','gen-f7','f-44']
+    ['gen-f1','gen-f2','gen-f3','gen-f4','gen-f5','gen-f8','gen-f9','gen-f10','gen-f11','gen-f12','gen-f13','gen-f14','gen-f15','gen-f20','gen-f21','gen-f22','gen-f23','gen-f24','gen-f25','f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/veronika','color/yulduz','color/zaynab','color/sufiya','core/alsu','core/fidania','core/gulnara','core/zulfiya'],
+    ['gen-f4','gen-f6','gen-f16','gen-f17','gen-f26','gen-f27','f-36','f-44','color/camilla','color/sufiya','core/gulnara'],
+    ['gen-f6','gen-f7','gen-f18','gen-f19','f-44']
   ],
   m:[
-    ['gen-m1','gen-m2','gen-m3','m-23','m-29','color/mark','color/timur','color/iskander','color/nail','color/farhad','color/gleb','color/edgar','color/hakim','core/ildar','core/lenar','core/marat','core/rinat'],
-    ['gen-m3','gen-m4','m-37','m-46','color/robert','color/iskander','core/marat'],
-    ['gen-m4','gen-m5','m-46']
+    ['gen-m1','gen-m2','gen-m3','gen-m6','gen-m7','gen-m8','gen-m9','gen-m10','gen-m14','gen-m15','gen-m16','gen-m17','m-23','m-29','color/mark','color/timur','color/iskander','color/nail','color/farhad','color/gleb','color/edgar','color/hakim','core/ildar','core/lenar','core/marat','core/rinat'],
+    ['gen-m3','gen-m4','gen-m11','gen-m12','gen-m18','m-37','m-46','color/robert','color/iskander','core/marat'],
+    ['gen-m4','gen-m5','gen-m13','gen-m19','m-46']
   ]
 };
 const faceImg={};
