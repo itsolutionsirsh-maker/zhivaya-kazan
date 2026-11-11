@@ -216,8 +216,10 @@ function placeChatLook(){const box=$('#chatModal')&&$('#chatModal').querySelecto
 function appendMsg(cls,text){const log=$('#chatLog');const d=document.createElement('div');d.className='m '+cls;d.textContent=text;log.append(d);log.scrollTop=log.scrollHeight;return d;}
 async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text||chatBusy||!chatNpc)return;inp.value='';const w=chatNpc;appendMsg('me',text);w.p.memory.push({role:'user',content:text});chatBusy=true;let reply=null;
   let act=null;
-  if(sampleFn){const bubble=appendMsg('npc','…');try{const r=await npcThink(w);reply=r.reply;bubble.textContent=reply;act=r;}catch(e){bubble.remove();if(e&&e.code==='not_granted')sampleFn=null;}}
-  if(!reply){const s=scriptedThink(w,text);reply=s?s.reply:pick(w.p.lines||SCRIPTED[w.role]||SCRIPTED.resident);act=s;await new Promise(r=>setTimeout(r,400));appendMsg('npc',reply);}
+  const local=typeof scriptedThink==='function'?scriptedThink(w,text):null;
+  if(local&&local.sure){reply=local.reply;act=local;await new Promise(r=>setTimeout(r,220));appendMsg('npc',reply);}
+  if(sampleFn&&!(local&&local.sure)){const bubble=appendMsg('npc','…');try{const r=await npcThink(w);reply=r.reply;bubble.textContent=reply;act=r;}catch(e){bubble.remove();if(e&&e.code==='not_granted')sampleFn=null;}}
+  if(!reply){reply=(local&&local.reply)||'Повтори, я не уловил. Куда идём или о чём речь?';act=local||{action:'none',place:''};await new Promise(r=>setTimeout(r,280));appendMsg('npc',reply);}
   if(act){const note=applyNpcAction(w,act);if(note)appendMsg('sys',note);}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);if(typeof noteHomeOffer==='function')noteHomeOffer(w,reply,act);chatBusy=false;}
 function contextForNpc(w){let place;if(w.isInterior&&interior)place=`внутри «${interior.name}» (${KIND_RU[interior.kind]||'помещение'})`;else{const near=world.pois.filter(p=>p.n&&dist(p.x,p.y,w.x,w.y)<80).slice(0,4).map(p=>p.n).join(', ');const road=nearestRoadName(w.x,w.y);place=`${road?'на улице '+road:'в центре'}${near?', рядом: '+near:''}`;}

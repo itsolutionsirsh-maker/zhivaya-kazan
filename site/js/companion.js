@@ -85,6 +85,7 @@ async function npcThink(w,extra){const base=w.isInterior&&interior?interior.ret:
   const sys=contextForNpc(w)+companionContext(w)+`\nМеста рядом (называй только их, точными названиями): ${placesText(base.x,base.y)}.`+(extra?'\n'+extra:'')+
     (typeof guestHomeHint==='function'?guestHomeHint(w):'')+
     '\nОтветь ТОЛЬКО JSON без пояснений: {"reply":"твоя живая реплика, 1–2 предложения","action":"none|follow|go|stop'+(typeof guestHomeOk==='function'&&guestHomeOk(w)?'|home':'')+'","place":"точное название места из списка или пустая строка"}.'+
+    ' Отвечай именно на последнюю реплику и на то, о чём уже договорились. Не меняй тему. Если спросили «куда» — назови место из договорённости или из списка рядом. Если звали пить пиво, кофе или есть — согласись или откажись и назови конкретное место из списка. Не говори про пробки, автобусы и салют, если об этом не спросили.'+
     ' action=go — вы только что договорились вместе пойти в конкретное место из списка (ты идёшь рядом и показываешь дорогу); follow — ты согласился пойти с собеседником, куда он поведёт, в том числе к нему домой; stop — ты прощаешься или больше не идёшь вместе; home — только если ТЫ зовёшь собеседника к себе, не наоборот. Соглашайся, только если это в твоём характере и у тебя есть время.';
   const turns=mem.map((m,i)=>i===mem.length-1?{role:'user',content:sys+'\n\nРеплика собеседника: '+m.content}:m);
   const res=await sampleFn.json(turns,{cache:false,modelTier:'quick'});
@@ -92,8 +93,46 @@ async function npcThink(w,extra){const base=w.isInterior&&interior?interior.ret:
   let reply=String((res&&res.reply)||'').trim()||'…';
   if(typeof tooMuchTatar==='function'&&tooMuchTatar(reply)){try{const fix=await sampleFn.json([{role:'user',content:'Перепиши реплику целиком по-русски. Смысл сохрани. Татарских слов не больше одного, и только короткое: рәхмәт, айда, яхшы, эчпочмак. Татарских предложений нельзя.\nРеплика: '+reply+'\nJSON: {"reply":"..."}'}],{cache:false,modelTier:'quick'});const n=String((fix&&fix.reply)||'').trim();reply=n&&!tooMuchTatar(n)?n:'Скажу проще: я тебя понял.';}catch(e){reply='Скажу проще: я тебя понял.';}}
   return {reply,action,place:String((res&&res.place)||'').slice(0,80)};}
-function scriptedThink(w,text){const t=norm(text);if(/(пойд[её]м|идем|пошли|айда|проводи|покажи дорогу|давай со мной|за мной)/.test(t))return {reply:pick(['Пойдём, мне как раз по пути!','Давай, веди!','Айда!']),action:'follow',place:''};
-  if(/(пока|до свидания|сау бул|мне пора)/.test(t))return {reply:'Сау бул! Ещё увидимся.',action:'stop',place:''};return null;}
+function talkBlob(w){return norm(((w&&w.p&&w.p.memory)||[]).slice(-8).map(m=>m.content).join(' '));}
+function spotKind(w,kinds){const base=w&&w.isInterior&&typeof interior!=='undefined'&&interior&&interior.ret?interior.ret:{x:(w&&w.x)||player.x,y:(w&&w.y)||player.y};
+  if(typeof placesNear!=='function')return null;return placesNear(base.x,base.y,1600,50).find(p=>kinds.includes(p.t))||null;}
+function sheOf(w){return !!(w&&w.p&&w.p.female);}
+function beerAsk(t){return /пив|пивк|бухн|бар/.test(t);}
+function cafeAsk(t){return /кофе|кафе|чай(?!к)/.test(t);}
+function foodAsk(t){return /поесть|поешь|поешь|перекус|обед|ужин|шаурм|эчпочмак|голод/.test(t);}
+function whereAsk(t){return /(^| )(куда|где)( |$)|в какое место|какое место|адрес/.test(t);}
+function inviteAsk(t){return /пошл|пойд|идем|айда|давай|зайдем|зайдём|сходим|поехали|за мной|со мной/.test(t);}
+function goSpot(w,place,why){if(!place)return null;const she=sheOf(w);return {reply:why+` Ближе всего «${place.n}». ${she?'Иду туда с тобой':'Иду туда с тобой'}.`,action:'go',place:place.n,sure:true};}
+function beerPlan(w){if(w.p&&w.p.age<18)return {reply:'Пиво мне рано. Если хочешь — пошли в кафе, там чай.',action:'none',place:'',sure:true};
+  if(/police|guard/.test(w.role||''))return {reply:'Я на службе, в бар отойти не могу.',action:'none',place:'',sure:true};
+  const bar=spotKind(w,['bar'])||spotKind(w,['cafe']);
+  if(!bar)return {reply:'По пиву я не против, но бара рядом не вижу. Назови место — и пойду.',action:'follow',place:'',sure:true};
+  return goSpot(w,bar,'По пиву — да.');}
+function cafePlan(w){const c=spotKind(w,['cafe'])||spotKind(w,['bar']);if(!c)return {reply:'Кафе рядом не вижу. Назови, какое — провожу.',action:'follow',place:'',sure:true};return goSpot(w,c,'Кофе — можно.');}
+function foodPlan(w){const c=spotKind(w,['cafe'])||spotKind(w,['bar'])||spotKind(w,['market']);if(!c)return {reply:'Поесть я не против, но заведения рядом не вижу. Куда пойдём?',action:'none',place:'',sure:true};return goSpot(w,c,'Поесть — давай.');}
+function answerWhere(w,t){const blob=talkBlob(w)+' '+t;
+  if(beerAsk(blob))return beerPlan(w);
+  if(cafeAsk(blob))return cafePlan(w);
+  if(foodAsk(blob))return foodPlan(w);
+  if(/домой|ко мне/.test(blob))return {reply:player.home?'Домой — так домой. Веди, я с тобой.':'Домой можно, только сначала покажи, где твой дом.',action:'follow',place:'',sure:true};
+  if(typeof companion!=='undefined'&&companion&&companion.w&&(companion.w===w||companion.w===w.companionOf)&&companion.dest&&companion.dest.n)return {reply:'Мы идём в «'+companion.dest.n+'».',action:'none',place:'',sure:true};
+  return {reply:'Куда именно? Скажи: бар, кафе, Кремль — и я отвечу, иду или нет.',action:'none',place:'',sure:true};}
+function scriptedThink(w,text){const t=norm(text);if(!t)return null;const she=sheOf(w);const name=w.p&&w.p.name||'я';
+  if(/(пока|до свидания|мне пора|бывай|прощай)/.test(t))return {reply:'Пока. Ещё увидимся.',action:'stop',place:'',sure:true};
+  if(whereAsk(t))return answerWhere(w,t);
+  if(beerAsk(t)&&(inviteAsk(t)||/хочу|давай|можно|по пив/.test(t)||t.length<40))return beerPlan(w);
+  if(cafeAsk(t)&&inviteAsk(t))return cafePlan(w);
+  if(foodAsk(t)&&(inviteAsk(t)||/хочу|давай|можно/.test(t)))return foodPlan(w);
+  if(inviteAsk(t))return {reply:'Иду. Только скажи куда — сам не угадаю.',action:'follow',place:'',sure:true};
+  if(/^(привет|здравств|здорово|салам|исенме|добрый|доброе|хай)( |$)/.test(t))return {reply:'Привет. Я '+name+', '+((w.p&&w.p.job)||'живу тут')+'.',action:'none',place:'',sure:true};
+  if(/как дела|как ты|как сам|как сама|как жизнь|как настроен/.test(t))return {reply:'Нормально, настроение '+(w.p&&w.p.mood||'ровное')+'. А у тебя?',action:'none',place:'',sure:true};
+  if(/как зовут|кто ты|ты кто|чем занима|кем работ|где учиш|студент/.test(t))return {reply:'Я '+name+', '+((w.p&&w.p.age)?w.p.age+' лет, ':'')+((w.p&&w.p.job)||'местный')+'.',action:'none',place:'',sure:true};
+  if(/спасибо|благодар|рахмат|рәхмәт/.test(t))return {reply:'Не за что.',action:'none',place:'',sure:true};
+  if(/погод|дожд|снег|холодн|жаркий|тепло/.test(t))return {reply:'Сейчас '+(typeof weatherText==='function'?weatherText():'как обычно')+'.',action:'none',place:'',sure:true};
+  if(/^(да|ок|окей|хорошо|ладно|го|ага|угу|конечно)$/.test(t)){const blob=talkBlob(w);if(beerAsk(blob))return beerPlan(w);if(cafeAsk(blob))return cafePlan(w);if(foodAsk(blob))return foodPlan(w);return {reply:'Хорошо. Куда тогда?',action:'none',place:'',sure:true};}
+  if(/почему|зачем/.test(t))return {reply:'Про что именно? Если про дорогу — скажи, куда идём.',action:'none',place:'',sure:true};
+  if(/^(что|как|когда|кто|сколько|зачем|почему)( |$)/.test(t)||/\?/.test(String(text)))return {reply:'Уточни вопрос: куда идём, как дела или кто я. Так я отвечу по делу, а не мимо.',action:'none',place:'',sure:false};
+  return {reply:'Слышу. Если зовёшь куда-то — скажи куда. Если просто разговор — я на связи.',action:'none',place:'',sure:false};}
 function playerAskedHome(w){const mem=(w.p&&w.p.memory)||[];let t='';for(let i=mem.length-1;i>=0;i--)if(mem[i].role==='user'){t=norm(mem[i].content);break;}
   return /(ко мне|к себе домой|ко мне домой|домой ко мне|заходи ко мне|пошли ко мне|пойд[её]м ко мне|идем ко мне|идём ко мне|пошли домой|идем домой|идём домой|ко мне в гости|в гости ко мне|у меня дома)/.test(t);}
 function homeBlob(w){return norm(((w&&w.p&&w.p.memory)||[]).slice(-8).map(m=>m.content).join(' '));}

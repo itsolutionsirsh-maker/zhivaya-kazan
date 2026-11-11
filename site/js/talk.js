@@ -14,8 +14,11 @@ async function npcReply(w,txt){if(!w.isInterior&&!w.companion){w.state='idle';w.
   w.p.memory.push({role:'user',content:txt});let reply=null;
   // ИИ отвечает, только если к жителю обратились (по имени или вопросом) — иначе короткая фраза по сценарию: так дешевле
   const asked=new RegExp(w.p.name,'i').test(txt)||/\?/.test(txt)||Math.random()<0.25;
-  let act=null;if(sampleFn&&asked){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов).');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
-  if(!reply){act=scriptedThink(w,txt);reply=act?act.reply:pick(w.p.lines||SCRIPTED[w.role]||SCRIPTED.resident);}
+  const local=typeof scriptedThink==='function'?scriptedThink(w,txt):null;
+  let act=null;
+  if(local&&local.sure){reply=local.reply;act=local;}
+  else if(sampleFn&&asked){w.say={t:'…',ttl:20};try{act=await npcThink(w,'Собеседник сказал это вслух на улице — ответь одной короткой фразой (до 12 слов) именно на его слова. Не меняй тему.');reply=act.reply.replace(/^["«]|["»]$/g,'');}catch(e){if(e&&e.code==='not_granted')sampleFn=null;}}
+  if(!reply){reply=(local&&local.reply)||pick(w.p.lines||SCRIPTED[w.role]||SCRIPTED.resident);act=act||local;}
   if(act){const note=applyNpcAction(w,act);if(note){addEvent(note,'say');nearLine('·',note,false);}}
   w.p.memory.push({role:'assistant',content:reply});if(w.p.memory.length>16)w.p.memory.splice(0,w.p.memory.length-16);
   w.say={t:reply.length>90?reply.slice(0,88)+'…':reply,ttl:7};nearLine(w.p.name,reply,false);}
