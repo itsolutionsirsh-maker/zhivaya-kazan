@@ -158,9 +158,11 @@ function updateTransport(dt){const p=player.busPlan;
   if(p&&p.stage==='walk'&&!player.bus&&!player.vehicle&&!player.inside&&dist(player.x,player.y,p.stopPt[0],p.stopPt[1])<7){p.stage='wait';player.waypoints=null;player.waitingStop={x:p.stopPt[0],y:p.stopPt[1],n:p.fromName};setHint(`Ждём ${busWord(p.route.type).toLowerCase()} ${p.route.ref} на «${p.fromName}»`);updateTripBox();}
   if(p&&p.stage==='wait'&&player.bus){p.stage='ride';updateTripBox();}
   if(taxiCall){taxiCall.t+=dt;const c=taxiCall.car;if(!c||c.crashed||c.remove||(taxiCall.state==='coming'&&taxiCall.t>150)){addEvent('Таксист не смог подъехать — вызовите ещё раз');cancelTrip(true);}
-    else if(taxiCall.state==='here'&&taxiCall.t-(taxiCall.tryT||0)>1.5){taxiCall.tryT=taxiCall.t;boardTaxi(true);}
-    else if(taxiCall.state==='coming'){const d=dist(c.x,c.y,player.x,player.y);if(taxiCall.mark==null||d<taxiCall.mark-12){taxiCall.mark=d;taxiCall.markT=taxiCall.t;}
-      if(taxiCall.t-(taxiCall.markT||0)>5){const pickup=c.target!=null&&c.target>=0?c.target:nearestNode(player.x,player.y,world.carAdj,200);taxiSend(c,pickup);taxiCall.mark=dist(c.x,c.y,player.x,player.y);taxiCall.markT=taxiCall.t;}}}
+    else if(taxiCall.state==='here'){c.speed=0;c.path=null;c.state='scene';if(taxiCall.t-(taxiCall.tryT||0)>1.2){taxiCall.tryT=taxiCall.t;boardTaxi(true);}}
+    else if(taxiCall.state==='coming'){const d=dist(c.x,c.y,player.x,player.y);
+      if(d<24){c.speed=0;c.path=null;c.state='scene';c.target=null;taxiCall.state='here';taxiCall.tryT=taxiCall.t;boardTaxi(true);}
+      else{if(taxiCall.mark==null||d<taxiCall.mark-12){taxiCall.mark=d;taxiCall.markT=taxiCall.t;}
+      if(d>36&&taxiCall.t-(taxiCall.markT||0)>5){const pickup=c.target!=null&&c.target>=0?c.target:nearestNode(player.x,player.y,world.carAdj,200);taxiSend(c,pickup);taxiCall.mark=dist(c.x,c.y,player.x,player.y);taxiCall.markT=taxiCall.t;}}}}
   tripTimer-=dt;if(tripTimer<=0){tripTimer=0.5;journeyTick();navTick();updateTripBox();}}
 let tripTimer=0;
 // ---------- пешком на автопилоте: идёт сам; джойстик или WASD — пауза, идёте сами; «Продолжить» — снова ведёт ----------
@@ -179,7 +181,7 @@ function updateTripBox(){const b=$('#tripBox');let t=null;const p=player.busPlan
   if(taxiCall&&taxiCall.car){const d=dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y),where=taxiRideWhere(taxiCall.dest);
     t=taxiCall.state==='here'
       ?`🚕 Такси на месте. Садимся и едем ${where}`
-      :`🚕 Ваше такси едет к вам · ${fmtDist(d)} · ${taxiEta(d)}. Как подъедет — сядете сами и поедете ${where}`;}
+      :`🚕 Ваше такси едет к вам · ${fmtDist(d)} · ${taxiEta(d)}. Как подъедет, сядете сами и поедете ${where}`;}
   else if(player.vehicle&&player.vehicle.kind==='taxi'){const where=taxiRideWhere(player.vehicle.dest);t=`🚕 Уже едем ${where} · осталось ${fmtDist(dist(player.x,player.y,player.vehicle.dest.x,player.vehicle.dest.y))}. Само довезёт`;}
   else if(player.navDest)t=player.navPaused?`🚶 Пауза: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`:`🚶 Идём: ${player.navDest.n} · ${fmtDist(dist(player.x,player.y,player.navDest.x,player.navDest.y))}`;
   else if(p)t=p.stage==='walk'?`🚌 Идём к остановке «${p.fromName}» (${p.route.ref})`:p.stage==='wait'?`🚌 Ждём ${p.route.ref} на «${p.fromName}»`:`🚌 ${p.route.ref} · выходим на «${p.toName}»`;

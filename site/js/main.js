@@ -108,7 +108,7 @@ function findAction(){
   if(taxiCall&&taxiCall.state==='here'&&dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y)<9)return actTarget({label:`Сесть в такси и ехать ${typeof taxiRideWhere==='function'?taxiRideWhere(taxiCall.dest):'по адресу'}`,run:boardTaxi},taxiCall.car,'taxi');
   if(taxiCall&&taxiCall.car&&!player.vehicle){const d=dist(taxiCall.car.x,taxiCall.car.y,player.x,player.y),where=typeof taxiRideWhere==='function'?taxiRideWhere(taxiCall.dest):'по адресу';
     if(taxiCall.state==='here')return {label:`Такси ждёт в ${fmtDist(d)}. Подойдите и нажмите E — поедете ${where}`,run:()=>setHint('Жёлтая метка — ваше такси. Подойдите и нажмите E')};
-    return {label:`Ждём ваше такси · ${typeof taxiEta==='function'?taxiEta(d):''} · ${fmtDist(d)}. Потом E — сесть и ехать ${where}`,run:()=>setHint('Сразу не уедет. Машина подъедет сама, тогда нажмите E')};}
+    return {label:`Ждём ваше такси · ${typeof taxiEta==='function'?taxiEta(d):''} · ${fmtDist(d)}. Как подъедет, сядете сами и поедете ${where}`,run:()=>setHint('Машина остановится рядом и вы сядете сами')};}
   if(player.vehicle){const v=player.vehicle;if(v.damaged>0)return {label:`Ждём ГИБДД… ${Math.ceil(v.damaged)} с`,run:()=>{}};
     if(v.kind==='own'&&v.speed<1&&typeof ECON!=='undefined'&&ECON.carCond<95&&world.pois.some(p=>p.t==='fuel'&&dist(p.x,p.y,v.x,v.y)<18))return repairAction(false);
     if(v.kind==='own'&&player.home&&dist(player.home.cx,player.home.cy,v.x,v.y)<40)return {label:'Припарковать у дома и выйти',run:exitVehicle};
