@@ -18,7 +18,7 @@ function dressForRoom(p,kind,o){
   }
   const f=student||pupil?(roomTone++%2)===0:Math.random()<0.5;
   p.female=f;p.name=pick(f?ROOM_F:ROOM_M);
-  p.age=pupil?Math.floor(rnd(16,18)):student?Math.floor(rnd(18,24)):Math.floor(rnd(32,55));
+  p.age=pupil?Math.floor(rnd(16,19)):student?Math.floor(rnd(18,24)):Math.floor(rnd(32,55));
   p.job=pupil?(f?'школьница':'школьник'):student?(f?'студентка':'студент'):(kind==='school'?(f?'учительница':'учитель'):(f?'преподавательница':'преподаватель'));
   p.hairStyle=f?1:(p.age>50&&Math.random()<0.25?3:0);
   p.hair=pick(['#2B1B12','#4A2E1C','#1A1A1A','#6B4A2E','#C9A86A','#8C4A32']);
