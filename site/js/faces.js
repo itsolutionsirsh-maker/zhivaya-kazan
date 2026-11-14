@@ -3,13 +3,13 @@
 const FACE_BANDS={
   f:[
     ['gen-f1','gen-f2','gen-f3','gen-f5','gen-f8','gen-f9','gen-f10','gen-f11','gen-f12','gen-f13','gen-f14','gen-f15','gen-f20','gen-f21','gen-f22','gen-f23','gen-f24','gen-f25','f-23','f-27','color/aliya','color/diana','color/leisan','color/camilla','color/mila','color/sofa','color/yulduz','color/zaynab','core/alsu'],
-    ['gen-f4','gen-f6','gen-f16','gen-f17','gen-f26','f-36','f-44','color/sufiya','color/veronika','core/gulnara','core/zulfiya'],
-    ['f-58','f-70','gen-f7','gen-f18','gen-f19','gen-f27','core/fidania']
+    ['gen-f4','gen-f6','gen-f16','f-36','f-44','color/veronika','core/gulnara','core/zulfiya'],
+    ['f-58','f-70','gen-f7','gen-f17','gen-f18','gen-f19','gen-f26','gen-f27','color/sufiya','core/fidania']
   ],
   m:[
     ['gen-m1','gen-m2','gen-m3','gen-m6','gen-m7','gen-m8','gen-m9','gen-m10','gen-m14','gen-m15','gen-m16','gen-m17','m-23','m-29','color/mark','color/timur','color/nail','color/gleb','core/ildar','core/lenar'],
-    ['gen-m4','gen-m5','gen-m11','gen-m12','gen-m18','m-37','m-46','color/farhad','color/hakim','color/iskander','color/robert','core/rinat','taxi-driver'],
-    ['gen-m13','gen-m19','m-60','m-72','color/edgar','color/pavel','core/marat']
+    ['gen-m4','gen-m5','gen-m11','gen-m12','m-37','m-46','color/farhad','color/hakim','color/iskander','color/robert','core/rinat','taxi-driver'],
+    ['gen-m13','gen-m18','gen-m19','m-60','m-72','color/edgar','color/pavel','core/marat']
   ]
 };
 const faceImg={};
@@ -23,8 +23,8 @@ function npcFaceId(p){if(!p)return null;const g=p.female?'f':'m';
   const teen=/школь/.test(String(p.job||''));
   const band=teen?FACE_TEENS[g]:FACE_BANDS[g][faceBand(p.age)];
   return band[faceHash((p.name||'')+'|'+g)%band.length];}
-const FACE_OLD=/fidania|\/f-58|\/f-70|gen-f7|gen-f18|gen-f19|gen-f27|\/pavel|\/edgar|\/marat|\/m-60|\/m-72|gen-m13|gen-m19/;
-function faceTooOld(url,age){return (+age||30)<45&&FACE_OLD.test(String(url||''));}
+const FACE_OLD=/sufiya|fidania|\/f-58|\/f-70|gen-f7|gen-f17|gen-f18|gen-f19|gen-f26|gen-f27|\/pavel|\/edgar|\/marat|\/m-60|\/m-72|gen-m13|gen-m18|gen-m19/;
+function faceTooOld(url,age){return (+age||30)<50&&FACE_OLD.test(String(url||''));}
 function npcFaceUrl(p){if(!p)return null;const age=+p.age||30;
   if(typeof p.photo==='string'&&p.photo&&!faceTooOld(p.photo,age))return p.photo;
   if(typeof p.look==='string'&&p.look&&!faceTooOld(p.look,age))return p.look;
